@@ -556,10 +556,15 @@ class RiderTaskCard extends StatelessWidget {
     super.key,
     required this.order,
     required this.onOpen,
+    this.onNavigate,
   });
 
   final DeliveryOrder order;
   final VoidCallback onOpen;
+
+  /// The rider tapped Navigate: this order is where they are heading, and the one their location
+  /// goes on from here — see `RiderLocationReporter.headingTo`. Null changes nothing but that.
+  final VoidCallback? onNavigate;
 
   @override
   Widget build(BuildContext context) {
@@ -651,7 +656,10 @@ class RiderTaskCard extends StatelessWidget {
                   verticalPadding: 10,
                   onPressed: order.deliveryAddress.trim().isEmpty
                       ? null
-                      : () => riderNavigateTo(context, order.deliveryAddress),
+                      : () {
+                          onNavigate?.call();
+                          riderNavigateTo(context, order.deliveryAddress);
+                        },
                 ),
               ),
               const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),

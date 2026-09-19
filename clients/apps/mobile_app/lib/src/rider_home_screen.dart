@@ -12,6 +12,7 @@ import 'rider_butler_board.dart';
 import 'rider_earnings_screen.dart';
 import 'rider_job_card.dart';
 import 'rider_location_banner.dart';
+import 'rider_location_disclosure.dart';
 import 'rider_order_detail_screen.dart';
 import 'rider_settings_widgets.dart';
 import 'settings_screen.dart';
@@ -138,7 +139,8 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> with WidgetsBindingOb
   Timer? _presenceTimer;
 
   /// The rider's real position, sent only while this screen is in the foreground and the rider
-  /// is working. See [RiderLocationReporter] for the cadence and what is never sent.
+  /// is working, on the one order whose leg they are on. See [RiderLocationReporter] for the
+  /// cadence, the active-leg rule and what is never sent.
   late final RiderLocationReporter _location = RiderLocationReporter(
     source: widget.locationSource ?? const DeviceRiderLocationSource(),
     pingOrder: (String orderId, RiderFix fix) => widget.api.ping(
@@ -156,7 +158,18 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> with WidgetsBindingOb
               accuracyM: fix.accuracyM,
               recordedAt: fix.takenAt,
             ),
+    explainBeforeAsking: _explainBeforeAsking,
   );
+
+  /// Before the phone's own location prompt: who will see the rider's location, when, and for
+  /// how long. The prompt shows only if the rider goes on.
+  Future<bool> _explainBeforeAsking() async {
+    if (!mounted) return false;
+    // Never mid-build: the first check can land before the screen's first frame is drawn.
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return false;
+    return showRiderLocationDisclosure(context);
+  }
 
   /// The reporter's last status, to notice the moment sharing starts.
   RiderLocationStatus _locationStatus = RiderLocationStatus.idle;
@@ -182,9 +195,9 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> with WidgetsBindingOb
 
   /// Where the mini-map's camera was placed, kept for the life of the tab.
   ///
-  /// The camera is set once, from the first fix the platform reports. Every ping after that moves
-  /// the marker and leaves the view alone — a map that re-centres itself every ten seconds cannot
-  /// be looked at, because it snaps back the moment the rider drags it.
+  /// The camera is set once, from the phone's first usable reading. Every reading after that
+  /// moves the marker and leaves the view alone — a map that re-centres itself every ten seconds
+  /// cannot be looked at, because it snaps back the moment the rider drags it.
   LatLng? _mapAnchor;
 
   /// Tiles that came back refused, and whether the map has given up on them.
@@ -226,20 +239,30 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> with WidgetsBindingOb
         status == RiderLocationStatus.sharing && _locationStatus != RiderLocationStatus.sharing;
     _locationStatus = status;
     if (!mounted) return;
-    setState(() {});
-    // The platform has a fix now: re-read presence at once, so the mini-map anchors and a STALE
-    // badge clears without waiting for the next poll.
+    setState(() {
+      // The phone's first usable reading places the mini-map's camera.
+      final RiderFix? fix = _location.lastFix;
+      _mapAnchor ??= fix == null ? null : LatLng(fix.latitude, fix.longitude);
+    });
+    // The platform has a fix now: re-read presence at once, so a STALE badge clears without
+    // waiting for the next poll.
     if (startedSharing) unawaited(_loadPresence());
   }
 
-  /// Tells the reporter what the rider is doing. The order ids are the claimed READY and
-  /// PICKED_UP ones — every order a customer may be watching a map for.
+  /// Tells the reporter what the rider is doing: on duty or not, and the claimed READY and
+  /// PICKED_UP orders — every order a customer may be watching a map for — with where each one
+  /// ends, which is what decides the order the rider's location goes on.
   void _syncLocationDemand() {
     _location.setDemand(
       onDuty: _presence?.dutyState == DutyState.onDuty,
-      orderIds: <String>[
+      legs: <RiderLeg>[
         for (final DeliveryOrder order in _assigned)
-          if (order.status == OrderStatus.ready || order.status == OrderStatus.pickedUp) order.id,
+          if (order.status == OrderStatus.ready || order.status == OrderStatus.pickedUp)
+            RiderLeg(
+              orderId: order.id,
+              collected: order.status == OrderStatus.pickedUp,
+              dropOff: order.deliveryAddress,
+            ),
       ],
     );
   }
@@ -298,25 +321,13 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> with WidgetsBindingOb
     try {
       final RiderPresence? presence = await tracking.myPresence();
       if (!mounted) return;
-      setState(() {
-        _presence = presence;
-        _anchorMap(presence);
-      });
+      setState(() => _presence = presence);
       // Duty can change without this app — the staleness sweep, the back office — and the
       // reporter must stop or start with it.
       _syncLocationDemand();
     } catch (_) {
       // The toggle keeps rendering the last answer; the next poll retries.
     }
-  }
-
-  /// Places the mini-map's camera the first time the platform reports a fix, and never again.
-  ///
-  /// Must be called from inside the same [setState] that stores the presence: the anchor is read
-  /// during build, so changing it outside a rebuild would leave the map keyed on a stale point.
-  void _anchorMap(RiderPresence? presence) {
-    if (_mapAnchor != null || presence == null || !presence.hasFix) return;
-    _mapAnchor = LatLng(presence.lat!, presence.lng!);
   }
 
   /// Declares duty and renders the *server's* answer — which can come back STALE when the phone
@@ -330,10 +341,7 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> with WidgetsBindingOb
       final RiderPresence result =
           await tracking.setDuty(on ? DutyState.onDuty : DutyState.offDuty);
       if (!mounted) return;
-      setState(() {
-        _presence = result;
-        _anchorMap(result);
-      });
+      setState(() => _presence = result);
       // Going on duty is when the location prompt appears, if it has not yet: in context, right
       // after the tap that makes it necessary. Off duty with nothing in hand stops sharing.
       _syncLocationDemand();
@@ -385,6 +393,8 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> with WidgetsBindingOb
       builder: (_) => RiderOrderDetailScreen(
         order: order,
         onAction: (OrderAction action) => _act(order, action),
+        // Start navigation says where the rider is heading: the order their location goes on.
+        onNavigate: () => _location.headingTo(order.id),
         trackingApi: widget.trackingApi,
         chatApi: widget.chatApi,
         socket: widget.socket,
@@ -549,22 +559,22 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> with WidgetsBindingOb
     );
   }
 
-  /// The last fix the *platform* holds for this rider, or null when it holds none.
+  /// Where the phone says the rider is: its own latest usable reading, or null before one.
   ///
-  /// Read from presence rather than from the phone's last reading on purpose. Presence carries a
-  /// fix exactly when the platform has accepted one — which is also the position a dispatcher is
-  /// looking at, so the rider and the platform are reading the same map, and a reading the
-  /// tracking service refused never shows up here as if it had been shared.
+  /// Not the last fix the platform holds. After an upgrade that is an old build's simulated
+  /// position (the London walk), and at any time it can be minutes old or one the platform has
+  /// since stopped showing anyone — a map that opened on it put a rider in Beirut in London for
+  /// the whole session. Whether customers can see the rider is the banner's job, not the map's:
+  /// "you are here" is the phone's reading, sent or not.
   LatLng? get _riderFix {
-    final RiderPresence? presence = _presence;
-    if (presence == null || !presence.hasFix) return null;
-    return LatLng(presence.lat!, presence.lng!);
+    final RiderFix? fix = _location.lastFix;
+    return fix == null ? null : LatLng(fix.latitude, fix.longitude);
   }
 
   /// The 160px `regional-mini-map`, drawn from OpenStreetMap raster tiles.
   ///
-  /// **What is on it.** The rider, at the last fix the platform holds for them. Nothing else — and
-  /// that is a data fact rather than a shortcut. An order carries no coordinates anywhere in its
+  /// **What is on it.** The rider, at the phone's own latest reading ([_riderFix]). Nothing else —
+  /// and that is a data fact rather than a shortcut. An order carries no coordinates anywhere in its
   /// contract (`OrderResponse` has an address string and no latitude or longitude), so there is no
   /// honest pin to drop for a job on the board. Inventing one from the address would need a
   /// geocoder call per order on a five-second refresh, and would put a rider's decision on a point
@@ -802,6 +812,8 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> with WidgetsBindingOb
                             child: RiderTaskCard(
                               order: order,
                               onOpen: () => _openDetail(order),
+                              // Navigate says where the rider is heading, as on the detail.
+                              onNavigate: () => _location.headingTo(order.id),
                             ),
                           ),
                     ],
@@ -934,8 +946,10 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> with WidgetsBindingOb
   ///
   /// When the rider is working and customers cannot see them, the banner says why and offers the
   /// fix. When their location is being shared and they carry orders ([sharingNote]), one quiet
-  /// line says it is shared only while the app is open — the consequence of the owner's
-  /// foreground-only rule a rider most needs to know, since switching to a navigation app stops it.
+  /// line says who sees it — the customer of the delivery, the shop until pickup, their company
+  /// while on duty, YouDrop support — and that it is shared only while the app is open, since
+  /// switching to a navigation app stops it. The whole of it, retention included, is the sheet
+  /// shown before the phone's permission prompt.
   List<Widget> _locationNotice(DeliveryStrings t, {required bool sharingNote}) {
     final RiderLocationStatus status = _location.status;
     if (status.hidesRider) {

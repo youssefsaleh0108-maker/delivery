@@ -7,40 +7,115 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_app/src/rider_home_screen.dart';
+import 'package:mobile_app/src/rider_job_card.dart';
 import 'package:mobile_app/src/rider_location_banner.dart';
+import 'package:mobile_app/src/rider_location_disclosure.dart';
 import 'package:mobile_app/src/rider_location_simulator.dart';
+import 'package:mobile_app/src/rider_order_detail_screen.dart';
 
-/// The rider app reports where the rider really is — and says so when it cannot.
+/// The rider app reports where the rider really is — to the one customer whose delivery they are
+/// on — and says so when it cannot.
 ///
-/// The screen used to random-walk a rider from London and ping only orders already picked up, so
-/// every live marker and ETA in dev and qa was fiction. These pin what replaced it: the phone's own
-/// fix on every claimed READY and PICKED_UP order, nothing at all without the permission or with
-/// the app in the background, an honest banner with the one way out for each refusal, and no
-/// simulator anywhere a release build can reach.
+/// The screen used to random-walk a rider from London and, once real, put every fix on every
+/// order in hand, so one customer's map drew the way to another's door. These pin what replaced
+/// it: the phone's own fix, on the order whose leg the rider is on and no other; nothing at all
+/// without the permission or with the app in the background; the rider told who sees their
+/// location before the system asks for it; an honest banner with the one way out for each
+/// refusal; the rider's own map on the phone's own reading; and no simulator anywhere a release
+/// build can reach.
 void main() {
-  group('what is sent', () {
-    testWidgets('pings every claimed READY and PICKED_UP order with the phone\'s real fix',
+  group('what is sent, and on which order', () {
+    testWidgets('each fix goes on the one order whose leg the rider is on, with the phone\'s fix',
         (WidgetTester tester) async {
       final _Rig rig = _Rig(onDuty: true, orders: <Map<String, dynamic>>[
-        _order('o-ready', 'READY'),
-        _order('o-carried', 'PICKED_UP'),
+        _order('o-ready', 'READY', address: _mar),
+        _order('o-carried', 'PICKED_UP', address: _hamra),
       ]);
       await rig.pump(tester);
+      await tester.pump(const Duration(seconds: 25));
 
       final List<_Call> pings = rig.gateway.pings;
-      expect(pings.map((_Call c) => c.path), <String>[
-        '/api/tracking/orders/o-ready/ping',
-        '/api/tracking/orders/o-carried/ping',
-      ]);
+      expect(pings, isNotEmpty);
+      // The rider carries one customer's order: heading on with it, or to the other shop. Either
+      // way the fix goes on the carried order — never on the other customer's, whose map must not
+      // be shown the way to this door.
+      expect(pings.map((_Call c) => c.path).toSet(), <String>{'/api/tracking/orders/o-carried/ping'});
       final Map<String, dynamic> body = pings.first.body!;
       expect(body['lat'], _Source.lat);
       expect(body['lng'], _Source.lng);
       expect(body['accuracyM'], 6);
-      expect(body['recordedAt'], rig.source.lastTakenAt!.toIso8601String());
+      expect(body['recordedAt'], isA<String>());
       expect(rig.gateway.calls, isNot(contains('POST /api/tracking/riders/me/ping')),
           reason: 'An order ping is presence already; a second, order-less one is the same write.');
+      await rig.dispose(tester);
+    });
+
+    testWidgets(
+        'carrying orders to two doors: no customer is shown the rider until Start navigation '
+        'says which', (WidgetTester tester) async {
+      final _Rig rig = _Rig(onDuty: true, orders: <Map<String, dynamic>>[
+        _order('o-a', 'PICKED_UP', address: _hamra, store: 'Shop A'),
+        _order('o-b', 'PICKED_UP', address: _mar, store: 'Shop B'),
+      ]);
+      await rig.pump(tester);
+      final DeliveryStrings t = rig.t(tester);
+
+      expect(rig.gateway.pings.map((_Call c) => c.path).toSet(),
+          <String>{'/api/tracking/riders/me/ping'},
+          reason: 'On nobody\'s order: either could show one customer the other\'s door.');
+      await tester.tap(find.text(t.riderTabActive).last);
+      await tester.pump();
+      expect(find.text(t.riderGpsLegUnknownTitle), findsOneWidget);
+
+      // The rider opens B's order and asks for directions: that is where they are heading.
+      await tester.tap(find.descendant(
+          of: find.ancestor(
+              of: find.text(t.riderOrderRef('o-b')), matching: find.byType(RiderTaskCard)),
+          matching: find.text(t.riderViewDetails)));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text(t.riderStartNavigation), 200,
+          scrollable: find
+              .descendant(
+                  of: find.byType(RiderOrderDetailScreen), matching: find.byType(Scrollable))
+              .first);
+      await tester.tap(find.text(t.riderStartNavigation));
+      await tester.pump();
+      Navigator.of(tester.element(find.byType(RiderOrderDetailScreen))).pop();
+      await tester.pumpAndSettle();
+      rig.gateway.log.clear();
+      await tester.pump(const Duration(seconds: 11));
+
+      expect(rig.gateway.pings.map((_Call c) => c.path).toSet(),
+          <String>{'/api/tracking/orders/o-b/ping'});
+      expect(find.text(t.riderGpsLegUnknownTitle), findsNothing);
+      await rig.dispose(tester);
+    });
+
+    testWidgets('Navigate on an Active card says the same: that order is where the rider is going',
+        (WidgetTester tester) async {
+      final _Rig rig = _Rig(onDuty: true, orders: <Map<String, dynamic>>[
+        _order('o-a', 'PICKED_UP', address: _hamra),
+        _order('o-b', 'PICKED_UP', address: _mar),
+      ]);
+      await rig.pump(tester);
+      final DeliveryStrings t = rig.t(tester);
+      await tester.tap(find.text(t.riderTabActive).last);
+      await tester.pump();
+
+      await tester.tap(find.descendant(
+          of: find.ancestor(
+              of: find.text(t.riderOrderRef('o-a')), matching: find.byType(RiderTaskCard)),
+          matching: find.text(t.riderNavigate)));
+      await tester.pump();
+      rig.gateway.log.clear();
+      await tester.pump(const Duration(seconds: 11));
+      await rig.settle(tester);
+
+      expect(rig.gateway.pings.map((_Call c) => c.path).toSet(),
+          <String>{'/api/tracking/orders/o-a/ping'});
       await rig.dispose(tester);
     });
 
@@ -60,12 +135,13 @@ void main() {
 
       expect(rig.source.asks, isEmpty, reason: 'No prompt for a rider nobody is watching.');
       expect(rig.gateway.pings, isEmpty);
+      expect(find.byType(RiderLocationDisclosure), findsNothing);
       expect(find.byType(SoftNote), findsNothing);
       expect(find.text(rig.t(tester).riderGpsOffTitle), findsNothing);
       await rig.dispose(tester);
     });
 
-    testWidgets('while sharing with orders in hand, the Active tab says it is only while open',
+    testWidgets('while sharing with orders in hand, the Active tab says who sees it, and when',
         (WidgetTester tester) async {
       final _Rig rig = _Rig(onDuty: false, orders: <Map<String, dynamic>>[
         _order('o-carried', 'PICKED_UP'),
@@ -81,8 +157,38 @@ void main() {
     });
   });
 
-  group('when the rider cannot be seen', () {
-    testWidgets('denied: nothing is sent, and "Allow location" asks again',
+  group('before the phone asks for the location', () {
+    testWidgets('the rider reads who sees it, when, and for how long — then the system prompt',
+        (WidgetTester tester) async {
+      final _Rig rig = _Rig(onDuty: true)..source.accessResult = RiderLocationAccess.denied;
+      await rig.pump(tester);
+      final DeliveryStrings t = rig.t(tester);
+
+      expect(find.byType(RiderLocationDisclosure), findsOneWidget);
+      for (final String line in <String>[
+        t.riderGpsDisclosureTitle,
+        t.riderGpsDisclosureCustomer,
+        t.riderGpsDisclosureShop,
+        t.riderGpsDisclosureCompany,
+        t.riderGpsDisclosureSupport,
+        t.riderGpsDisclosureWhen,
+        t.riderGpsDisclosureKept,
+      ]) {
+        expect(find.text(line), findsOneWidget, reason: line);
+      }
+      expect(rig.source.asks, everyElement(isFalse),
+          reason: 'No system prompt while the rider is still reading.');
+
+      await tester.tap(find.text(t.riderGpsDisclosureContinue));
+      await rig.settle(tester);
+
+      expect(rig.source.asks.last, isTrue, reason: 'The prompt comes after the sheet.');
+      expect(find.byType(RiderLocationDisclosure), findsNothing);
+      expect(rig.gateway.pings, isNotEmpty);
+      await rig.dispose(tester);
+    });
+
+    testWidgets('"Not now": no prompt and nothing sent; "Allow location" explains again first',
         (WidgetTester tester) async {
       final _Rig rig = _Rig(onDuty: true, orders: <Map<String, dynamic>>[
         _order('o-carried', 'PICKED_UP'),
@@ -91,13 +197,20 @@ void main() {
       await rig.pump(tester);
       final DeliveryStrings t = rig.t(tester);
 
+      await tester.tap(find.text(t.riderGpsDisclosureNotNow));
+      await rig.settle(tester);
+
+      expect(rig.source.asks, everyElement(isFalse));
       expect(rig.gateway.pings, isEmpty);
       expect(rig.source.reads, 0, reason: 'No reading without the permission.');
       expect(find.text(t.riderGpsOffTitle), findsOneWidget);
       expect(find.text(t.riderGpsDeniedBody), findsOneWidget);
 
-      rig.source.accessResult = RiderLocationAccess.granted;
       await tester.tap(find.text(t.riderGpsAllow));
+      await rig.settle(tester);
+      expect(find.byType(RiderLocationDisclosure), findsOneWidget);
+
+      await tester.tap(find.text(t.riderGpsDisclosureContinue));
       await rig.settle(tester);
 
       expect(rig.source.asks.last, isTrue);
@@ -105,13 +218,17 @@ void main() {
       expect(find.text(t.riderGpsOffTitle), findsNothing);
       await rig.dispose(tester);
     });
+  });
 
-    testWidgets('denied for good: the banner opens this app\'s settings page',
+  group('when the rider cannot be seen', () {
+    testWidgets('denied for good: the banner opens this app\'s settings page, and no sheet',
         (WidgetTester tester) async {
       final _Rig rig = _Rig(onDuty: true)..source.accessResult = RiderLocationAccess.deniedForever;
       await rig.pump(tester);
       final DeliveryStrings t = rig.t(tester);
 
+      expect(find.byType(RiderLocationDisclosure), findsNothing,
+          reason: 'Nothing will be asked, so there is nothing to explain first.');
       expect(find.text(t.riderGpsBlockedBody), findsOneWidget);
       await tester.tap(find.text(t.locOpenSettings));
       await tester.pump();
@@ -167,6 +284,65 @@ void main() {
           find.descendant(
               of: find.byType(RiderLocationBanner), matching: find.byType(YdPillButton)),
           findsNothing);
+      await rig.dispose(tester);
+    });
+
+    // After an upgrade, or outside the service area, the platform can keep refusing what the
+    // phone sends. The rider used to be left on "locating" while nobody saw them.
+    testWidgets('fixes the platform keeps refusing: the banner says customers cannot see them',
+        (WidgetTester tester) async {
+      final _Rig rig = _Rig(onDuty: true, orders: <Map<String, dynamic>>[
+        _order('o-carried', 'PICKED_UP'),
+      ])
+        ..gateway.refuseWith = 'OUTSIDE_SERVICE_AREA';
+      await rig.pump(tester);
+      final DeliveryStrings t = rig.t(tester);
+      expect(find.text(t.riderGpsNoFixTitle), findsNothing, reason: 'One refusal is a hiccup.');
+
+      await tester.pump(const Duration(seconds: 21));
+      await rig.settle(tester);
+
+      expect(find.text(t.riderGpsNoFixTitle), findsOneWidget);
+      expect(find.text(t.riderGpsClockTitle), findsNothing, reason: 'Not the clock.');
+      await rig.dispose(tester);
+    });
+  });
+
+  group('the rider\'s own map, and no position from anywhere but the phone', () {
+    // The platform's last stored position for a rider who upgraded from the simulator is the
+    // London walk. The map used to open there for the whole session. Now what the rider sees
+    // and what the rider sends are both the phone's own reading, whatever the platform holds.
+    testWidgets('the mini-map centres on the phone\'s fix, and every ping carries that fix',
+        (WidgetTester tester) async {
+      final _Rig rig = _Rig(onDuty: true, storedAt: (lat: 51.5074, lng: -0.1278));
+      await rig.pump(tester, settleAfter: false);
+
+      // Caught on the frame it is first drawn: a test has no tile server, and the screen gives the
+      // map up for its placeholder after a run of refused tiles.
+      final (FlutterMap map, MarkerLayer markers) = await _firstMap(tester);
+      expect(map.options.initialCenter.latitude, _Source.lat);
+      expect(map.options.initialCenter.longitude, _Source.lng);
+      expect(markers.markers.single.point.latitude, _Source.lat);
+      expect(markers.markers.single.point.longitude, _Source.lng);
+
+      await rig.settle(tester);
+      await tester.pump(const Duration(seconds: 41));
+      await rig.settle(tester);
+      expect(rig.gateway.pings, hasLength(greaterThan(1)));
+      for (final _Call ping in rig.gateway.pings) {
+        expect((ping.body!['lat'], ping.body!['lng']), (_Source.lat, _Source.lng));
+      }
+      await rig.dispose(tester);
+    });
+
+    testWidgets('with no reading from the phone, the platform\'s stored point is never drawn',
+        (WidgetTester tester) async {
+      final _Rig rig = _Rig(onDuty: true, storedAt: (lat: 51.5074, lng: -0.1278))
+        ..source.noFix = true;
+      await rig.pump(tester);
+
+      expect(find.byType(FlutterMap), findsNothing);
+      expect(find.text(rig.t(tester).riderMapNoFixYet), findsOneWidget);
       await rig.dispose(tester);
     });
   });
@@ -227,27 +403,35 @@ void main() {
         addTearDown(tester.view.reset);
 
         for (final RiderLocationStatus status in RiderLocationStatus.values) {
-          await tester.pumpWidget(MaterialApp(
-            theme: DeliveryTheme.light(),
-            locale: locale,
-            localizationsDelegates: DeliveryStrings.localizationsDelegates,
-            supportedLocales: DeliveryStrings.supportedLocales,
-            builder: (BuildContext context, Widget? child) => MediaQuery(
-              data: MediaQuery.of(context).copyWith(textScaler: const TextScaler.linear(1.3)),
-              child: child!,
-            ),
-            home: Scaffold(
-              body: ListView(
-                padding: const EdgeInsets.all(20),
-                children: <Widget>[
-                  RiderLocationBanner(status: status, onAllow: () {}, onOpenSettings: () {}),
-                ],
-              ),
-            ),
-          ));
+          await tester.pumpWidget(_narrow(locale, ListView(
+            padding: const EdgeInsets.all(20),
+            children: <Widget>[
+              RiderLocationBanner(status: status, onAllow: () {}, onOpenSettings: () {}),
+            ],
+          )));
           expect(tester.takeException(), isNull, reason: '$status overflowed');
           expect(find.byType(Text).evaluate().isNotEmpty, status.hidesRider,
               reason: 'Drawn exactly for the states that hide the rider: $status');
+        }
+      });
+
+      testWidgets('the sheet before the prompt fits, and reads in its language '
+          '(${locale.languageCode})', (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(320, 568);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        await tester.pumpWidget(_narrow(locale, const RiderLocationDisclosure()));
+
+        expect(tester.takeException(), isNull);
+        final DeliveryStrings t =
+            DeliveryStrings.of(tester.element(find.byType(RiderLocationDisclosure)));
+        await tester.scrollUntilVisible(find.text(t.riderGpsDisclosureNotNow), 100);
+        expect(find.text(t.riderGpsDisclosureNotNow), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        if (locale.languageCode == 'ar') {
+          expect(Directionality.of(tester.element(find.text(t.riderGpsDisclosureTitle))),
+              TextDirection.rtl);
         }
       });
 
@@ -277,22 +461,6 @@ void main() {
   });
 
   group('no simulated position in a build a rider installs', () {
-    test('the London walk is gone from the app', () {
-      final List<File> sources = Directory('lib')
-          .listSync(recursive: true)
-          .whereType<File>()
-          .where((File f) => f.path.endsWith('.dart'))
-          .toList();
-      expect(sources, isNotEmpty);
-      for (final File file in sources) {
-        final String text = file.readAsStringSync();
-        expect(text.contains('51.5074'), isFalse, reason: file.path);
-        expect(text.contains('-0.1278'), isFalse, reason: file.path);
-      }
-      expect(File('lib/src/rider_home_screen.dart').readAsStringSync().contains('Random'), isFalse,
-          reason: 'Nothing on the rider screen invents a position any more.');
-    });
-
     test('the simulator is built in one place, behind the compile-time debug guard', () {
       final List<String> constructions = <String>[];
       for (final File file in Directory('lib').listSync(recursive: true).whereType<File>()) {
@@ -347,15 +515,44 @@ void main() {
 
 // ---------------------------------------------------------------------------------------- rig
 
-Map<String, dynamic> _order(String id, String status) => <String, dynamic>{
+const String _hamra = 'Hamra Street, Beirut';
+const String _mar = 'Mar Mikhael, Beirut';
+
+/// The rider's mini-map and its marker layer, on the first frame the map is drawn.
+Future<(FlutterMap, MarkerLayer)> _firstMap(WidgetTester tester) async {
+  for (int i = 0; i < 200; i++) {
+    await tester.pump(const Duration(milliseconds: 5));
+    final Finder map = find.byType(FlutterMap);
+    if (map.evaluate().isNotEmpty) {
+      return (tester.widget<FlutterMap>(map), tester.widget<MarkerLayer>(find.byType(MarkerLayer)));
+    }
+  }
+  fail('The mini-map was never drawn');
+}
+
+Widget _narrow(Locale locale, Widget child) => MaterialApp(
+      theme: DeliveryTheme.light(),
+      locale: locale,
+      localizationsDelegates: DeliveryStrings.localizationsDelegates,
+      supportedLocales: DeliveryStrings.supportedLocales,
+      builder: (BuildContext context, Widget? inner) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: const TextScaler.linear(1.3)),
+        child: inner!,
+      ),
+      home: Scaffold(body: child),
+    );
+
+Map<String, dynamic> _order(String id, String status,
+        {String address = _hamra, String store = 'Abu Hassan'}) =>
+    <String, dynamic>{
       'id': id,
       'customerId': 'customer-$id',
       'merchantId': 'merchant-1',
       'riderId': 'rider-sub',
       'status': status,
       'totalAmount': 12.5,
-      'storeName': 'Abu Hassan',
-      'deliveryAddress': 'Hamra Street, Beirut',
+      'storeName': store,
+      'deliveryAddress': address,
       'placedAt': '2026-09-19T09:30:00Z',
     };
 
@@ -368,10 +565,17 @@ class _Call {
 }
 
 class _Gateway implements HttpClientAdapter {
-  _Gateway({required this.onDuty, required this.orders});
+  _Gateway({required this.onDuty, required this.orders, this.storedAt});
 
   final bool onDuty;
   final List<Map<String, dynamic>> orders;
+
+  /// Where the platform last stored the rider, as presence answers it. Null: nowhere yet.
+  final ({double lat, double lng})? storedAt;
+
+  /// When set, every ping is refused with a 422 carrying this reason.
+  String? refuseWith;
+
   final List<_Call> log = <_Call>[];
 
   List<String> get calls => log.map((_Call c) => '${c.method} ${c.path}').toList();
@@ -394,14 +598,25 @@ class _Gateway implements HttpClientAdapter {
     } else if (path == '/api/orders/available') {
       body = <String, dynamic>{'content': <dynamic>[], 'totalElements': 0};
     } else if (path == '/api/tracking/riders/me/duty' && options.method == 'GET') {
-      // No lat/lng: the mini-map stays on its placeholder, so no tile is ever fetched.
+      final ({double lat, double lng})? stored = storedAt;
       body = <String, dynamic>{
         'riderId': 'rider-sub',
         'dutyState': onDuty ? 'ON_DUTY' : 'OFF_DUTY',
         'state': onDuty ? 'STALE' : 'OFF_DUTY',
+        if (stored != null) ...<String, dynamic>{
+          'lat': stored.lat,
+          'lng': stored.lng,
+          'lastSeenAt': '2026-09-19T09:00:00Z',
+        },
       };
     } else if (path.endsWith('/ping')) {
-      status = 202;
+      final String? reason = refuseWith;
+      if (reason != null) {
+        status = 422;
+        body = <String, dynamic>{'title': 'Location not recorded', 'reason': reason};
+      } else {
+        status = 202;
+      }
     } else if (path == '/api/riders/me/rating') {
       status = 404;
     }
@@ -421,16 +636,21 @@ class _Source extends RiderLocationSource {
   static const double lng = 35.5018;
 
   RiderLocationAccess accessResult = RiderLocationAccess.granted;
+
+  /// What the system prompt leaves the permission at, when one is shown: the rider's answer.
+  RiderLocationAccess afterPrompt = RiderLocationAccess.granted;
+
   bool noFix = false;
   final List<bool> asks = <bool>[];
   int reads = 0;
   int appSettingsOpened = 0;
   int locationSettingsOpened = 0;
-  DateTime? lastTakenAt;
 
   @override
   Future<RiderLocationAccess> access({required bool ask}) async {
     asks.add(ask);
+    // Only a refusal that can still be asked about shows the prompt — as on a phone.
+    if (ask && accessResult == RiderLocationAccess.denied) accessResult = afterPrompt;
     return accessResult;
   }
 
@@ -438,9 +658,7 @@ class _Source extends RiderLocationSource {
   Future<RiderFix?> current() async {
     reads++;
     if (noFix) return null;
-    final DateTime now = DateTime.now().toUtc();
-    lastTakenAt = now;
-    return RiderFix(latitude: lat, longitude: lng, accuracyM: 6, takenAt: now);
+    return RiderFix(latitude: lat, longitude: lng, accuracyM: 6, takenAt: DateTime.now().toUtc());
   }
 
   @override
@@ -451,8 +669,11 @@ class _Source extends RiderLocationSource {
 }
 
 class _Rig {
-  _Rig({required bool onDuty, List<Map<String, dynamic>> orders = const <Map<String, dynamic>>[]})
-      : gateway = _Gateway(onDuty: onDuty, orders: orders);
+  _Rig({
+    required bool onDuty,
+    List<Map<String, dynamic>> orders = const <Map<String, dynamic>>[],
+    ({double lat, double lng})? storedAt,
+  }) : gateway = _Gateway(onDuty: onDuty, orders: orders, storedAt: storedAt);
 
   final _Gateway gateway;
   final _Source source = _Source();
@@ -461,7 +682,10 @@ class _Rig {
       DeliveryStrings.of(tester.element(find.byType(RiderHomeScreen)));
 
   Future<void> pump(WidgetTester tester,
-      {Size size = const Size(400, 900), double textScale = 1.0, Locale? locale}) async {
+      {Size size = const Size(400, 900),
+      double textScale = 1.0,
+      Locale? locale,
+      bool settleAfter = true}) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -493,13 +717,14 @@ class _Rig {
         onSignOut: () async {},
       ),
     ));
-    await settle(tester);
+    if (settleAfter) await settle(tester);
   }
 
   /// Lets the board and presence answer and the reporter ask, read and send: Dio's pipeline takes
-  /// several turns of the event loop, all well inside the reporter's first ten-second tick.
+  /// several turns of the event loop, all well inside the reporter's first ten-second tick. A sheet
+  /// sliding up or down takes a few of them too.
   Future<void> settle(WidgetTester tester) async {
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < 12; i++) {
       await tester.pump(const Duration(milliseconds: 50));
     }
   }

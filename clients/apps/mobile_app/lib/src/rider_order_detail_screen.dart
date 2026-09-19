@@ -25,6 +25,7 @@ class RiderOrderDetailScreen extends StatefulWidget {
     super.key,
     required this.order,
     required this.onAction,
+    this.onNavigate,
     this.trackingApi,
     this.chatApi,
     this.socket,
@@ -35,6 +36,11 @@ class RiderOrderDetailScreen extends StatefulWidget {
 
   /// Completes when the action has been sent and the board refreshed.
   final Future<void> Function(OrderAction) onAction;
+
+  /// The rider tapped Start navigation: this order's next stop is where they are heading. The
+  /// rider screen puts their location on this order from here on — see
+  /// `RiderLocationReporter.headingTo`. Null changes nothing but that.
+  final VoidCallback? onNavigate;
 
   /// The ETA half of the tracking service. Null draws the route card exactly as before — no panel
   /// at all, never a fabricated number.
@@ -421,7 +427,12 @@ class _RiderOrderDetailScreenState extends State<RiderOrderDetailScreen> {
                       verticalPadding: 14,
                       onPressed: _navigationTarget(order).isEmpty
                           ? null
-                          : () => riderNavigateTo(context, _navigationTarget(order)),
+                          : () {
+                              // Said before the maps app takes the screen: this is the order the
+                              // rider is heading for, and the one their location now goes on.
+                              widget.onNavigate?.call();
+                              riderNavigateTo(context, _navigationTarget(order));
+                            },
                     ),
                   ),
                   // Not in the design, and kept anyway: cancel is a real transition the server

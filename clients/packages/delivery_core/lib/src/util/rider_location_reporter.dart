@@ -37,16 +37,53 @@ enum RiderLocationStatus {
   /// The fixes come from a mock-location app, so none of them is sent.
   mocked(true),
 
-  /// No usable fix: no signal, or nothing precise enough to send, for a while now.
+  /// No usable fix: no signal, nothing precise enough to send, or the platform keeps refusing
+  /// what is sent (outside the service area, an impossible jump) — for a while now.
   noFix(true),
 
   /// The platform keeps refusing the fixes as dated in the future or too old: the phone's clock
   /// is wrong, which only the rider can put right.
-  clockWrong(true);
+  clockWrong(true),
+
+  /// The rider carries orders to more than one door and has not said which they are heading to,
+  /// so no customer is shown them: a fix put on either order could show one customer the way to
+  /// the other's door. Start navigation on one says which.
+  legUnknown(true);
 
   const RiderLocationStatus(this.hidesRider);
 
   final bool hidesRider;
+}
+
+/// One of the rider's claimed orders, as the reporter needs it: which leg it is on, and where it
+/// ends.
+@immutable
+class RiderLeg {
+  const RiderLeg({required this.orderId, required this.collected, required this.dropOff});
+
+  final String orderId;
+
+  /// True once the order is picked up: its leg runs to the customer's door. Before that, to the
+  /// shop.
+  final bool collected;
+
+  /// Where the order ends — its delivery address, as the order carries it. Two orders with the
+  /// same address end at the same door.
+  final String dropOff;
+
+  /// The door, compared loosely: the same address typed with different spacing or capitals is
+  /// one door, not two.
+  String get door => dropOff.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+
+  @override
+  bool operator ==(Object other) =>
+      other is RiderLeg &&
+      other.orderId == orderId &&
+      other.collected == collected &&
+      other.dropOff == dropOff;
+
+  @override
+  int get hashCode => Object.hash(orderId, collected, dropOff);
 }
 
 /// Sends one fix on one of the rider's orders (`POST /api/tracking/orders/{id}/ping`).
@@ -54,6 +91,10 @@ typedef RiderOrderPing = Future<void> Function(String orderId, RiderFix fix);
 
 /// Sends one fix with no order (`POST /api/tracking/riders/me/ping`).
 typedef RiderPresencePing = Future<void> Function(RiderFix fix);
+
+/// Asked right before the operating system's location prompt would be shown. True lets the prompt
+/// go ahead; false leaves the permission as it is.
+typedef RiderLocationExplanation = Future<bool> Function();
 
 /// Reports the rider's real position while — and only while — somebody needs it.
 ///
@@ -74,22 +115,48 @@ typedef RiderPresencePing = Future<void> Function(RiderFix fix);
 /// one ping every forty seconds instead of one every ten, which is what keeps them on the roster
 /// (whose presence window is two minutes) and nothing more.
 ///
-/// **Where.** With orders in hand, every fix goes on each order, and nothing else: an order ping
-/// already counts as presence on the server, so a second, order-less ping per fix would be the same
-/// write twice. The order-less ping is only for a rider on duty with nothing in hand.
+/// **Where — the active leg.** A fix goes on exactly one order: the one whose leg the rider is on
+/// now, meaning the stop they are heading to — its shop before pickup, its door after. The server
+/// shows a rider only to the customer (and, before pickup, the shop) of the order their latest fix
+/// went on, so this choice is who sees the rider. It is read off the rider's own acts, newest
+/// first ([activeOrderId]):
+///
+/// 1. **Start navigation** on an order ([headingTo]) is the rider saying where they are going. It
+///    stands until they collect or hand over an order, which changes where they go next.
+/// 2. Otherwise the order they last **claimed** (heading to its shop) or **picked up** (heading on
+///    with it), or, with no such act seen yet, the first order on the Active tab.
+///
+/// …and never an order whose door is not where the rider can be heading. A rider can only be
+/// heading to a customer's door if they carry that customer's order, so the doors that matter are
+/// those of the orders already picked up. With none, any leg is safe: the rider is on the way to
+/// a shop. With one door in the bag, the fix goes on an order to that door (the pointer if it is
+/// one, the first such order if not) — never on another customer's order, which could show that
+/// customer the way to this door. With two or more doors in the bag and no Start navigation since
+/// the last pickup or hand-over, nobody can say which door is next: the fix goes on no order —
+/// only to the rider's presence, so the fleet still sees them — and the rider is told
+/// ([RiderLocationStatus.legUnknown]) that tapping Start navigation on the delivery they are
+/// heading to is what puts it on that customer's map.
 ///
 /// **What the rider is told.** [status]. Permission and settings problems come from the platform
 /// and are re-checked (never re-prompted) before every reading and on every return to the
 /// foreground, so fixing them in the system settings takes effect without the rider having to do
-/// anything else here.
+/// anything else here. Refusals from the tracking service surface too: three clock refusals in a
+/// row as [RiderLocationStatus.clockWrong], three of any other kind as
+/// [RiderLocationStatus.noFix] — never left looking like "locating".
+///
+/// **Before the prompt.** When the operating system's permission prompt is about to be shown,
+/// [explainBeforeAsking] is asked first: the rider reads who will see their location, when, and
+/// for how long, and only then sees the system's question.
 class RiderLocationReporter extends ChangeNotifier {
   RiderLocationReporter({
     required RiderLocationSource source,
     required RiderOrderPing pingOrder,
     RiderPresencePing? pingRider,
+    RiderLocationExplanation? explainBeforeAsking,
   })  : _source = source,
         _pingOrder = pingOrder,
-        _pingRider = pingRider;
+        _pingRider = pingRider,
+        _explainBeforeAsking = explainBeforeAsking;
 
   /// Reading cadence with a delivery in hand. Matches the tracking service's rider ping interval:
   /// every reduction multiplies writes across every active rider.
@@ -111,9 +178,9 @@ class RiderLocationReporter extends ChangeNotifier {
   /// bad reading under a roof does not flash a banner.
   static const Duration sharingGrace = Duration(seconds: 90);
 
-  /// Consecutive clock refusals before the rider is told their phone's clock is wrong. One is a
-  /// hiccup; three in a row, ten seconds apart, is the clock.
-  static const int clockRefusalsBeforeTelling = 3;
+  /// Consecutive refusals of one kind before the rider is told. One is a hiccup; three in a row,
+  /// ten seconds apart, is the clock, or a position the platform will not take.
+  static const int refusalsBeforeTelling = 3;
 
   /// Timers are not exact. Comparing elapsed time with the tick length itself would fail by
   /// milliseconds and silently halve every cadence above.
@@ -122,12 +189,23 @@ class RiderLocationReporter extends ChangeNotifier {
   final RiderLocationSource _source;
   final RiderOrderPing _pingOrder;
   final RiderPresencePing? _pingRider;
+  final RiderLocationExplanation? _explainBeforeAsking;
 
   RiderLocationStatus _status = RiderLocationStatus.idle;
 
   bool _foreground = true;
   bool _onDuty = false;
-  List<String> _orderIds = const <String>[];
+  List<RiderLeg> _legs = const <RiderLeg>[];
+
+  /// Whether a demand has been seen yet. The orders present at the first one were not claimed in
+  /// front of this reporter, so they say nothing about where the rider is heading.
+  bool _seeded = false;
+
+  /// The order the rider last claimed or picked up, or tapped Start navigation on.
+  String? _lastActedOn;
+
+  /// The order the rider last tapped Start navigation on, until a pickup or hand-over.
+  String? _headingTo;
 
   bool _running = false;
   bool _disposed = false;
@@ -148,16 +226,54 @@ class RiderLocationReporter extends ChangeNotifier {
   bool _forceNext = false;
   RiderFix? _lastSent;
   DateTime? _lastSentAt;
+  RiderFix? _lastFix;
   int _clockRefusals = 0;
+  int _otherRefusals = 0;
 
   /// What to tell the rider. See [RiderLocationStatus.hidesRider].
   RiderLocationStatus get status => _status;
 
   /// Whether the rider's location is wanted right now.
-  bool get needed => _foreground && (_onDuty || _orderIds.isNotEmpty);
+  bool get needed => _foreground && (_onDuty || _legs.isNotEmpty);
 
   /// When a fix last reached the platform, by this phone's clock. Null until one has.
   DateTime? get lastSentAt => _lastSentAt;
+
+  /// The phone's own latest usable reading — not mocked, precise enough — whether or not it has
+  /// been sent or accepted. What the rider's own map shows: where the rider is, not what the
+  /// platform last stored (which, after an upgrade, can be an old build's simulated position).
+  RiderFix? get lastFix => _lastFix;
+
+  /// The order the next fix goes on, or null for none — see the class comment for the rule.
+  String? get activeOrderId {
+    final List<RiderLeg> legs = _legs;
+    if (legs.isEmpty) return null;
+
+    final RiderLeg? navigated = _legOf(_headingTo, legs);
+    if (navigated != null) return navigated.orderId;
+
+    final Set<String> carriedDoors = <String>{
+      for (final RiderLeg leg in legs)
+        if (leg.collected) leg.door,
+    };
+    if (carriedDoors.length > 1) return null;
+
+    final List<RiderLeg> safe = carriedDoors.isEmpty
+        ? legs
+        : <RiderLeg>[
+            for (final RiderLeg leg in legs)
+              if (leg.door == carriedDoors.single) leg,
+          ];
+    return (_legOf(_lastActedOn, safe) ?? safe.first).orderId;
+  }
+
+  static RiderLeg? _legOf(String? orderId, List<RiderLeg> legs) {
+    if (orderId == null) return null;
+    for (final RiderLeg leg in legs) {
+      if (leg.orderId == orderId) return leg;
+    }
+    return null;
+  }
 
   /// The app came to the foreground ([foreground] true) or left it.
   void setForeground(bool foreground) {
@@ -167,24 +283,66 @@ class RiderLocationReporter extends ChangeNotifier {
   }
 
   /// What the rider is doing: declared on duty or not, and the orders in their hands that a
-  /// customer may be watching — claimed READY and PICKED_UP ones.
-  void setDemand({required bool onDuty, required Iterable<String> orderIds}) {
-    final List<String> ids = <String>[
-      for (final String id in orderIds.toSet()) id,
-    ];
-    final bool added = ids.any((String id) => !_orderIds.contains(id));
+  /// customer may be watching — claimed READY and PICKED_UP ones, in the Active tab's order.
+  void setDemand({required bool onDuty, required Iterable<RiderLeg> legs}) {
+    final Map<String, RiderLeg> byId = <String, RiderLeg>{
+      for (final RiderLeg leg in legs) leg.orderId: leg,
+    };
+    final List<RiderLeg> next = byId.values.toList();
+    final String? activeBefore = activeOrderId;
+    final Map<String, RiderLeg> before = <String, RiderLeg>{
+      for (final RiderLeg leg in _legs) leg.orderId: leg,
+    };
+
+    bool added = false;
+    bool movedOn = false;
+    for (final RiderLeg leg in next) {
+      final RiderLeg? was = before[leg.orderId];
+      if (was == null) {
+        added = true;
+        // A claim: heading to its shop. Not on the first demand — those orders were already in
+        // hand when this reporter started, and were not claimed in front of it.
+        if (_seeded) _lastActedOn = leg.orderId;
+      } else if (leg.collected && !was.collected) {
+        // A pickup: the rider goes on with it — or to another shop, or another door. Where the
+        // bag holds several doors, only Start navigation can say which.
+        _lastActedOn = leg.orderId;
+        movedOn = true;
+      }
+    }
+    if (before.keys.any((String id) => !byId.containsKey(id))) {
+      // Handed over or cancelled: the next stop is somewhere new.
+      movedOn = true;
+    }
+    if (movedOn) _headingTo = null;
+    _seeded = true;
+
     _onDuty = onDuty;
-    _orderIds = ids;
+    _legs = next;
     _reconcile();
-    if (added && _running && _access == RiderLocationAccess.granted) {
-      // A newly claimed order's customer should see the rider now, not after the next movement
-      // or heartbeat.
-      _forceNext = true;
-      unawaited(sample());
+    if ((added || activeOrderId != activeBefore) && _running) {
+      // A newly claimed order's customer, or the customer whose leg just began, should see the
+      // rider now rather than after the next movement or heartbeat.
+      _sendSoon();
     }
   }
 
-  /// The banner's "allow" button: shows the system prompt again.
+  /// The rider tapped Start navigation on [orderId]: that order's next stop is where they are
+  /// heading, and it is the order their fixes go on until they collect or hand over an order.
+  void headingTo(String orderId) {
+    if (_legOf(orderId, _legs) == null) return;
+    final String? activeBefore = activeOrderId;
+    _headingTo = orderId;
+    _lastActedOn = orderId;
+    if (activeOrderId != activeBefore && _running) _sendSoon();
+  }
+
+  void _sendSoon() {
+    _forceNext = true;
+    if (_access == RiderLocationAccess.granted) unawaited(sample());
+  }
+
+  /// The banner's "allow" button: shows the system prompt again — after the explanation.
   Future<void> askAgain() async {
     if (!_running) return;
     await _checkAccess(ask: true, generation: _generation);
@@ -238,7 +396,7 @@ class RiderLocationReporter extends ChangeNotifier {
   Future<void> _tick() async {
     if (!_running || _sampling) return;
     _ticks++;
-    if (_orderIds.isEmpty && _ticks.isOdd) return;
+    if (_legs.isEmpty && _ticks.isOdd) return;
     if (_access != RiderLocationAccess.granted) {
       await _checkAccess(ask: false, generation: _generation);
       if (_access != RiderLocationAccess.granted) return;
@@ -246,9 +404,20 @@ class RiderLocationReporter extends ChangeNotifier {
     await sample();
   }
 
+  /// Checks the permission, and — when [ask] and the system would show its prompt — explains
+  /// first, then lets the prompt show only if the rider goes on.
   Future<void> _checkAccess({required bool ask, required int generation}) async {
-    final RiderLocationAccess access = await _source.access(ask: ask);
+    RiderLocationAccess access = await _source.access(ask: false);
     if (generation != _generation || _disposed) return;
+    if (ask && access == RiderLocationAccess.denied) {
+      final RiderLocationExplanation? explain = _explainBeforeAsking;
+      final bool goOn = explain == null || await explain();
+      if (generation != _generation || _disposed) return;
+      if (goOn) {
+        access = await _source.access(ask: true);
+        if (generation != _generation || _disposed) return;
+      }
+    }
     _access = access;
     switch (access) {
       case RiderLocationAccess.granted:
@@ -292,13 +461,18 @@ class RiderLocationReporter extends ChangeNotifier {
         _unusable(now);
         return;
       }
+      _lastFix = fix;
       if (_due(fix, now)) {
         await _send(fix, generation);
-      } else if (_status.hidesRider) {
+      } else if (_status.hidesRider && _status != RiderLocationStatus.legUnknown &&
+          _clockRefusals < refusalsBeforeTelling &&
+          _otherRefusals < refusalsBeforeTelling) {
         // A good reading that is not due means a fix was sent within the heartbeat, so the rider
         // is on the map; a banner left over from a mock app or a weak spot is no longer true.
         _setStatus(RiderLocationStatus.sharing);
       }
+      // The rider's own map follows the phone even when nothing else changed.
+      if (!_disposed) notifyListeners();
     } finally {
       _sampling = false;
     }
@@ -321,32 +495,48 @@ class RiderLocationReporter extends ChangeNotifier {
   }
 
   Future<void> _send(RiderFix fix, int generation) async {
-    final List<String> orders = List<String>.of(_orderIds);
+    final String? orderId = activeOrderId;
     final RiderPresencePing? pingRider = _pingRider;
-    final List<_Outcome> outcomes = <_Outcome>[];
-    if (orders.isNotEmpty) {
-      for (final String orderId in orders) {
-        // Backgrounded halfway through: the rest of this fix stays on the phone.
-        if (generation != _generation) break;
-        outcomes.add(await _attempt(() => _pingOrder(orderId, fix)));
-      }
-    } else if (_onDuty && pingRider != null) {
-      outcomes.add(await _attempt(() => pingRider(fix)));
+    final _Outcome outcome;
+    final bool onNoOrder;
+    if (orderId != null) {
+      onNoOrder = false;
+      outcome = await _attempt(() => _pingOrder(orderId, fix));
+    } else if ((_onDuty || _legs.isNotEmpty) && pingRider != null) {
+      // Between jobs — or carrying orders to several doors with no word of which is next, when
+      // the fix goes to the rider's presence and on no customer's order.
+      onNoOrder = _legs.isNotEmpty;
+      outcome = await _attempt(() => pingRider(fix));
     } else {
+      if (_legs.isNotEmpty) _setStatus(RiderLocationStatus.legUnknown);
       return;
     }
+    if (generation != _generation) return;
 
-    if (outcomes.contains(_Outcome.delivered)) {
-      _lastSent = fix;
-      _lastSentAt = clock.now();
-      _forceNext = false;
-      _clockRefusals = 0;
-      if (generation == _generation) _setStatus(RiderLocationStatus.sharing);
-    } else if (outcomes.contains(_Outcome.clockRefused)) {
-      _clockRefusals++;
-      if (generation == _generation && _clockRefusals >= clockRefusalsBeforeTelling) {
-        _setStatus(RiderLocationStatus.clockWrong);
-      }
+    switch (outcome) {
+      case _Outcome.delivered:
+        _lastSent = fix;
+        _lastSentAt = clock.now();
+        _forceNext = false;
+        _clockRefusals = 0;
+        _otherRefusals = 0;
+        _setStatus(onNoOrder ? RiderLocationStatus.legUnknown : RiderLocationStatus.sharing);
+      case _Outcome.clockRefused:
+        _otherRefusals = 0;
+        _clockRefusals++;
+        if (_clockRefusals >= refusalsBeforeTelling) {
+          _setStatus(RiderLocationStatus.clockWrong);
+        }
+      case _Outcome.refused:
+        // Outside the service area, an impossible jump, too imprecise: the fix did not reach
+        // anybody's map. Said as no usable fix once it keeps happening, rather than "locating".
+        _clockRefusals = 0;
+        _otherRefusals++;
+        if (_otherRefusals >= refusalsBeforeTelling) {
+          _setStatus(RiderLocationStatus.noFix);
+        }
+      case _Outcome.failed:
+        break;
     }
   }
 
@@ -357,8 +547,8 @@ class RiderLocationReporter extends ChangeNotifier {
       await ping();
       return _Outcome.delivered;
     } on DioException catch (e) {
-      if (e.response?.statusCode == 422 && _isClockReason(e.response?.data)) {
-        return _Outcome.clockRefused;
+      if (e.response?.statusCode == 422) {
+        return _isClockReason(e.response?.data) ? _Outcome.clockRefused : _Outcome.refused;
       }
       return _Outcome.failed;
     } catch (_) {
@@ -399,4 +589,4 @@ class RiderLocationReporter extends ChangeNotifier {
   }
 }
 
-enum _Outcome { delivered, clockRefused, failed }
+enum _Outcome { delivered, clockRefused, refused, failed }

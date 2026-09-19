@@ -9,7 +9,8 @@ import 'package:flutter/material.dart';
 /// nothing in hand is not being watched, so their location being off is nobody's problem and
 /// nothing is shown. Each state names its own cause, because each has a different way out: the
 /// phone's location switch, the permission prompt, this app's settings page, or nothing the app
-/// can open (a mock-location app, a wrong clock, no signal), where the banner says what to do
+/// can open (a mock-location app, a wrong clock, no signal, positions the platform keeps refusing,
+/// orders to more than one door with no word of which is next), where the banner says what to do
 /// and offers no button rather than a button that cannot work.
 ///
 /// Amber rather than red: this is the rider's call to act, not the app failing.
@@ -61,6 +62,10 @@ class RiderLocationBanner extends StatelessWidget {
         ),
       RiderLocationStatus.mocked => (t.riderGpsMockedTitle, t.riderGpsMockedBody, null, null),
       RiderLocationStatus.clockWrong => (t.riderGpsClockTitle, t.riderGpsClockBody, null, null),
+      // The way out is on the order itself — Start navigation on the one they are heading to —
+      // so the banner says where it is rather than offering a button that could only guess.
+      RiderLocationStatus.legUnknown =>
+        (t.riderGpsLegUnknownTitle, t.riderGpsLegUnknownBody, null, null),
       // The last three never get here (the early return above); listed for exhaustiveness.
       RiderLocationStatus.noFix ||
       RiderLocationStatus.idle ||
