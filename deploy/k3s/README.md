@@ -80,13 +80,14 @@ invent is the onboarding client secret, which must match what the realm import c
 - **Service-order attachments need their bucket once per environment.** The files customers attach
   to service orders live in the private `order-attachments` bucket, which `minio/bootstrap.sh`
   creates. A finished Job never runs again, whether Argo CD or `kubectl apply` applies it (the
-  generated ConfigMaps keep their names). So the bootstrap Job's name carries a suffix:
-  `minio-init-2` since this bucket was added. The next sync creates the renamed Job, and the script
-  runs once more in each environment. It is idempotent, so existing buckets and rules are left as
-  they are. Bump the suffix whenever the script changes. To confirm:
+  generated ConfigMaps keep their names). So the bootstrap Job's name carries a suffix, now
+  `minio-init-3`: -2 added this bucket, and -3 moved the image to quay.io. The next sync creates the
+  renamed Job, and the script runs once more in each environment. It is idempotent, so existing
+  buckets and rules are left as they are. Bump the suffix whenever the script or its image changes.
+  To confirm:
 
   ```sh
-  kubectl -n delivery-dev logs job/minio-init-2 | grep order-attachments
+  kubectl -n delivery-dev logs job/minio-init-3 | grep order-attachments
   # and the same with delivery-qa
   ```
 

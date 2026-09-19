@@ -213,7 +213,7 @@ services:
     networks: [delivery]
 
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
     container_name: delivery-minio
     mem_limit: 224m
     restart: unless-stopped
@@ -236,7 +236,7 @@ services:
   # Creates the five buckets from Section 5, and order-attachments for service orders, with their
   # access policies, then exits.
   minio-init:
-    image: minio/mc:latest
+    image: quay.io/minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
     container_name: delivery-minio-init
     mem_limit: 48m
     depends_on:
