@@ -167,6 +167,12 @@ delivery:
       # a customer would rather see a slightly aged estimate than have it blink out under a bridge.
       max-fix-age: 5m
 
+    checkout-map:
+      # A multi-shop checkout's map is computed at most this often, and the answer is shared by
+      # everyone allowed to see it (CheckoutTrackingService). Each computation is a round of
+      # position reads and — with a routing engine — routing requests, and the screen polls.
+      recompute-after: 5s
+
     routing:
       # Which provider computes ETAs. HAVERSINE_DEV is the dev implementation: a straight line at
       # the average speed below, with no idea that roads exist. It is the default because the
