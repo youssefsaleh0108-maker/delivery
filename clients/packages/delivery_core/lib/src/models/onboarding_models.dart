@@ -107,6 +107,7 @@ class OnboardingApplication {
     required this.provisionedUserRef,
     required this.provisionedEntityId,
     this.details = const <String, String>{},
+    this.detailLists = const <String, List<String>>{},
     this.suspended,
     this.service,
   });
@@ -165,6 +166,13 @@ class OnboardingApplication {
   /// must therefore treat "no details" as ordinary, not as an error.
   final Map<String, String> details;
 
+  /// The details that arrived as lists, entry by entry: what [details] joins into one line with
+  /// commas, for the reader that has to tell the entries apart — a company's roster, whose zone
+  /// filter offers each region a rider works in, from the `companyRegions` the server records.
+  /// Splitting the joined line again would not do: a zone's name is the company's own, and can hold
+  /// a comma. Empty lists are left out, as they are from [details].
+  final Map<String, List<String>> detailLists;
+
   bool get emailVerified => emailVerifiedAt != null;
   bool get phoneVerified => phoneVerifiedAt != null;
 
@@ -190,6 +198,7 @@ class OnboardingApplication {
         provisionedUserRef: json['provisionedUserRef'] as String?,
         provisionedEntityId: json['provisionedEntityId'] as String?,
         details: _details(json['details']),
+        detailLists: _detailLists(json['details']),
         suspended: json['suspended'] as bool?,
         service: ServiceApplicationAnswers.fromJson(json['service']),
       );
@@ -214,12 +223,27 @@ class OnboardingApplication {
   static String? _detailText(dynamic value) {
     if (value == null) return null;
     if (value is! List) return value.toString();
-    final List<String> entries = <String>[
-      for (final dynamic entry in value)
-        if (entry != null && entry.toString().trim().isNotEmpty) entry.toString().trim(),
-    ];
+    final List<String> entries = _listEntries(value);
     return entries.isEmpty ? null : entries.join(', ');
   }
+
+  /// The list details, kept as lists — see [detailLists].
+  static Map<String, List<String>> _detailLists(dynamic value) {
+    if (value is! Map) return const <String, List<String>>{};
+    final Map<String, List<String>> lists = <String, List<String>>{};
+    for (final MapEntry<dynamic, dynamic> e in value.entries) {
+      if (e.value is! List) continue;
+      final List<String> entries = _listEntries(e.value as List<dynamic>);
+      if (entries.isNotEmpty) lists[e.key.toString()] = List<String>.unmodifiable(entries);
+    }
+    return lists;
+  }
+
+  /// A list's entries as text: blanks and nulls are no answer and are left out.
+  static List<String> _listEntries(List<dynamic> value) => <String>[
+        for (final dynamic entry in value)
+          if (entry != null && entry.toString().trim().isNotEmpty) entry.toString().trim(),
+      ];
 
   static DateTime? _time(dynamic value) =>
       value == null ? null : DateTime.tryParse(value as String)?.toLocal();

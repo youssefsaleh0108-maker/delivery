@@ -59,6 +59,21 @@ void main() {
     expect(application.details['vehicleType'], 'MOTORCYCLE');
   });
 
+  test('a list is also kept entry by entry, even when an entry holds a comma', () {
+    final OnboardingApplication application = OnboardingApplication.fromJson(_application(
+        <String, dynamic>{
+          'companyRegions': <dynamic>['Mar Mikhael, Beirut', ' Hamra ', '', null],
+          'emptyList': <dynamic>[],
+          'vehicleType': 'MOTORCYCLE',
+        }));
+
+    expect(application.detailLists['companyRegions'], <String>['Mar Mikhael, Beirut', 'Hamra']);
+    expect(application.details['companyRegions'], 'Mar Mikhael, Beirut, Hamra');
+    // Only lists, and only lists with something in them.
+    expect(application.detailLists.keys, <String>['companyRegions']);
+    expect(OnboardingApplication.fromJson(_application(null)).detailLists, isEmpty);
+  });
+
   test('everything else still reads as it did: false and 0 survive, and a number is its digits', () {
     final OnboardingApplication application = OnboardingApplication.fromJson(_application(
         <String, dynamic>{'agreed': false, 'fleetSize': 0, 'workLatitude': 33.89}));

@@ -172,6 +172,25 @@ class CarrierFleet {
     return null;
   }
 
+  /// The same answer as [regionOf], one region at a time: what the zone filter offers and matches.
+  ///
+  /// A company rider's region is a list — "Achrafieh, Hamra" on the card — and offered whole it made
+  /// one filter entry that matched only riders with exactly that list, never a rider working in
+  /// Hamra alone. The list's own entries are read ([OnboardingApplication.detailLists]) rather than
+  /// the line split at its commas, because a zone's name is the company's own and can hold one.
+  /// Empty when [regionOf] is null.
+  List<String> regionsOf(String rider) {
+    final OnboardingApplication? application = applications[rider];
+    if (application == null) return const <String>[];
+    for (final String key in regionKeys) {
+      final List<String>? entries = application.detailLists[key];
+      if (entries != null) return entries;
+      final String? value = application.details[key];
+      if (value != null && value.trim().isNotEmpty) return <String>[value.trim()];
+    }
+    return const <String>[];
+  }
+
   /// The application keys a rider's region has been written under, first match wins.
   ///
   /// `companyRegions` comes first: a rider who applies to a company does not choose an area, and the
