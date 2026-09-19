@@ -189,6 +189,7 @@ class _GiftHubScreenState extends State<GiftHubScreen> {
         storeApi: widget.storeApi,
         orderApi: widget.orderApi,
         cart: widget.cart,
+        addresses: widget.addresses,
         onOpenBasket: widget.onOpenBasket,
         initialVertical: category.vertical,
       ),
@@ -205,6 +206,7 @@ class _GiftHubScreenState extends State<GiftHubScreen> {
         orderApi: widget.orderApi,
         cart: widget.cart,
         storeId: bundle.storeId,
+        addresses: widget.addresses,
         onOpenBasket: widget.onOpenBasket,
       ),
     ));

@@ -4,6 +4,7 @@ import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
 import 'cart.dart';
+import 'delivery_address.dart';
 import 'product_detail_screen.dart' show CustomerPhoto;
 import 'store_page_screen.dart';
 import 'store_power_chip.dart';
@@ -25,6 +26,7 @@ class ShopsListingScreen extends StatefulWidget {
     required this.onOpenBasket,
     this.initialVertical,
     this.chips = const <CategoryChip>[],
+    this.addresses,
   });
 
   final StoreApi storeApi;
@@ -41,6 +43,10 @@ class ShopsListingScreen extends StatefulWidget {
 
   /// The curated strip, passed through from home so this screen does not refetch it.
   final List<CategoryChip> chips;
+
+  /// Handed to every shop opened from this list, for its delivery area map. See
+  /// [StorePageScreen.addresses].
+  final DeliveryAddressStore? addresses;
 
   @override
   State<ShopsListingScreen> createState() => _ShopsListingScreenState();
@@ -89,6 +95,7 @@ class _ShopsListingScreenState extends State<ShopsListingScreen> {
         cart: widget.cart,
         storeId: store.id,
         preview: store,
+        addresses: widget.addresses,
         onOpenBasket: widget.onOpenBasket,
       ),
     ));

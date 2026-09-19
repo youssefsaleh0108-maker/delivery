@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'delivery_address.dart';
+import 'delivery_area_button.dart';
 import 'order_placement.dart';
 import 'service_order_screen.dart';
 import 'service_order_words.dart';
@@ -201,6 +202,13 @@ class _ServiceProviderScreenState extends State<ServiceProviderScreen> {
         children: <Widget>[
           _hero(store, t),
           _identity(store, t),
+          // Only when one of its offers is delivered: a pickup-only provider has no delivery area.
+          DeliveryAreaButton(
+            store: store,
+            addresses: _kit.addresses,
+            offersDeliver: _offers
+                .any((Product o) => o.service?.fulfilmentModes.includesDelivery ?? false),
+          ),
           _tabBar(t),
           ...switch (_tab) {
             _Tab.offers => _offersTab(store, t),
