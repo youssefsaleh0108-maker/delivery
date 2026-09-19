@@ -10,6 +10,8 @@ import 'package:mobile_app/src/sign_in_screen.dart';
 import 'package:mobile_app/src/store_home_screen.dart';
 import 'package:mobile_app/src/store_page_screen.dart';
 
+import 'support/demo_logins.dart';
+
 // The customer's whole first session, against the real dev backend.
 //
 // test/ has widget tests for each of these screens, and integration_test/arabic_rtl_test.dart
@@ -60,8 +62,11 @@ import 'package:mobile_app/src/store_page_screen.dart';
 const String _username = String.fromEnvironment('TEST_USERNAME', defaultValue: 'customer');
 
 /// Six digits, and that matters: _submitCredentials() refuses anything whose length is not
-/// PasscodePad.passcodeLength before it ever reaches the network.
-const String _passcode = String.fromEnvironment('TEST_PASSCODE', defaultValue: '100001');
+/// PasscodePad.passcodeLength before it ever reaches the network. TEST_PASSCODE overrides it for a CI
+/// account; otherwise it is the demo customer's, supplied at run time (DemoLogins).
+const String _passcodeOverride = String.fromEnvironment('TEST_PASSCODE');
+String get _passcode =>
+    _passcodeOverride.isNotEmpty ? _passcodeOverride : DemoLogins.passwordOf('customer');
 
 /// How many shops to try before giving up on finding a stocked one. See the loop in the test for
 /// why this is not simply 1.

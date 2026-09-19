@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'demo_logins.dart';
+
 /// The preconditions a business-flow scenario needs, arranged over HTTP before the app is driven.
 ///
 /// <p><strong>Why a scenario arranges its own world.</strong> A test that drives a real purchase
@@ -31,18 +33,6 @@ class Backend {
     'KEYCLOAK_ISSUER',
     defaultValue: 'http://192.168.10.24:8180/realms/delivery-platform',
   );
-
-  /// The demo accounts, and the client each one signs in through.
-  ///
-  /// Backoffice is the odd one out: it authenticates against `delivery-portal` rather than
-  /// `mobile-app`, which is how the portal is separated from the phone app.
-  static const Map<String, String> _passwords = <String, String>{
-    'customer': '100001',
-    'merchant': '200002',
-    'rider': '300003',
-    'backoffice': '400004',
-    'carrier': '500005',
-  };
 
   static final HttpClient _http = HttpClient()
     ..connectionTimeout = const Duration(seconds: 15);
@@ -114,12 +104,16 @@ class Backend {
   // ---------------------------------------------------------------- identity
 
   /// A bearer token for one demo account, from the same realm the app signs in against.
+  ///
+  /// Backoffice is the odd one out: it authenticates against `delivery-portal` rather than
+  /// `mobile-app`, which is how the portal is separated from the phone app. The password comes
+  /// from [DemoLogins], supplied at run time.
   static Future<String> signIn(String user) async {
     final String client = user == 'backoffice' ? 'delivery-portal' : 'mobile-app';
     final _Res res = await _send(
       'POST',
       '$issuer/protocol/openid-connect/token',
-      form: 'client_id=$client&username=$user&password=${_passwords[user]}&grant_type=password',
+      form: 'client_id=$client&username=$user&password=${Uri.encodeQueryComponent(DemoLogins.passwordOf(user))}&grant_type=password',
     );
     if (res.code != 200) _fail('signing in as $user', res);
     return (jsonDecode(res.body) as Map<String, dynamic>)['access_token'] as String;

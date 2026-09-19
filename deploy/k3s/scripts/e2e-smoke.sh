@@ -8,6 +8,12 @@
 # job board, backoffice the applications, the carrier their company, and the money and points
 # services answer. Pass --with-email to also push one real verification code through the mail
 # relay (it sends an actual email, so it is opt-in).
+#
+# The demo logins' passwords are read from the environment's demo-logins Secret at run time — they
+# are not in this file any more (they were, and the repository was public). So run it ON THE BOX,
+# where kubectl reaches the namespace; from a workstation, KUBECTL="ssh delivery-vps kubectl" works
+# too. A password travels from the Secret straight into curl's stdin: never argv, never the
+# terminal.
 set -u
 
 ENV="${1:?usage: e2e-smoke.sh <dev|qa> [--with-email addr]}"
@@ -20,9 +26,23 @@ PASS=0; FAIL=0
 ok()   { PASS=$((PASS+1)); printf "  ok   %s\n" "$1"; }
 bad()  { FAIL=$((FAIL+1)); printf "  FAIL %s -- %s\n" "$1" "$2"; }
 
-tok() { # tok <user> <pass>
-  curl -s -X POST "$IAM/realms/delivery-platform/protocol/openid-connect/token" \
-    -d client_id=mobile-app -d "username=$1" -d "password=$2" -d grant_type=password \
+KUBECTL="${KUBECTL:-kubectl}"
+NS="delivery-$ENV"
+# The whole Secret, fetched once — one kubectl call rather than one per user, which matters when
+# KUBECTL is ssh: the box refuses a burst of new connections. Held in memory only, base64 as the
+# API returns it; demo_password decodes one user's on stdout, and that is only ever piped into curl.
+DEMO_LOGINS=$($KUBECTL -n "$NS" get secret demo-logins -o json) \
+  || { echo "cannot read the demo-logins Secret in $NS — run this on the box, or set KUBECTL"; exit 2; }
+demo_password() {
+  printf '%s\n' "$DEMO_LOGINS" | sed -n "s/^ *\"$1\": *\"\([^\"]*\)\".*/\1/p" | base64 -d
+}
+for u in customer rider merchant backoffice carrier; do
+  [ -n "$(demo_password "$u")" ] || { echo "demo-logins in $NS has no $u"; exit 2; }
+done
+
+tok() { # tok <user>
+  demo_password "$1" | curl -s -X POST "$IAM/realms/delivery-platform/protocol/openid-connect/token" \
+    -d client_id=mobile-app -d "username=$1" --data-urlencode "password@-" -d grant_type=password \
     | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p'
 }
 code() { # code <token> <method> <path> [json]
@@ -35,11 +55,11 @@ code() { # code <token> <method> <path> [json]
 }
 
 echo "=== $ENV : sign-in, all five roles ==="
-CUST=$(tok customer 100001);  [ -n "$CUST" ] && ok "customer signs in"  || bad "customer sign-in" "no token"
-RIDER=$(tok rider 300003);    [ -n "$RIDER" ] && ok "rider signs in"    || bad "rider sign-in" "no token"
-MERCH=$(tok merchant 200002); [ -n "$MERCH" ] && ok "merchant signs in" || bad "merchant sign-in" "no token"
-BACK=$(tok backoffice 400004);[ -n "$BACK" ] && ok "backoffice signs in" || bad "backoffice sign-in" "no token"
-CARR=$(tok carrier 500005);   [ -n "$CARR" ] && ok "carrier signs in"   || bad "carrier sign-in" "no token"
+CUST=$(tok customer);  [ -n "$CUST" ] && ok "customer signs in"  || bad "customer sign-in" "no token"
+RIDER=$(tok rider);    [ -n "$RIDER" ] && ok "rider signs in"    || bad "rider sign-in" "no token"
+MERCH=$(tok merchant); [ -n "$MERCH" ] && ok "merchant signs in" || bad "merchant sign-in" "no token"
+BACK=$(tok backoffice);[ -n "$BACK" ] && ok "backoffice signs in" || bad "backoffice sign-in" "no token"
+CARR=$(tok carrier);   [ -n "$CARR" ] && ok "carrier signs in"   || bad "carrier sign-in" "no token"
 
 echo "=== $ENV : the customer's day ==="
 C=$(code "$CUST" GET "/api/stores")
@@ -84,7 +104,7 @@ elif [ "$C" = 404 ]; then bad "carrier company" "404 - demo carrier has no compa
 else bad "carrier company" "HTTP $C"; fi
 
 echo "=== $ENV : the backoffice day ==="
-BC=$(curl -s -o /tmp/e2e_body -w "%{http_code}" -X POST "$IAM/realms/delivery-platform/protocol/openid-connect/token" -d client_id=delivery-portal -d username=backoffice -d password=400004 -d grant_type=password)
+BC=$(demo_password backoffice | curl -s -o /tmp/e2e_body -w "%{http_code}" -X POST "$IAM/realms/delivery-platform/protocol/openid-connect/token" -d client_id=delivery-portal -d username=backoffice --data-urlencode "password@-" -d grant_type=password)
 PTOK=$(sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p' /tmp/e2e_body)
 [ -n "$PTOK" ] && ok "backoffice signs in on the portal client" || bad "portal client sign-in" "HTTP $BC"
 C=$(code "$PTOK" GET "/api/onboarding/applications")

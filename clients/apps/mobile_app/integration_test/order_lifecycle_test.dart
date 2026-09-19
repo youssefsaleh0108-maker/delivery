@@ -20,6 +20,7 @@ import 'package:mobile_app/src/store_home_screen.dart';
 import 'package:mobile_app/src/store_page_screen.dart';
 
 import 'support/backend.dart';
+import 'support/demo_logins.dart';
 import 'support/journey.dart';
 
 /// **One order, three people, one phone.** The business flow this whole platform exists for,
@@ -117,7 +118,7 @@ void main() {
     // ============================================================ the customer buys something
 
     await app.main();
-    await signIn(tester, 'customer', '100001', expectedShell: CustomerShell);
+    await signIn(tester, 'customer', DemoLogins.passwordOf('customer'), expectedShell: CustomerShell);
 
     await pumpUntil(tester, find.text(en.custActiveStoresNearby),
         reason: 'The storefront never finished loading.');
@@ -430,7 +431,7 @@ void main() {
 
     // ============================================================ the merchant makes it
 
-    await signIn(tester, 'merchant', '200002', expectedShell: MerchantShell);
+    await signIn(tester, 'merchant', DemoLogins.passwordOf('merchant'), expectedShell: MerchantShell);
 
     await tester.tap(find.descendant(
         of: find.byType(YdBottomNav), matching: find.text(en.navOrders)));
@@ -532,7 +533,7 @@ void main() {
 
     // ============================================================ the rider carries it
 
-    await signIn(tester, 'rider', '300003', expectedShell: RiderHomeScreen);
+    await signIn(tester, 'rider', DemoLogins.passwordOf('rider'), expectedShell: RiderHomeScreen);
 
     // The offer card renders the delivery address and never an order reference — which is why the
     // address carries this run's tag. Matching on it is the only way to be sure the job claimed
@@ -640,7 +641,7 @@ void main() {
 
     // ============================================================ and the customer sees it arrive
 
-    await signIn(tester, 'customer', '100001', expectedShell: CustomerShell);
+    await signIn(tester, 'customer', DemoLogins.passwordOf('customer'), expectedShell: CustomerShell);
     await tester.tap(find.descendant(
         of: find.byType(CustomerNavBar), matching: find.text(en.navOrders)));
     await pumpUntil(tester, find.byType(MyOrdersScreen), reason: 'The Orders tab did not build.');

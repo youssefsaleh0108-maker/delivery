@@ -406,6 +406,14 @@ spec:
           env:
             - name: SERVER_PORT
               value: "8104"
+            # The service account's client secret (view-users only), from keycloak-clients — the
+            # Secret the realm import filled the same client from. It used to be a literal in
+            # vault/bootstrap.sh, published with the repository, and the Config Server handed it
+            # over from Vault; Vault no longer carries it, so application.yml's
+            # `${KEYCLOAK_CLIENT_SECRET}` binds this. Rotation: regenerate it in Keycloak, update the
+            # Secret, restart this Deployment (scripts/rotate-secrets.sh does all three).
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: keycloak-clients, key: NOTIFICATIONS_CLIENT_SECRET } }
           ports:
             - containerPort: 8104
           # Ask the application, not the socket.
@@ -682,6 +690,12 @@ spec:
           env:
             - name: SERVER_PORT
               value: "8112"
+            # Signs the dev-passthrough delivery receipts that /webhooks/dlr/dev_passthrough accepts,
+            # and that route is PUBLIC. application.yml's fallback for it is in the repository, so
+            # without this variable anybody could write delivery outcomes for the SMS this platform
+            # sends. The value is minted per environment into sms-dlr and never leaves the box.
+            - name: SMS_DEV_DLR_SECRET
+              valueFrom: { secretKeyRef: { name: sms-dlr, key: SMS_DEV_DLR_SECRET } }
           ports:
             - containerPort: 8112
           # Ask the application, not the socket.
@@ -751,6 +765,10 @@ spec:
           env:
             - name: SERVER_PORT
               value: "8115"
+            # The service account's client secret (view-users only) — see notifications-manager's
+            # KEYCLOAK_CLIENT_SECRET for why it comes from keycloak-clients and not from Vault.
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: keycloak-clients, key: ACCOUNTING_CLIENT_SECRET } }
           ports:
             - containerPort: 8115
           # Ask the application, not the socket.
@@ -820,6 +838,15 @@ spec:
           env:
             - name: SERVER_PORT
               value: "8116"
+            # The webhook's HMAC secret and Meta's verify token, from whatsapp-webhook. They used to
+            # be literals in platform-common — in the repository, and in every pod's environment.
+            # /webhooks/whatsapp is public, so the HMAC secret is all that stands between the
+            # internet and a merchant's conversations and order drafts. The dev simulator signs
+            # with this same value, so it keeps working whatever the value is.
+            - name: WHATSAPP_APP_SECRET
+              valueFrom: { secretKeyRef: { name: whatsapp-webhook, key: WHATSAPP_APP_SECRET } }
+            - name: WHATSAPP_VERIFY_TOKEN
+              valueFrom: { secretKeyRef: { name: whatsapp-webhook, key: WHATSAPP_VERIFY_TOKEN } }
           ports:
             - containerPort: 8116
           # Ask the application, not the socket.
@@ -891,8 +918,11 @@ spec:
               value: "8117"
             - name: KEYCLOAK_CLIENT_ID
               value: onboarding-service
+            # This client holds BACKOFFICE, the widest grant on the platform, so its secret sits in
+            # keycloak-clients, which only this Deployment and Keycloak read — not in
+            # platform-secrets, which every service imports whole.
             - name: KEYCLOAK_CLIENT_SECRET
-              valueFrom: { secretKeyRef: { name: platform-secrets, key: ONBOARDING_CLIENT_SECRET } }
+              valueFrom: { secretKeyRef: { name: keycloak-clients, key: ONBOARDING_CLIENT_SECRET } }
             - name: MINIO_ACCESS_KEY
               valueFrom: { secretKeyRef: { name: platform-secrets, key: MINIO_ROOT_USER } }
             - name: MINIO_SECRET_KEY

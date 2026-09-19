@@ -8,6 +8,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:mobile_app/main.dart' as app;
 
+import 'support/demo_logins.dart';
+
 // The carrier console, driven end to end: cold start, the app's own sign-in form, and then the
 // three tabs a delivery company actually reads — the shell it lands on, the fleet roster, and the
 // earnings breakdown.
@@ -66,12 +68,10 @@ const String _clientId = 'mobile-app';
 
 /// A demo login on the dev realm, and it must stay that.
 ///
-/// This is a seeded account on a throwaway realm, which is the only reason a credential is sitting
-/// in a repository at all. Anyone copying this file as the template for a QA or staging run has to
-/// replace these — pointing it at an environment where this account is real would put a working
-/// password in version control.
+/// Its passcode is supplied at run time ([DemoLogins]). It used to sit here, in a public
+/// repository, which made the dev carrier a login anybody could use.
 const String _carrierUsername = 'carrier';
-const String _carrierPasscode = '500005';
+final String _carrierPasscode = DemoLogins.passwordOf('carrier');
 
 /// Pumps a frame at a time until [finder] matches, or the deadline passes.
 ///
@@ -143,7 +143,7 @@ Future<String> _carrierAccessToken() async {
         await client.postUrl(Uri.parse('$_issuer/protocol/openid-connect/token'));
     request.headers
         .set(HttpHeaders.contentTypeHeader, 'application/x-www-form-urlencoded');
-    request.write(const <String, String>{
+    request.write(<String, String>{
       'grant_type': 'password',
       'client_id': _clientId,
       'username': _carrierUsername,
