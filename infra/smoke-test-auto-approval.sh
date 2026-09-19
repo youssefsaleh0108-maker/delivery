@@ -19,6 +19,15 @@ roles() {
     | jq -r '[.realm_access.roles[]|select(.=="DELIVERY" or .=="MERCHANT" or .=="APPLICANT")]|sort|join(",")'
 }
 
+# The demo logins' passwords, from the environment's demo-logins Secret, supplied by whoever runs
+# this — they were literals here, and the repository was public. On the box, for example:
+#   DEMO_CUSTOMER_PASSWORD=$(kubectl -n delivery-dev get secret demo-logins -o jsonpath='{.data.customer}' | base64 -d)
+: "${DEMO_CUSTOMER_PASSWORD:?set DEMO_CUSTOMER_PASSWORD from the demo-logins Secret}" "${DEMO_MERCHANT_PASSWORD:?set DEMO_MERCHANT_PASSWORD from the demo-logins Secret}"
+# A random six-digit passcode for each account this run creates: those accounts stay behind, and a
+# passcode printed in a public file would make each one a login anybody could use.
+pc() { printf '%06d' $(( $(od -An -N4 -tu4 /dev/urandom | tr -d ' ') % 1000000 )); }
+RIDER_PC=$(pc); MERCH_PC=$(pc); CARRIER_PC=$(pc)
+
 apply() { # apply <kind> <email> <passcode>  -> prints the reference
   curl -s -o /dev/null -X POST "$GW/api/onboarding/verifications" -H 'Content-Type: application/json' \
     -d "{\"channel\":\"EMAIL\",\"destination\":\"$2\"}"
@@ -35,7 +44,7 @@ apply() { # apply <kind> <email> <passcode>  -> prints the reference
 
 echo '=== 1. A rider, with nobody reviewing ==========================================='
 RE="qa.autorider$(date +%s)@example.invalid"
-RREF=$(apply RIDER "$RE" 246810)
+RREF=$(apply RIDER "$RE" "$RIDER_PC")
 check 'application submitted' 'yes' "$([ -n "$RREF" ] && [ "$RREF" != null ] && echo yes || echo no)"
 # Still queued until the applicant has a sign-in. Approving before that produced an account with
 # a password nobody knew, and blocked the passcode they went on to choose.
@@ -43,21 +52,21 @@ check 'queued until a sign-in exists' 'SUBMITTED' \
   "$(psql -h postgres -U delivery -d delivery -At -c "select status from onboarding.onboarding_applications where reference='$RREF';")"
 
 curl -s -o /dev/null -X POST "$GW/api/onboarding/applications/$RREF/account" \
-  -H 'Content-Type: application/json' -d '{"password":"246810"}'
+  -H 'Content-Type: application/json' -d "{\"password\":\"$RIDER_PC\"}"
 sleep 8
 check 'decided without a reviewer' 'PROVISIONED' \
   "$(psql -h postgres -U delivery -d delivery -At -c "select status from onboarding.onboarding_applications where reference='$RREF';")"
 check 'and the record says who decided' 'system:auto-approval' \
   "$(psql -h postgres -U delivery -d delivery -At -c "select decided_by from onboarding.onboarding_applications where reference='$RREF';")"
 RT=$(curl -s -X POST "$KC" -d client_id=mobile-app -d grant_type=password \
-  --data-urlencode "username=$RE" -d password=246810 | jq -r .access_token)
+  --data-urlencode "username=$RE" -d "password=$RIDER_PC" | jq -r .access_token)
 check 'signs in' 'yes' "$([ "$RT" != null ] && echo yes || echo no)"
 # The whole point: DELIVERY granted and APPLICANT gone, in one step, with no reviewer.
 check 'holds DELIVERY, not APPLICANT' 'DELIVERY' "$(roles "$RT")"
 
 echo '=== 2. And can actually take work ==============================================='
-CUST=$(curl -s -X POST "$KC" -d client_id=mobile-app -d username=customer -d password=100001 -d grant_type=password | jq -r .access_token)
-MERCH=$(curl -s -X POST "$KC" -d client_id=delivery-portal -d username=merchant -d password=200002 -d grant_type=password | jq -r .access_token)
+CUST=$(printf '%s' "$DEMO_CUSTOMER_PASSWORD" | curl -s -X POST "$KC" -d client_id=mobile-app -d username=customer --data-urlencode "password@-" -d grant_type=password | jq -r .access_token)
+MERCH=$(printf '%s' "$DEMO_MERCHANT_PASSWORD" | curl -s -X POST "$KC" -d client_id=delivery-portal -d username=merchant --data-urlencode "password@-" -d grant_type=password | jq -r .access_token)
 P=$(curl -s "$GW/api/products/mine?size=50" -H "Authorization: Bearer $MERCH" | jq -r '[(.content // .)[]|select(.status=="ACTIVE")][0].id')
 O=$(curl -s -X POST "$GW/api/orders" -H "Authorization: Bearer $CUST" -H 'Content-Type: application/json' \
   -d "{\"items\":[{\"productId\":\"$P\",\"qty\":1}],\"deliveryAddress\":\"Auto St\",\"paymentMethod\":\"CASH\"}" | jq -r .id)
@@ -68,14 +77,14 @@ check 'claims a job immediately' '200' \
 
 echo '=== 3. A merchant, same ========================================================='
 ME="qa.automerch$(date +%s)@example.invalid"
-MREF=$(apply MERCHANT "$ME" 135791)
+MREF=$(apply MERCHANT "$ME" "$MERCH_PC")
 curl -s -o /dev/null -X POST "$GW/api/onboarding/applications/$MREF/account" \
-  -H 'Content-Type: application/json' -d '{"password":"135791"}'
+  -H 'Content-Type: application/json' -d "{\"password\":\"$MERCH_PC\"}"
 sleep 8
 check 'decided without a reviewer' 'PROVISIONED' \
   "$(psql -h postgres -U delivery -d delivery -At -c "select status from onboarding.onboarding_applications where reference='$MREF';")"
 MT=$(curl -s -X POST "$KC" -d client_id=mobile-app -d grant_type=password \
-  --data-urlencode "username=$ME" -d password=135791 | jq -r .access_token)
+  --data-urlencode "username=$ME" -d "password=$MERCH_PC" | jq -r .access_token)
 check 'holds MERCHANT, not APPLICANT' 'MERCHANT' "$(roles "$MT")"
 NEW=$(curl -s -X POST "$GW/api/products" -H "Authorization: Bearer $MT" -H 'Content-Type: application/json' \
   -d '{"name":"Auto Approved Item","description":"placed with no reviewer","price":4.50}' | jq -r .id)
@@ -85,7 +94,7 @@ check 'may publish (needs an image, so 422 not 403)' '422' \
 
 echo '=== 4. A carrier is still reviewed =============================================='
 CE="qa.autocarrier$(date +%s)@example.invalid"
-CREF=$(apply CARRIER "$CE" 975312)
+CREF=$(apply CARRIER "$CE" "$CARRIER_PC")
 # Carriers were deliberately left manual: a company signs for a fleet and a payout account.
 check 'carrier still waits for a human' 'SUBMITTED' \
   "$(psql -h postgres -U delivery -d delivery -At -c "select status from onboarding.onboarding_applications where reference='$CREF';")"

@@ -28,6 +28,20 @@ import { execSync } from 'node:child_process';
 const ENV = process.argv[2] || 'dev';
 const API = `https://api-${ENV}.youdrop.shop`;
 const IAM = `https://iam-${ENV}.youdrop.shop`;
+const NS = `delivery-${ENV}`;
+
+// The demo logins' passwords come from the environment's demo-logins Secret — one ssh call for all
+// of them, held in memory — or from DEMO_<USER>_PASSWORD if set. They were literals here, and the
+// repository was public.
+let demoLogins = null;
+const demoPassword = (user) => {
+  const fromEnv = process.env[`DEMO_${user.toUpperCase()}_PASSWORD`];
+  if (fromEnv) return fromEnv;
+  demoLogins ??= JSON.parse(execSync(`ssh delivery-vps "kubectl -n ${NS} get secret demo-logins -o json"`,
+    { encoding: 'utf8' })).data;
+  if (!demoLogins?.[user]) throw new Error(`demo-logins in ${NS} has no ${user}`);
+  return Buffer.from(demoLogins[user], 'base64').toString('utf8');
+};
 
 const IN_HOUSE = '00000000-0000-4000-8000-00000000d001';
 const RUN = Date.now().toString(36).toUpperCase();
@@ -84,11 +98,11 @@ const waitFor = async (attempt, seconds = 60) => {
 
 console.log(`\n=== an outside company carries an order on ${ENV} ===\n`);
 
-const customer = await signIn('customer', '100001');
-const merchant = await signIn('merchant', '200002');
-const rider = await signIn('rider', '300003');
-const carrier = await signIn('carrier', '500005');
-const backoffice = await signIn('backoffice', '400004', 'delivery-portal');
+const customer = await signIn('customer', demoPassword('customer'));
+const merchant = await signIn('merchant', demoPassword('merchant'));
+const rider = await signIn('rider', demoPassword('rider'));
+const carrier = await signIn('carrier', demoPassword('carrier'));
+const backoffice = await signIn('backoffice', demoPassword('backoffice'), 'delivery-portal');
 const riderSub = subOf(rider);
 ok('every role signs in');
 

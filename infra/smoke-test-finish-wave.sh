@@ -14,13 +14,21 @@ GW=https://api-dev.youdrop.shop
 KC=https://iam-dev.youdrop.shop/realms/delivery-platform/protocol/openid-connect/token
 PASS=0; FAIL=0
 check() { if [ "$2" = "$3" ]; then printf '  \033[32mPASS\033[0m  %-56s %s\n' "$1" "$3"; PASS=$((PASS+1)); else printf '  \033[31mFAIL\033[0m  %-56s expected %s, got %s\n' "$1" "$2" "$3"; FAIL=$((FAIL+1)); fi; }
-tok() { curl -s -X POST "$KC" -d client_id="${3:-mobile-app}" --data-urlencode "username=$1" -d "password=$2" -d grant_type=password | jq -r .access_token; }
+tok() { printf '%s' "$2" | curl -s -X POST "$KC" -d client_id="${3:-mobile-app}" --data-urlencode "username=$1" --data-urlencode "password@-" -d grant_type=password | jq -r .access_token; }
+# The demo logins' passwords, from the environment's demo-logins Secret, supplied by whoever runs
+# this — they were literals here, and the repository was public. On the box, for example:
+#   DEMO_CUSTOMER_PASSWORD=$(kubectl -n delivery-dev get secret demo-logins -o jsonpath='{.data.customer}' | base64 -d)
+: "${DEMO_CUSTOMER_PASSWORD:?set DEMO_CUSTOMER_PASSWORD from the demo-logins Secret}" "${DEMO_MERCHANT_PASSWORD:?set DEMO_MERCHANT_PASSWORD from the demo-logins Secret}" "${DEMO_RIDER_PASSWORD:?set DEMO_RIDER_PASSWORD from the demo-logins Secret}" "${DEMO_BACKOFFICE_PASSWORD:?set DEMO_BACKOFFICE_PASSWORD from the demo-logins Secret}" "${DEMO_CARRIER_PASSWORD:?set DEMO_CARRIER_PASSWORD from the demo-logins Secret}"
+# A random six-digit passcode for each account this run creates: those accounts stay behind, and a
+# passcode printed in a public file would make each one a login anybody could use.
+pc() { printf '%06d' $(( $(od -An -N4 -tu4 /dev/urandom | tr -d ' ') % 1000000 )); }
+OLD_PC=$(pc); NEW_PC=$(pc); THIRD_PC=$(pc)
 
-CUST=$(tok customer 100001)
-MERCH=$(tok merchant 200002 delivery-portal)
-RIDER=$(tok rider 300003)
-BO=$(tok backoffice 400004 delivery-portal)
-CARRIER=$(tok carrier 500005 delivery-portal)
+CUST=$(tok customer "$DEMO_CUSTOMER_PASSWORD")
+MERCH=$(tok merchant "$DEMO_MERCHANT_PASSWORD" delivery-portal)
+RIDER=$(tok rider "$DEMO_RIDER_PASSWORD")
+BO=$(tok backoffice "$DEMO_BACKOFFICE_PASSWORD" delivery-portal)
+CARRIER=$(tok carrier "$DEMO_CARRIER_PASSWORD" delivery-portal)
 
 echo '=== 1. Delivery tiers ==========================================================='
 P=$(curl -s "$GW/api/products/mine?size=50" -H "Authorization: Bearer $MERCH" | jq -r '[(.content // .)[]|select(.status=="ACTIVE")][0].id')
@@ -64,16 +72,16 @@ T=$(curl -s -X POST "$GW/api/onboarding/verifications/confirm" -H 'Content-Type:
 # to a valid code for an address with no account. A skipped setup step reads as a product failure.
 check 'account created for the reset test' '201' "$(curl -s -o /dev/null -w '%{http_code}' \
   -X POST "$GW/api/onboarding/signup" -H 'Content-Type: application/json' \
-  -d "{\"email\":\"$E\",\"verificationToken\":\"$T\",\"firstName\":\"Reset\",\"lastName\":\"Tester\",\"password\":\"111222\"}")"
+  -d "{\"email\":\"$E\",\"verificationToken\":\"$T\",\"firstName\":\"Reset\",\"lastName\":\"Tester\",\"password\":\"$OLD_PC\"}")"
 check 'unknown email still 202'  '202' "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$GW/api/onboarding/password-reset" -H 'Content-Type: application/json' -d '{"email":"nobody@example.invalid"}')"
 sleep 65   # the per-address cooldown is shared with the signup code sent above — by design
 check 'reset requested' '202' "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$GW/api/onboarding/password-reset" -H 'Content-Type: application/json' -d "{\"email\":\"$E\"}")"
 sleep 6
 RCODE=$(psql -h postgres -U delivery -d delivery -At -c "select body from notification.notification_log where recipient='$E' order by created_at desc limit 1;" | grep -oE '[0-9]{6}' | head -1)
-check 'confirm sets new passcode' '204' "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$GW/api/onboarding/password-reset/confirm" -H 'Content-Type: application/json' -d "{\"email\":\"$E\",\"code\":\"$RCODE\",\"newPassword\":\"333444\"}")"
-check 'new passcode signs in' 'yes' "$([ "$(tok "$E" 333444)" != null ] && echo yes || echo no)"
-check 'old passcode dead' 'null' "$(tok "$E" 111222)"
-check 'code is single-use (422 per contract)' '422' "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$GW/api/onboarding/password-reset/confirm" -H 'Content-Type: application/json' -d "{\"email\":\"$E\",\"code\":\"$RCODE\",\"newPassword\":\"555666\"}")"
+check 'confirm sets new passcode' '204' "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$GW/api/onboarding/password-reset/confirm" -H 'Content-Type: application/json' -d "{\"email\":\"$E\",\"code\":\"$RCODE\",\"newPassword\":\"$NEW_PC\"}")"
+check 'new passcode signs in' 'yes' "$([ "$(tok "$E" "$NEW_PC")" != null ] && echo yes || echo no)"
+check 'old passcode dead' 'null' "$(tok "$E" "$OLD_PC")"
+check 'code is single-use (422 per contract)' '422' "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$GW/api/onboarding/password-reset/confirm" -H 'Content-Type: application/json' -d "{\"email\":\"$E\",\"code\":\"$RCODE\",\"newPassword\":\"$THIRD_PC\"}")"
 
 echo '=== 5. Partner API keys ========================================================='
 K=$(curl -s -X POST "$GW/api/partner-keys" -H "Authorization: Bearer $CARRIER" -H 'Content-Type: application/json' -d '{"label":"e2e"}')
