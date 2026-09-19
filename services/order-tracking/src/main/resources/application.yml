@@ -227,6 +227,12 @@ delivery:
         # authenticates by query parameter, so nothing in MapboxRouteProvider ever logs a URI.
         profile: mapbox/driving-traffic
 
+    # How long a delivery's trail is kept: a day's tracking_events partition is dropped once the day
+    # is older than this (TrackingPartitionMaintenance). What survives it is a per-order summary
+    # with no position in it. The rider app's location disclosure states this number
+    # (riderGpsDisclosureKept in delivery_l10n) — change the two together.
+    raw-ping-retention-days: 30
+
     # Shift boundaries are kept far longer than raw GPS: payroll and late disputes ask about them
     # months later, and the table is a few rows per rider per day rather than millions. The same
     # retention covers duty_sessions — the intervals are built from the same boundaries and age out
