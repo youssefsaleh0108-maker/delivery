@@ -1578,9 +1578,9 @@ that does not exist, and a screen listed here with no tick is one nobody has dri
 
   - [ ] Back — pops to Home.  `YdScreenHeader`
   - [ ] Search field, hint t.isrchFieldHint = "Search items in shops" — 350ms-debounced; searches again from 2 characters.  `YdSearchField`
-  - [ ] Shop line (logo, name, Busy/Closing-soon StoreStatePill, t.etaRange, fee, distance only with a pin) — pushes StorePageScreen with preview.  `InkWell in ItemSearchGroupCard`
+  - [ ] Shop line (logo, name, Busy/Closing-soon StoreStatePill, t.etaRange, fee, distance only with a pin) — pushes StorePageScreen with preview and the address book, so its Delivery area map says inside/outside.  `InkWell in ItemSearchGroupCard`
   - [ ] Item row — tap: BasketAdd.open -> ProductDetailScreen; AddButton: BasketAdd.add; with the product in the basket, remove + count as on the shelf.  `InkWell + AddButton`
-  - [ ] t.isrchMoreInStore(n) = "{n} more in this shop" — only when the shop matched more than the card shows; pushes StorePageScreen(initialSearch: the words): shelf searched, field open.  `TextButton.icon`
+  - [ ] t.isrchMoreInStore(n) = "{n} more in this shop" — only when the shop matched more than the card shows; pushes StorePageScreen(initialSearch: the words, and the address book): shelf searched, field open.  `TextButton.icon`
   - [ ] Basket bar t.viewBasket — once the basket has something; onOpenBasket to the shell's Basket tab. No shortfall advice here.  `StickyBasketBar`
   - [ ] Infinite scroll — 10 shops a page.  `PagedList + NotificationListener`
 

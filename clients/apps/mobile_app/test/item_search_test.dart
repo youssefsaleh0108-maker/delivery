@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
@@ -9,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_app/src/cart.dart';
 import 'package:mobile_app/src/customer_shell.dart';
 import 'package:mobile_app/src/delivery_address.dart';
+import 'package:mobile_app/src/delivery_area_map_screen.dart';
 import 'package:mobile_app/src/home_item_search_section.dart';
 import 'package:mobile_app/src/item_search_screen.dart';
 import 'package:mobile_app/src/product_detail_screen.dart' show AddButton, ProductDetailScreen;
@@ -106,6 +109,17 @@ void main() {
         product('p3', 'shop-1', 'Diet Pepsi Can', price: 0.9),
       ], matched: matched);
 
+  /// Where Corner Grocer delivers, as its full store read says: 3 km around a pin on the results'
+  /// pinned address, and to Hamra, the area of the address the shell finds saved on the phone.
+  final Map<String, dynamic> deliveryArea = <String, dynamic>{
+    'latitude': 33.8977,
+    'longitude': 35.4829,
+    'deliveryRadiusMetres': 3000,
+    'deliveryZones': <dynamic>[
+      <String, dynamic>{'id': 'z-hamra', 'name': 'Hamra', 'sortOrder': 10, 'active': true},
+    ],
+  };
+
   /// Every item search the app asked, by its body.
   final List<Map<String, dynamic>> searches = <Map<String, dynamic>>[];
 
@@ -115,11 +129,13 @@ void main() {
   /// A fake gateway: [search] answers the item search from the request body, or null to fail it with
   /// a 500; with a [searchStatus] other than 200 its answer is the error body of that status, as
   /// `ApiExceptionHandler` writes a refusal. [options] gives a product's option groups (none by
-  /// default). The rest of what the shell and a shop page read on start is answered empty.
+  /// default); [shop] adds fields to a shop's full store read. The rest of what the shell and a
+  /// shop page read on start is answered empty.
   Dio gateway(
     Map<String, dynamic>? Function(Map<String, dynamic> body) search, {
     Map<String, List<Map<String, dynamic>>> options = const <String, List<Map<String, dynamic>>>{},
     int searchStatus = 200,
+    Map<String, dynamic> shop = const <String, dynamic>{},
   }) {
     final Dio dio = Dio(BaseOptions(baseUrl: 'http://127.0.0.1:1'));
     dio.interceptors.add(InterceptorsWrapper(
@@ -147,7 +163,11 @@ void main() {
             body = options[path.split('/')[3]] ?? const <dynamic>[];
           } else if (RegExp(r'^/api/stores/shop-\d+$').hasMatch(path)) {
             final String id = path.split('/').last;
-            body = <String, dynamic>{...card(id, 'Corner Grocer'), 'offers': const <dynamic>[]};
+            body = <String, dynamic>{
+              ...card(id, 'Corner Grocer'),
+              'offers': const <dynamic>[],
+              ...shop,
+            };
           } else if (path.endsWith('/products') || path.endsWith('/offers')) {
             body = page(const <Map<String, dynamic>>[]);
           } else if (path.endsWith('/aisles')) {
@@ -275,6 +295,64 @@ void main() {
 
       expect(find.byType(ItemSearchScreen), findsOneWidget);
       expect(searches.last, <String, dynamic>{'q': 'pepsi', 'page': 0, 'size': 10});
+    });
+
+    /// The address the shell finds saved on the phone, as the last session left it: in Hamra, with
+    /// no pin.
+    void savedInHamra() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(storageChannel, (MethodCall call) async {
+        final Map<Object?, Object?> args =
+            (call.arguments as Map<Object?, Object?>?) ?? const <Object?, Object?>{};
+        if (call.method == 'read' && args['key'] == 'delivery.addresses.user-1') {
+          const DeliveryAddress home = DeliveryAddress(line: '12 Rose Street', zoneId: 'z-hamra');
+          return jsonEncode(<String, dynamic>{
+            'selected': home.toJson(),
+            'recents': <Object>[home.toJson()],
+          });
+        }
+        return null;
+      });
+    }
+
+    testWidgets("a shop opened from the section knows the shell's address: inside its area",
+        (WidgetTester tester) async {
+      savedInHamra();
+      await pumpShell(
+          tester,
+          gateway((_) => answerOf(<Map<String, dynamic>>[cornerGrocer()], nearby: false),
+              shop: deliveryArea));
+      await type(tester, 'pepsi');
+
+      await tester.tap(find.text('Corner Grocer'));
+      await tester.pumpAndSettle();
+      expect(find.byType(StorePageScreen), findsOneWidget);
+
+      await tester.tap(find.text(en.dareaButton));
+      await tester.pumpAndSettle();
+      expect(find.byType(DeliveryAreaMapScreen), findsOneWidget);
+      expect(find.text(en.dareaInside), findsOneWidget);
+    });
+
+    testWidgets('so does a shop opened from "See all items"', (WidgetTester tester) async {
+      savedInHamra();
+      await pumpShell(
+          tester,
+          gateway((_) => answerOf(<Map<String, dynamic>>[cornerGrocer()], nearby: false),
+              shop: deliveryArea));
+      await type(tester, 'pepsi');
+      await tester.tap(find.text(en.isrchSeeAll));
+      await tester.pumpAndSettle();
+      expect(find.byType(ItemSearchScreen), findsOneWidget);
+
+      await tester.tap(find.text('Corner Grocer'));
+      await tester.pumpAndSettle();
+      expect(find.byType(StorePageScreen), findsOneWidget);
+
+      await tester.tap(find.text(en.dareaButton));
+      await tester.pumpAndSettle();
+      expect(find.byType(DeliveryAreaMapScreen), findsOneWidget);
+      expect(find.text(en.dareaInside), findsOneWidget);
     });
 
     testWidgets('is not drawn while offline, and searches once the connection is back',
@@ -485,6 +563,32 @@ void main() {
           reads.lastWhere((RequestOptions o) => o.path == '/api/stores/shop-1/products');
       expect(shelf.queryParameters['search'], 'pepsi');
     });
+
+    // The customer's address book goes with every shop opened from here, so the shop's "Delivery
+    // area" map can say whether the chosen address is inside it.
+    for (final (String way, String tapOn, int matched) in <(String, String, int)>[
+      ('the shop line', 'Corner Grocer', 3),
+      ('"N more in this shop"', en.isrchMoreInStore(2), 5),
+    ]) {
+      testWidgets('a shop opened by $way says the address is inside its delivery area',
+          (WidgetTester tester) async {
+        await pumpResults(
+            tester,
+            gateway((_) => answerOf(<Map<String, dynamic>>[cornerGrocer(matched: matched)]),
+                shop: deliveryArea));
+
+        await tester.tap(find.text(tapOn));
+        await tester.pumpAndSettle();
+        expect(tester.widget<StorePageScreen>(find.byType(StorePageScreen)).addresses,
+            same(addresses));
+
+        await tester.tap(find.text(en.dareaButton));
+        await tester.pumpAndSettle();
+        expect(find.byType(DeliveryAreaMapScreen), findsOneWidget);
+        // The results' pinned address sits on the shop's pin, well inside its 3 km.
+        expect(find.text(en.dareaInside), findsOneWidget);
+      });
+    }
 
     testWidgets('no "more in this shop" when the card shows everything the shop matched',
         (WidgetTester tester) async {
