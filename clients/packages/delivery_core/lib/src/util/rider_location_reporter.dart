@@ -79,8 +79,9 @@ typedef RiderPresencePing = Future<void> Function(RiderFix fix);
 /// write twice. The order-less ping is only for a rider on duty with nothing in hand.
 ///
 /// **What the rider is told.** [status]. Permission and settings problems come from the platform
-/// and are re-checked on every tick and every return to the foreground, so fixing them in the
-/// system settings takes effect without the rider having to do anything else here.
+/// and are re-checked (never re-prompted) before every reading and on every return to the
+/// foreground, so fixing them in the system settings takes effect without the rider having to do
+/// anything else here.
 class RiderLocationReporter extends ChangeNotifier {
   RiderLocationReporter({
     required RiderLocationSource source,
