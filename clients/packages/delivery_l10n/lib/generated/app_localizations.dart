@@ -13805,7 +13805,7 @@ abstract class DeliveryStrings {
   /// No description provided for @dekkaneBrowseTitle.
   ///
   /// In en, this message translates to:
-  /// **'Your Neighborhood'**
+  /// **'Your neighbourhood'**
   String get dekkaneBrowseTitle;
 
   /// No description provided for @dekkaneBrowseSubRegion.
