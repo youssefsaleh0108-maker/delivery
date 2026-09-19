@@ -1,6 +1,7 @@
 package com.delivery.tracking.route;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -72,6 +73,32 @@ public class HaversineRouteProvider implements RouteProvider {
         double metres = distanceMetres(from, to);
         long seconds = Math.round(metres / averageSpeedMetresPerSecond);
         return Optional.of(new RouteEstimate(metres, Duration.ofSeconds(seconds), NAME));
+    }
+
+    /**
+     * The straight legs between the stops, summed — and no geometry, because there is none.
+     *
+     * <p>Summed from {@link #estimate}, leg by leg, so a path's length and time are exactly what an
+     * ETA over the same stops adds up to: the line on the map and the number beside it cannot
+     * disagree. The null polyline is what tells a client to draw dashed straight segments and say
+     * they are approximate.
+     */
+    @Override
+    public Optional<RoutePath> path(List<GeoPoint> stops) {
+        if (stops.size() < 2) {
+            return Optional.empty();
+        }
+        RouteEstimate total = estimate(stops.get(0), stops.get(1)).orElseThrow();
+        for (int i = 2; i < stops.size(); i++) {
+            total = total.plus(estimate(stops.get(i - 1), stops.get(i)).orElseThrow());
+        }
+        return Optional.of(new RoutePath(total.distanceMetres(), total.travelTime(), NAME, null));
+    }
+
+    /** Straight lines, said out loud. */
+    @Override
+    public PathGeometry pathGeometry() {
+        return PathGeometry.STRAIGHT;
     }
 
     /**

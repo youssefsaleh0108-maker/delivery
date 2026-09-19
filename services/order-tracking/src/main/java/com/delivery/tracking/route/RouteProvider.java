@@ -1,5 +1,6 @@
 package com.delivery.tracking.route;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -35,4 +36,39 @@ public interface RouteProvider {
 
     /** Empty when this provider cannot answer; never a guess in place of a real route. */
     Optional<RouteEstimate> estimate(GeoPoint from, GeoPoint to);
+
+    /**
+     * The route through {@code stops}, visited in the order given — the line a customer's map
+     * draws, with its length and time.
+     *
+     * <p>Empty on the same terms as {@link #estimate}: this provider cannot answer, so nothing is
+     * drawn. A provider that knows the roads answers with their geometry or not at all; it never
+     * degrades to a straight line, which would put a road on the map that nobody returned. The
+     * default is that empty answer, so a provider has to decide what its paths are before any are
+     * drawn from it.
+     *
+     * @param stops two or more points, in visiting order
+     */
+    default Optional<RoutePath> path(List<GeoPoint> stops) {
+        return Optional.empty();
+    }
+
+    /**
+     * How this provider's paths are drawn. {@link PathGeometry#STRAIGHT} unless it returns road
+     * geometry: a map claiming roads it was never given is the failure this whole layer avoids.
+     */
+    default PathGeometry pathGeometry() {
+        return PathGeometry.STRAIGHT;
+    }
+
+    /**
+     * Whether a path from this provider may be kept and served again.
+     *
+     * <p>False by default, and false for Mapbox by contract: its terms forbid storing Navigation
+     * API results, so every drawing of a Mapbox path is a fresh request. Only a provider whose
+     * results the platform may keep turns this on.
+     */
+    default boolean mayCachePaths() {
+        return false;
+    }
 }

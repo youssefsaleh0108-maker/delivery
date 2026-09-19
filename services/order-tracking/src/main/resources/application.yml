@@ -191,6 +191,16 @@ delivery:
         # access-token comes from Vault at secret/order-tracking, never from here. Mapbox
         # authenticates by query parameter, so nothing in MapboxRouteProvider ever logs a URI.
         profile: mapbox/driving-traffic
+      paths:
+        # The lines a checkout map draws (RoutePaths). Kept in Redis only for a provider whose
+        # terms allow it — OSRM. Never Mapbox, whose terms forbid storing Navigation API results,
+        # and never the dev provider, which is arithmetic. A planned shop → door path is the same
+        # road all day.
+        planned-ttl: 24h
+        # A rider's leg is re-routed once they are this far from where it was last routed from, or
+        # once the window below has passed, whichever comes first.
+        leg-refresh-metres: 150
+        leg-refresh-after: 60s
 
     # Shift boundaries are kept far longer than raw GPS: payroll and late disputes ask about them
     # months later, and the table is a few rows per rider per day rather than millions. The same

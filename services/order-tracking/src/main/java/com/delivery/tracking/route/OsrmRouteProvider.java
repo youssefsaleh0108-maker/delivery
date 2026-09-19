@@ -1,6 +1,7 @@
 package com.delivery.tracking.route;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -114,5 +115,78 @@ public class OsrmRouteProvider implements RouteProvider {
             log.warn("OSRM route lookup failed; reporting no estimate", e);
             return Optional.empty();
         }
+    }
+
+    /**
+     * The routed path through the stops, with the road geometry to draw.
+     *
+     * <p>{@code overview=simplified}: a phone's map needs the shape of the route, not every vertex
+     * OSRM knows, and the simplified line keeps a checkout map's refresh to a few hundred bytes.
+     * {@code geometries=polyline6} is the 1e6-precision encoding, which is what the app decodes.
+     *
+     * <p>A route that comes back without geometry is treated as no route at all. Falling back to
+     * straight lines here would put a line the provider never returned on a map labelled as roads.
+     */
+    @Override
+    public Optional<RoutePath> path(List<GeoPoint> stops) {
+        if (!isConfigured() || stops.size() < 2) {
+            // Unconfigured is the registry's problem to announce; this just declines, as estimate
+            // does.
+            return Optional.empty();
+        }
+
+        // lng,lat per stop and ';' between them. The values are numbers formatted here, so they go
+        // into the path as they are rather than as an expanded variable, which would
+        // percent-encode the separators OSRM splits on.
+        String coordinates = LngLat.list(stops);
+
+        try {
+            JsonNode response = client.get()
+                    .uri(uri -> uri.path("/route/v1/{profile}/" + coordinates)
+                            .queryParam("overview", "simplified")
+                            .queryParam("geometries", "polyline6")
+                            .build(profile))
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, (request, res) -> {
+                        // Classified below: a bad status is an empty path, not an exception.
+                    })
+                    .body(JsonNode.class);
+
+            if (response == null || !"Ok".equals(response.path("code").asText())) {
+                log.warn("OSRM returned no usable path (code {})",
+                        response == null ? "none" : response.path("code").asText());
+                return Optional.empty();
+            }
+
+            JsonNode route = response.path("routes").path(0);
+            JsonNode geometry = route.path("geometry");
+            if (route.isMissingNode() || !geometry.isTextual() || geometry.asText().isEmpty()) {
+                return Optional.empty();
+            }
+
+            double metres = route.path("distance").asDouble();
+            long seconds = Math.round(route.path("duration").asDouble());
+            return Optional.of(new RoutePath(metres, Duration.ofSeconds(seconds), NAME,
+                    geometry.asText()));
+
+        } catch (Exception e) {
+            log.warn("OSRM path lookup failed; drawing no path", e);
+            return Optional.empty();
+        }
+    }
+
+    /** Roads, as OSRM returned them. */
+    @Override
+    public PathGeometry pathGeometry() {
+        return PathGeometry.ROAD;
+    }
+
+    /**
+     * Yes: OSRM here is the platform's own server over open data, so a path may be kept and served
+     * again, which is what keeps a checkout map's refreshes from re-routing the same streets.
+     */
+    @Override
+    public boolean mayCachePaths() {
+        return true;
     }
 }
