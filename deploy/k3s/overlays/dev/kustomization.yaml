@@ -14,6 +14,12 @@ resources:
   # SMTP_PASSWORD is the Gmail app password, living only in platform-secrets on the box.
   # SMS_TEST_INBOX must be a mailbox the operator owns once the relay is real — every
   # simulated SMS becomes an actual email to it.
+  # Notifications Manager's test code sink. The delivery log masks every one-time code, so the
+  # smoke tests read theirs from notification.test_code_sink, which keeps codes ONLY for
+  # @youdrop.test addresses (a reserved domain nobody can own). A test environment's switch:
+  # never copy it into a production overlay.
+  # Riders are approved as soon as their email is verified (the owner's decision, 2026-09-19).
+  # A value set from the portal's auto-approval screen wins over this one; dev has none for riders.
 configMapGenerator:
 - literals:
   - KEYCLOAK_PUBLIC_URL=https://iam-dev.youdrop.shop
@@ -27,19 +33,17 @@ configMapGenerator:
   - SMTP_STARTTLS=true
   - EMAIL_FROM=noreply@youdrop.shop
   - SMS_TEST_INBOX=youssef.saleh0108@gmail.com
-  # Notifications Manager's test code sink. The delivery log masks every one-time code, so the
-  # smoke tests read theirs from notification.test_code_sink, which keeps codes ONLY for
-  # @youdrop.test addresses (a reserved domain nobody can own). A test environment's switch:
-  # never copy it into a production overlay.
   - TEST_CODE_SINK_ENABLED=true
-  # Riders are approved as soon as their email is verified (the owner's decision, 2026-09-19).
-  # A value set from the portal's auto-approval screen wins over this one; dev has none for riders.
   - AUTO_APPROVE_RIDER=true
   name: platform-env
 
 generatorOptions:
   disableNameSuffixHash: true
 
+# order-manager lives in its own repository, and dev runs its moving `:develop` tag, so a new
+# order-manager build changes nothing Argo CD can see. Changing this value rolls the pods, and
+# imagePullPolicy: Always makes them pull the new build. Set it to the order-manager commit that
+# should be running.
 patches:
 - patch: |-
     - op: replace
@@ -48,10 +52,6 @@ patches:
   target:
     kind: Deployment
     name: portal
-# order-manager lives in its own repository, and dev runs its moving `:develop` tag, so a new
-# order-manager build changes nothing Argo CD can see. Changing this value rolls the pods, and
-# imagePullPolicy: Always makes them pull the new build. Set it to the order-manager commit that
-# should be running.
 - patch: |-
     - op: add
       path: /spec/template/metadata/annotations/youdrop.shop~1order-manager-build
@@ -101,7 +101,7 @@ images:
   newTag: sha-14747c95bbb749aff1b8bea44031ed5255931ec9
 - name: ghcr.io/youssefsaleh0108-maker/transfer-service
   newName: ghcr.io/youssefsaleh0108-maker/transfer-service
-  newTag: sha-14747c95bbb749aff1b8bea44031ed5255931ec9
+  newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
 - name: ghcr.io/youssefsaleh0108-maker/whatsapp-service
   newName: ghcr.io/youssefsaleh0108-maker/whatsapp-service
   newTag: sha-14747c95bbb749aff1b8bea44031ed5255931ec9
