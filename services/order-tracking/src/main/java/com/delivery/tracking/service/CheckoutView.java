@@ -17,6 +17,10 @@ import com.delivery.tracking.service.EtaService.EtaResult;
  * order, or a rider's recorded fix. A point it does not hold is null, and a line through a missing
  * point is not in {@link #paths()} at all.
  *
+ * <p>Every rider position here is one {@link TrackingService#sightingFor} shows the caller for one
+ * of that rider's orders — nothing the single-order endpoints would withhold. Where it withholds
+ * one, there is no marker, no line starting from it, and no distance measured from it.
+ *
  * @param provider   who computed every path and estimate in this answer — {@code HAVERSINE_DEV}
  *                   is straight lines at an assumed speed
  * @param geometry   how every path in this answer is drawn: ROAD (solid, as returned) or
@@ -25,9 +29,9 @@ import com.delivery.tracking.service.EtaService.EtaResult;
  * @param door       the customer's pin, or null when the orders carry none (or disagree)
  * @param orders     one row per order of the checkout, in a stable order
  * @param riders     one entry per rider holding a live order of the checkout — nothing about the
- *                   person beyond where their phone last was
+ *                   person beyond where their phone last was, when the caller may see it
  * @param paths      the expected routes: PLANNED (nobody on the way yet) and RIDER_LEG (from a
- *                   fresh fix through the stops still ahead)
+ *                   fresh fix the caller may see, through the stops still ahead)
  * @param computedAt when this answer was computed; answers are reused for a few seconds
  */
 public record CheckoutView(
@@ -57,8 +61,11 @@ public record CheckoutView(
      *                      {@link RunPlan}): a collected stop's number is fact, an uncollected one's
      *                      is {@code expected}
      * @param expected      true when {@code stop} is the platform's expectation, not a fact
-     * @param eta           exactly what {@code /orders/{id}/eta} answers for this order; in a run,
-     *                      every order carries the run's door estimate
+     * @param eta           what {@code /orders/{id}/eta} answers for this order — in a run, every
+     *                      order carries the run's door estimate — except that no distance is
+     *                      given while the rider's position is withheld from the caller: metres
+     *                      from a rider nobody is shown are a ring around a shop that says where
+     *                      they are
      */
     public record OrderView(
             UUID orderId,
@@ -79,13 +86,19 @@ public record CheckoutView(
      * @param orderIds           the rider's live orders of this checkout, in the order they are
      *                           taken to be visited
      * @param run                true when they hold two or more of them
-     * @param position           their latest fix across those orders, or null before the first
+     * @param sighting           what the caller may know of where they are, as the single-order
+     *                           {@code GET .../rider} says it: {@code VISIBLE} with a position, or
+     *                           {@code HEADING_TO_SHOP} (still far from the shop: a time, no
+     *                           position), {@code ON_ANOTHER_DELIVERY} (nothing) or {@code NO_FIX}
+     * @param position           the latest fix the caller may see across those orders; null when
+     *                           there is none or the rider is not {@code VISIBLE}
      * @param hasOtherDeliveries whether they are also carrying orders that are not this checkout's.
      *                           A yes/no and nothing more — never whose, where or how many
      */
     public record RiderView(
             List<UUID> orderIds,
             boolean run,
+            RiderSighting.State sighting,
             RiderFix position,
             boolean hasOtherDeliveries) {
     }

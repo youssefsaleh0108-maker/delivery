@@ -38,6 +38,7 @@ import com.delivery.tracking.route.RoutePaths;
 import com.delivery.tracking.route.RouteProviderRegistry;
 import com.delivery.tracking.service.CheckoutTrackingService;
 import com.delivery.tracking.service.EtaService;
+import com.delivery.tracking.service.RiderSighting;
 import com.delivery.tracking.service.TrackingService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -85,6 +86,8 @@ class CheckoutTrackingControllerAccessTest {
 
         TrackingService tracking = mock(TrackingService.class);
         when(tracking.currentPosition(any(UUID.class), any(), anyBoolean())).thenReturn(Optional.empty());
+        when(tracking.sightingFor(any(OrderParticipants.class), any(), anyBoolean()))
+                .thenReturn(new RiderSighting(RiderSighting.State.NO_FIX, null, null));
         RouteProviderRegistry providers = new RouteProviderRegistry(
                 List.of(new HaversineRouteProvider(18)), HaversineRouteProvider.NAME);
         EtaService eta = new EtaService(tracking, participants, providers, Duration.ofMinutes(5));

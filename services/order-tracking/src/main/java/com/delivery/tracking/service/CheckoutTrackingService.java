@@ -42,14 +42,20 @@ import com.delivery.tracking.service.TrackingService.Position;
  * snapshotted pins, and each rider's recorded fixes — and never from anything guessed. The rules
  * that decide what is drawn:
  * <ul>
+ *   <li>Every rider position is read through {@link TrackingService#sightingFor}, the one rule for
+ *       who may see a rider, for this caller and each of the rider's orders here. What it withholds
+ *       on the single-order endpoints is withheld here: no marker, no line from it, no distance
+ *       measured from it, and no stop order worked out from it.</li>
  *   <li>A shop or the door with no pin is not drawn, and no line passes through it.</li>
- *   <li>No rider yet: a PLANNED path shop → door. A rider with a fresh fix: a RIDER_LEG from the
- *       fix through the stops still ahead to the door — through every sibling shop when the rider
- *       holds several of the checkout's orders (a run; see {@link RunPlan}). A rider without a
- *       fresh fix: no line at all, because where the rider is is exactly what is unknown.</li>
+ *   <li>No rider yet: a PLANNED path shop → door. A rider with a fresh fix the caller may see: a
+ *       RIDER_LEG from the fix through the stops still ahead to the door — through every sibling
+ *       shop when the rider holds several of the checkout's orders (a run; see {@link RunPlan}).
+ *       A rider without one: no line at all, because where the rider is is exactly what is
+ *       unknown, or not the caller's to know.</li>
  *   <li>Once an order is delivered or cancelled it has no path and no rider, as tracking has
  *       closed.</li>
- *   <li>Every estimate is the one {@link EtaService} gives the single-order panel.</li>
+ *   <li>Every estimate is the one {@link EtaService} gives the single-order panel — without its
+ *       distance while the rider's position is withheld from the caller.</li>
  * </ul>
  *
  * <p><strong>Computed at most once every few seconds per checkout.</strong> The screen polls, the
@@ -159,35 +165,44 @@ public class CheckoutTrackingService {
         for (Map.Entry<String, List<OrderParticipants>> entry : byRider.entrySet()) {
             List<OrderParticipants> riderOrders = entry.getValue();
 
-            // One rider, one position: the latest fix pinged against any of their orders here.
-            Optional<Position> fix = Optional.empty();
+            // One rider, one position: what the gate lets this caller see of them on any of their
+            // orders here — never a fix it would withhold on one of them (RunSighting).
+            List<RiderSighting> sightings = new ArrayList<>();
             for (OrderParticipants order : riderOrders) {
-                fix = RunPlan.later(fix,
-                        tracking.currentPosition(order.getOrderId(), callerId, isBackoffice));
+                sightings.add(tracking.sightingFor(order, callerId, isBackoffice));
             }
-            boolean fresh = fix.isPresent() && fix.get().recordedAt() != null
-                    && !fix.get().recordedAt().isBefore(now.minus(maxFixAge));
+            RunSighting seen = RunSighting.of(sightings);
+            Optional<Position> shown = seen.shown();
+            boolean fresh = shown.isPresent() && shown.get().recordedAt() != null
+                    && !shown.get().recordedAt().isBefore(now.minus(maxFixAge));
 
-            RunPlan plan = RunPlan.of(riderOrders, fix);
+            // Which shop is expected next is measured from where the rider was last seen, so it is
+            // measured only from a point the caller may see: a withheld fix would be given away by
+            // the order it puts the shops in.
+            RunPlan plan = RunPlan.of(riderOrders, shown);
             boolean run = riderOrders.size() >= 2;
             if (run) {
                 stops.putAll(plan.stopNumbers());
                 expected.addAll(plan.expected());
             }
             for (OrderParticipants order : riderOrders) {
-                etas.put(order.getOrderId(), eta.estimate(order, riderOrders, fix, now));
+                EtaResult estimate = eta.estimate(order, riderOrders, seen, now);
+                etas.put(order.getOrderId(),
+                        shown.isPresent() ? estimate : estimate.withoutDistance());
             }
 
             List<UUID> visitOrder = plan.visitOrder().stream()
                     .map(OrderParticipants::getOrderId)
                     .toList();
-            riders.add(new RiderView(visitOrder, run,
-                    fix.map(p -> new RiderFix(p.lat(), p.lng(), p.recordedAt(), !fresh)).orElse(null),
+            riders.add(new RiderView(visitOrder, run, seen.state(),
+                    shown.map(p -> new RiderFix(p.lat(), p.lng(), p.recordedAt(), !fresh))
+                            .orElse(null),
                     participants.riderHasOtherLiveOrders(entry.getKey(), checkoutId)));
 
-            // The live leg: only from a fresh fix, and only when every stop on it has a pin.
+            // The live leg: only from a fresh fix the caller may see, and only when every stop on
+            // it has a pin.
             if (fresh && door.isPresent() && plan.aheadPinned()) {
-                GeoPoint from = new GeoPoint(fix.get().lat(), fix.get().lng());
+                GeoPoint from = new GeoPoint(shown.get().lat(), shown.get().lng());
                 List<GeoPoint> ahead = new ArrayList<>(plan.aheadPins());
                 ahead.add(door.get());
                 Optional<RoutePath> leg = paths.riderLeg(from, ahead);
@@ -207,7 +222,7 @@ public class CheckoutTrackingService {
             // Riderless or finished: no fix to measure from. The estimate says which, in the
             // same words the single-order panel would.
             etas.put(order.getOrderId(),
-                    eta.estimate(order, List.of(order), Optional.empty(), now));
+                    eta.estimate(order, List.of(order), RunSighting.NOTHING, now));
             if (!order.isComplete() && order.getRiderId() == null
                     && order.pickup().isPresent() && door.isPresent()) {
                 List<GeoPoint> points = List.of(order.pickup().get(), door.get());

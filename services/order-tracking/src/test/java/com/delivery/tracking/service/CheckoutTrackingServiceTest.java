@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -23,15 +24,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 
 import com.delivery.tracking.domain.OrderParticipants;
 import com.delivery.tracking.domain.OrderParticipantsRepository;
+import com.delivery.tracking.domain.TrackingEvent;
+import com.delivery.tracking.domain.TrackingEventRepository;
 import com.delivery.tracking.route.GeoPoint;
 import com.delivery.tracking.route.HaversineRouteProvider;
 import com.delivery.tracking.route.PathGeometry;
@@ -43,40 +49,56 @@ import com.delivery.tracking.service.CheckoutView.PathKind;
 import com.delivery.tracking.service.CheckoutView.PathView;
 import com.delivery.tracking.service.CheckoutView.Pin;
 import com.delivery.tracking.service.CheckoutView.RiderView;
+import com.delivery.tracking.service.EtaService.EtaResult;
 import com.delivery.tracking.service.EtaService.Leg;
 import com.delivery.tracking.service.EtaService.Reason;
+import com.delivery.tracking.service.PresenceService.LatestFix;
+import com.delivery.tracking.service.RiderSighting.State;
 import com.delivery.tracking.service.TrackingService.Position;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 /**
  * What a customer's map of a multi-shop checkout shows, and — mostly — what it refuses to show.
  *
- * <p>Every coordinate on that map is one the platform holds, every number on a pickup stop is
- * either a fact (collected, in collection order) or marked as an expectation, and every line ends
- * at a pin. The tests are arranged around those three promises.
+ * <p>Every coordinate on that map is one the platform holds and the caller may see, every number
+ * on a pickup stop is either a fact (collected, in collection order) or marked as an expectation,
+ * and every line ends at a pin. The tests are arranged around those promises.
+ *
+ * <p>The rider-visibility gate is the real one ({@link TrackingService#sightingFor}), over an
+ * in-memory projection and presence store: where it withholds a rider on the single-order
+ * endpoints, the map must withhold them too.
  */
 @DisplayName("the checkout map")
 class CheckoutTrackingServiceTest {
 
     private static final UUID CHECKOUT = UUID.fromString("c4ec0000-0000-4000-8000-000000000001");
     private static final String CUSTOMER = "customer-sub";
+    private static final String SOMEONE_ELSE = "someone-else-sub";
     private static final String RIDER = "rider-1";
     private static final String OTHER_RIDER = "rider-2";
 
     // Beirut. The door in Mar Mikhael; shops in Hamra (A), Achrafieh (B) and Ras Beirut (C).
+    // A–B 1.3 km, A–door 1.9 km, B–door 1.5 km; C is 2.1 km from A and 3.4 km from B.
     private static final GeoPoint DOOR = new GeoPoint(33.8981, 35.5214);
     private static final GeoPoint SHOP_A = new GeoPoint(33.8938, 35.5018);
     private static final GeoPoint SHOP_B = new GeoPoint(33.8869, 35.5131);
     private static final GeoPoint SHOP_C = new GeoPoint(33.9000, 35.4800);
+    // Another customer's door, 1.2 km south of this customer's.
+    private static final GeoPoint THEIR_DOOR = offset(DOOR, -1_200, 0);
 
     private static final UUID A = UUID.fromString("00000000-0000-4000-8000-00000000000a");
     private static final UUID B = UUID.fromString("00000000-0000-4000-8000-00000000000b");
     private static final UUID C = UUID.fromString("00000000-0000-4000-8000-00000000000c");
+    private static final UUID X = UUID.fromString("00000000-0000-4000-8000-0000000000ff");
 
     // Starts at the real now: the single-order endpoint compared against below reads the real clock.
     private final MutableClock clock =
             new MutableClock(Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS));
     private final List<OrderParticipants> rows = new ArrayList<>();
-    private final Map<UUID, Position> fixes = new HashMap<>();
+    private final List<OrderParticipants> others = new ArrayList<>();
+    private final Map<String, LatestFix> latest = new HashMap<>();
+    private final Map<UUID, TrackingEvent> orderFixes = new HashMap<>();
 
     private OrderParticipantsRepository participants;
     private TrackingService tracking;
@@ -111,29 +133,60 @@ class CheckoutTrackingServiceTest {
         }
     }
 
+    /** A point {@code north} and {@code east} metres from {@code from}. */
+    private static GeoPoint offset(GeoPoint from, double north, double east) {
+        double metresPerDegreeLat = 111_195.08;
+        double metresPerDegreeLng = metresPerDegreeLat * Math.cos(Math.toRadians(from.lat()));
+        return new GeoPoint(from.lat() + north / metresPerDegreeLat,
+                from.lng() + east / metresPerDegreeLng);
+    }
+
     @BeforeEach
+    @SuppressWarnings("unchecked")
     void setUp() {
         participants = mock(OrderParticipantsRepository.class);
-        tracking = mock(TrackingService.class);
         when(participants.findByCheckoutIdAndCustomerId(CHECKOUT, CUSTOMER)).thenReturn(rows);
         when(participants.findByCheckoutId(CHECKOUT)).thenReturn(rows);
-        when(tracking.currentPosition(any(UUID.class), any(), anyBoolean()))
-                .thenAnswer(call -> Optional.ofNullable(fixes.get(call.<UUID>getArgument(0))));
-        when(tracking.sightingFor(any(OrderParticipants.class), any(), anyBoolean()))
-                .thenAnswer(call -> Optional.ofNullable(
-                                fixes.get(call.<OrderParticipants>getArgument(0).getOrderId()))
-                        .map(RiderSighting::visible)
-                        .orElseGet(() -> RiderSighting.nothing(RiderSighting.State.NO_FIX)));
+        when(participants.findById(any())).thenAnswer(call -> all()
+                .filter(o -> o.getOrderId().equals(call.getArgument(0))).findFirst());
+        // The repository's rule for the hand-over buffer, over the same rows.
+        when(participants.otherCustomersDoors(anyString(), anyString(), any())).thenAnswer(call -> {
+            String rider = call.getArgument(0);
+            String customer = call.getArgument(1);
+            Instant finishedSince = call.getArgument(2);
+            return all()
+                    .filter(o -> rider.equals(o.getRiderId()))
+                    .filter(o -> !customer.equals(o.getCustomerId()))
+                    .filter(o -> o.dropoff().isPresent())
+                    .filter(o -> o.isTrackable() || (o.getCompletedAt() != null
+                            && !o.getCompletedAt().isBefore(finishedSince)))
+                    .toList();
+        });
+
+        PresenceService presence = mock(PresenceService.class);
+        when(presence.latestFix(anyString()))
+                .thenAnswer(call -> Optional.ofNullable(latest.get(call.<String>getArgument(0))));
+        TrackingEventRepository events = mock(TrackingEventRepository.class);
+        when(events.findLatestForOrder(any(), any(Pageable.class))).thenAnswer(call ->
+                Optional.ofNullable(orderFixes.get(call.<UUID>getArgument(0)))
+                        .map(List::of).orElse(List.of()));
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        when(redis.opsForValue()).thenReturn(mock(ValueOperations.class));
+        tracking = spy(new TrackingService(events, participants, presence, redis,
+                new ObjectMapper().registerModule(new JavaTimeModule()), Duration.ofSeconds(60)));
 
         // 60 km/h, so kilometres read as minutes.
         RouteProviderRegistry providers = new RouteProviderRegistry(
                 List.of(new HaversineRouteProvider(60)), HaversineRouteProvider.NAME);
         eta = new EtaService(tracking, participants, providers, Duration.ofMinutes(5));
         RoutePaths paths = new RoutePaths(providers, mock(StringRedisTemplate.class),
-                new com.fasterxml.jackson.databind.ObjectMapper(), Duration.ofHours(24), 150,
-                Duration.ofSeconds(60));
+                new ObjectMapper(), Duration.ofHours(24), 150, Duration.ofSeconds(60));
         service = new CheckoutTrackingService(participants, tracking, eta, paths,
                 Duration.ofMinutes(5), Duration.ofSeconds(5), clock);
+    }
+
+    private Stream<OrderParticipants> all() {
+        return Stream.concat(rows.stream(), others.stream());
     }
 
     // ------------------------------------------------------------------------------ fixtures
@@ -156,9 +209,28 @@ class CheckoutTrackingServiceTest {
         return order;
     }
 
+    /** Somebody else's order, from its own shop to their door, in this rider's hands. */
+    private OrderParticipants theirOrder(String rider, String status) {
+        OrderParticipants order = new OrderParticipants(X, SOMEONE_ELSE, "merchant-x", rider,
+                status);
+        order.applyRoute(null, offset(THEIR_DOOR, 0, -900), THEIR_DOOR);
+        others.add(order);
+        return order;
+    }
+
+    /**
+     * The rider's phone reported {@code where}, {@code ago}, on {@code orderId}: the rider's latest
+     * fix (what the gate reads for the customer) if it is newer than the one before, and the
+     * order's own latest position (what the back office reads).
+     */
     private void riderAt(UUID orderId, String rider, GeoPoint where, Duration ago) {
-        fixes.put(orderId, new Position(orderId, rider, where.lat(), where.lng(), 5f,
-                clock.instant().minus(ago)));
+        Instant at = clock.instant().minus(ago);
+        LatestFix previous = latest.get(rider);
+        if (previous == null || !at.isBefore(previous.at())) {
+            latest.put(rider, new LatestFix(rider, orderId, where.lat(), where.lng(), 5f, at));
+        }
+        orderFixes.put(orderId, new TrackingEvent(orderId, rider, where.lat(), where.lng(), 5f,
+                at));
     }
 
     private CheckoutView view() {
@@ -171,6 +243,31 @@ class CheckoutTrackingServiceTest {
 
     private static List<PathView> pathsOf(CheckoutView view, PathKind kind) {
         return view.paths().stream().filter(p -> p.kind() == kind).toList();
+    }
+
+    /**
+     * The promise the gate makes about this endpoint: every rider marker is a position the
+     * single-order endpoint shows this customer for one of that rider's orders, and every live leg
+     * starts at a marker.
+     */
+    private void showsNothingTheOrderEndpointsWithhold(CheckoutView view) {
+        for (RiderView rider : view.riders()) {
+            if (rider.position() == null) {
+                assertThat(view.paths()).noneMatch(p -> p.kind() == PathKind.RIDER_LEG
+                        && p.orderIds().stream().anyMatch(rider.orderIds()::contains));
+                continue;
+            }
+            Pin marker = new Pin(rider.position().lat(), rider.position().lng());
+            assertThat(rider.orderIds())
+                    .as("some order of the rider shows the customer this marker on its own")
+                    .anyMatch(id -> tracking.currentPosition(id, CUSTOMER, false)
+                            .map(p -> new Pin(p.lat(), p.lng()).equals(marker))
+                            .orElse(false));
+            view.paths().stream()
+                    .filter(p -> p.kind() == PathKind.RIDER_LEG)
+                    .filter(p -> p.orderIds().stream().anyMatch(rider.orderIds()::contains))
+                    .forEach(p -> assertThat(p.points().get(0)).isEqualTo(marker));
+        }
     }
 
     // ------------------------------------------------------------------------------ tests
@@ -245,6 +342,7 @@ class CheckoutTrackingServiceTest {
             assertThat(view.riders()).hasSize(1);
             assertThat(rider.run()).isTrue();
             assertThat(rider.orderIds()).containsExactly(A, B, C);
+            assertThat(rider.sighting()).isEqualTo(State.VISIBLE);
             assertThat(rider.position().stale()).isFalse();
 
             // One live leg for the whole run: rider → B → C → door.
@@ -257,6 +355,7 @@ class CheckoutTrackingServiceTest {
                     new Pin(SHOP_C.lat(), SHOP_C.lng()),
                     new Pin(DOOR.lat(), DOOR.lng()));
             assertThat(pathsOf(view, PathKind.PLANNED)).isEmpty();
+            showsNothingTheOrderEndpointsWithhold(view);
         }
 
         @Test
@@ -284,8 +383,6 @@ class CheckoutTrackingServiceTest {
             collected(A, "Hamra Bakery", SHOP_A, RIDER, clock.instant().minusSeconds(600));
             order(B, "Achrafieh Pharmacy", SHOP_B, "READY", RIDER);
             riderAt(A, RIDER, SHOP_A, Duration.ofSeconds(5));
-            when(participants.findById(A)).thenReturn(Optional.of(rows.get(0)));
-            when(participants.findById(B)).thenReturn(Optional.of(rows.get(1)));
 
             CheckoutView view = view();
 
@@ -335,8 +432,8 @@ class CheckoutTrackingServiceTest {
         void no_numbers_without_a_run() {
             order(A, "Hamra Bakery", SHOP_A, "READY", RIDER);
             order(B, "Achrafieh Pharmacy", SHOP_B, "READY", OTHER_RIDER);
-            riderAt(A, RIDER, SHOP_C, Duration.ofSeconds(10));
-            riderAt(B, OTHER_RIDER, SHOP_C, Duration.ofSeconds(10));
+            riderAt(A, RIDER, offset(SHOP_A, 500, 0), Duration.ofSeconds(10));
+            riderAt(B, OTHER_RIDER, offset(SHOP_B, 0, 500), Duration.ofSeconds(10));
 
             CheckoutView view = view();
 
@@ -348,6 +445,164 @@ class CheckoutTrackingServiceTest {
             // A leg each: rider → own shop → door.
             assertThat(pathsOf(view, PathKind.RIDER_LEG)).hasSize(2)
                     .allSatisfy(p -> assertThat(p.points()).hasSize(3));
+            showsNothingTheOrderEndpointsWithhold(view);
+        }
+    }
+
+    @Nested
+    @DisplayName("the rider-visibility gate")
+    class Gate {
+
+        /**
+         * The rider finished somebody else's delivery five minutes ago and their leg switched to
+         * this customer's order, but the phone is still 100 m from that other door. The
+         * single-order endpoint withholds the rider (the hand-over buffer); so does the map: no
+         * marker, no leg from there, no distance or time, not even the fix's time.
+         */
+        @Test
+        @DisplayName("draws no rider inside the hand-over buffer of another customer's door")
+        void no_marker_inside_the_handover_buffer() {
+            collected(A, "Hamra Bakery", SHOP_A, RIDER, clock.instant().minusSeconds(1_200));
+            OrderParticipants theirs = theirOrder(RIDER, "PICKED_UP");
+            theirs.apply(RIDER, "DELIVERED");
+            theirs.stampMilestones("DELIVERED", clock.instant().minus(Duration.ofMinutes(5)));
+            riderAt(A, RIDER, offset(THEIR_DOOR, 100, 0), Duration.ofSeconds(10));
+
+            CheckoutView view = view();
+
+            RiderView rider = view.riders().get(0);
+            assertThat(rider.sighting()).isEqualTo(State.ON_ANOTHER_DELIVERY);
+            assertThat(rider.position()).isNull();
+            assertThat(pathsOf(view, PathKind.RIDER_LEG)).isEmpty();
+            EtaResult estimate = row(view, A).eta();
+            assertThat(estimate.available()).isFalse();
+            assertThat(estimate.reason()).isEqualTo(Reason.RIDER_ON_ANOTHER_DELIVERY);
+            assertThat(estimate.remainingMetres()).isNull();
+            assertThat(estimate.remainingSeconds()).isNull();
+            assertThat(estimate.fixRecordedAt()).isNull();
+            assertThat(tracking.currentPosition(A, CUSTOMER, false)).isEmpty();
+            showsNothingTheOrderEndpointsWithhold(view);
+        }
+
+        @Test
+        @DisplayName("draws the rider again once they are past the buffer")
+        void a_marker_past_the_handover_buffer() {
+            collected(A, "Hamra Bakery", SHOP_A, RIDER, clock.instant().minusSeconds(1_200));
+            OrderParticipants theirs = theirOrder(RIDER, "PICKED_UP");
+            theirs.apply(RIDER, "DELIVERED");
+            theirs.stampMilestones("DELIVERED", clock.instant().minus(Duration.ofMinutes(5)));
+            riderAt(A, RIDER, offset(THEIR_DOOR, 400, 0), Duration.ofSeconds(10));
+
+            CheckoutView view = view();
+
+            assertThat(view.riders().get(0).sighting()).isEqualTo(State.VISIBLE);
+            assertThat(view.riders().get(0).position()).isNotNull();
+            assertThat(pathsOf(view, PathKind.RIDER_LEG)).hasSize(1);
+            showsNothingTheOrderEndpointsWithhold(view);
+        }
+
+        /** The rider's latest fix went on somebody else's order: they are on that delivery. */
+        @Test
+        @DisplayName("draws no rider while they are on another customer's delivery")
+        void no_marker_on_another_delivery() {
+            collected(A, "Hamra Bakery", SHOP_A, RIDER, clock.instant().minusSeconds(600));
+            theirOrder(RIDER, "PICKED_UP");
+            riderAt(A, RIDER, offset(SHOP_A, 200, 0), Duration.ofSeconds(60));
+            riderAt(X, RIDER, offset(THEIR_DOOR, 0, -600), Duration.ofSeconds(5));
+
+            CheckoutView view = view();
+
+            assertThat(view.riders().get(0).sighting()).isEqualTo(State.ON_ANOTHER_DELIVERY);
+            assertThat(view.riders().get(0).position()).isNull();
+            assertThat(view.paths()).isEmpty();
+            assertThat(row(view, A).eta().reason()).isEqualTo(Reason.RIDER_ON_ANOTHER_DELIVERY);
+            showsNothingTheOrderEndpointsWithhold(view);
+        }
+
+        /**
+         * Claims often happen at home. A READY order's rider more than 2 km from the shop is not
+         * shown: no marker and no leg — but a time, as the single-order endpoint gives, with no
+         * distance measured from the place it withholds.
+         */
+        @Test
+        @DisplayName("draws no rider on a READY order more than 2 km from the shop, and gives a time without metres")
+        void no_marker_ready_beyond_two_kilometres() {
+            order(A, "Hamra Bakery", SHOP_A, "READY", RIDER);
+            riderAt(A, RIDER, offset(SHOP_A, 0, 3_000), Duration.ofSeconds(10));
+
+            CheckoutView view = view();
+
+            RiderView rider = view.riders().get(0);
+            assertThat(rider.sighting()).isEqualTo(State.HEADING_TO_SHOP);
+            assertThat(rider.position()).isNull();
+            assertThat(view.paths()).isEmpty();
+            EtaResult estimate = row(view, A).eta();
+            assertThat(estimate.available()).isTrue();
+            assertThat(estimate.leg()).isEqualTo(Leg.TO_PICKUP);
+            assertThat(estimate.remainingSeconds()).isPositive();
+            assertThat(estimate.remainingMetres()).as("no distance from a withheld fix").isNull();
+            // The panel's time is the same; only the map drops the metres.
+            EtaResult panel = eta.estimateFor(A, CUSTOMER, false);
+            assertThat(estimate.remainingSeconds()).isEqualTo(panel.remainingSeconds());
+            showsNothingTheOrderEndpointsWithhold(view);
+        }
+
+        @Test
+        @DisplayName("draws the rider once they are within 2 km of the shop")
+        void a_marker_ready_within_two_kilometres() {
+            order(A, "Hamra Bakery", SHOP_A, "READY", RIDER);
+            riderAt(A, RIDER, offset(SHOP_A, 0, 1_500), Duration.ofSeconds(10));
+
+            CheckoutView view = view();
+
+            assertThat(view.riders().get(0).sighting()).isEqualTo(State.VISIBLE);
+            assertThat(view.riders().get(0).position()).isNotNull();
+            assertThat(pathsOf(view, PathKind.RIDER_LEG)).hasSize(1);
+            assertThat(row(view, A).eta().remainingMetres()).isNotNull();
+            showsNothingTheOrderEndpointsWithhold(view);
+        }
+
+        /**
+         * Which shop comes next is worked out from where the rider is. From a withheld fix, the
+         * order of the stops would say which shop the rider is nearer, so no order is given.
+         */
+        @Test
+        @DisplayName("works out no stop order from a fix it withholds")
+        void no_expected_order_from_a_withheld_fix() {
+            order(A, "Hamra Bakery", SHOP_A, "READY", RIDER);
+            order(B, "Achrafieh Pharmacy", SHOP_B, "READY", RIDER);
+            riderAt(A, RIDER, offset(SHOP_A, 0, -3_000), Duration.ofSeconds(10));
+
+            CheckoutView view = view();
+
+            assertThat(view.riders().get(0).position()).isNull();
+            assertThat(view.orders()).allSatisfy(o -> {
+                assertThat(o.stop()).isNull();
+                assertThat(o.expected()).isFalse();
+                assertThat(o.eta().remainingMetres()).isNull();
+            });
+        }
+
+        /**
+         * One marker per rider: shown when the single-order endpoint shows it for any of the
+         * rider's orders here — A's shop is 1.2 km away — though C's, 2.4 km away, would not.
+         */
+        @Test
+        @DisplayName("shows a run's rider when the gate shows them on one of its orders")
+        void a_run_is_shown_through_any_of_its_orders() {
+            order(A, "Hamra Bakery", SHOP_A, "READY", RIDER);
+            order(C, "Ras Beirut Grocer", SHOP_C, "READY", RIDER);
+            GeoPoint between = new GeoPoint(33.8950, 35.5050);
+            riderAt(A, RIDER, between, Duration.ofSeconds(10));
+
+            CheckoutView view = view();
+
+            assertThat(tracking.currentPosition(A, CUSTOMER, false)).isPresent();
+            assertThat(tracking.currentPosition(C, CUSTOMER, false)).isEmpty();
+            assertThat(view.riders().get(0).position())
+                    .extracting(f -> new Pin(f.lat(), f.lng()))
+                    .isEqualTo(new Pin(between.lat(), between.lng()));
+            showsNothingTheOrderEndpointsWithhold(view);
         }
     }
 
@@ -372,8 +627,9 @@ class CheckoutTrackingServiceTest {
             assertThat(row(view, A).eta().reason()).isEqualTo(Reason.ORDER_COMPLETE);
             assertThat(view.riders()).isEmpty();
             assertThat(view.paths()).noneMatch(p -> p.orderIds().contains(A));
-            // Tracking closed: the delivered order's position is not even read.
-            verify(tracking, never()).currentPosition(any(UUID.class), anyString(), anyBoolean());
+            // Tracking closed: the delivered order's rider is not even asked about.
+            verify(tracking, never()).sightingFor(any(OrderParticipants.class), anyString(),
+                    anyBoolean());
         }
 
         @Test
@@ -422,7 +678,7 @@ class CheckoutTrackingServiceTest {
             b.applyRoute(null, SHOP_B, null);
             b.applyCheckout(CHECKOUT, "Achrafieh Pharmacy");
             rows.add(b);
-            riderAt(A, RIDER, SHOP_C, Duration.ofSeconds(5));
+            riderAt(A, RIDER, offset(SHOP_A, 300, 0), Duration.ofSeconds(5));
 
             CheckoutView view = view();
 
@@ -437,7 +693,7 @@ class CheckoutTrackingServiceTest {
         void a_pinless_stop_in_a_run() {
             order(A, "Hamra Bakery", SHOP_A, "READY", RIDER);
             order(B, "Achrafieh Pharmacy", null, "READY", RIDER);
-            riderAt(A, RIDER, SHOP_C, Duration.ofSeconds(5));
+            riderAt(A, RIDER, offset(SHOP_A, 300, 0), Duration.ofSeconds(5));
 
             CheckoutView view = view();
 
@@ -473,6 +729,7 @@ class CheckoutTrackingServiceTest {
             CheckoutView view = view();
 
             assertThat(row(view, A).riderAssigned()).isTrue();
+            assertThat(view.riders().get(0).sighting()).isEqualTo(State.NO_FIX);
             assertThat(view.riders().get(0).position()).isNull();
             assertThat(view.paths()).isEmpty();
             assertThat(row(view, A).eta().reason()).isEqualTo(Reason.NO_FIX);
@@ -548,14 +805,14 @@ class CheckoutTrackingServiceTest {
         CheckoutView again = view();
 
         assertThat(again).isSameAs(first);
-        verify(tracking, times(1)).currentPosition(any(UUID.class), any(), anyBoolean());
+        verify(tracking, times(1)).sightingFor(any(OrderParticipants.class), any(), anyBoolean());
 
         clock.advance(Duration.ofSeconds(3));
         CheckoutView later = view();
 
         assertThat(later).isNotSameAs(first);
         assertThat(later.computedAt()).isEqualTo(clock.instant());
-        verify(tracking, times(2)).currentPosition(any(UUID.class), any(), anyBoolean());
+        verify(tracking, times(2)).sightingFor(any(OrderParticipants.class), any(), anyBoolean());
         // The caller is still checked on every request, memo or not.
         verify(participants, times(3)).findByCheckoutIdAndCustomerId(CHECKOUT, CUSTOMER);
     }

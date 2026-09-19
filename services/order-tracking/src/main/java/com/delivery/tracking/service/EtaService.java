@@ -89,43 +89,51 @@ public class EtaService {
             return EtaResult.unavailable(orderId, Reason.ORDER_COMPLETE, provider, null, now);
         }
 
-        RiderSighting sighting = tracking.sightingFor(order, userId, isBackoffice);
-        if (sighting.state() == RiderSighting.State.ON_ANOTHER_DELIVERY) {
-            // Not even the fix's time: nothing about where the rider is now.
-            return EtaResult.unavailable(orderId, Reason.RIDER_ON_ANOTHER_DELIVERY, provider, null,
-                    now);
-        }
-
         // When this order's rider also holds siblings of it from the same checkout, the rider's
         // latest fix is the latest across all of them, and the journey runs through the siblings'
-        // shops still ahead (see RunPlan) — the same answer the checkout map gives. A sibling's
-        // fix is read through the same gate, and only for a caller who is on that sibling.
+        // shops still ahead (see RunPlan) — the same answer the checkout map gives. Every order's
+        // fix is read through the gate, and only for a caller who is on that order.
         List<OrderParticipants> riderOrders = riderOrdersOf(order);
-        Optional<Position> fix = sighting.measuredFrom();
-        for (OrderParticipants sibling : riderOrders) {
-            if (!sibling.getOrderId().equals(orderId)
-                    && (isBackoffice || sibling.isVisibleTo(userId))) {
-                fix = RunPlan.later(fix,
-                        tracking.sightingFor(sibling, userId, isBackoffice).measuredFrom());
+        List<RiderSighting> sightings = new ArrayList<>();
+        for (OrderParticipants each : riderOrders) {
+            if (each.getOrderId().equals(orderId) || isBackoffice || each.isVisibleTo(userId)) {
+                sightings.add(tracking.sightingFor(each, userId, isBackoffice));
             }
         }
-        return estimate(order, riderOrders, fix, now);
+        return estimate(order, riderOrders, RunSighting.of(sightings), now);
     }
 
     /**
      * The estimate for one order, from everything it depends on: the rider's other live orders of
-     * the same checkout (just the order itself when it has none) and the rider's latest fix across
-     * them.
+     * the same checkout (just the order itself when it has none) and what the gate lets this caller
+     * know of the rider across them.
      *
-     * <p>Public because the checkout map computes every order of a checkout at once and must give
-     * each exactly the number this endpoint would. Authorisation is the caller's job: nothing here
-     * checks who is asking.
+     * <p>For the checkout map, which computes every order of a checkout at once and must give each
+     * the number this endpoint would. Authorisation is the caller's job: the sighting must be the
+     * gate's answer for the same caller.
      *
      * @param riderOrders the rider's live orders of this checkout, this one included
-     * @param fix         the rider's latest fix across {@code riderOrders}, empty if none
+     * @param sighting    {@link TrackingService#sightingFor} for this caller across
+     *                    {@code riderOrders}, folded
      */
-    public EtaResult estimate(OrderParticipants order, List<OrderParticipants> riderOrders,
-                              Optional<Position> fix, Instant now) {
+    EtaResult estimate(OrderParticipants order, List<OrderParticipants> riderOrders,
+                       RunSighting sighting, Instant now) {
+        if (!order.isComplete() && sighting.elsewhere()) {
+            // Not even the fix's time: nothing about where the rider is now.
+            return EtaResult.unavailable(order.getOrderId(), Reason.RIDER_ON_ANOTHER_DELIVERY,
+                    providers.active().name(), null, now);
+        }
+        return estimate(order, riderOrders, sighting.measuredFrom(), now);
+    }
+
+    /**
+     * The estimate from a fix already judged: the gate's basis for this caller, or the latest of
+     * them across the run.
+     *
+     * @param fix the fix to measure from, empty if none
+     */
+    private EtaResult estimate(OrderParticipants order, List<OrderParticipants> riderOrders,
+                               Optional<Position> fix, Instant now) {
         UUID orderId = order.getOrderId();
         String provider = providers.active().name();
 
@@ -300,6 +308,17 @@ public class EtaService {
                                      Instant fixRecordedAt, Instant now) {
             return new EtaResult(orderId, false, reason, null, null, null, null,
                     provider, fixRecordedAt, now);
+        }
+
+        /**
+         * The same estimate with no distance: for a reader who may not see the position it was
+         * measured from, to whom metres from the rider are a ring around the shop that says where
+         * the rider is. The time stays, as the gate allows.
+         */
+        EtaResult withoutDistance() {
+            return remainingMetres == null ? this
+                    : new EtaResult(orderId, available, reason, leg, null, remainingSeconds,
+                            estimatedArrival, provider, fixRecordedAt, computedAt);
         }
     }
 }
