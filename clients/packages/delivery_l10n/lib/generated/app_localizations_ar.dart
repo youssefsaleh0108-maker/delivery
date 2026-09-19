@@ -12646,4 +12646,115 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get svcChatOrderNotFound => 'تعذّر فتح محادثة هذا الطلب. نعيد تحميله.';
+
+  @override
+  String checkoutMapTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'طلبك من $count متجر',
+      many: 'طلبك من $count متجرًا',
+      few: 'طلبك من $count متاجر',
+      two: 'طلبك من متجرين',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String checkoutMapSeeAll(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'اعرض الطلبات الـ$count على خريطة واحدة',
+      many: 'اعرض الطلبات الـ$count على خريطة واحدة',
+      few: 'اعرض الطلبات الـ$count على خريطة واحدة',
+      two: 'اعرض الطلبين على خريطة واحدة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get checkoutMapApproximate => 'مسار تقريبي — خطوط مستقيمة لا طرقات';
+
+  @override
+  String get checkoutMapNoRiderYet => 'لا يوجد سائق بعد';
+
+  @override
+  String get checkoutMapRiderToShop => 'سائقك في الطريق إلى المتجر';
+
+  @override
+  String get checkoutMapRiderHasIt => 'طلبك مع سائقك';
+
+  @override
+  String checkoutMapRiderLastSeen(String ago) {
+    return 'آخر ظهور لسائقك $ago';
+  }
+
+  @override
+  String checkoutMapStop(int number) {
+    return 'المحطة $number';
+  }
+
+  @override
+  String checkoutMapStopExpected(int number) {
+    return 'المحطة $number · متوقعة';
+  }
+
+  @override
+  String get checkoutMapOtherDeliveries =>
+      'لدى سائقك توصيلات أخرى، وقد تطول الأوقات';
+
+  @override
+  String get checkoutMapShopNoPin =>
+      'هذا المتجر غير ظاهر على الخريطة: لا يوجد له دبوس موقع';
+
+  @override
+  String get checkoutMapDoorNoPin =>
+      'عنوانك غير ظاهر على الخريطة: حُفظ دون دبوس موقع';
+
+  @override
+  String checkoutMapDeliveredAt(String time) {
+    return 'تم التوصيل الساعة $time';
+  }
+
+  @override
+  String get checkoutMapCancelledSeeWhy => 'أُلغي — اعرف السبب';
+
+  @override
+  String checkoutMapEtaEstimate(String time, int minutes) {
+    return 'الوصول المقدّر $time · نحو $minutes دقيقة';
+  }
+
+  @override
+  String get checkoutMapAllFinished => 'انتهت كل الطلبات من هذه السلة';
+
+  @override
+  String get checkoutMapLoadFailed => 'تعذّر تحميل خريطة طلبك';
+
+  @override
+  String get checkoutMapNotFound => 'خريطة هذا الطلب غير متاحة';
+
+  @override
+  String get checkoutMapTilesDown =>
+      'تعذّر تحميل الخريطة. تقدّم كل طلب مذكور أدناه.';
+
+  @override
+  String get checkoutMapNothingToDraw =>
+      'لا يوجد لأي من هذه الأماكن دبوس على الخريطة بعد';
+
+  @override
+  String get checkoutMapUnnamedShop => 'متجر';
+
+  @override
+  String get checkoutMapYourRider => 'سائقك';
+
+  @override
+  String checkoutMapRiderMarkerLastSeen(String ago) {
+    return 'سائقك، آخر ظهور $ago';
+  }
+
+  @override
+  String checkoutMapShopPinStop(String shop, int number) {
+    return '$shop، المحطة $number';
+  }
 }

@@ -63,9 +63,16 @@ class CartScreen extends StatefulWidget {
     this.connectivity,
     this.deliveryTerms,
     this.showing = true,
+    this.onCheckoutPlaced,
   });
 
   final Cart cart;
+
+  /// Called after a basket from several shops is placed as one order per shop, with the checkout
+  /// that links them and how many shops it holds — after [onOrderPlaced] has moved to Orders, so
+  /// the checkout map opens over the Orders tab and Back lands there. Null when the shell has no
+  /// checkout map; the jump to Orders is then the whole of it, as before.
+  final void Function(String checkoutId, int shopCount)? onCheckoutPlaced;
   final DeliveryAddressStore addresses;
   final OrderApi orderApi;
 
@@ -261,16 +268,26 @@ class _CartScreenState extends State<CartScreen> {
           content: Text(DeliveryStrings.of(context).multiCartPlaced(
               outcome.orders.length, '\$${outcome.totalAmount.toStringAsFixed(2)}'))));
       widget.onOrderPlaced();
+      // Several shops: straight onto the map of all of them, over Orders (the owner's default).
+      final String? checkoutId = outcome.checkoutId;
+      if (checkoutId != null && outcome.orders.length > 1) {
+        widget.onCheckoutPlaced?.call(checkoutId, outcome.orders.length);
+      }
       return;
     }
     if (outcome is EarlierCheckoutPlaced) {
       // An earlier try went through as one order per shop. Not one order's receipt, which would read
-      // them as a single order: the customer is sent to Orders, where each carries its badge.
+      // them as a single order: the customer is sent to Orders, where each carries its badge — and,
+      // as after any multi-shop checkout, the map of all of them opens over it.
       _removePromo();
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(DeliveryStrings.of(context)
               .multiCartEarlierCheckoutPlaced(outcome.order.checkoutSize ?? 2))));
       widget.onOrderPlaced();
+      final String? checkoutId = outcome.order.checkoutId;
+      if (checkoutId != null && outcome.order.isPartOfCheckout) {
+        widget.onCheckoutPlaced?.call(checkoutId, outcome.order.checkoutSize!);
+      }
       return;
     }
     final DeliveryOrder? order = outcome is DeliveryOrder ? outcome : null;

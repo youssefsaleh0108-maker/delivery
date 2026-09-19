@@ -10,6 +10,7 @@ import 'butler_screen.dart';
 import 'cached_catalog_screen.dart';
 import 'cart.dart';
 import 'cart_screen.dart';
+import 'checkout_map_screen.dart';
 import 'customer_nav_bar.dart';
 import 'delivery_address.dart';
 import 'delivery_terms_book.dart';
@@ -19,6 +20,7 @@ import 'notification_inbox.dart';
 import 'offline_banner.dart';
 import 'offline_catalog.dart';
 import 'offline_store.dart';
+import 'order_details_screen.dart';
 import 'order_outbox.dart';
 import 'profile_drawer.dart';
 import 'rewards_screen.dart';
@@ -59,6 +61,7 @@ class CustomerShell extends StatefulWidget {
     required this.onSignOut,
     this.onOfferServices,
     this.onSwitchToShop,
+    this.checkoutTrackingApi,
   });
 
   final StoreApi storeApi;
@@ -135,6 +138,11 @@ class CustomerShell extends StatefulWidget {
   /// Takes a customer who also runs a shop to it — the menu's half of the role switch homeFor's
   /// preferred-role rule honours. Null hides the row: with no shop there is nowhere to switch to.
   final VoidCallback? onSwitchToShop;
+
+  /// The checkout map: every order of a multi-shop checkout on one map, opened right after such
+  /// a checkout and from each of its orders' badges. Null leaves the badges plain and checkout
+  /// landing on Orders alone.
+  final CheckoutTrackingApi? checkoutTrackingApi;
 
   @override
   State<CustomerShell> createState() => _CustomerShellState();
@@ -260,6 +268,34 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
     Navigator.of(context)
         .popUntil((Route<dynamic> route) => route == shell || route.isFirst);
     _open(CustomerNavBar.ordersIndex);
+  }
+
+  /// Opens the map of a checkout just placed, over the Orders tab checkout has already switched to
+  /// — so Back lands on Orders, where each of its orders now has its card. A row on the map opens
+  /// that order's page over the map.
+  void _openCheckoutMap(String checkoutId, int shopCount) {
+    final CheckoutTrackingApi? api = widget.checkoutTrackingApi;
+    if (api == null || !mounted) return;
+    openCheckoutMap(
+      context,
+      api: api,
+      checkoutId: checkoutId,
+      shopCount: shopCount,
+      liveSocket: widget.trackingSocket,
+      onOpenOrder: (String orderId) => Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => OrderDetailsScreen(
+          orderApi: widget.orderApi,
+          storeApi: widget.storeApi,
+          cart: _cart,
+          orderId: orderId,
+          onOpenBasket: _openBasket,
+          trackingApi: widget.trackingApi,
+          trackingSocket: widget.trackingSocket,
+          chatApi: widget.chatApi,
+          checkoutTrackingApi: api,
+        ),
+      )),
+    );
   }
 
   /// Pushes the gift hub (Figma 112:1684) over the shell, from the Home card or the profile menu.
@@ -494,6 +530,7 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
               cart: _cart,
               onOpenBasket: _openBasket,
               outbox: _outbox,
+              checkoutTrackingApi: widget.checkoutTrackingApi,
             ),
             if (_catalogOpen)
               CachedCatalogScreen(
@@ -543,6 +580,7 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
             // The purchase just made belongs on the offline shelf.
             _refreshCatalog(force: true);
           },
+          onCheckoutPlaced: widget.checkoutTrackingApi == null ? null : _openCheckoutMap,
         );
       case CustomerNavBar.servicesIndex:
         // Service shops live here and only here: Home's storefront never lists them.

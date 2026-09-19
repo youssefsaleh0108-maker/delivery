@@ -182,6 +182,10 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   // the app decides those features exist. Removing a line here turns the feature off everywhere,
   // silently — treat it like the release switch it is.
   late final TrackingApi _trackingApi = TrackingApi(_dio);
+
+  /// A multi-shop checkout's orders on one map, from Order Tracking — opened after such a checkout
+  /// and from each of its orders' badges.
+  late final CheckoutTrackingApi _checkoutTrackingApi = CheckoutTrackingApi(_dio);
   late final GeocodingApi _geocodingApi = GeocodingApi(_dio);
   late final AggregatesApi _aggregatesApi = AggregatesApi(_dio);
 
@@ -599,6 +603,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
       geocodingApi: _geocodingApi,
       trackingApi: _trackingApi,
       trackingSocket: _trackingSocket,
+      checkoutTrackingApi: _checkoutTrackingApi,
       chatApi: _chatApi,
       neighbourhoodChatApi: _neighbourhoodChatApi,
       shopChatApi: _shopChatApi,

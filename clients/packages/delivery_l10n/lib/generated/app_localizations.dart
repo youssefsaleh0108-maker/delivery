@@ -21206,6 +21206,150 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Couldn\'t open this order\'s chat. Reloading the order.'**
   String get svcChatOrderNotFound;
+
+  /// No description provided for @checkoutMapTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, other{Your {count}-shop order}}'**
+  String checkoutMapTitle(int count);
+
+  /// No description provided for @checkoutMapSeeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, other{See all {count} on one map}}'**
+  String checkoutMapSeeAll(int count);
+
+  /// No description provided for @checkoutMapApproximate.
+  ///
+  /// In en, this message translates to:
+  /// **'Approximate path — straight lines, not roads'**
+  String get checkoutMapApproximate;
+
+  /// No description provided for @checkoutMapNoRiderYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No rider yet'**
+  String get checkoutMapNoRiderYet;
+
+  /// No description provided for @checkoutMapRiderToShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider is on the way to the shop'**
+  String get checkoutMapRiderToShop;
+
+  /// No description provided for @checkoutMapRiderHasIt.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider has it'**
+  String get checkoutMapRiderHasIt;
+
+  /// No description provided for @checkoutMapRiderLastSeen.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider was last seen {ago}'**
+  String checkoutMapRiderLastSeen(String ago);
+
+  /// No description provided for @checkoutMapStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop {number}'**
+  String checkoutMapStop(int number);
+
+  /// No description provided for @checkoutMapStopExpected.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop {number} · expected'**
+  String checkoutMapStopExpected(int number);
+
+  /// No description provided for @checkoutMapOtherDeliveries.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider has other deliveries; times may be longer'**
+  String get checkoutMapOtherDeliveries;
+
+  /// No description provided for @checkoutMapShopNoPin.
+  ///
+  /// In en, this message translates to:
+  /// **'This shop isn\'t on the map: it has no location pin'**
+  String get checkoutMapShopNoPin;
+
+  /// No description provided for @checkoutMapDoorNoPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Your address isn\'t on the map: it was saved without a pin'**
+  String get checkoutMapDoorNoPin;
+
+  /// No description provided for @checkoutMapDeliveredAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered at {time}'**
+  String checkoutMapDeliveredAt(String time);
+
+  /// No description provided for @checkoutMapCancelledSeeWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled — see why'**
+  String get checkoutMapCancelledSeeWhy;
+
+  /// No description provided for @checkoutMapEtaEstimate.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated arrival {time} · about {minutes} min'**
+  String checkoutMapEtaEstimate(String time, int minutes);
+
+  /// No description provided for @checkoutMapAllFinished.
+  ///
+  /// In en, this message translates to:
+  /// **'Every order from this basket is finished'**
+  String get checkoutMapAllFinished;
+
+  /// No description provided for @checkoutMapLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load your order map'**
+  String get checkoutMapLoadFailed;
+
+  /// No description provided for @checkoutMapNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'This order map isn\'t available'**
+  String get checkoutMapNotFound;
+
+  /// No description provided for @checkoutMapTilesDown.
+  ///
+  /// In en, this message translates to:
+  /// **'The map couldn\'t load. Each order\'s progress is listed below.'**
+  String get checkoutMapTilesDown;
+
+  /// No description provided for @checkoutMapNothingToDraw.
+  ///
+  /// In en, this message translates to:
+  /// **'None of these places has a map pin yet'**
+  String get checkoutMapNothingToDraw;
+
+  /// No description provided for @checkoutMapUnnamedShop.
+  ///
+  /// In en, this message translates to:
+  /// **'A shop'**
+  String get checkoutMapUnnamedShop;
+
+  /// No description provided for @checkoutMapYourRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider'**
+  String get checkoutMapYourRider;
+
+  /// No description provided for @checkoutMapRiderMarkerLastSeen.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider, last seen {ago}'**
+  String checkoutMapRiderMarkerLastSeen(String ago);
+
+  /// No description provided for @checkoutMapShopPinStop.
+  ///
+  /// In en, this message translates to:
+  /// **'{shop}, stop {number}'**
+  String checkoutMapShopPinStop(String shop, int number);
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

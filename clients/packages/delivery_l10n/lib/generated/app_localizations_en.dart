@@ -12500,4 +12500,111 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get svcChatOrderNotFound =>
       'Couldn\'t open this order\'s chat. Reloading the order.';
+
+  @override
+  String checkoutMapTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Your $count-shop order',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String checkoutMapSeeAll(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'See all $count on one map',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get checkoutMapApproximate =>
+      'Approximate path — straight lines, not roads';
+
+  @override
+  String get checkoutMapNoRiderYet => 'No rider yet';
+
+  @override
+  String get checkoutMapRiderToShop => 'Your rider is on the way to the shop';
+
+  @override
+  String get checkoutMapRiderHasIt => 'Your rider has it';
+
+  @override
+  String checkoutMapRiderLastSeen(String ago) {
+    return 'Your rider was last seen $ago';
+  }
+
+  @override
+  String checkoutMapStop(int number) {
+    return 'Stop $number';
+  }
+
+  @override
+  String checkoutMapStopExpected(int number) {
+    return 'Stop $number · expected';
+  }
+
+  @override
+  String get checkoutMapOtherDeliveries =>
+      'Your rider has other deliveries; times may be longer';
+
+  @override
+  String get checkoutMapShopNoPin =>
+      'This shop isn\'t on the map: it has no location pin';
+
+  @override
+  String get checkoutMapDoorNoPin =>
+      'Your address isn\'t on the map: it was saved without a pin';
+
+  @override
+  String checkoutMapDeliveredAt(String time) {
+    return 'Delivered at $time';
+  }
+
+  @override
+  String get checkoutMapCancelledSeeWhy => 'Cancelled — see why';
+
+  @override
+  String checkoutMapEtaEstimate(String time, int minutes) {
+    return 'Estimated arrival $time · about $minutes min';
+  }
+
+  @override
+  String get checkoutMapAllFinished =>
+      'Every order from this basket is finished';
+
+  @override
+  String get checkoutMapLoadFailed => 'Couldn\'t load your order map';
+
+  @override
+  String get checkoutMapNotFound => 'This order map isn\'t available';
+
+  @override
+  String get checkoutMapTilesDown =>
+      'The map couldn\'t load. Each order\'s progress is listed below.';
+
+  @override
+  String get checkoutMapNothingToDraw =>
+      'None of these places has a map pin yet';
+
+  @override
+  String get checkoutMapUnnamedShop => 'A shop';
+
+  @override
+  String get checkoutMapYourRider => 'Your rider';
+
+  @override
+  String checkoutMapRiderMarkerLastSeen(String ago) {
+    return 'Your rider, last seen $ago';
+  }
+
+  @override
+  String checkoutMapShopPinStop(String shop, int number) {
+    return '$shop, stop $number';
+  }
 }

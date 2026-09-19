@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' as intl;
 
 import 'cart.dart';
+import 'checkout_map_screen.dart';
 import 'order_tracking_panel.dart';
 import 'rate_rider_sheet.dart';
 import 'shop_limit_dialog.dart';
@@ -36,9 +37,14 @@ class OrderDetailsScreen extends StatefulWidget {
     this.trackingSocket,
     this.chatApi,
     this.preview,
+    this.checkoutTrackingApi,
   });
 
   final OrderApi orderApi;
+
+  /// The checkout map. With it, the "part of a checkout" badge opens every order of the checkout
+  /// on one map; without it the badge stays the plain statement it was.
+  final CheckoutTrackingApi? checkoutTrackingApi;
   final StoreApi storeApi;
   final Cart cart;
   final String orderId;
@@ -254,6 +260,41 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  /// Every order of this one's checkout on one map. A row there for this very order comes back
+  /// here rather than stacking a second copy of this page; a sibling's row opens its own page.
+  void _openCheckoutMap(DeliveryOrder order) {
+    final CheckoutTrackingApi? api = widget.checkoutTrackingApi;
+    final String? checkoutId = order.checkoutId;
+    if (api == null || checkoutId == null) return;
+    final ModalRoute<Object?>? thisPage = ModalRoute.of(context);
+    openCheckoutMap(
+      context,
+      api: api,
+      checkoutId: checkoutId,
+      shopCount: order.checkoutSize,
+      liveSocket: widget.trackingSocket,
+      onOpenOrder: (String id) {
+        if (id == widget.orderId && thisPage != null) {
+          Navigator.of(context).popUntil((Route<dynamic> r) => r == thisPage);
+          return;
+        }
+        Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => OrderDetailsScreen(
+            orderApi: widget.orderApi,
+            storeApi: widget.storeApi,
+            cart: widget.cart,
+            orderId: id,
+            onOpenBasket: widget.onOpenBasket,
+            trackingApi: widget.trackingApi,
+            trackingSocket: widget.trackingSocket,
+            chatApi: widget.chatApi,
+            checkoutTrackingApi: widget.checkoutTrackingApi,
+          ),
+        ));
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
@@ -409,8 +450,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       ),
                     ),
                     // Checked out together with other shops' orders: said here as on the Orders
-                    // list, so this order is never mistaken for the whole purchase.
-                    if (order.isPartOfCheckout) ...<Widget>[
+                    // list, so this order is never mistaken for the whole purchase — and, with
+                    // the checkout map wired, the way to all of them on one map.
+                    if (order.isPartOfCheckout && widget.checkoutTrackingApi != null)
+                      CheckoutMapBadge(
+                        shopCount: order.checkoutSize!,
+                        onPressed: () => _openCheckoutMap(order),
+                      )
+                    else if (order.isPartOfCheckout) ...<Widget>[
                       const SizedBox(height: DeliverySpacing.xs),
                       YdBadge(
                         label: t.multiCartPartOfOrder(order.checkoutSize!),
