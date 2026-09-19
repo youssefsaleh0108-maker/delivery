@@ -463,7 +463,6 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
           session: widget.session,
           profileApi: widget.profileApi,
           splitApi: widget.splitApi,
-          transferApi: widget.transferApi,
           onSignOut: widget.onSignOut,
           onOpenBasket: _openBasket,
           onOpenGiftHub: _giftHubEntry,

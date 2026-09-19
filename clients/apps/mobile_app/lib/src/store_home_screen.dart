@@ -44,7 +44,6 @@ class StoreHomeScreen extends StatefulWidget {
     required this.session,
     this.profileApi,
     this.splitApi,
-    this.transferApi,
     this.neighbourhoodChatApi,
     this.chatSocket,
     this.shopChatAction,
@@ -79,10 +78,9 @@ class StoreHomeScreen extends StatefulWidget {
   /// The account's picture for the header avatar. Null keeps the monogram.
   final ProfileApi? profileApi;
 
-  /// The group-split invitations banner: polls for requests addressed to this account. Both
-  /// arrive together or the banner stays undrawn.
+  /// The group-split invitations banner: polls for requests addressed to this account. Null keeps
+  /// the banner undrawn.
   final SplitApi? splitApi;
-  final TransferApi? transferApi;
   final Future<void> Function() onSignOut;
 
   /// The shell's way to its Basket tab, handed to every shop page opened from here — a card, a
@@ -560,9 +558,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
 
   /// The frame's invitation banner: who invited you, one tap to your share.
   Widget _splitRequestBanner(DeliveryStrings t) {
-    if (_splitRequests.isEmpty ||
-        widget.splitApi == null ||
-        widget.transferApi == null) {
+    if (_splitRequests.isEmpty || widget.splitApi == null) {
       return const SizedBox.shrink();
     }
     final SplitPlan plan = _splitRequests.first;
@@ -578,7 +574,6 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
             await Navigator.of(context).push(MaterialPageRoute<void>(
               builder: (_) => FriendSplitScreen(
                 splitApi: widget.splitApi!,
-                transferApi: widget.transferApi!,
                 plan: plan,
                 myUsername: widget.session.username ?? '',
               ),

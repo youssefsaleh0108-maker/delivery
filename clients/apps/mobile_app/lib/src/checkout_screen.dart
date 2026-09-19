@@ -445,6 +445,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             await Navigator.of(context).push<void>(MaterialPageRoute<void>(
               builder: (BuildContext ctx) => SplitCompleteScreen(
                 plan: plan,
+                cashOrder: _payment == PaymentMethod.cash,
                 onTrack: () => Navigator.of(ctx).pop(),
               ),
             ));

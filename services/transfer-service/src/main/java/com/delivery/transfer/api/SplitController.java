@@ -76,6 +76,23 @@ public class SplitController {
         return service.mine(jwt.getSubject()).stream().map(SplitController::payload).toList();
     }
 
+    /**
+     * How an invitee may answer a share right now: cash at the door, plus a wallet only where the
+     * dev simulator stands in for it, flagged {@code simulated} so the app can say so. Not the
+     * checkout's {@code /api/transfers/methods}: a connector that carries an order's payment cannot
+     * take a share's money.
+     */
+    @GetMapping("/methods")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public List<Map<String, Object>> methods() {
+        return service.shareMethods().stream().map(m -> {
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("method", m.method());
+            out.put("simulated", m.simulated());
+            return out;
+        }).toList();
+    }
+
     /** The invitations waiting on the calling user — what the home banner polls. */
     @GetMapping("/requests")
     @PreAuthorize("hasRole('CUSTOMER')")
@@ -172,6 +189,7 @@ public class SplitController {
             share.put("itemsCount", s.getItemsCount());
             share.put("status", s.getStatus());
             share.put("method", s.getMethod());
+            share.put("simulated", s.isSimulated());
             share.put("paidAt", s.getPaidAt());
             return share;
         }).toList());

@@ -2,6 +2,7 @@ package com.delivery.transfer.service;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -64,6 +65,21 @@ public class TransferService {
 
     public List<TransferMethod> availableMethods() {
         return registry.availableMethods();
+    }
+
+    /** The ready connector that would carry {@code method}, if any — the same one a POST would use. */
+    public Optional<MoneyTransferConnector> connectorFor(TransferMethod method) {
+        return registry.forMethod(method);
+    }
+
+    /**
+     * Order Manager's answer about an order, asked with the caller's own token, so its visibility
+     * rule decides: a stranger's order and one that was never placed are both
+     * {@link OrderManagerClient.OrderUnavailableException}. The split manager needs the same fact
+     * this service does before it records money against an order.
+     */
+    public OrderManagerClient.OrderSummary order(UUID orderId) {
+        return orders.fetch(orderId);
     }
 
     /** A priced split: what the customer is asked to approve, and what initiate will store. */

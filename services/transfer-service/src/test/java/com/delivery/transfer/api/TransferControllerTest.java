@@ -77,7 +77,8 @@ class TransferControllerTest {
         when(registry.forMethod(any())).thenReturn(Optional.of(new CashOnDeliveryConnector()));
         when(transfers.findByOrderId(ORDER)).thenReturn(Optional.empty());
         when(transfers.save(any())).thenAnswer(call -> call.getArgument(0));
-        when(orders.fetch(any())).thenReturn(new OrderSummary(ORDER, PAYER, "PLACED"));
+        when(orders.fetch(any())).thenReturn(new OrderSummary(ORDER, PAYER, null, "PLACED",
+                new BigDecimal("10.01"), "CASH", "DUE"));
         // The same transfer as Postgres hands it back: every column at the scale it was declared
         // with, which is where the rate grew its two decimals.
         when(transfers.findByOrderId(STORED_ORDER)).thenReturn(Optional.of(new MoneyTransfer(

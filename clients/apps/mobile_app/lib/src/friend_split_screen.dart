@@ -3,20 +3,21 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
+import 'split_labels.dart';
+
 /// The invitee's side (Figma `friend-payment-request` 83:299 + `friend-payment` 83:627): who
-/// invited you, your share in both currencies at the locked rate, the methods a connector will
-/// actually carry plus cash at the door, and the two honest answers — pay, or decline.
+/// invited you, your share in both currencies at the locked rate, the ways the server will take a
+/// share — cash at the door, and a wallet only where the dev simulator stands in for one, said so
+/// on the row — and the two honest answers: commit, or decline.
 class FriendSplitScreen extends StatefulWidget {
   const FriendSplitScreen({
     super.key,
     required this.splitApi,
-    required this.transferApi,
     required this.plan,
     required this.myUsername,
   });
 
   final SplitApi splitApi;
-  final TransferApi transferApi;
   final SplitPlan plan;
   final String myUsername;
 
@@ -25,7 +26,13 @@ class FriendSplitScreen extends StatefulWidget {
 }
 
 class _FriendSplitScreenState extends State<FriendSplitScreen> {
-  List<String> _walletMethods = const <String>[];
+  /// The wallets the server offers for a share. It used to be the checkout's method list, which
+  /// offered every wallet the simulator carried as if it took money, preselected Whish and called
+  /// it recommended — and the answer then marked the share paid with nothing moved (RECON-01).
+  List<SplitShareMethod> _wallets = const <SplitShareMethod>[];
+
+  /// Cash at the door until the invitee picks otherwise: the one way a share's money certainly
+  /// arrives.
   String _method = 'CASH_AT_DOOR';
   bool _acting = false;
 
@@ -46,12 +53,13 @@ class _FriendSplitScreenState extends State<FriendSplitScreen> {
 
   Future<void> _loadMethods() async {
     try {
-      final List<String> methods = await widget.transferApi.methods();
+      final List<SplitShareMethod> methods = await widget.splitApi.methods();
       if (!mounted) return;
       setState(() {
-        _walletMethods =
-            methods.where((String m) => m != 'CASH_ON_DELIVERY').toList();
-        if (_walletMethods.contains('WHISH')) _method = 'WHISH';
+        _wallets = methods
+            .where((SplitShareMethod m) =>
+                m.method == 'WHISH' || m.method == 'OMT' || m.method == 'BOB')
+            .toList();
       });
     } catch (_) {
       // Cash at the door remains.
@@ -216,10 +224,14 @@ class _FriendSplitScreenState extends State<FriendSplitScreen> {
                   ),
                 ),
                 const SizedBox(height: DeliverySpacing.sm),
-                if (_walletMethods.contains('WHISH'))
-                  _methodRow(t.custWhishShort, 'WHISH', recommended: true),
-                if (_walletMethods.contains('OMT')) _methodRow(t.custOmtShort, 'OMT'),
-                if (_walletMethods.contains('BOB')) _methodRow(t.custBobShort, 'BOB'),
+                for (final SplitShareMethod wallet in _wallets)
+                  _methodRow(
+                    splitMethodLabel(t, wallet.method),
+                    wallet.method,
+                    subtitle: wallet.simulated ? t.splitSimulatedMethodNote : null,
+                    // Never a stand-in: recommending a payment that moves no money is the lie.
+                    recommended: wallet.method == 'WHISH' && !wallet.simulated,
+                  ),
                 _methodRow(t.custCashAtDoor, 'CASH_AT_DOOR',
                     subtitle: t.custRiderCollectsFromYou),
                 const SizedBox(height: DeliverySpacing.lg),

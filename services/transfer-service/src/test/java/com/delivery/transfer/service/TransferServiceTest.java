@@ -53,7 +53,8 @@ class TransferServiceTest {
         when(registry.forMethod(any())).thenReturn(Optional.of(new CashOnDeliveryConnector()));
         when(transfers.findByOrderId(any())).thenReturn(Optional.empty());
         when(transfers.save(any())).thenAnswer(call -> call.getArgument(0));
-        when(orders.fetch(ORDER)).thenReturn(new OrderSummary(ORDER, PAYER, "PLACED"));
+        when(orders.fetch(ORDER)).thenReturn(new OrderSummary(ORDER, PAYER, null, "PLACED",
+                new BigDecimal("10.01"), "CASH", "DUE"));
     }
 
     /**
@@ -87,7 +88,8 @@ class TransferServiceTest {
         @DisplayName("someone else's order records nothing")
         void anotherCustomersOrderIsRefused() {
             when(orders.fetch(ORDER))
-                    .thenReturn(new OrderSummary(ORDER, SOMEONE_ELSE, "PLACED"));
+                    .thenReturn(new OrderSummary(ORDER, SOMEONE_ELSE, null, "PLACED",
+                            new BigDecimal("10.01"), "CASH", "DUE"));
 
             assertThatThrownBy(() -> service.record(ORDER, PAYER, TransferMethod.CASH_ON_DELIVERY,
                     new BigDecimal("10.00"), null))

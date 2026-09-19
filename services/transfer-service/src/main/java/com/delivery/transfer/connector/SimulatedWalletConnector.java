@@ -46,6 +46,12 @@ public class SimulatedWalletConnector implements MoneyTransferConnector {
         return enabled;
     }
 
+    /** Nothing it accepts is money: it mints a reference and moves nothing. */
+    @Override
+    public boolean simulated() {
+        return true;
+    }
+
     @Override
     public void initiate(MoneyTransfer transfer) {
         transfer.carriedBy(name(),

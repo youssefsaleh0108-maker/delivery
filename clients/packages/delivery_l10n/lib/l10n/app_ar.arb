@@ -3925,5 +3925,16 @@
   "dareaZoneLabelsNote": "تشير أسماء المناطق على الخريطة إلى وسط كل منطقة تقريبًا، لا إلى حدودها.",
   "dareaInside": "عنوانك داخل منطقة التوصيل",
   "dareaOutside": "عنوانك خارج منطقة التوصيل",
-  "dareaMapUnavailable": "تعذّر تحميل الخريطة الآن. منطقة التوصيل موصوفة أدناه."
+  "dareaMapUnavailable": "تعذّر تحميل الخريطة الآن. منطقة التوصيل موصوفة أدناه.",
+  "splitSimulatedPayment": "{method} · محاكاة، لم تُحوَّل أي أموال",
+  "@splitSimulatedPayment": {"placeholders":{"method":{"type":"String"}}},
+  "splitSimulatedChip": "محاكاة",
+  "splitWithTheOrder": "مع الطلب",
+  "splitSimulatedMethodNote": "دفعة تجريبية: لا تُحوَّل أي أموال، ويحصّلها السائق نقداً",
+  "riderSplitOrderDifference": "الفرق عن إجمالي الطلب",
+  "splitConfirmedChip": "مؤكَّدة",
+  "splitNConfirmed": "{confirmed} / {total} مؤكَّدة",
+  "@splitNConfirmed": {"placeholders":{"confirmed":{"type":"int"},"total":{"type":"int"}}},
+  "splitAmountConfirmedOf": "{confirmed} من {total} مؤكَّدة",
+  "@splitAmountConfirmedOf": {"placeholders":{"confirmed":{"type":"String"},"total":{"type":"String"}}}
 }

@@ -6140,5 +6140,16 @@
   "dareaZoneLabelsNote": "Area names on the map mark roughly the middle of each area, not its edges.",
   "dareaInside": "Your address is inside the delivery area",
   "dareaOutside": "Your address is outside the delivery area",
-  "dareaMapUnavailable": "The map can't load right now. The delivery area is described below."
+  "dareaMapUnavailable": "The map can't load right now. The delivery area is described below.",
+  "splitSimulatedPayment": "{method} · simulated, no money moved",
+  "@splitSimulatedPayment": {"placeholders":{"method":{"type":"String"}}},
+  "splitSimulatedChip": "Simulated",
+  "splitWithTheOrder": "With the order",
+  "splitSimulatedMethodNote": "Test payment: no money moves, and the rider collects it in cash",
+  "riderSplitOrderDifference": "Difference from the order total",
+  "splitConfirmedChip": "Confirmed",
+  "splitNConfirmed": "{confirmed} / {total} confirmed",
+  "@splitNConfirmed": {"placeholders":{"confirmed":{"type":"int"},"total":{"type":"int"}}},
+  "splitAmountConfirmedOf": "{confirmed} of {total} confirmed",
+  "@splitAmountConfirmedOf": {"placeholders":{"confirmed":{"type":"String"},"total":{"type":"String"}}}
 }
