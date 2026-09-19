@@ -448,8 +448,9 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                   // Banners sit above the offers rail: designed artwork the business chose to lead
                   // with, ahead of the mechanical list of discounts.
                   if (_banners.isNotEmpty) SliverToBoxAdapter(child: _bannerRail()),
-                  // The neighbourhood's two doors, side by side under the banner — where the owner
-                  // asked for them. With no banner to sit under, they take its place.
+                  // The neighbourhood's two doors under the banner, where the owner asked for them:
+                  // side by side, or stacked when a title word would not fit a half tile. With no
+                  // banner to sit under, they take its place.
                   SliverToBoxAdapter(child: _neighbourhoodRow(t)),
                   if (_railFavorites.isNotEmpty)
                     SliverToBoxAdapter(child: _featuredSection()),
@@ -955,33 +956,99 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
     ));
   }
 
-  /// The neighbourhood's two doors, the browse and the chat room, side by side in one row under
-  /// the banner rail. The owner asked for them "beside each other under the banner"; they used to
-  /// be two full-width cards stacked above it.
+  /// The gap between the neighbourhood's two doors, across the row or down the stack: the house
+  /// two-up gap, which the shop grid further down also uses.
+  static const double _entryGap = DeliverySpacing.md - DeliverySpacing.xs;
+
+  /// How far an entry card's content sits in from the card's edge.
+  static const double _entryInset = DeliverySpacing.md - DeliverySpacing.xs;
+
+  /// The neighbourhood's two doors, the browse and the chat room, under the banner rail. The owner
+  /// asked for them "beside each other under the banner"; they used to be two full-width cards
+  /// stacked above it.
   ///
-  /// Two equal columns with the house two-up gap. The shop grid further down uses the same gap, so
-  /// on a phone the tiles line up with its columns. [IntrinsicHeight] gives both tiles the height
-  /// of whichever has more to say, and each whole tile is its own tap target. A stretched Row alone
-  /// would not do it: inside the scroll view its height is unbounded. With no chat room, the
-  /// browse does not sit beside an empty half. It takes the whole row, as the full-width card it
-  /// was drawn as.
+  /// Side by side they are two equal columns with the house two-up gap, so on a phone the tiles
+  /// line up with the shop grid's columns. [IntrinsicHeight] gives both tiles the height of
+  /// whichever has more to say, and each whole tile is its own tap target. A stretched Row alone
+  /// would not do it: inside the scroll view its height is unbounded.
+  ///
+  /// A half tile leaves its words little room, though: 106dp on a 320dp phone and 126dp on a 360dp
+  /// one, the commonest Android width. A title can wrap between its words, but a word wider than
+  /// the tile has to break in the middle of itself, and larger text makes the words wider. At text
+  /// x1.3, "Neighbourhood" in the tile's 13sp Rubik is 134dp. So before anything is laid out, the
+  /// row measures the longest word of each title in the tile's own style at the reader's text
+  /// size. Only when both fit do the doors share the row. When either does not, they are the two
+  /// full-width cards, one under the other, still under the banner: there the words get 176dp even
+  /// on a 320dp phone. Shrinking the words to fit the tile (a FittedBox) was the other way out, and
+  /// a worse one: it holds a title to one line and so shrinks it even at normal text size, where
+  /// it wraps between its words perfectly well.
+  ///
+  /// The [LayoutBuilder] sits outside the [IntrinsicHeight]. It supplies the row's real width to
+  /// measure against, and it cannot answer the intrinsic-size questions [IntrinsicHeight] asks of
+  /// what is inside it.
+  ///
+  /// With no chat room, the browse does not sit beside an empty half. It takes the whole row, as the
+  /// full-width card it was drawn as.
   Widget _neighbourhoodRow(DeliveryStrings t) {
     return Padding(
       padding: const EdgeInsetsDirectional.fromSTEB(
           _gutter, DeliverySpacing.sm, _gutter, DeliverySpacing.sm),
       child: widget.neighbourhoodChatApi == null
           ? _neighbourhoodEntry(t, compact: false)
-          : IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  Expanded(child: _neighbourhoodEntry(t, compact: true)),
-                  const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
-                  Expanded(child: _neighbourhoodChatEntry(t)),
-                ],
-              ),
+          : LayoutBuilder(
+              builder: (BuildContext context, BoxConstraints row) {
+                // What a half tile leaves its words: half the row after the gap, inside the card's
+                // own inset on both sides.
+                final double tileWords = (row.maxWidth - _entryGap) / 2 - 2 * _entryInset;
+                final bool sideBySide = _everyWordFits(
+                    context, <String>[t.dekkaneBrowseTitle, t.chatRoomEntryTitle], tileWords);
+                if (!sideBySide) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      _neighbourhoodEntry(t, compact: false),
+                      const SizedBox(height: _entryGap),
+                      _neighbourhoodChatEntry(t, compact: false),
+                    ],
+                  );
+                }
+                return IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      Expanded(child: _neighbourhoodEntry(t, compact: true)),
+                      const SizedBox(width: _entryGap),
+                      Expanded(child: _neighbourhoodChatEntry(t, compact: true)),
+                    ],
+                  ),
+                );
+              },
             ),
     );
+  }
+
+  /// Whether the longest word of each of [titles] fits on a line [width] wide, set as a half
+  /// tile's title at the reader's text size.
+  ///
+  /// A paragraph's minimum intrinsic width is the widest piece of it that cannot be broken, which
+  /// for a title is its longest word. A [TextPainter] measures that with the same line breaker,
+  /// font and text scale the tile's [Text] will use. The style is merged over the ambient
+  /// [DefaultTextStyle] just as [Text] merges it, so the theme's font and letter spacing count.
+  bool _everyWordFits(BuildContext context, List<String> titles, double width) {
+    final TextStyle style =
+        DefaultTextStyle.of(context).style.merge(_entryTitleStyle(compact: true));
+    for (final String title in titles) {
+      final TextPainter painter = TextPainter(
+        text: TextSpan(text: title, style: style),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+        locale: Localizations.maybeLocaleOf(context),
+      )..layout();
+      final double longestWord = painter.minIntrinsicWidth;
+      painter.dispose();
+      if (longestWord > width) return false;
+    }
+    return true;
   }
 
   /// The door to the neighbourhood browse (Figma 112:1941).
@@ -989,8 +1056,8 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   /// That screen existed long before anything opened it (the surface checklist carried it as
   /// UNREACHABLE), so it has a place on Home where somebody asking "what is near me" already is.
   /// The frames draw no entry card of their own; this is the home feed's own card language, and it
-  /// names the screen it opens. Half of the neighbourhood row when the chat room is beside it, the
-  /// whole row when it is not.
+  /// names the screen it opens. Half of the neighbourhood row when the chat room is beside it, a
+  /// full-width card otherwise.
   Widget _neighbourhoodEntry(DeliveryStrings t, {required bool compact}) => _homeEntryCard(
         icon: Icons.storefront_rounded,
         title: t.dekkaneBrowseTitle,
@@ -1002,13 +1069,23 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   /// The door to the neighbourhood's chat room (Figma 121:102). It sits beside the browse because
   /// both are the same neighbourhood: the shops near the address, and the people. The frame marks
   /// Home as the tab it belongs to and draws no entry of its own, so it takes the feed's card
-  /// language. Only ever drawn as a half tile: when there is no room there is no tile at all.
-  Widget _neighbourhoodChatEntry(DeliveryStrings t) => _homeEntryCard(
+  /// language. A half tile beside the browse, or a full-width card under it when a title will not
+  /// fit the tile. With no room there is no door at all.
+  Widget _neighbourhoodChatEntry(DeliveryStrings t, {required bool compact}) => _homeEntryCard(
         icon: Icons.forum_rounded,
         title: t.chatRoomEntryTitle,
         subtitle: t.chatRoomEntrySub,
         onTap: _openNeighbourhoodChat,
-        compact: true,
+        compact: compact,
+      );
+
+  /// An entry card's title. The half tile's is a size smaller than the full card's; see
+  /// [_homeEntryCard] for why 13.
+  static TextStyle _entryTitleStyle({required bool compact}) => TextStyle(
+        fontSize: compact ? 13 : 15,
+        fontWeight: FontWeight.w700,
+        color: DeliveryColors.ink,
+        height: 1.25,
       );
 
   /// The home feed's entry card: the glyph on a brand-soft disc, a bold title over a muted line, a
@@ -1021,11 +1098,14 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   /// width underneath.
   ///
   /// The tile's sizes were measured with the app's own Rubik, not guessed. At 14sp,
-  /// "Neighbourhood" is 108dp wide and would break mid-word at 320dp; at 13sp it fits. The
-  /// browse's subtitle needs four lines at 320dp, so capping it at the full card's two would cut
-  /// it short on the phones this has to fit. The caps are only a backstop against copy nobody
-  /// measured. The tile's height is never fixed, so larger text makes the row taller and never
-  /// clips it.
+  /// "Neighbourhood" is 111dp wide and would break mid-word at 320dp even at normal text size; at
+  /// 13sp it is 104dp and fits the tile's 106dp. Larger text is [_neighbourhoodRow]'s to handle:
+  /// it only draws the tiles when every word of both titles fits them. A title is never capped, in
+  /// either shape, so it is never cut short. The browse's subtitle needs four lines in the tile at
+  /// 320dp, and three in the full card there with text x1.3, which is exactly when the full card
+  /// stands in for the tile. So both shapes allow it four lines, a cap that is only a backstop
+  /// against copy nobody measured. Heights are never fixed, so larger text makes a card taller and
+  /// never clips it.
   Widget _homeEntryCard({
     required IconData icon,
     required String title,
@@ -1049,21 +1129,15 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
       children: <Widget>[
         Text(
           title,
-          // Two lines, in both shapes: a long title wraps rather than losing its end, which at
-          // full width with large text is what a single line used to do.
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: compact ? 13 : 15,
-            fontWeight: FontWeight.w700,
-            color: DeliveryColors.ink,
-            height: 1.25,
-          ),
+          // No line cap, in either shape: a title wraps onto as many lines as it needs, and the
+          // card grows to hold them. With a cap, very large text (x2) cut the full card's title
+          // short, since there a word can be wider than a whole line on a phone under 390dp.
+          style: _entryTitleStyle(compact: compact),
         ),
         const SizedBox(height: 2),
         Text(
           subtitle,
-          maxLines: compact ? 4 : 2,
+          maxLines: 4,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontSize: 12, color: DeliveryColors.muted, height: 1.3),
         ),
@@ -1072,7 +1146,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
 
     return YdCard(
       onTap: onTap,
-      padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - DeliverySpacing.xs),
+      padding: const EdgeInsetsDirectional.all(_entryInset),
       child: compact
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
