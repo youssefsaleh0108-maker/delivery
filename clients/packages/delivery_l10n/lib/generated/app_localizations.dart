@@ -21458,6 +21458,24 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'The map can\'t load right now. The delivery area is described below.'**
   String get dareaMapUnavailable;
+
+  /// No description provided for @reconOwedToCompany.
+  ///
+  /// In en, this message translates to:
+  /// **'Owed to {company}'**
+  String reconOwedToCompany(String company);
+
+  /// No description provided for @reconCompanyTakesItIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Their company takes this in at its hub. It is not banked here.'**
+  String get reconCompanyTakesItIn;
+
+  /// No description provided for @reconBankedAmountChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'{holder} now holds {amount} for the platform, not the amount you confirmed. Nothing was recorded.'**
+  String reconBankedAmountChanged(String holder, String amount);
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

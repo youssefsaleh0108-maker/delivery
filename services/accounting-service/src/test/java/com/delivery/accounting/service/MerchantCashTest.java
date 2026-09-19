@@ -66,10 +66,16 @@ class MerchantCashTest {
     @Mock
     private AccountDirectory accounts;
 
-    /** A row of the cash-on-hand query, shaped as Spring Data projects it. */
+    /** A row of the per-holder query the companies' list reads, shaped as Spring Data projects it. */
     private record Balance(String getHolderRef, HolderKind getHolderKind, BigDecimal getAmount,
                            long getOrders, Instant getOldest)
             implements CashFloatRepository.HolderBalance {
+    }
+
+    /** A row of the cash-on-hand query: a shop's till is owed to the platform, so no company. */
+    private record Line(String getHolderRef, HolderKind getHolderKind, String getCarrierRef,
+                        BigDecimal getAmount, long getOrders, Instant getOldest)
+            implements CashFloatRepository.CreditorBalance {
     }
 
     private CashFloatService cashFloat() {
@@ -114,8 +120,8 @@ class MerchantCashTest {
         }
 
         private CarrierCashService.OnHand listedWith(int hoursOld) {
-            when(floats.outstandingByHolder()).thenReturn(List.of(new Balance(SHOP,
-                    HolderKind.MERCHANT, new BigDecimal("52.50"), 2,
+            when(floats.outstandingByCreditor()).thenReturn(List.of(new Line(SHOP,
+                    HolderKind.MERCHANT, null, new BigDecimal("52.50"), 2,
                     NOW.minus(Duration.ofHours(hoursOld)))));
             List<CarrierCashService.OnHand> list = service.cashOnHand();
             assertThat(list).hasSize(1);

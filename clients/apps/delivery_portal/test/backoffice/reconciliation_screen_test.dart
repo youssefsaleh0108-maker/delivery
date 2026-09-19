@@ -569,4 +569,87 @@ void main() {
       expect(find.descendant(of: shopRow(), matching: find.text('—')), findsOneWidget);
     });
   });
+
+  /// RECON-03: the dev rider held 254.87 of the platform's cash and 76.39 owed to a delivery
+  /// company, listed as one 331.26 line whose "Banked" sent the holder kind alone and cleared both.
+  /// The server now lists each debt as its own line, and "Banked" confirms the platform's figure.
+  group('RECON-03: a rider carrying a delivery company\'s cash', () {
+    const String riderRef = 'abcdef12-8888-4888-8888-888888888888';
+    const String companyRef = '77777777-7777-4777-8777-777777777777';
+
+    setUp(() {
+      final String at =
+          DateTime.now().toUtc().subtract(const Duration(hours: 3)).toIso8601String();
+      floatJson = '''
+[{"holderRef":"$riderRef","holderKind":"RIDER","carrierRef":null,"amount":254.87,"orders":7,
+  "oldest":"$at","overdue":false,"owed":"254.87"},
+ {"holderRef":"$riderRef","holderKind":"RIDER","carrierRef":"$companyRef","amount":76.39,
+  "orders":2,"oldest":"$at","overdue":false}]''';
+      remit = (RequestOptions options) => _json(
+          '{"remittanceId":"r9","holderRef":"$riderRef","amount":254.87,"collections":7,'
+          '"replayed":false}');
+    });
+
+    testWidgets('lists the platform\'s cash and the company\'s apart; only the first is banked here',
+        (WidgetTester tester) async {
+      await pump(tester);
+
+      expect(find.text('ABCDEF12'), findsNWidgets(2));
+      expect(find.text('\$254.87'), findsOneWidget);
+      expect(find.text('\$76.39'), findsOneWidget);
+      // The tile counts all the cash out there; no line adds the two debts together.
+      expect(find.text('\$331.26'), findsOneWidget);
+      expect(
+          find.descendant(of: find.byType(ListView).first, matching: find.text('\$331.26')),
+          findsNothing);
+      // Named for the company it is owed to, with no button: the company takes it in at its hub.
+      expect(find.textContaining('Owed to Libanex Express'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'Banked'), findsOneWidget);
+      final Finder companyRow = find
+          .ancestor(of: find.textContaining('Owed to Libanex Express'), matching: find.byType(Row))
+          .first;
+      expect(find.descendant(of: companyRow, matching: find.text('Banked')), findsNothing);
+    });
+
+    testWidgets('banking confirms the platform\'s figure on screen, with one key',
+        (WidgetTester tester) async {
+      await pump(tester);
+
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Banked'));
+      await tester.pumpAndSettle();
+      final Finder dialog = find.byType(AlertDialog);
+      expect(find.descendant(of: dialog, matching: find.textContaining('\$254.87')),
+          findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Yes, they banked it'));
+      await tester.pumpAndSettle();
+
+      final RequestOptions post =
+          adapter.requests.singleWhere((RequestOptions o) => o.method == 'POST');
+      expect(post.path, '/api/accounting/float/$riderRef/remit');
+      final Map<String, dynamic> body = post.data as Map<String, dynamic>;
+      expect(body['expectedAmount'], '254.87');
+      expect(body['requestKey'], matches(RegExp(r'^[0-9a-f]{32}$')));
+      expect(body['holderKind'], 'RIDER');
+      expect(find.text('Recorded \$254.87 from ABCDEF12.'), findsOneWidget);
+    });
+
+    testWidgets('a banking refused because the rider collected more says what they hold now',
+        (WidgetTester tester) async {
+      remit = (RequestOptions options) => _json(
+          '{"error":"They are holding 260.12 now.","code":"AMOUNT_CHANGED","current":"260.12"}',
+          status: 409);
+      await pump(tester);
+
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Banked'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Yes, they banked it'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('ABCDEF12 now holds \$260.12 for the platform, not the amount you confirmed. '
+            'Nothing was recorded.'),
+        findsOneWidget,
+      );
+    });
+  });
 }

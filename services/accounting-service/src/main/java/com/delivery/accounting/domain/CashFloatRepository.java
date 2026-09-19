@@ -21,7 +21,8 @@ public interface CashFloatRepository extends JpaRepository<CashFloatEntry, UUID>
     boolean existsByOrderIdAndEntryKind(UUID orderId, CashFloatEntry.Kind entryKind);
 
     /**
-     * Oldest first, so a remittance clears the longest-held cash before the newest — and LOCKED.
+     * What one holder owes the PLATFORM, oldest first, so a remittance clears the longest-held cash
+     * before the newest — and LOCKED.
      *
      * <p>The lock is the fix for a race that cost money. Two operators pressing "Banked" at once both
      * read the same outstanding rows, and both wrote a remittance and a CASH_REMITTANCE posting: the
@@ -29,6 +30,14 @@ public interface CashFloatRepository extends JpaRepository<CashFloatEntry, UUID>
      * waits for the first to commit, re-reads them as already cleared, and records nothing. Only the
      * write path may call this — Postgres refuses {@code FOR UPDATE} in a read-only transaction, which
      * is why the views read {@link #heldBy} instead.
+     *
+     * <p><strong>Never a rider's cash for a delivery company (RECON-03).</strong> A company's rider
+     * owes the notes from its jobs to the company, which takes them in at its hub
+     * ({@link #lockHeldForCarrier}) and then owes the platform. They are not the platform's to
+     * record as banked: when they were, the Back Office's "banked" on a rider cleared 76.39 the
+     * rider still owed company 5857ac51, and the company could never record its own hand-over. So a
+     * rider's rows that name a company are left out here, and only there can they be cleared. A
+     * company's own custody and a shop's till are owed to the platform directly and are always in.
      *
      * <p><strong>Every kind of cash the subject holds.</strong> One Keycloak subject can be a shop
      * and a rider at once — a shop that also delivers — and its till and its bag are owed on
@@ -42,6 +51,8 @@ public interface CashFloatRepository extends JpaRepository<CashFloatEntry, UUID>
             WHERE f.holderRef = :holder
               AND f.entryKind = com.delivery.accounting.domain.CashFloatEntry$Kind.COLLECTED
               AND f.clearedBy IS NULL
+              AND (f.holderKind <> com.delivery.accounting.domain.CashFloatEntry$HolderKind.RIDER
+                   OR f.carrierRef IS NULL)
             ORDER BY f.createdAt ASC
             """)
     List<CashFloatEntry> outstandingFor(@Param("holder") String holder);
@@ -49,7 +60,7 @@ public interface CashFloatRepository extends JpaRepository<CashFloatEntry, UUID>
     /**
      * {@link #outstandingFor(String)} for one kind of holder, LOCKED: what a remittance clears once
      * it knows who is paying — a shop's till without the bag the same account carries as a rider,
-     * or the reverse.
+     * or the reverse. The same rule applies: a rider's cash for a delivery company is never here.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
@@ -58,6 +69,8 @@ public interface CashFloatRepository extends JpaRepository<CashFloatEntry, UUID>
               AND f.holderKind = :holderKind
               AND f.entryKind = com.delivery.accounting.domain.CashFloatEntry$Kind.COLLECTED
               AND f.clearedBy IS NULL
+              AND (f.holderKind <> com.delivery.accounting.domain.CashFloatEntry$HolderKind.RIDER
+                   OR f.carrierRef IS NULL)
             ORDER BY f.createdAt ASC
             """)
     List<CashFloatEntry> outstandingFor(@Param("holder") String holder,
@@ -244,21 +257,50 @@ public interface CashFloatRepository extends JpaRepository<CashFloatEntry, UUID>
     }
 
     /**
-     * When each rider's oldest outstanding cash was collected, once per party it is owed to — a null
-     * company being the platform's own fleet. [holderRef, carrierRef, Instant].
+     * Everyone holding cash, one line per party it is owed to, largest first — the Back Office's
+     * cash-on-hand list (RECON-03).
      *
-     * <p>What the Back Office's cash-on-hand list is flagged by. That list shows a rider's cash as
-     * one line, but a rider can carry the platform's cash and a company's at once and the two are
-     * late at different ages, so the oldest of each is read apart rather than the oldest of both.
+     * <p>A rider can carry the platform's cash and a delivery company's at once, and the two are
+     * different debts: the platform's is banked with the platform, and the company's is handed over
+     * at the company's hub. {@link #outstandingByHolder()} adds them into one line, and the one
+     * "banked" button on that line was how a rider's company cash came to be cleared as the
+     * platform's. Grouped by the company as well, each debt is its own line with its own age, and
+     * only the platform's line is one the Back Office can record as banked.
+     *
+     * <p>{@code carrierRef} is the company a rider's cash is owed to, and null for the platform's own
+     * fleet. A company's custody always names itself there and a shop's till never names anybody, so
+     * neither splits.
      */
     @Query("""
-            SELECT f.holderRef, f.carrierRef, MIN(f.createdAt) FROM CashFloatEntry f
-            WHERE f.holderKind = com.delivery.accounting.domain.CashFloatEntry$HolderKind.RIDER
-              AND f.entryKind = com.delivery.accounting.domain.CashFloatEntry$Kind.COLLECTED
+            SELECT f.holderRef AS holderRef,
+                   f.holderKind AS holderKind,
+                   f.carrierRef AS carrierRef,
+                   SUM(f.amount) AS amount,
+                   COUNT(f) AS orders,
+                   MIN(f.createdAt) AS oldest
+            FROM CashFloatEntry f
+            WHERE f.entryKind = com.delivery.accounting.domain.CashFloatEntry$Kind.COLLECTED
               AND f.clearedBy IS NULL
-            GROUP BY f.holderRef, f.carrierRef
+            GROUP BY f.holderRef, f.holderKind, f.carrierRef
+            ORDER BY SUM(f.amount) DESC
             """)
-    List<Object[]> oldestHeldByRider();
+    List<CreditorBalance> outstandingByCreditor();
+
+    /** A row of {@link #outstandingByCreditor()}. */
+    interface CreditorBalance {
+        String getHolderRef();
+
+        CashFloatEntry.HolderKind getHolderKind();
+
+        /** The company a rider's cash is owed to; null when it is owed to the platform. */
+        String getCarrierRef();
+
+        BigDecimal getAmount();
+
+        long getOrders();
+
+        java.time.Instant getOldest();
+    }
 
     // --------------------------------------------------------------- delivery-company custody
 

@@ -76,24 +76,38 @@ class _ReconciliationScreenState extends State<ReconciliationScreen> {
     }
   }
 
-  /// Records that a holder has banked everything they were carrying.
+  /// Records that a rider has banked the cash they owe the platform.
   ///
   /// Confirmed first, because there is no way back. The ledger can discharge a collection but not
   /// un-discharge one, so an accidental click here means a rider is shown as square with the
   /// platform while still holding the notes.
+  ///
+  /// <strong>Against the figure on screen, and only the platform's (RECON-03).</strong> The line's
+  /// own figure goes with the confirmation, and a key made once per confirmation: if the rider
+  /// collected more since the page loaded the server records nothing and says what they hold now,
+  /// and a double press records one banking. Cash a rider holds for a delivery company is a line of
+  /// its own that has no button here — it is the company's to take in at its hub — and the server
+  /// never clears it from this route either.
   Future<void> _remit(CashHolder holder) async {
     // A shop's till is settled on terms of its own, against what it owes rather than what it holds.
     if (holder.isShop) return _remitShop(holder);
+    if (holder.isOwedToCompany) return;
 
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    // The figure the operator is looking at, exactly as the server wrote it. A server from before
+    // the list carried it sent the amount alone, which is the same figure for a rider.
+    final Money expected = holder.owed ?? Money(holder.amount.toStringAsFixed(2));
+    final String requestKey = CarrierCashApi.newRequestKey();
     final bool confirmed = await showDialog<bool>(
           context: context,
           builder: (BuildContext context) => AlertDialog(
             title: const Text('Record a hand-over'),
             content: Text(
               'Confirm ${_shortId(holder.holderRef)} has handed over '
-              '${_money(holder.amount)} in cash, covering ${holder.orders} '
+              '${_cash(expected)} in cash, covering ${holder.orders} '
               '${holder.orders == 1 ? 'order' : 'orders'}.\n\n'
-              'This clears their whole balance and cannot be undone.',
+              'This clears the cash they owe the platform and cannot be undone. Cash they hold '
+              'for a delivery company is not touched.',
             ),
             actions: <Widget>[
               TextButton(
@@ -116,12 +130,20 @@ class _ReconciliationScreenState extends State<ReconciliationScreen> {
     try {
       // Which of the account's cash this is: one account can be a rider and a shop at once, and the
       // server will not guess between the bag and the till.
-      final Remittance receipt =
-          await widget.api.remit(holder.holderRef, holderKind: holder.holderKind);
+      final Remittance receipt = await widget.api.remit(
+        holder.holderRef,
+        expected: expected,
+        requestKey: requestKey,
+        holderKind: holder.holderKind,
+      );
       messenger.showSnackBar(SnackBar(
         content: Text(receipt.isEmpty
             ? 'Nothing was outstanding — somebody may have recorded this already.'
             : 'Recorded ${_money(receipt.amount)} from ${_shortId(receipt.holderRef)}.'),
+      ));
+    } on CashAmountChanged catch (e) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(t.reconBankedAmountChanged(_shortId(holder.holderRef), _cash(e.current))),
       ));
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('Could not record it: $e')));
@@ -289,7 +311,7 @@ class _ReconciliationScreenState extends State<ReconciliationScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(
                     DeliverySpacing.lg, 0, DeliverySpacing.lg, DeliverySpacing.lg),
-                child: _CashOnHand(holders: riders, onRemit: _remit),
+                child: _CashOnHand(holders: riders, names: data.names, onRemit: _remit),
               ),
             // Hidden when no company holds or is owed anything, as cash on hand is; shown with its
             // own sentence when it could not be loaded, because silence would read as "none".
@@ -460,10 +482,17 @@ class _SummaryTiles extends StatelessWidget {
 ///
 /// Sorted oldest-first rather than largest-first. The biggest balance is usually just the busiest
 /// rider; the oldest one is the question worth asking.
+///
+/// A rider carrying cash for a delivery company as well as the platform's is on it twice, once per
+/// debt (RECON-03): the platform's line is the one "Banked" records, and the company's line says
+/// who it is owed to and has no button, because the company takes it in at its own hub.
 class _CashOnHand extends StatelessWidget {
-  const _CashOnHand({required this.holders, required this.onRemit});
+  const _CashOnHand({required this.holders, required this.names, required this.onRemit});
 
   final List<CashHolder> holders;
+
+  /// Company names by provider id; a short id stands in for one it does not know.
+  final Map<String, String> names;
   final Future<void> Function(CashHolder) onRemit;
 
   @override
@@ -497,8 +526,13 @@ class _CashOnHand extends StatelessWidget {
               padding: const EdgeInsets.all(DeliverySpacing.sm),
               itemCount: sorted.length,
               separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (BuildContext context, int i) =>
-                  _HolderRow(holder: sorted[i], onRemit: onRemit),
+              itemBuilder: (BuildContext context, int i) => _HolderRow(
+                holder: sorted[i],
+                company: sorted[i].carrierRef == null
+                    ? null
+                    : names[sorted[i].carrierRef!] ?? _shortId(sorted[i].carrierRef!),
+                onRemit: onRemit,
+              ),
             ),
           ),
         ),
@@ -508,9 +542,12 @@ class _CashOnHand extends StatelessWidget {
 }
 
 class _HolderRow extends StatelessWidget {
-  const _HolderRow({required this.holder, required this.onRemit});
+  const _HolderRow({required this.holder, required this.onRemit, this.company});
 
   final CashHolder holder;
+
+  /// Who a rider's line is owed to when it is a delivery company's cash; null when the platform's.
+  final String? company;
   final Future<void> Function(CashHolder) onRemit;
 
   @override
@@ -549,8 +586,13 @@ class _HolderRow extends StatelessWidget {
                           t.carrCashOrderCount(holder.orders),
                           t.svcCashShopTakenAtCounter(_money(holder.amount)),
                         ].join(' · ')
-                      : '${holder.orders} ${holder.orders == 1 ? 'order' : 'orders'} '
-                          '· since ${_ago(holder.oldest)}',
+                      : <String>[
+                          if (company != null) t.reconOwedToCompany(company!),
+                          '${holder.orders} ${holder.orders == 1 ? 'order' : 'orders'} '
+                              '· since ${_ago(holder.oldest)}',
+                        ].join(' · '),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: meta,
                 ),
               ],
@@ -579,6 +621,14 @@ class _HolderRow extends StatelessWidget {
               onPressed: holder.owed == null ? null : () => onRemit(holder),
               icon: const Icon(Icons.account_balance_outlined, size: 16),
               label: Text(t.carrCashBoRecordPayment),
+            )
+          else if (holder.isOwedToCompany)
+            // The company's to take in at its hub, never the platform's to record as banked
+            // (RECON-03): no button, and the reason one hover away.
+            Tooltip(
+              message: t.reconCompanyTakesItIn,
+              child: const Icon(Icons.local_shipping_outlined,
+                  size: 18, color: DeliveryColors.muted),
             )
           else
             OutlinedButton.icon(

@@ -12674,4 +12674,18 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get dareaMapUnavailable =>
       'The map can\'t load right now. The delivery area is described below.';
+
+  @override
+  String reconOwedToCompany(String company) {
+    return 'Owed to $company';
+  }
+
+  @override
+  String get reconCompanyTakesItIn =>
+      'Their company takes this in at its hub. It is not banked here.';
+
+  @override
+  String reconBankedAmountChanged(String holder, String amount) {
+    return '$holder now holds $amount for the platform, not the amount you confirmed. Nothing was recorded.';
+  }
 }

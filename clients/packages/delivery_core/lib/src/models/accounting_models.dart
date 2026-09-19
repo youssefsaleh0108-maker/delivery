@@ -192,6 +192,7 @@ class CashHolder {
     required this.oldest,
     this.overdue,
     this.owed,
+    this.carrierRef,
   });
 
   final String holderRef;
@@ -199,6 +200,14 @@ class CashHolder {
   /// RIDER; PROVIDER for a delivery company holding what its riders handed it; or MERCHANT for a
   /// shop holding what its counter took for pickup orders.
   final String holderKind;
+
+  /// The delivery company a rider's line is owed to, or null when the line is owed to the platform.
+  ///
+  /// A rider can carry the platform's cash and a company's at once, and the server lists each debt
+  /// as its own line (RECON-03). A company's line is the company's to take in at its hub, never the
+  /// platform's to record as banked.
+  final String? carrierRef;
+
   final double amount;
   final int orders;
 
@@ -212,10 +221,13 @@ class CashHolder {
   /// in which case the screen falls back to its own rule.
   final bool? overdue;
 
-  /// What a shop owes the platform out of its till: the platform's commission. The rest of the
-  /// till is the shop's own share, which it keeps, so this — never [amount] — is the figure a
-  /// shop's payment is recorded against. Exactly as the ledger wrote it; null for riders and
-  /// companies, and when the server did not say, never a zero.
+  /// The figure a payment through the remit route is recorded against, exactly as the ledger wrote
+  /// it: what the operator confirms.
+  ///
+  /// For a shop it is what the shop owes out of its till — the platform's commission; the rest of
+  /// the till is the shop's own share, which it keeps. For a rider's line owed to the platform it is
+  /// the whole line. Null on a rider's line owed to a delivery company, which is not the platform's
+  /// to record, and when the server did not say — never a zero.
   final Money? owed;
 
   /// A delivery company rather than a rider.
@@ -223,6 +235,9 @@ class CashHolder {
 
   /// A shop holding cash its counter took for pickup orders, rather than a rider.
   bool get isShop => holderKind == 'MERCHANT';
+
+  /// A rider's cash owed to their delivery company rather than to the platform (RECON-03).
+  bool get isOwedToCompany => carrierRef != null;
 
   /// How long the oldest cash has been out.
   Duration get age => DateTime.now().difference(oldest);
@@ -235,6 +250,9 @@ class CashHolder {
         oldest: DateTime.parse(json['oldest'] as String),
         overdue: json['overdue'] is bool ? json['overdue'] as bool : null,
         owed: Money.parse(json['owed']),
+        carrierRef: json['carrierRef'] is String && (json['carrierRef'] as String).isNotEmpty
+            ? json['carrierRef'] as String
+            : null,
       );
 }
 

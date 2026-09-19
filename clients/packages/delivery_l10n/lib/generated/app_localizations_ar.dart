@@ -12833,4 +12833,18 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get dareaMapUnavailable =>
       'تعذّر تحميل الخريطة الآن. منطقة التوصيل موصوفة أدناه.';
+
+  @override
+  String reconOwedToCompany(String company) {
+    return 'مستحق لشركة $company';
+  }
+
+  @override
+  String get reconCompanyTakesItIn =>
+      'تستلم الشركة هذا المبلغ في مركزها، ولا يُسجَّل إيداعه هنا.';
+
+  @override
+  String reconBankedAmountChanged(String holder, String amount) {
+    return 'يحمل $holder الآن $amount للمنصة، وليس المبلغ الذي أكّدته. لم يُسجَّل أي شيء.';
+  }
 }

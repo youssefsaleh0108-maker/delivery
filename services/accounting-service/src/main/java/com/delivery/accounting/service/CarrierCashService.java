@@ -560,28 +560,47 @@ public class CarrierCashService {
 
     /**
      * One line of the Back Office's cash-on-hand list: a rider, a company or a shop holding cash that
-     * has not been banked.
+     * has not been banked, owed to one party.
      *
-     * @param overdue judged by the limit for the cash this holder has — see {@link #cashOnHand()}
+     * @param carrierRef the delivery company a rider's line is owed to, or null when the line is owed
+     *                   to the platform — a platform-fleet rider's bag, a company's own custody, a
+     *                   shop's till. Only a line with no company is the platform's to record as
+     *                   banked (RECON-03)
+     * @param overdue    judged by the limit for the cash on this line — see {@link #cashOnHand()}
      */
-    public record OnHand(String holderRef, HolderKind holderKind, BigDecimal amount, long orders,
-                         Instant oldest, boolean overdue) {
+    public record OnHand(String holderRef, HolderKind holderKind, String carrierRef,
+                         BigDecimal amount, long orders, Instant oldest, boolean overdue) {
+
+        /** A line owed to the platform — the only shape there was before the list split (RECON-03). */
+        public OnHand(String holderRef, HolderKind holderKind, BigDecimal amount, long orders,
+                      Instant oldest, boolean overdue) {
+            this(holderRef, holderKind, null, amount, orders, oldest, overdue);
+        }
+
+        /** Whether the platform is who this cash is owed to, and so the one who records it banked. */
+        public boolean owedToPlatform() {
+            return carrierRef == null;
+        }
     }
 
     /**
-     * Everyone holding cash, largest first, each flagged late by the limit that applies to what they
-     * hold.
+     * Everyone holding cash, one line per party it is owed to, largest first, each flagged late by
+     * the limit that applies to it.
+     *
+     * <p><strong>One line per debt (RECON-03).</strong> A rider carrying the platform's cash and a
+     * delivery company's at once owes two parties, on two terms, and used to be one line with one
+     * "banked" button that cleared both as the platform's. Now the platform's part and each company's
+     * part are lines of their own: the platform's line is what the Back Office records as banked, and
+     * a company's line is shown for what it is — owed to that company, which takes it in at its hub.
      *
      * <p><strong>Two limits, because the owner's decision changed one kind of cash and not the
      * other.</strong> A rider of the platform's own fleet owes the platform directly and keeps the
      * line the Back Office always held them to ({@code platform-overdue-after-hours}, a day). Cash
      * in a delivery company's custody — with one of its riders, or with the company after a
      * hand-over — is judged by the carrier limit, the one the company's own page states, so the two
-     * sides of a hand-over still agree on what "late" means.
-     *
-     * <p>A rider carrying both kinds at once is late when either part is, each by its own line: a
-     * day-old platform bag is not excused by a fresh company one beside it, and a company bag inside
-     * its limit is not made late by the platform's shorter one.
+     * sides of a hand-over still agree on what "late" means. Each of a rider's lines is judged by its
+     * own limit and its own oldest note: a day-old platform bag is not excused by a fresh company one
+     * beside it, and a company bag inside its limit is not made late by the platform's shorter one.
      *
      * <p><strong>A shop's till is a third kind of cash (V52)</strong>: what a shop's counter took
      * for pickup orders, owed to the platform directly. It is judged by its own line,
@@ -590,24 +609,23 @@ public class CarrierCashService {
      */
     @Transactional(readOnly = true)
     public List<OnHand> cashOnHand() {
-        Set<String> lateRiders = new java.util.HashSet<>();
-        for (Object[] row : floats.oldestHeldByRider()) {
-            Instant oldest = (Instant) row[2];
-            boolean late = row[1] == null ? isPlatformOverdue(oldest) : isOverdue(oldest);
-            if (late) {
-                lateRiders.add((String) row[0]);
-            }
-        }
-        return floats.outstandingByHolder().stream()
-                .map(row -> new OnHand(row.getHolderRef(), row.getHolderKind(), row.getAmount(),
-                        row.getOrders(), row.getOldest(),
-                        // Every kind spelt out: a new holder kind must decide its own line here
-                        // rather than silently inherit a rider's, as a shop's till once would have.
-                        switch (row.getHolderKind()) {
-                            case PROVIDER -> isOverdue(row.getOldest());
-                            case MERCHANT -> isMerchantOverdue(row.getOldest());
-                            case RIDER -> lateRiders.contains(row.getHolderRef());
-                        }))
+        return floats.outstandingByCreditor().stream()
+                .map(row -> {
+                    // A company's custody names itself on its rows; as a line it is owed to the
+                    // platform, and saying so keeps "no company" meaning one thing on every line.
+                    String owedTo = row.getHolderKind() == HolderKind.RIDER ? row.getCarrierRef() : null;
+                    return new OnHand(row.getHolderRef(), row.getHolderKind(), owedTo,
+                            row.getAmount(), row.getOrders(), row.getOldest(),
+                            // Every kind spelt out: a new holder kind must decide its own line here
+                            // rather than silently inherit a rider's, as a shop's till once would have.
+                            switch (row.getHolderKind()) {
+                                case PROVIDER -> isOverdue(row.getOldest());
+                                case MERCHANT -> isMerchantOverdue(row.getOldest());
+                                case RIDER -> owedTo == null
+                                        ? isPlatformOverdue(row.getOldest())
+                                        : isOverdue(row.getOldest());
+                            });
+                })
                 .toList();
     }
 

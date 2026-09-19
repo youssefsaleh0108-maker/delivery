@@ -87,6 +87,11 @@ public class ReconciliationController {
      * <p>{@code holderKind} says which of the account's cash is being paid in. One account can be a
      * shop with a till and a rider with a bag, settled on different terms, so when it holds both and
      * the body does not say, nothing is recorded and the answer is 409 {@code HOLDER_KIND_REQUIRED}.
+     *
+     * <p><strong>Only what is owed to the platform (RECON-03).</strong> A rider's cash from a
+     * delivery company's jobs is owed to that company, which records its own hand-over, so banking a
+     * rider clears their platform-fleet cash and nothing else — and {@code expectedAmount} is checked
+     * against that figure, the {@code owed} of the rider's platform line on {@code /float}.
      */
     @PostMapping("/float/{holderRef}/remit")
     public ResponseEntity<?> remit(@PathVariable String holderRef,
@@ -219,10 +224,17 @@ public class ReconciliationController {
      * disagree about what "late" means — and the shop limit for a shop's till. See
      * {@link CarrierCashService#cashOnHand()}.
      *
-     * <p>A shop's line also carries {@code owed} and {@code retained} (V52), as two-decimal strings.
-     * A shop keeps its share of its till and pays the platform its commission, so {@code amount} is
-     * the cash it holds, {@code owed} is the figure its payment is recorded against — what
-     * {@code /float/{ref}/remit} expects — and {@code retained} is the share it keeps.
+     * <p><strong>One line per debt (RECON-03).</strong> A rider carrying cash for a delivery company
+     * as well as the platform's has a line for each: {@code carrierRef} names the company a line is
+     * owed to, and is null on a line owed to the platform. Only a line owed to the platform carries
+     * {@code owed}, the two-decimal string a payment through {@code /float/{ref}/remit} is recorded
+     * against — the Back Office confirms that figure as {@code expectedAmount}. A company's line has
+     * none, because it is not the platform's to record: the company takes that cash in at its hub,
+     * and a remittance never clears it.
+     *
+     * <p>A shop's {@code owed} is not its till (V52): a shop keeps its share of its till and pays the
+     * platform its commission, so {@code amount} is the cash it holds, {@code owed} is the platform's
+     * part, and {@code retained} is the share it keeps.
      *
      * <p>The role is checked in the method as well as on the class, as on every cash route here: this
      * list names who holds the platform's money, and a standalone test can only prove a lock it can
@@ -245,16 +257,19 @@ public class ReconciliationController {
                     Map<String, Object> out = new LinkedHashMap<String, Object>();
                     out.put("holderRef", holder.holderRef());
                     out.put("holderKind", holder.holderKind());
+                    out.put("carrierRef", holder.carrierRef());
                     out.put("amount", holder.amount());
                     out.put("orders", holder.orders());
                     out.put("oldest", holder.oldest());
                     out.put("overdue", holder.overdue());
-                    var till = holder.holderKind() == CashFloatEntry.HolderKind.MERCHANT
-                            ? tills.get(holder.holderRef())
-                            : null;
-                    if (till != null) {
-                        out.put("owed", Statement.money(till.owed()).toPlainString());
-                        out.put("retained", Statement.money(till.retained()).toPlainString());
+                    if (holder.holderKind() == CashFloatEntry.HolderKind.MERCHANT) {
+                        var till = tills.get(holder.holderRef());
+                        if (till != null) {
+                            out.put("owed", Statement.money(till.owed()).toPlainString());
+                            out.put("retained", Statement.money(till.retained()).toPlainString());
+                        }
+                    } else if (holder.owedToPlatform()) {
+                        out.put("owed", Statement.money(holder.amount()).toPlainString());
                     }
                     return out;
                 })

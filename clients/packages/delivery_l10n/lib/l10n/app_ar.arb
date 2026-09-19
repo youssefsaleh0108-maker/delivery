@@ -3925,5 +3925,10 @@
   "dareaZoneLabelsNote": "تشير أسماء المناطق على الخريطة إلى وسط كل منطقة تقريبًا، لا إلى حدودها.",
   "dareaInside": "عنوانك داخل منطقة التوصيل",
   "dareaOutside": "عنوانك خارج منطقة التوصيل",
-  "dareaMapUnavailable": "تعذّر تحميل الخريطة الآن. منطقة التوصيل موصوفة أدناه."
+  "dareaMapUnavailable": "تعذّر تحميل الخريطة الآن. منطقة التوصيل موصوفة أدناه.",
+  "reconOwedToCompany": "مستحق لشركة {company}",
+  "@reconOwedToCompany": {"placeholders":{"company":{"type":"String"}}},
+  "reconCompanyTakesItIn": "تستلم الشركة هذا المبلغ في مركزها، ولا يُسجَّل إيداعه هنا.",
+  "reconBankedAmountChanged": "يحمل {holder} الآن {amount} للمنصة، وليس المبلغ الذي أكّدته. لم يُسجَّل أي شيء.",
+  "@reconBankedAmountChanged": {"placeholders":{"holder":{"type":"String"},"amount":{"type":"String"}}}
 }

@@ -119,7 +119,10 @@ class ReconciliationMerchantCashTest {
         mvc.perform(get("/api/accounting/float"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].holderKind").value("RIDER"))
-                .andExpect(jsonPath("$[0].owed").doesNotExist())
+                // RECON-03: a rider's line owed to the platform carries the figure a "banked" is
+                // confirmed against — the whole bag, since a rider keeps no share of it — and no
+                // share kept, which only a shop's till has.
+                .andExpect(jsonPath("$[0].owed").value("13.25"))
                 .andExpect(jsonPath("$[0].retained").doesNotExist());
         verify(cashFloat, never()).shopTills();
     }

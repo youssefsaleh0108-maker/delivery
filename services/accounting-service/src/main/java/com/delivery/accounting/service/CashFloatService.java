@@ -157,6 +157,11 @@ public class CashFloatService {
      * subject holds when that is all of one kind, exactly as before, and refuses when it is not,
      * rather than record the till and the bag as one payment of whichever kind happened to be oldest.
      *
+     * <p><strong>Only cash owed to the platform (RECON-03).</strong> A delivery company's rider owes
+     * the notes from the company's jobs to the company, which records its own hand-over
+     * ({@link #handOver}); they are never cleared here. Banking a rider clears their platform-fleet
+     * cash, and {@code expected} is checked against that figure alone.
+     *
      * <p><strong>A shop keeps its share.</strong> A shop's till is cleared against what the shop owes
      * out of it, never against the till ({@link ShopTill}): what it pays is REMITTED and posted as
      * every payment is, and the share it keeps is RETAINED and posted nowhere, because none of it

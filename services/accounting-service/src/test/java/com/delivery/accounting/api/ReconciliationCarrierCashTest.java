@@ -254,4 +254,34 @@ class ReconciliationCarrierCashTest {
                 .andExpect(jsonPath("$[1].holderKind").value("RIDER"))
                 .andExpect(jsonPath("$[1].overdue").value(false));
     }
+
+    /**
+     * RECON-03: the dev rider held 254.87 of the platform's cash and 76.39 owed to company
+     * 5857ac51, listed as one 331.26 line whose "banked" cleared both. Each debt is its own line
+     * now, and only the platform's carries a figure the Back Office can confirm as banked.
+     */
+    @Test
+    @DisplayName("RECON-03: a rider's platform cash and their company's cash are separate lines")
+    void floatSplitsARidersCashByWhoItIsOwedTo() throws Exception {
+        signedInAs("op-1", "BACKOFFICE");
+        when(carrierCash.cashOnHand()).thenReturn(List.of(
+                new CarrierCashService.OnHand("rider-1", CashFloatEntry.HolderKind.RIDER, null,
+                        new BigDecimal("254.87"), 7, Instant.parse("2026-09-18T09:00:00Z"), true),
+                new CarrierCashService.OnHand("rider-1", CashFloatEntry.HolderKind.RIDER, COMPANY,
+                        new BigDecimal("76.39"), 2, Instant.parse("2026-09-19T09:00:00Z"),
+                        false)));
+
+        mvc.perform(get("/api/accounting/float"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].holderRef").value("rider-1"))
+                .andExpect(jsonPath("$[0].carrierRef").isEmpty())
+                .andExpect(jsonPath("$[0].amount").value(254.87))
+                .andExpect(jsonPath("$[0].owed").value("254.87"))
+                .andExpect(jsonPath("$[1].holderRef").value("rider-1"))
+                .andExpect(jsonPath("$[1].carrierRef").value(COMPANY))
+                .andExpect(jsonPath("$[1].amount").value(76.39))
+                // Owed to the company, which takes it in at its hub: nothing here to confirm.
+                .andExpect(jsonPath("$[1].owed").doesNotExist());
+    }
 }
