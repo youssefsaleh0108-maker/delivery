@@ -10,6 +10,8 @@ import 'package:mobile_app/src/merchant_shell.dart';
 import 'package:mobile_app/src/one_time_code.dart';
 import 'package:mobile_app/src/sign_in_screen.dart';
 
+import 'support/demo_logins.dart';
+
 // That a shop can sign in on a phone and reach all five of its own screens.
 //
 // test/merchant_shell_wiring_test.dart already proves the shell HANDS the right clients to the
@@ -51,7 +53,7 @@ import 'package:mobile_app/src/sign_in_screen.dart';
 /// The demo shop on the dev realm. Six digits because the realm's credential is a passcode, and the
 /// field refuses anything else — see the LengthLimitingTextInputFormatter at sign_in_screen.dart:528.
 const String _username = 'merchant';
-const String _passcode = '200002';
+final String _passcode = DemoLogins.passwordOf('merchant');
 
 /// Pumps a frame at a time until [finder] matches, or the deadline passes.
 ///
@@ -204,7 +206,7 @@ void main() {
     //
     // A real token round trip over the public internet, then main.dart's branch: carrier (717)
     // wins first, delivery (727) second, and only an account that is neither lands on the shell
-    // below. If merchant/200002 ever picks up one of those claims on the dev realm this is where
+    // below. If the demo merchant ever picks up one of those claims on the dev realm this is where
     // it shows, and the message says so — the client cannot see the realm and nothing here pins it.
     await _pumpUntil(
       tester,

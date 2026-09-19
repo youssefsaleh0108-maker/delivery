@@ -19,7 +19,8 @@ import 'package:flutter_test/flutter_test.dart';
 /// ```
 /// flutter test test/live --dart-define=LIVE_BACKEND=true \
 ///   --dart-define=API_BASE_URL=https://api-dev.youdrop.shop \
-///   --dart-define=KEYCLOAK_ISSUER=https://iam-dev.youdrop.shop/realms/delivery-platform
+///   --dart-define=KEYCLOAK_ISSUER=https://iam-dev.youdrop.shop/realms/delivery-platform \
+///   --dart-define-from-file=demo-logins.json   # DEMO_<USER>_PASSWORD from the demo-logins Secret
 /// ```
 class Live {
   Live._();
@@ -34,12 +35,25 @@ class Live {
     defaultValue: 'https://iam-dev.youdrop.shop/realms/delivery-platform',
   );
 
-  static const Map<String, String> _passwords = <String, String>{
-    'customer': '100001',
-    'merchant': '200002',
-    'rider': '300003',
-    'backoffice': '400004',
-  };
+  /// The demo logins' passwords, supplied at run time as dart-defines (see the command above). They
+  /// used to be literals here, in a public repository; each environment now keeps them only in
+  /// its demo-logins Secret (deploy/k3s/README.md, "The demo logins").
+  static const String _customer = String.fromEnvironment('DEMO_CUSTOMER_PASSWORD');
+  static const String _merchant = String.fromEnvironment('DEMO_MERCHANT_PASSWORD');
+  static const String _rider = String.fromEnvironment('DEMO_RIDER_PASSWORD');
+  static const String _backoffice = String.fromEnvironment('DEMO_BACKOFFICE_PASSWORD');
+
+  static String _passwordOf(String user) {
+    final String value = switch (user) {
+      'customer' => _customer,
+      'merchant' => _merchant,
+      'rider' => _rider,
+      'backoffice' => _backoffice,
+      _ => '',
+    };
+    if (value.isEmpty) fail('No password for the demo login "$user": pass --dart-define=DEMO_${user.toUpperCase()}_PASSWORD.');
+    return value;
+  }
 
   /// `flutter test` installs an [HttpOverrides] that answers every request with a 400, so that a
   /// unit test cannot silently depend on the network. These tests depend on it on purpose, and
@@ -50,7 +64,7 @@ class Live {
     final String client = user == 'backoffice' ? 'delivery-portal' : 'mobile-app';
     final Response<dynamic> res = await Dio().postUri<dynamic>(
       Uri.parse('$issuer/protocol/openid-connect/token'),
-      data: 'client_id=$client&username=$user&password=${_passwords[user]}&grant_type=password',
+      data: 'client_id=$client&username=$user&password=${Uri.encodeQueryComponent(_passwordOf(user))}&grant_type=password',
       options: Options(
         contentType: 'application/x-www-form-urlencoded',
         validateStatus: (int? c) => true,

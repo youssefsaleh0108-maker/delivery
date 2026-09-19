@@ -10,6 +10,7 @@ import 'package:mobile_app/src/my_orders_screen.dart';
 import 'package:mobile_app/src/order_details_screen.dart';
 
 import 'support/backend.dart';
+import 'support/demo_logins.dart';
 import 'support/journey.dart';
 
 /// **Changing your mind, and the window in which you still can.**
@@ -51,7 +52,7 @@ void main() {
     );
 
     await app.main();
-    await signIn(tester, 'customer', '100001', expectedShell: CustomerShell);
+    await signIn(tester, 'customer', DemoLogins.passwordOf('customer'), expectedShell: CustomerShell);
 
     // firstOrNothing, never .first: inside a poll, Finder.first throws 'Bad state: No element'
     // on the frames before the list has loaded, so the wait dies on its first tick with a message
