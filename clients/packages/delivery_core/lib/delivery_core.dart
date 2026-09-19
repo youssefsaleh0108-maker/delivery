@@ -123,3 +123,8 @@ export 'src/models/order_attachment_models.dart';
 // with a reason, and the trail. The hold a provider reads on their offer is Product.moderation.
 export 'src/api/backoffice_catalog_api.dart';
 export 'src/models/offer_moderation_models.dart';
+// The checkout map: every order of a multi-shop checkout on one map, from Order Tracking, and the
+// polyline decoder its road geometry needs.
+export 'src/api/checkout_tracking_api.dart';
+export 'src/models/checkout_tracking_models.dart';
+export 'src/util/polyline.dart';
