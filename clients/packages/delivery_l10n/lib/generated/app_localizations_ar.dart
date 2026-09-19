@@ -12646,4 +12646,55 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get svcChatOrderNotFound => 'تعذّر فتح محادثة هذا الطلب. نعيد تحميله.';
+
+  @override
+  String get riderGpsOffTitle => 'الموقع مطفأ — لا يراك الزبائن على الخريطة';
+
+  @override
+  String get riderGpsServicesOffBody =>
+      'شغّل خدمة الموقع في هاتفك ليتابع الزبائن توصيل طلباتهم.';
+
+  @override
+  String get riderGpsDeniedBody =>
+      'يحتاج YouDrop إلى موقعك فقط أثناء فتح التطبيق.';
+
+  @override
+  String get riderGpsBlockedBody =>
+      'الموقع محظور على YouDrop. اسمح به من إعدادات التطبيق.';
+
+  @override
+  String get riderGpsApproximateTitle =>
+      'الموقع الدقيق مطفأ — لا يعرف الزبائن أين أنت';
+
+  @override
+  String get riderGpsApproximateBody =>
+      'فعّل الموقع الدقيق لـ YouDrop من إعدادات التطبيق.';
+
+  @override
+  String get riderGpsMockedTitle => 'تطبيق موقع وهمي مفعّل — موقعك لا يُشارَك';
+
+  @override
+  String get riderGpsMockedBody =>
+      'أوقف تطبيق الموقع الوهمي من خيارات المطوّرين في هاتفك.';
+
+  @override
+  String get riderGpsNoFixTitle =>
+      'لا توجد إشارة GPS — لا يراك الزبائن على الخريطة';
+
+  @override
+  String get riderGpsNoFixBody =>
+      'يزول هذا وحده حين يحدّد هاتفك موقعك. المكان المكشوف يساعد.';
+
+  @override
+  String get riderGpsClockTitle => 'موقعك مرفوض';
+
+  @override
+  String get riderGpsClockBody =>
+      'يبدو أن تاريخ هاتفك ووقته غير صحيحين. اضبطهما على الوضع التلقائي.';
+
+  @override
+  String get riderGpsAllow => 'اسمح بالموقع';
+
+  @override
+  String get riderGpsSharingNote => 'يرى الزبائن موقعك فقط أثناء فتح YouDrop.';
 }

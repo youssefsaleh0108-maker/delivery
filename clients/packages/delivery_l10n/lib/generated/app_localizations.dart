@@ -21206,6 +21206,90 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Couldn\'t open this order\'s chat. Reloading the order.'**
   String get svcChatOrderNotFound;
+
+  /// No description provided for @riderGpsOffTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Location is off — customers can\'t see you on the map'**
+  String get riderGpsOffTitle;
+
+  /// No description provided for @riderGpsServicesOffBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on your phone\'s location so customers can follow their delivery.'**
+  String get riderGpsServicesOffBody;
+
+  /// No description provided for @riderGpsDeniedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'YouDrop needs your location only while the app is open.'**
+  String get riderGpsDeniedBody;
+
+  /// No description provided for @riderGpsBlockedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Location is blocked for YouDrop. Allow it in the app\'s settings.'**
+  String get riderGpsBlockedBody;
+
+  /// No description provided for @riderGpsApproximateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Precise location is off — customers can\'t see where you are'**
+  String get riderGpsApproximateTitle;
+
+  /// No description provided for @riderGpsApproximateBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on precise location for YouDrop in the app\'s settings.'**
+  String get riderGpsApproximateBody;
+
+  /// No description provided for @riderGpsMockedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A fake-location app is on — your location isn\'t being shared'**
+  String get riderGpsMockedTitle;
+
+  /// No description provided for @riderGpsMockedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off the mock location app in your phone\'s developer options.'**
+  String get riderGpsMockedBody;
+
+  /// No description provided for @riderGpsNoFixTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No GPS signal — customers can\'t see you on the map'**
+  String get riderGpsNoFixTitle;
+
+  /// No description provided for @riderGpsNoFixBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This clears by itself once your phone finds you. Open sky helps.'**
+  String get riderGpsNoFixBody;
+
+  /// No description provided for @riderGpsClockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your location is being refused'**
+  String get riderGpsClockTitle;
+
+  /// No description provided for @riderGpsClockBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your phone\'s date and time look wrong. Set them to automatic.'**
+  String get riderGpsClockBody;
+
+  /// No description provided for @riderGpsAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow location'**
+  String get riderGpsAllow;
+
+  /// No description provided for @riderGpsSharingNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers see your location only while YouDrop is open.'**
+  String get riderGpsSharingNote;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

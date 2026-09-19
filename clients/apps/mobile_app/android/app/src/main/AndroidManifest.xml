@@ -4,10 +4,20 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <!-- Fingerprint and face unlock. Gates a session already on this device; nothing is sent. -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
-    <!-- Centring the map pickers on the phone. Asked only when a picker's "use my location" runs;
-         a shop pin and a delivery door both need street precision, hence FINE alongside COARSE. -->
+    <!-- Centring the map pickers on the phone, and a working rider's live position. Asked only when
+         a picker's "use my location" runs, or when a rider goes on duty or holds a delivery. A shop
+         pin, a delivery door and a rider on a customer's map all need street precision, hence FINE
+         alongside COARSE (Android 12+ asks for both together, and a rider who grants only the
+         approximate one is told the map cannot place them). -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <!-- Foreground only, by the owner's decision: the rider app shares its position while it is on
+         screen and never after. Removed from the merged manifest rather than merely not declared,
+         because geolocator's permission request asks for background location too whenever the
+         merged manifest holds it — a dependency adding it one day would silently widen what
+         riders are asked to grant. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"
+        tools:node="remove"/>
     <!-- Not required: the pickers fall back to a city view on devices without GPS. -->
     <uses-feature android:name="android.hardware.location.gps" android:required="false"/>
 

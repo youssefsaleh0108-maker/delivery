@@ -6090,5 +6090,19 @@
   "@svcChatClosedOn": {"placeholders":{"date":{"type":"String"}}},
   "svcChatClosed": "Chat about this order has closed",
   "svcChatUnavailable": "Chat is unavailable right now.",
-  "svcChatOrderNotFound": "Couldn't open this order's chat. Reloading the order."
+  "svcChatOrderNotFound": "Couldn't open this order's chat. Reloading the order.",
+  "riderGpsOffTitle": "Location is off — customers can't see you on the map",
+  "riderGpsServicesOffBody": "Turn on your phone's location so customers can follow their delivery.",
+  "riderGpsDeniedBody": "YouDrop needs your location only while the app is open.",
+  "riderGpsBlockedBody": "Location is blocked for YouDrop. Allow it in the app's settings.",
+  "riderGpsApproximateTitle": "Precise location is off — customers can't see where you are",
+  "riderGpsApproximateBody": "Turn on precise location for YouDrop in the app's settings.",
+  "riderGpsMockedTitle": "A fake-location app is on — your location isn't being shared",
+  "riderGpsMockedBody": "Turn off the mock location app in your phone's developer options.",
+  "riderGpsNoFixTitle": "No GPS signal — customers can't see you on the map",
+  "riderGpsNoFixBody": "This clears by itself once your phone finds you. Open sky helps.",
+  "riderGpsClockTitle": "Your location is being refused",
+  "riderGpsClockBody": "Your phone's date and time look wrong. Set them to automatic.",
+  "riderGpsAllow": "Allow location",
+  "riderGpsSharingNote": "Customers see your location only while YouDrop is open."
 }

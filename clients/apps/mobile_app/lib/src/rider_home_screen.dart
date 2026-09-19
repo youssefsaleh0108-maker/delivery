@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
@@ -12,6 +11,7 @@ import 'package:latlong2/latlong.dart';
 import 'rider_butler_board.dart';
 import 'rider_earnings_screen.dart';
 import 'rider_job_card.dart';
+import 'rider_location_banner.dart';
 import 'rider_order_detail_screen.dart';
 import 'rider_settings_widgets.dart';
 import 'settings_screen.dart';
@@ -22,9 +22,12 @@ import 'settings_screen.dart';
 /// app with one bottom bar, so they are one widget here: the tabs share the poll that keeps the
 /// board fresh, and a job claimed on Available appears on Active without a second round trip.
 ///
-/// While an order is PICKED_UP this screen reports the rider's position on a timer, which is what
-/// feeds the customer's tracking card. That, the 5-second refresh and the action wiring are older
-/// than the redesign and are carried through it unchanged — the restyle happens around them.
+/// While the app is open and the rider is on duty or holds a READY or PICKED_UP order, this screen
+/// reports the phone's real position through a [RiderLocationReporter] — what feeds the customer's
+/// tracking card, the ETA and the fleet roster. Foreground only, by the owner's rule: the reporter
+/// stops the moment the app leaves the screen, and a banner says so whenever the rider is working
+/// and customers cannot see them. The 5-second refresh and the action wiring are older than the
+/// redesign and are carried through it unchanged — the restyle happens around them.
 ///
 /// The design has no home for the errands board, which is a live feature: a customer can raise a
 /// Butler request right now and a rider has to be able to claim it. So Available carries a
@@ -46,6 +49,7 @@ class RiderHomeScreen extends StatefulWidget {
     this.splitApi,
     this.socket,
     this.prefsApi,
+    this.locationSource,
     this.pendingApproval = false,
     required this.onSignOut,
   });
@@ -86,6 +90,11 @@ class RiderHomeScreen extends StatefulWidget {
   /// Handed to the settings page's notification-preferences grid; null leaves the row undrawn.
   final NotificationPrefsApi? prefsApi;
 
+  /// Where the rider's position comes from. Null means the phone's own GPS, which is what every
+  /// installed build uses; tests hand in a scripted source, and a debug build asked to simulate
+  /// hands in the simulator (see `main.dart`).
+  final RiderLocationSource? locationSource;
+
   final AuthSession session;
 
   /// Passed through to Settings, which is a tab of its own now.
@@ -117,16 +126,40 @@ const List<OrderStatus> _liveStatuses = <OrderStatus>[
   OrderStatus.pickedUp,
 ];
 
-class _RiderHomeScreenState extends State<RiderHomeScreen> {
+class _RiderHomeScreenState extends State<RiderHomeScreen> with WidgetsBindingObserver {
   static const Duration _refreshInterval = Duration(seconds: 5);
 
-  /// Matches `delivery.tracking.rider-ping-interval-seconds` in config-repo. Every reduction here
-  /// multiplies write volume on tracking_events across every active rider (Section 10).
-  static const Duration _pingInterval = Duration(seconds: 10);
+  /// How often the rider's own presence is re-read while their location is being shared, so the
+  /// duty card's "last seen" moves and a STALE verdict shows up without reopening Settings. The
+  /// read is served from the tracking service's cache; the pings themselves are the reporter's.
+  static const Duration _presenceInterval = Duration(seconds: 15);
 
   Timer? _refreshTimer;
-  Timer? _pingTimer;
-  final Random _random = Random();
+  Timer? _presenceTimer;
+
+  /// The rider's real position, sent only while this screen is in the foreground and the rider
+  /// is working. See [RiderLocationReporter] for the cadence and what is never sent.
+  late final RiderLocationReporter _location = RiderLocationReporter(
+    source: widget.locationSource ?? const DeviceRiderLocationSource(),
+    pingOrder: (String orderId, RiderFix fix) => widget.api.ping(
+      orderId,
+      fix.latitude,
+      fix.longitude,
+      accuracyM: fix.accuracyM,
+      recordedAt: fix.takenAt,
+    ),
+    pingRider: widget.trackingApi == null
+        ? null
+        : (RiderFix fix) => widget.trackingApi!.ping(
+              fix.latitude,
+              fix.longitude,
+              accuracyM: fix.accuracyM,
+              recordedAt: fix.takenAt,
+            ),
+  );
+
+  /// The reporter's last status, to notice the moment sharing starts.
+  RiderLocationStatus _locationStatus = RiderLocationStatus.idle;
 
   int _tab = 0;
   _Board _board = _Board.deliveries;
@@ -147,13 +180,6 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
   /// answered — the line is then absent rather than showing a score nobody gave.
   RiderStanding? _standing;
 
-  /// Simulated position, walked slightly on each ping.
-  ///
-  /// Real GPS needs a location plugin and a runtime permission prompt, which is a Phase 5 concern.
-  /// What matters now is that the tracking pipeline carries real, changing coordinates end to end.
-  double _lat = 51.5074;
-  double _lng = -0.1278;
-
   /// Where the mini-map's camera was placed, kept for the life of the tab.
   ///
   /// The camera is set once, from the first fix the platform reports. Every ping after that moves
@@ -172,11 +198,50 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _location.addListener(_onLocationChanged);
+    _location.setForeground(_isForeground(WidgetsBinding.instance.lifecycleState));
     _refresh();
     _refreshTimer = Timer.periodic(_refreshInterval, (_) => _refresh(silent: true));
-    _pingTimer = Timer.periodic(_pingInterval, (_) => _pingActiveDeliveries());
+    _presenceTimer = Timer.periodic(_presenceInterval, (_) {
+      if (_location.needed) unawaited(_loadPresence());
+    });
     unawaited(_loadPresence());
     unawaited(_loadStanding());
+  }
+
+  /// Foreground is anything on screen. `inactive` counts: it is what the permission prompt itself
+  /// puts the app in, and stopping there would cancel the very request being answered.
+  static bool _isForeground(AppLifecycleState? state) =>
+      state == null || state == AppLifecycleState.resumed || state == AppLifecycleState.inactive;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _location.setForeground(_isForeground(state));
+  }
+
+  void _onLocationChanged() {
+    final RiderLocationStatus status = _location.status;
+    final bool startedSharing =
+        status == RiderLocationStatus.sharing && _locationStatus != RiderLocationStatus.sharing;
+    _locationStatus = status;
+    if (!mounted) return;
+    setState(() {});
+    // The platform has a fix now: re-read presence at once, so the mini-map anchors and a STALE
+    // badge clears without waiting for the next poll.
+    if (startedSharing) unawaited(_loadPresence());
+  }
+
+  /// Tells the reporter what the rider is doing. The order ids are the claimed READY and
+  /// PICKED_UP ones — every order a customer may be watching a map for.
+  void _syncLocationDemand() {
+    _location.setDemand(
+      onDuty: _presence?.dutyState == DutyState.onDuty,
+      orderIds: <String>[
+        for (final DeliveryOrder order in _assigned)
+          if (order.status == OrderStatus.ready || order.status == OrderStatus.pickedUp) order.id,
+      ],
+    );
   }
 
   /// The rider's own rating, once. It never moves fast enough to be worth polling, and a rating
@@ -193,8 +258,11 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _refreshTimer?.cancel();
-    _pingTimer?.cancel();
+    _presenceTimer?.cancel();
+    _location.removeListener(_onLocationChanged);
+    _location.dispose();
     super.dispose();
   }
 
@@ -215,45 +283,10 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
             .toList();
         _loading = false;
       });
+      _syncLocationDemand();
     } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _pingActiveDeliveries() async {
-    final List<DeliveryOrder> inTransit =
-        _assigned.where((DeliveryOrder o) => o.status == OrderStatus.pickedUp).toList();
-    final bool onDuty = _presence?.dutyState == DutyState.onDuty;
-    if (inTransit.isEmpty && !onDuty) return;
-
-    // Drift by roughly a street's width so the customer's view visibly changes.
-    _lat += (_random.nextDouble() - 0.5) * 0.002;
-    _lng += (_random.nextDouble() - 0.5) * 0.002;
-
-    for (final DeliveryOrder order in inTransit) {
-      try {
-        await widget.api.ping(order.id, _lat, _lng, accuracyM: 8);
-      } catch (_) {
-        // A dropped ping is replaced by the next one; never surface it to the rider.
-      }
-    }
-
-    // The order-less ping: what keeps a rider *between* jobs believed on the roster. Only while
-    // they declared duty — an off-duty rider's phone reports nothing.
-    final TrackingApi? tracking = widget.trackingApi;
-    if (tracking != null && onDuty) {
-      try {
-        await tracking.ping(_lat, _lng, accuracyM: 8);
-      } catch (_) {
-        // Same policy as the order ping: the next fix replaces a dropped one.
-      }
-    }
-    // Re-ask what the platform now believes, so "last seen" moves and a STALE verdict shows up
-    // without waiting for the settings tab to be reopened. Cheap for a rider who never declared
-    // duty too: the server answers 204 and the toggle keeps its resting state.
-    if (tracking != null) {
-      await _loadPresence();
     }
   }
 
@@ -269,6 +302,9 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
         _presence = presence;
         _anchorMap(presence);
       });
+      // Duty can change without this app — the staleness sweep, the back office — and the
+      // reporter must stop or start with it.
+      _syncLocationDemand();
     } catch (_) {
       // The toggle keeps rendering the last answer; the next poll retries.
     }
@@ -298,6 +334,9 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
         _presence = result;
         _anchorMap(result);
       });
+      // Going on duty is when the location prompt appears, if it has not yet: in context, right
+      // after the tap that makes it necessary. Off duty with nothing in hand stops sharing.
+      _syncLocationDemand();
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -412,14 +451,18 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
         _mapSlot(t),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-          child: Row(
+          // A Wrap, not a Row: on a 320-wide phone at a 1.3 font scale the two chips are wider
+          // than the strip, and a Row drew the overflow stripes across them. They now fall onto a
+          // second line instead, starting from the reading edge in Arabic too.
+          child: Wrap(
+            spacing: DeliverySpacing.sm,
+            runSpacing: DeliverySpacing.sm,
             children: <Widget>[
               YdChip(
                 label: t.riderSegmentDeliveries,
                 selected: _board == _Board.deliveries,
                 onTap: () => setState(() => _board = _Board.deliveries),
               ),
-              const SizedBox(width: DeliverySpacing.sm),
               YdChip(
                 label: t.errands,
                 selected: _board == _Board.errands,
@@ -508,11 +551,10 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
 
   /// The last fix the *platform* holds for this rider, or null when it holds none.
   ///
-  /// Read from presence rather than from this screen's own [_lat]/[_lng] on purpose. Those two
-  /// start at a hard-coded origin and are only a position once a ping has actually been sent, so
-  /// centring a map on them before that would put a rider somewhere they have never been. Presence
-  /// carries a fix exactly when one has been recorded — which is also the position a dispatcher is
-  /// looking at, so the rider and the platform are reading the same map.
+  /// Read from presence rather than from the phone's last reading on purpose. Presence carries a
+  /// fix exactly when the platform has accepted one — which is also the position a dispatcher is
+  /// looking at, so the rider and the platform are reading the same map, and a reading the
+  /// tracking service refused never shows up here as if it had been shared.
   LatLng? get _riderFix {
     final RiderPresence? presence = _presence;
     if (presence == null || !presence.hasFix) return null;
@@ -687,6 +729,7 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: <Widget>[
+          ..._locationNotice(t, sharingNote: false),
           Text(
             t.riderOffersNearYou,
             style: const TextStyle(
@@ -744,6 +787,7 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
                   child: ListView(
                     padding: const EdgeInsets.all(20),
                     children: <Widget>[
+                      ..._locationNotice(t, sharingNote: true),
                       if (_assigned.isEmpty)
                         YdEmptyState(
                           icon: Icons.two_wheeler_rounded,
@@ -780,6 +824,9 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
             child: ListView(
               padding: const EdgeInsets.all(20),
               children: <Widget>[
+                // First on Settings too: going on duty here is what makes the location needed,
+                // so a refusal shows up right where the rider just tapped.
+                ..._locationNotice(t, sharingNote: false),
                 RiderProfileCard(
                   name: widget.session.displayName,
                   standing: _standing,
@@ -878,6 +925,37 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
   }
 
   // ---------------------------------------------------------------------- parts
+
+  /// The location notice at the top of a tab's list, or nothing.
+  ///
+  /// Inside the scrolling list rather than pinned above the tab: on a 320-wide phone at a large
+  /// text size a pinned banner plus the Available tab's map and chips no longer fit, and the one
+  /// thing a warning must never do is push the screen into overflow.
+  ///
+  /// When the rider is working and customers cannot see them, the banner says why and offers the
+  /// fix. When their location is being shared and they carry orders ([sharingNote]), one quiet
+  /// line says it is shared only while the app is open — the consequence of the owner's
+  /// foreground-only rule a rider most needs to know, since switching to a navigation app stops it.
+  List<Widget> _locationNotice(DeliveryStrings t, {required bool sharingNote}) {
+    final RiderLocationStatus status = _location.status;
+    if (status.hidesRider) {
+      return <Widget>[
+        RiderLocationBanner(
+          status: status,
+          onAllow: () => unawaited(_location.askAgain()),
+          onOpenSettings: () => unawaited(_location.openSettings()),
+        ),
+        const SizedBox(height: DeliverySpacing.md),
+      ];
+    }
+    if (sharingNote && status == RiderLocationStatus.sharing && _assigned.isNotEmpty) {
+      return <Widget>[
+        SoftNote(icon: Icons.my_location_rounded, text: t.riderGpsSharingNote),
+        const SizedBox(height: DeliverySpacing.md),
+      ];
+    }
+    return const <Widget>[];
+  }
 
   /// The redesign's 56px white screen header: title hard against the start edge, an optional
   /// accent-coloured fact against the end edge.

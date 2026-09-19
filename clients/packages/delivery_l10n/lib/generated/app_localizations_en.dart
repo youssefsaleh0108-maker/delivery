@@ -12500,4 +12500,58 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get svcChatOrderNotFound =>
       'Couldn\'t open this order\'s chat. Reloading the order.';
+
+  @override
+  String get riderGpsOffTitle =>
+      'Location is off — customers can\'t see you on the map';
+
+  @override
+  String get riderGpsServicesOffBody =>
+      'Turn on your phone\'s location so customers can follow their delivery.';
+
+  @override
+  String get riderGpsDeniedBody =>
+      'YouDrop needs your location only while the app is open.';
+
+  @override
+  String get riderGpsBlockedBody =>
+      'Location is blocked for YouDrop. Allow it in the app\'s settings.';
+
+  @override
+  String get riderGpsApproximateTitle =>
+      'Precise location is off — customers can\'t see where you are';
+
+  @override
+  String get riderGpsApproximateBody =>
+      'Turn on precise location for YouDrop in the app\'s settings.';
+
+  @override
+  String get riderGpsMockedTitle =>
+      'A fake-location app is on — your location isn\'t being shared';
+
+  @override
+  String get riderGpsMockedBody =>
+      'Turn off the mock location app in your phone\'s developer options.';
+
+  @override
+  String get riderGpsNoFixTitle =>
+      'No GPS signal — customers can\'t see you on the map';
+
+  @override
+  String get riderGpsNoFixBody =>
+      'This clears by itself once your phone finds you. Open sky helps.';
+
+  @override
+  String get riderGpsClockTitle => 'Your location is being refused';
+
+  @override
+  String get riderGpsClockBody =>
+      'Your phone\'s date and time look wrong. Set them to automatic.';
+
+  @override
+  String get riderGpsAllow => 'Allow location';
+
+  @override
+  String get riderGpsSharingNote =>
+      'Customers see your location only while YouDrop is open.';
 }
