@@ -379,7 +379,10 @@ String riderEtaReasonLabel(DeliveryStrings t, EtaUnavailableReason reason) =>
       EtaUnavailableReason.noDestination => t.etaNoMapPoint,
       EtaUnavailableReason.providerUnavailable => t.etaRouteServiceDown,
       EtaUnavailableReason.orderComplete => t.etaNothingOnItsWay,
-      EtaUnavailableReason.unknown => t.etaUnavailable,
+      // Only ever sent to a customer or a shop; a rider always sees their own position.
+      EtaUnavailableReason.riderOnAnotherDelivery ||
+      EtaUnavailableReason.unknown =>
+        t.etaUnavailable,
     };
 
 /// Which stretch of the journey an estimate covers, in the rider's language.

@@ -448,12 +448,23 @@ class OrderApi {
     return RiderPosition.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// What this caller may know of where the order's rider is, and why when it is not a position:
+  /// still far from the shop, on another customer's delivery, collected (for the shop), and so on.
+  /// The live position is [RiderSighting.position]; 404 as for [currentPosition].
+  Future<RiderSighting> riderSighting(String orderId) async {
+    final Response<dynamic> response =
+        await _dio.get<dynamic>('/api/tracking/orders/$orderId/rider');
+    return RiderSighting.fromJson(response.data as Map<String, dynamic>);
+  }
+
   /// Reports this rider's position on one of their orders. Fire-and-forget: a dropped ping is
   /// replaced by the next one.
   ///
-  /// [recordedAt] is when the phone took the fix. The server refuses a fix dated in the future or
-  /// more than a minute old, and one that is too imprecise or too far from the last — a 422 whose
-  /// body names the `reason`. Sent in UTC so the server never has to guess the phone's offset.
+  /// [recordedAt] is when the phone took the fix, and the server requires it (422
+  /// `FIX_TIME_MISSING` without it). It also refuses a fix dated in the future or more than a
+  /// minute old, one outside the service area, and one that is too imprecise or too far from the
+  /// last — a 422 whose body names the `reason`. One that adds nothing new is answered 202 like any
+  /// other. Sent in UTC so the server never has to guess the phone's offset.
   Future<void> ping(String orderId, double lat, double lng,
       {double? accuracyM, DateTime? recordedAt}) async {
     await _dio.post<dynamic>(

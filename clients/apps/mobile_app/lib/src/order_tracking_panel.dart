@@ -88,8 +88,19 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel>
   static const LatLng _openingView = LatLng(33.8938, 35.5018);
 
   Timer? _poll;
+
+  /// The recorded line: from pickup only, and only while the rider is on this delivery — the
+  /// tracking service decides, and a READY order has none.
   List<RiderPosition> _trail = <RiderPosition>[];
+
+  /// Where the rider is shown, when they are: the tracking service's sighting, or a pushed frame.
+  /// Not the trail's last point — before pickup there is a rider to show and no trail.
   RiderPosition? _latest;
+
+  /// Why there is no rider on the map when there is none: still far from the shop, or on
+  /// somebody else's delivery. Null before the first answer, and from a tracking service that
+  /// predates the read.
+  RiderSightingState? _sighting;
   bool _loaded = false;
 
   /// The server's last answer about when the rider is expected. Null until the first answer —
@@ -173,10 +184,15 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel>
     } catch (_) {
       return; // Not a position; the durable copy arrives on the next refetch.
     }
+    // A fix on an order not yet collected moves the dot and is never part of the line: the
+    // rider's way to the shop starts wherever they claimed it, often at home. A tracking service
+    // that predates the flag put every frame on the trail.
+    final bool onTrail = frame['onTrail'] != false;
     setState(() {
       _glideFrom = _latest == null ? null : LatLng(_latest!.lat, _latest!.lng);
-      _trail = <RiderPosition>[..._trail, fix];
+      if (onTrail) _trail = <RiderPosition>[..._trail, fix];
       _latest = fix;
+      _sighting = RiderSightingState.visible;
       _loaded = true;
     });
     if (_glideFrom != null) {
@@ -231,10 +247,22 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel>
   Future<void> _refresh() async {
     try {
       final List<RiderPosition> history = await widget.api.trackHistory(widget.order.id);
+      RiderSighting? sighting;
+      try {
+        sighting = await widget.api.riderSighting(widget.order.id);
+      } catch (_) {
+        // A tracking service without the read: the trail's last point stands in, as it used to.
+      }
       if (!mounted) return;
       setState(() {
         _trail = history;
-        _latest = history.isEmpty ? null : history.last;
+        if (sighting != null) {
+          _sighting = sighting.state;
+          _latest = sighting.position;
+        } else {
+          _sighting = null;
+          _latest = history.isEmpty ? null : history.last;
+        }
         _loaded = true;
       });
     } catch (_) {
@@ -366,9 +394,11 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel>
 
   // ------------------------------------------------------------------ the map slot
 
-  /// Everything with a real position on it: the recorded track, and the door when it is known.
+  /// Everything with a real position on it: the recorded track, the rider (who before pickup is
+  /// shown with no track at all), and the door when it is known.
   List<LatLng> get _plotted => <LatLng>[
         for (final RiderPosition p in _trail) LatLng(p.lat, p.lng),
+        if (_latest case final RiderPosition fix) LatLng(fix.lat, fix.lng),
         if (_destination != null) _destination!,
       ];
 
@@ -517,7 +547,7 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel>
   Widget _mapOverlay(DeliveryStrings t) {
     return Stack(
       children: <Widget>[
-        if (_trail.isEmpty && _destination == null)
+        if (_trail.isEmpty && _destination == null && _latest == null)
           Positioned.fill(
             child: IgnorePointer(
               child: Center(
@@ -551,7 +581,7 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel>
                           boxShadow: YdCard.softShadow,
                         ),
                         child: Text(
-                          _afterPickup ? t.waitingForRider : t.locationAfterPickup,
+                          _waitingCaption(t),
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             fontSize: 13,
@@ -633,6 +663,19 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel>
     );
   }
 
+  /// The sentence that stands in for a rider the map does not show: why, when the tracking
+  /// service said — still far from the shop, or finishing somebody else's delivery. Before there
+  /// is a rider at all, when they will appear: near the shop, not only once the order is collected.
+  String _waitingCaption(DeliveryStrings t) => switch (_sighting) {
+        RiderSightingState.headingToShop => t.custRiderShownNearShop,
+        RiderSightingState.onAnotherDelivery => t.etaRiderOnAnotherDelivery,
+        _ => _afterPickup ? t.waitingForRider : t.custRiderShownNearShop,
+      };
+
+  /// The rider card's line while there is no trail: the line on the map starts at pickup.
+  String _noTrailLine(DeliveryStrings t) =>
+      widget.order.status == OrderStatus.pickedUp ? t.waitingForRider : t.custRouteAfterPickup;
+
   // ------------------------------------------------------------------ the sheet over it
 
   /// The big line: minutes when the server sent them, the order's status when it did not.
@@ -659,7 +702,7 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel>
     if (eta != null && !eta.available && eta.reason != null) {
       return custEtaReasonLabel(t, eta.reason!);
     }
-    return _afterPickup ? t.waitingForRider : t.locationAfterPickup;
+    return _afterPickup ? t.waitingForRider : t.custRiderShownNearShop;
   }
 
   Widget _sheet(DeliveryStrings t) {
@@ -778,7 +821,7 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel>
                 const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
                 Expanded(
                   child: Text(
-                    t.locationAfterPickup,
+                    _noTrailLine(t),
                     style: const TextStyle(
                       fontSize: 13,
                       color: DeliveryColors.muted,

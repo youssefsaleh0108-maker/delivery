@@ -113,9 +113,10 @@ class TrackingApi {
 
   /// Where one rider is.
   ///
-  /// The server narrows this sharply — self, backoffice, the employing fleet, or a customer with
-  /// a live order in that rider's hands — and answers 404 to everybody else, identically to a
-  /// rider who does not exist.
+  /// The server narrows this sharply — self; backoffice, with the last known position and its
+  /// time; or the employing fleet, with the position only while the rider is on duty — and answers
+  /// 404 to everybody else, identically to a rider who does not exist. A customer sees a rider
+  /// through their order (`OrderApi.riderSighting`), never here.
   Future<RiderPresence> riderLocation(String riderId) async {
     final Response<dynamic> response =
         await _dio.get<dynamic>('/api/tracking/riders/$riderId/location');
