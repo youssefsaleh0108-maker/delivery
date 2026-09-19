@@ -29,6 +29,7 @@ import com.delivery.onboarding.client.PlatformClient;
 import com.delivery.onboarding.client.PlatformClient.ServiceArea;
 import com.delivery.onboarding.domain.AutoApprovalAuditRepository;
 import com.delivery.onboarding.domain.AutoApprovalDecisionRepository;
+import com.delivery.onboarding.domain.CarrierRegistrationRepository;
 import com.delivery.onboarding.domain.ContactVerification.Channel;
 import com.delivery.onboarding.domain.OnboardingApplication;
 import com.delivery.onboarding.domain.OnboardingApplication.Kind;
@@ -83,7 +84,8 @@ class ServiceProviderAnswersTest {
                 .thenReturn(List.of("PRINTING", "TAILORING", "REPAIRS", "PHOTOGRAPHY"));
         when(platform.serviceAreas()).thenReturn(List.of(
                 new ServiceArea(MAR_MIKHAEL, "Mar Mikhael"), new ServiceArea(HAMRA, "Hamra")));
-        answers = new ServiceProviderAnswers(platform);
+        answers = new ServiceProviderAnswers(platform,
+                new HiringCompanies(platform, mock(CarrierRegistrationRepository.class)));
     }
 
     private static Map<String, Object> services(Object category, Object area) {
@@ -308,7 +310,8 @@ class ServiceProviderAnswersTest {
         @BeforeEach
         void setUp() {
             clock = new MovableClock();
-            remembering = new ServiceProviderAnswers(platform, clock);
+            remembering = new ServiceProviderAnswers(platform,
+                    new HiringCompanies(platform, mock(CarrierRegistrationRepository.class)), clock);
         }
 
         @Test

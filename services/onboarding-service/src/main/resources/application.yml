@@ -177,6 +177,11 @@ delivery:
       # It names no shop and no person — category names, and the zone names a customer's address
       # picker already shows.
       - /api/onboarding/service-options
+      # Who is hiring riders, and where each company works: what the rider wizard offers before
+      # there is an account. Company names and place names, both of which the companies advertise —
+      # the same names Order Manager's own open list carries, plus the regions a company with no
+      # zones registered with.
+      - /api/onboarding/hiring-companies
 
   onboarding:
     # Who gets in without a human deciding — the SEED, no longer the source of truth.

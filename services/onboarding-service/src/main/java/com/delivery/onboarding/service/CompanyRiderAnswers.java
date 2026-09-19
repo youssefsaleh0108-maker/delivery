@@ -6,7 +6,6 @@ import java.util.Map;
 import java.util.UUID;
 
 import com.delivery.onboarding.client.PlatformClient;
-import com.delivery.onboarding.client.PlatformClient.HiringCompany;
 import com.delivery.onboarding.domain.OnboardingApplication.Kind;
 
 /**
@@ -15,16 +14,10 @@ import com.delivery.onboarding.domain.OnboardingApplication.Kind;
  * <p><strong>The rider does not choose; the company's region is recorded.</strong> A rider who joins a
  * company rides where that company delivers, so the owner's rule is that they pick no area of their
  * own. The app shows them the company's region, read-only, and this records the same region on the
- * application as {@code details.companyRegions}: the names of the company's active coverage zones as
- * Order Manager's public list of who is hiring gives them when the application is judged — the list
- * the rider picked the company from. A company that has drawn no zone yet is recorded with an empty
- * list rather than with a guess.
- *
- * <p>Not the company's own registration answer ({@code details.coverage} on a delivery company's
- * application: Beirut, Mount Lebanon and so on). A company the back office registered has none, so
- * reading it would record different kinds of region depending on how a company joined. The owner may
- * still ask for it as the fallback for a company with no zones; {@link #regionOf} is the one place
- * that decision is made.
+ * application as {@code details.companyRegions}. What that region is — the company's zones, or else
+ * the regions it registered with, or else nothing — is decided in one place, {@link HiringCompanies},
+ * which also serves the list the app shows; so the rider is recorded with the region they were shown,
+ * read afresh when the application is judged.
  *
  * <p><strong>What the app sent about a place is dropped, not refused</strong>: the free-text area, the
  * map pin, and the older keys a rider's region has been written under. Installed copies of the app
@@ -34,8 +27,8 @@ import com.delivery.onboarding.domain.OnboardingApplication.Kind;
  *
  * <p><strong>The company must be hiring.</strong> Until now any id went through until approval, and an
  * application to a suspended company, a shop's own fleet or an id that names nothing sat in a queue
- * nobody reads. It is refused here with {@link CompanyAnswerException#NOT_HIRING}, judged by the same
- * list the app offered, so the rider chooses again.
+ * nobody reads. It is refused here with {@link CompanyAnswerException#NOT_HIRING}, judged by Order
+ * Manager's list of who is hiring — the list the app offered — so the rider chooses again.
  *
  * <p>A rider riding for YouDrop itself names no company, costs no call, and keeps the area and pin they
  * chose. {@code companyRegions} is only ever written here, so a copy of it sent with any other
@@ -67,10 +60,10 @@ public final class CompanyRiderAnswers {
         }
     }
 
-    private final PlatformClient platform;
+    private final HiringCompanies hiring;
 
-    CompanyRiderAnswers(PlatformClient platform) {
-        this.platform = platform;
+    CompanyRiderAnswers(HiringCompanies hiring) {
+        this.hiring = hiring;
     }
 
     /**
@@ -103,9 +96,7 @@ public final class CompanyRiderAnswers {
             return unclaimed;
         }
 
-        HiringCompany company = platform.hiringCompanies().stream()
-                .filter(candidate -> candidate.id().equals(targetProviderId))
-                .findFirst()
+        HiringCompanies.Company company = hiring.find(targetProviderId)
                 .orElseThrow(() -> new CompanyAnswerException(CompanyAnswerException.NOT_HIRING,
                         "That delivery company is not taking riders right now. Choose another "
                                 + "company, or ride for YouDrop"));
@@ -114,16 +105,7 @@ public final class CompanyRiderAnswers {
                 ? new LinkedHashMap<>()
                 : new LinkedHashMap<>(details);
         PLACE_KEYS.forEach(recorded::remove);
-        recorded.put(COMPANY_REGIONS, regionOf(company));
+        recorded.put(COMPANY_REGIONS, company.regions());
         return recorded;
-    }
-
-    /**
-     * The region recorded for a company: the names of its active zones, and an empty list when it has
-     * drawn none. The place a fallback to the company's registration answer would go, if the owner
-     * asks for one.
-     */
-    private static List<String> regionOf(HiringCompany company) {
-        return company.regions();
     }
 }

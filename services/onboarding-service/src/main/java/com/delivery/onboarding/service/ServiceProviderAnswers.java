@@ -99,15 +99,15 @@ public class ServiceProviderAnswers {
     }
 
     @Autowired
-    public ServiceProviderAnswers(PlatformClient platform) {
-        this(platform, Clock.systemUTC());
+    public ServiceProviderAnswers(PlatformClient platform, HiringCompanies hiring) {
+        this(platform, hiring, Clock.systemUTC());
     }
 
     /** With a clock the test moves, for the form's lists. */
-    ServiceProviderAnswers(PlatformClient platform, Clock clock) {
+    ServiceProviderAnswers(PlatformClient platform, HiringCompanies hiring, Clock clock) {
         this.platform = platform;
         this.clock = clock;
-        this.companyRiders = new CompanyRiderAnswers(platform);
+        this.companyRiders = new CompanyRiderAnswers(hiring);
     }
 
     /**

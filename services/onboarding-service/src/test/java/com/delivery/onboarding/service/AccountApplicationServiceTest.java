@@ -18,6 +18,7 @@ import com.delivery.onboarding.client.KeycloakAdminClient;
 import com.delivery.onboarding.client.PlatformClient;
 import com.delivery.onboarding.domain.AutoApprovalAuditRepository;
 import com.delivery.onboarding.domain.AutoApprovalDecisionRepository;
+import com.delivery.onboarding.domain.CarrierRegistrationRepository;
 import com.delivery.onboarding.domain.OnboardingApplication;
 import com.delivery.onboarding.domain.OnboardingApplication.Kind;
 import com.delivery.onboarding.domain.OnboardingApplicationRepository;
@@ -65,6 +66,9 @@ class AccountApplicationServiceTest {
     /** Product Service as the services check reads it: the launch categories, and Hamra. */
     private PlatformClient platform;
 
+    /** Delivery companies' own applications, which a company with no zones is read from. */
+    private CarrierRegistrationRepository registrations;
+
     private AccountApplicationService service;
 
     @BeforeEach
@@ -75,6 +79,7 @@ class AccountApplicationServiceTest {
         keycloak = mock(KeycloakAdminClient.class);
         decisions = mock(AutoApprovalDecisionRepository.class);
         platform = mock(PlatformClient.class);
+        registrations = mock(CarrierRegistrationRepository.class);
         when(platform.openServiceCategories())
                 .thenReturn(List.of("PRINTING", "TAILORING", "REPAIRS", "PHOTOGRAPHY"));
         when(platform.serviceAreas())
@@ -93,7 +98,8 @@ class AccountApplicationServiceTest {
      */
     private AccountApplicationService serviceWith(boolean riderAutomatic, boolean merchantAutomatic) {
         return new AccountApplicationService(applications, intake,
-                new ServiceProviderAnswers(platform), onboarding, keycloak,
+                new ServiceProviderAnswers(platform, new HiringCompanies(platform, registrations)),
+                onboarding, keycloak,
                 new AutoApprovalPolicy(riderAutomatic, merchantAutomatic, false, decisions,
                         mock(AutoApprovalAuditRepository.class)));
     }
@@ -561,8 +567,27 @@ class AccountApplicationServiceTest {
         }
 
         @Test
-        @DisplayName("a company that has drawn no zone yet is recorded with an empty region, not a guess")
-        void no_zones_is_an_empty_region() {
+        @DisplayName("a company with no zones is recorded with the regions it chose when it registered")
+        void no_zones_records_the_registered_regions() {
+            hiring(new PlatformClient.HiringCompany(swift, "Swift Couriers", List.of()));
+            OnboardingApplication registration = new OnboardingApplication(Kind.CARRIER,
+                    "Swift Couriers", "Rami Aoun", "rami@swift.example", Instant.now(), null, null,
+                    null, Map.of("coverage", List.of("Beirut", "Mount Lebanon")), null);
+            registration.provisionedAs("swift-owner-sub", swift);
+            when(registrations.findByKindAndProvisionedEntityIdIn(eq(Kind.CARRIER), any()))
+                    .thenReturn(List.of(registration));
+
+            service.apply(sam(), riderFor(swift));
+
+            assertThat(recordedDetails())
+                    .containsEntry("companyRegions", List.of("Beirut", "Mount Lebanon"))
+                    .doesNotContainKey("preferredArea");
+        }
+
+        @Test
+        @DisplayName("a company with neither zones nor an application of its own is recorded with an empty region, not a guess")
+        void neither_is_an_empty_region() {
+            // A company the back office registered by hand: no zones, and nothing it applied with.
             hiring(new PlatformClient.HiringCompany(swift, "Swift Couriers", List.of()));
 
             service.apply(sam(), riderFor(swift));
