@@ -158,6 +158,39 @@ public class DeliveryZoneService {
         return storeZones.findByStoreId(storeId);
     }
 
+    /**
+     * The areas a shop delivers to, as a customer is shown them: its shop page's "Delivery area"
+     * map lists these by name and marks the ones the back office has placed.
+     *
+     * <p>Exactly the areas {@link #termsFor} serves, and that is the whole contract. The map tells a
+     * customer "your address is inside" or "outside" from this list, and checkout is refused or
+     * accepted by termsFor; were the two ever different sets, the shop page would promise an address
+     * that placement then refuses. So:
+     * <ul>
+     *   <li><strong>every area the shop has a price for, retired ones included.</strong> termsFor
+     *       honours a coverage row whatever became of its area, and a saved address that names a
+     *       retired area still orders there (retiring only takes it out of the picker);
+     *   <li><strong>empty means the areas do not limit the shop</strong> — no coverage rows, so
+     *       termsFor answers every area, and no area at all, with the flat fee. It never means
+     *       "delivers nowhere", exactly as on {@code /coverage}.
+     * </ul>
+     *
+     * <p>Names and centres only. What the shop charges for each area stays on the merchant's own
+     * coverage screen and on the per-area quote checkout asks for; the map answers where, not how
+     * much. A shop's list of areas is no secret — any signed-in caller can already ask
+     * {@code /terms} whether the shop serves any area it names.
+     */
+    @Transactional(readOnly = true)
+    public List<DeliveryZone> servedAreasOf(UUID storeId) {
+        List<UUID> served = storeZones.findByStoreId(storeId).stream()
+                .map(StoreDeliveryZone::getZoneId)
+                .toList();
+        if (served.isEmpty()) {
+            return List.of();
+        }
+        return zones.findByIdInOrderBySortOrderAscNameAsc(served);
+    }
+
     @Transactional
     public StoreDeliveryZone setCoverage(UUID storeId, UUID zoneId, BigDecimal fee,
                                          BigDecimal minOrder, int etaExtraMinutes) {

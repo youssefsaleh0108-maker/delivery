@@ -48,6 +48,7 @@ import com.delivery.product.api.dto.StoreDtos.StoreCardResponse;
 import com.delivery.product.api.dto.StoreDtos.StoreRequest;
 import com.delivery.product.api.dto.StoreDtos.PowerRequest;
 import com.delivery.product.api.dto.StoreDtos.RadiusRequest;
+import com.delivery.product.api.dto.StoreDtos.ServedZoneResponse;
 import com.delivery.product.api.dto.StoreDtos.StoreResponse;
 import com.delivery.product.api.dto.StoreDtos.VerifiedLocalRequest;
 import com.delivery.product.domain.GeoPoint;
@@ -57,6 +58,7 @@ import com.delivery.product.domain.StoreOffer;
 import com.delivery.product.domain.StoreReview;
 import com.delivery.product.service.CatalogService;
 import com.delivery.product.service.CatalogService.ProductView;
+import com.delivery.product.service.DeliveryZoneService;
 import com.delivery.product.service.PopularServiceShops;
 import com.delivery.product.service.ProductImageService;
 import com.delivery.product.service.ProductImageService.ImageUrl;
@@ -122,15 +124,20 @@ public class StoreController {
     private final ReviewService reviewService;
     private final PopularServiceShops popularServiceShops;
 
+    /** For the areas a shop delivers to, which ride on the store as {@code deliveryZones}. */
+    private final DeliveryZoneService deliveryZones;
+
     public StoreController(StoreService storeService, CatalogService catalog,
                            ProductImageService images, StoreImageService storeImages,
-                           ReviewService reviewService, PopularServiceShops popularServiceShops) {
+                           ReviewService reviewService, PopularServiceShops popularServiceShops,
+                           DeliveryZoneService deliveryZones) {
         this.storeService = storeService;
         this.catalog = catalog;
         this.images = images;
         this.storeImages = storeImages;
         this.reviewService = reviewService;
         this.popularServiceShops = popularServiceShops;
+        this.deliveryZones = deliveryZones;
     }
 
     // ---------------------------------------------------------------- storefront
@@ -783,7 +790,19 @@ public class StoreController {
                 store.getPowerUpdatedAt(),
                 v.powerCurrent(),
                 store.getDeliveryRadiusMetres(),
+                servedZonesOf(store),
                 store.getServiceCategory());
+    }
+
+    /**
+     * Where a shop delivers by area, for its shop page's map: on the full store only, never on a
+     * card, so the storefront grid costs no query per shop for it.
+     */
+    private List<ServedZoneResponse> servedZonesOf(Store store) {
+        return deliveryZones.servedAreasOf(store.getId()).stream()
+                .map(zone -> new ServedZoneResponse(zone.getId(), zone.getName(), zone.getRegion(),
+                        zone.getCenterLat(), zone.getCenterLng()))
+                .toList();
     }
 
     private static OfferResponse toOffer(StoreOffer offer) {
