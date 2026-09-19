@@ -248,4 +248,100 @@ class VisionProviderSeamTest {
             assertThat(Detections.sanitize(many, 1, 120)).hasSize(120);
         }
     }
+
+    /**
+     * Photo search for customers asks for a REAL reader and never gets the fake in its place: a sample
+     * answer for a shopper would be shops selling something they never photographed.
+     */
+    @Nested
+    @DisplayName("a real reader, for customers")
+    class Real {
+
+        @Test
+        void nobody_choosing_means_no_real_reader_not_the_fake() {
+            VisionProviders providers = new VisionProviders(
+                    List.of(new FakeVisionProvider(), claude(true)), new MockEnvironment());
+
+            assertThat(providers.real()).isEmpty();
+            // Blitz still answers, with samples.
+            assertThat(providers.active().name()).isEqualTo(FakeVisionProvider.NAME);
+        }
+
+        @Test
+        void choosing_the_fake_by_name_is_no_real_reader_either() {
+            VisionProviders providers = new VisionProviders(List.of(new FakeVisionProvider(), claude(true)),
+                    new MockEnvironment().withProperty(VisionProviders.PROPERTY, "fake"));
+
+            assertThat(providers.real()).isEmpty();
+        }
+
+        @Test
+        void claude_without_a_key_is_no_real_reader_where_blitz_falls_back_to_samples() {
+            VisionProviders providers = new VisionProviders(List.of(new FakeVisionProvider(), claude(false)),
+                    new MockEnvironment().withProperty(VisionProviders.PROPERTY, "CLAUDE"));
+
+            assertThat(providers.real()).isEmpty();
+            assertThat(providers.active().name()).isEqualTo(FakeVisionProvider.NAME);
+        }
+
+        @Test
+        void claude_with_a_key_is_the_real_reader() {
+            VisionProviders providers = new VisionProviders(List.of(new FakeVisionProvider(), claude(true)),
+                    new MockEnvironment().withProperty(VisionProviders.PROPERTY, "claude"));
+
+            assertThat(providers.real()).hasValueSatisfying(
+                    provider -> assertThat(provider.name()).isEqualTo(ClaudeVisionProvider.NAME));
+        }
+
+        @Test
+        void a_name_that_matches_nothing_is_no_real_reader_and_does_not_throw() {
+            VisionProviders providers = new VisionProviders(List.of(new FakeVisionProvider(), claude(true)),
+                    new MockEnvironment().withProperty(VisionProviders.PROPERTY, "CLAUDIA"));
+
+            assertThat(providers.real()).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("the fake describing a product photo")
+    class FakeDescribing {
+
+        private final FakeVisionProvider fake = new FakeVisionProvider();
+
+        @Test
+        void the_same_photo_is_always_the_same_sample_product() {
+            VisionProvider.ProductPhoto photo =
+                    new VisionProvider.ProductPhoto("a jar".getBytes(StandardCharsets.UTF_8));
+
+            VisionProvider.ProductDescription first = fake.describe(photo);
+            VisionProvider.ProductDescription again = fake.describe(
+                    new VisionProvider.ProductPhoto("a jar".getBytes(StandardCharsets.UTF_8)));
+
+            assertThat(again).usingRecursiveComparison().isEqualTo(first);
+            assertThat(first.isProduct()).isTrue();
+            assertThat(first.name()).isNotBlank();
+            assertThat(first.nameAr()).isNotBlank();
+            assertThat(first.keywords()).isNotEmpty();
+            assertThat(fake.name()).isEqualTo("FAKE");
+        }
+
+        /** A made-up code prefilled into a merchant's product form would pass for a real one. */
+        @Test
+        void a_sample_never_carries_a_barcode() {
+            for (int i = 0; i < 40; i++) {
+                assertThat(fake.describe(new VisionProvider.ProductPhoto(
+                        ("photo " + i).getBytes(StandardCharsets.UTF_8))).barcode()).isNull();
+            }
+        }
+
+        @Test
+        void different_photos_choose_across_the_sample_shelf() {
+            java.util.Set<String> names = new java.util.HashSet<>();
+            for (int i = 0; i < 60; i++) {
+                names.add(fake.describe(new VisionProvider.ProductPhoto(
+                        ("photo " + i).getBytes(StandardCharsets.UTF_8))).name());
+            }
+            assertThat(names.size()).isGreaterThan(3);
+        }
+    }
 }

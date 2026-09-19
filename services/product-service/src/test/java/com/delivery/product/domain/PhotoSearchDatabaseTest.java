@@ -1,0 +1,378 @@
+package com.delivery.product.domain;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
+
+import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.springframework.data.jpa.repository.support.JpaRepositoryFactory;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
+import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
+
+import com.delivery.product.domain.PhotoSearchUse.Kind;
+import com.delivery.product.service.PhotoQuota;
+import com.delivery.product.service.PhotoSearchException;
+import com.delivery.product.service.PhotoSearchException.Scope;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+/**
+ * V38 and the photo quota's SQL, against a real PostgreSQL: the counts, the windows, the sweep, and the
+ * advisory lock that stops two photos sent at once from both taking the last one.
+ *
+ * <p>Runs only when {@code PRODUCT_TEST_DB_URL} names a database a superuser may use, as
+ * {@code ItemSearchDatabaseTest} does, and CI runs it the same way. It migrates a schema of its own
+ * with a random name and drops only that schema. {@link PhotoQuota#take} is transactional in the
+ * service; here each call runs in a transaction the test opens, as Spring's would.
+ */
+@EnabledIfEnvironmentVariable(named = "PRODUCT_TEST_DB_URL", matches = ".+")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@DisplayName("the photo quota, against a real database")
+class PhotoSearchDatabaseTest {
+
+    private final String url = System.getenv("PRODUCT_TEST_DB_URL");
+    private final String user = envOr("PRODUCT_TEST_DB_USER", "postgres");
+    private final String password = envOr("PRODUCT_TEST_DB_PASSWORD", "postgres");
+    private final String schema = "photo_search_it_" + UUID.randomUUID().toString().substring(0, 8);
+
+    private EntityManagerFactory entityManagerFactory;
+    private EntityManager em;
+    private PhotoSearchUseRepository uses;
+    private final MovableClock clock = new MovableClock(Instant.parse("2026-09-20T10:00:00Z"));
+
+    /** The configured limits: ten a day, three a minute, a thousand for the platform, thirty for a merchant. */
+    private static final PhotoQuota.Limits CONFIGURED = new PhotoQuota.Limits(10, 3, 1000, 30);
+
+    /** The limits in force; the platform test lowers the platform's day to five to reach it. */
+    private PhotoQuota.Limits limits = CONFIGURED;
+
+    private static String envOr(String name, String fallback) {
+        String value = System.getenv(name);
+        return value == null || value.isBlank() ? fallback : value;
+    }
+
+    /** A clock the test moves by hand. */
+    private static final class MovableClock extends Clock {
+        private volatile Instant now;
+
+        MovableClock(Instant now) {
+            this.now = now;
+        }
+
+        void advance(Duration by) {
+            now = now.plus(by);
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return now;
+        }
+    }
+
+    @BeforeAll
+    void migrateFromEmpty() throws SQLException {
+        try (Connection admin = DriverManager.getConnection(url, user, password);
+             Statement statement = admin.createStatement()) {
+            statement.execute("CREATE EXTENSION IF NOT EXISTS postgis");
+            statement.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm");
+            statement.execute("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"");
+            statement.execute("CREATE SCHEMA " + schema);
+        }
+        Flyway.configure()
+                .dataSource(url, user, password)
+                .schemas(schema)
+                .defaultSchema(schema)
+                .locations("classpath:db/migration/shared", "classpath:db/migration/product")
+                .outOfOrder(true)
+                .load()
+                .migrate();
+
+        entityManagerFactory = entityManagerFactory();
+        em = entityManagerFactory.createEntityManager();
+        uses = new JpaRepositoryFactory(em).getRepository(PhotoSearchUseRepository.class);
+    }
+
+    @AfterAll
+    void dropTheSchema() throws SQLException {
+        if (em != null) {
+            if (em.getTransaction().isActive()) {
+                em.getTransaction().rollback();
+            }
+            em.close();
+        }
+        if (entityManagerFactory != null) {
+            entityManagerFactory.close();
+        }
+        try (Connection admin = DriverManager.getConnection(url, user, password);
+             Statement statement = admin.createStatement()) {
+            statement.execute("SET lock_timeout = '30s'");
+            statement.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE");
+        }
+    }
+
+    @BeforeEach
+    void emptyTheTable() throws SQLException {
+        limits = CONFIGURED;
+        try (Connection connection = DriverManager.getConnection(urlInSchema(), user, password);
+             Statement statement = connection.createStatement()) {
+            statement.execute("DELETE FROM photo_search_uses");
+        }
+    }
+
+    /** One use, in its own transaction, as the service's {@code @Transactional} runs it. */
+    private int take(String account, Kind kind) {
+        return take(em, account, kind);
+    }
+
+    private int take(EntityManager manager, String account, Kind kind) {
+        PhotoQuota quota = new PhotoQuota(new JpaRepositoryFactory(manager)
+                .getRepository(PhotoSearchUseRepository.class), clock, limits);
+        manager.getTransaction().begin();
+        try {
+            int left = quota.take(account, kind);
+            manager.getTransaction().commit();
+            return left;
+        } catch (RuntimeException e) {
+            manager.getTransaction().rollback();
+            throw e;
+        }
+    }
+
+    private long stored(String account) {
+        em.clear();
+        return uses.countByAccountIdAndKindAndCreatedAtAfter(account, Kind.CUSTOMER_SEARCH, Instant.EPOCH)
+                + uses.countByAccountIdAndKindAndCreatedAtAfter(account, Kind.MERCHANT_FIND, Instant.EPOCH);
+    }
+
+    @Test
+    @DisplayName("the table takes only the two kinds, and nothing about the photo")
+    void the_table_takes_only_the_two_kinds() throws SQLException {
+        try (Connection connection = DriverManager.getConnection(urlInSchema(), user, password);
+             Statement statement = connection.createStatement()) {
+            assertThatThrownBy(() -> statement.execute("INSERT INTO photo_search_uses (id, account_id, kind) "
+                    + "VALUES ('" + UUID.randomUUID() + "', 'someone', 'PHOTO_UPLOAD')"))
+                    .isInstanceOf(SQLException.class)
+                    .hasMessageContaining("chk_photo_search_use_kind");
+            var columns = statement.executeQuery("SELECT string_agg(column_name, ',' ORDER BY column_name) "
+                    + "FROM information_schema.columns WHERE table_schema = '" + schema
+                    + "' AND table_name = 'photo_search_uses'");
+            columns.next();
+            assertThat(columns.getString(1)).isEqualTo("account_id,created_at,id,kind");
+        }
+    }
+
+    @Test
+    @DisplayName("a customer has ten a day, and the eleventh is told to wait until the oldest leaves the day")
+    void ten_a_day() {
+        Instant first = clock.instant();
+        for (int i = 0; i < 10; i++) {
+            assertThat(take("customer-day", Kind.CUSTOMER_SEARCH)).isEqualTo(9 - i);
+            clock.advance(Duration.ofSeconds(61));
+        }
+
+        assertThatThrownBy(() -> take("customer-day", Kind.CUSTOMER_SEARCH))
+                .isInstanceOfSatisfying(PhotoSearchException.class, e -> {
+                    assertThat(e.getCode()).isEqualTo("PHOTO_SEARCH_LIMIT");
+                    assertThat(e.getScope()).isEqualTo(Scope.DAY);
+                    assertThat(e.getLimit()).isEqualTo(10);
+                    long expected = Duration.between(clock.instant(), first.plus(Duration.ofHours(24))).getSeconds();
+                    assertThat(e.getRetryAfterSeconds()).isEqualTo(expected);
+                });
+        // A refused use is not counted.
+        assertThat(stored("customer-day")).isEqualTo(10);
+
+        // The first one leaves the day, and one more is allowed.
+        clock.advance(Duration.between(clock.instant(), first.plus(Duration.ofHours(24))).plusSeconds(1));
+        assertThat(take("customer-day", Kind.CUSTOMER_SEARCH)).isZero();
+    }
+
+    @Test
+    @DisplayName("three a minute, then a wait of at most a minute")
+    void three_a_minute() {
+        for (int i = 0; i < 3; i++) {
+            take("customer-burst", Kind.CUSTOMER_SEARCH);
+            clock.advance(Duration.ofSeconds(5));
+        }
+
+        assertThatThrownBy(() -> take("customer-burst", Kind.CUSTOMER_SEARCH))
+                .isInstanceOfSatisfying(PhotoSearchException.class, e -> {
+                    assertThat(e.getScope()).isEqualTo(Scope.MINUTE);
+                    assertThat(e.getLimit()).isEqualTo(3);
+                    assertThat(e.getRetryAfterSeconds()).isBetween(1L, 60L);
+                });
+
+        clock.advance(Duration.ofSeconds(50));
+        assertThat(take("customer-burst", Kind.CUSTOMER_SEARCH)).isEqualTo(6);
+    }
+
+    @Test
+    @DisplayName("the platform's day counts every customer, and merchants' finds are not in it")
+    void the_platform_day_counts_every_customer() {
+        limits = new PhotoQuota.Limits(10, 3, 5, 30);
+        for (int i = 0; i < 40; i++) {
+            take("merchant-" + i, Kind.MERCHANT_FIND);
+        }
+        for (int i = 0; i < 5; i++) {
+            take("customer-" + i, Kind.CUSTOMER_SEARCH);
+        }
+
+        assertThatThrownBy(() -> take("customer-new", Kind.CUSTOMER_SEARCH))
+                .isInstanceOfSatisfying(PhotoSearchException.class, e -> {
+                    assertThat(e.getCode()).isEqualTo("PHOTO_SEARCH_LIMIT");
+                    assertThat(e.getScope()).isEqualTo(Scope.PLATFORM);
+                    assertThat(e.getLimit()).isEqualTo(5);
+                });
+        // Merchants are not held to the customers' platform day.
+        assertThat(take("merchant-more", Kind.MERCHANT_FIND)).isEqualTo(29);
+    }
+
+    @Test
+    @DisplayName("a merchant's finds and a customer's searches are counted apart, with limits of their own")
+    void kinds_are_counted_apart() {
+        for (int i = 0; i < 10; i++) {
+            take("both", Kind.CUSTOMER_SEARCH);
+            clock.advance(Duration.ofSeconds(61));
+        }
+        assertThat(take("both", Kind.MERCHANT_FIND)).isEqualTo(29);
+
+        assertThatThrownBy(() -> {
+            for (int i = 0; i < 3; i++) {
+                take("finder", Kind.MERCHANT_FIND);
+            }
+            take("finder", Kind.MERCHANT_FIND);
+        }).isInstanceOfSatisfying(PhotoSearchException.class, e -> {
+            assertThat(e.getCode()).isEqualTo("PHOTO_FIND_LIMIT");
+            assertThat(e.getScope()).isEqualTo(Scope.MINUTE);
+        });
+    }
+
+    @Test
+    @DisplayName("a use older than 48 hours is deleted by the next one, whoever's it is")
+    void old_uses_are_swept() {
+        take("old-customer", Kind.CUSTOMER_SEARCH);
+        clock.advance(Duration.ofHours(49));
+
+        take("someone-else", Kind.CUSTOMER_SEARCH);
+
+        assertThat(stored("old-customer")).isZero();
+        assertThat(stored("someone-else")).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("what is left is read without counting")
+    void left_does_not_count() {
+        take("reader", Kind.CUSTOMER_SEARCH);
+        PhotoQuota quota = new PhotoQuota(uses, clock, limits);
+
+        assertThat(quota.left("reader", Kind.CUSTOMER_SEARCH)).isEqualTo(9);
+        assertThat(quota.left("reader", Kind.CUSTOMER_SEARCH)).isEqualTo(9);
+        assertThat(quota.left("reader", Kind.MERCHANT_FIND)).isEqualTo(30);
+    }
+
+    /**
+     * Two photos from one account with one use left: the second waits on the account's lock until the
+     * first commits, then counts it, and is refused. Without the lock both would count nine and both
+     * would take the tenth.
+     */
+    @Test
+    @DisplayName("two photos at once cannot both take the account's last use")
+    void the_account_lock_serialises_the_last_use() throws Exception {
+        for (int i = 0; i < 9; i++) {
+            take("racer", Kind.CUSTOMER_SEARCH);
+            clock.advance(Duration.ofSeconds(61));
+        }
+
+        EntityManager first = entityManagerFactory.createEntityManager();
+        EntityManager second = entityManagerFactory.createEntityManager();
+        try {
+            PhotoQuota firstQuota = new PhotoQuota(new JpaRepositoryFactory(first)
+                    .getRepository(PhotoSearchUseRepository.class), clock, limits);
+            // The first takes the last use and holds its transaction open.
+            first.getTransaction().begin();
+            assertThat(firstQuota.take("racer", Kind.CUSTOMER_SEARCH)).isZero();
+
+            CountDownLatch started = new CountDownLatch(1);
+            CompletableFuture<Object> racing = CompletableFuture.supplyAsync(() -> {
+                started.countDown();
+                try {
+                    return take(second, "racer", Kind.CUSTOMER_SEARCH);
+                } catch (PhotoSearchException e) {
+                    return e;
+                }
+            });
+            assertThat(started.await(10, TimeUnit.SECONDS)).isTrue();
+            // Still waiting on the lock the first holds.
+            Thread.sleep(500);
+            assertThat(racing).isNotDone();
+
+            first.getTransaction().commit();
+            Object outcome = racing.get(30, TimeUnit.SECONDS);
+            assertThat(outcome).isInstanceOfSatisfying(PhotoSearchException.class,
+                    e -> assertThat(e.getScope()).isEqualTo(Scope.DAY));
+            assertThat(stored("racer")).isEqualTo(10);
+        } finally {
+            if (first.getTransaction().isActive()) {
+                first.getTransaction().rollback();
+            }
+            first.close();
+            second.close();
+        }
+    }
+
+    private EntityManagerFactory entityManagerFactory() {
+        LocalContainerEntityManagerFactoryBean factory = new LocalContainerEntityManagerFactoryBean();
+        factory.setDataSource(new DriverManagerDataSource(urlInSchema(), user, password));
+        factory.setPackagesToScan("com.delivery.product.domain");
+        factory.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
+        Map<String, Object> jpa = new HashMap<>();
+        // What the service boots with: Flyway owns the schema, and Hibernate refuses to start if an
+        // entity has drifted from it — PhotoSearchUse against V38 included.
+        jpa.put("hibernate.hbm2ddl.auto", "validate");
+        jpa.put("hibernate.default_schema", schema);
+        jpa.put("hibernate.physical_naming_strategy",
+                "org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy");
+        jpa.put("hibernate.implicit_naming_strategy",
+                "org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy");
+        factory.setJpaPropertyMap(jpa);
+        factory.afterPropertiesSet();
+        return factory.getObject();
+    }
+
+    private String urlInSchema() {
+        return url + (url.contains("?") ? "&" : "?") + "currentSchema=" + schema;
+    }
+}

@@ -76,6 +76,21 @@ spring:
     # first time the library ships V51.
     out-of-order: true
 
+  # Search by photo's upload, the one multipart request this service takes (PhotoSearchController, and a
+  # merchant's find by photo). Every other image goes to MinIO by presigned URL and never through here;
+  # this photo is read once and must not be stored, so it comes straight to the reader instead.
+  #
+  # A photo is at most 2 MB (the apps send about 800 KB), and the request 64 KiB more for the form's
+  # framing and the two coordinates, so a photo of exactly the advertised size is not refused for its
+  # envelope. Over either, the container refuses the request while parsing it: 413 PHOTO_TOO_LARGE.
+  # file-size-threshold is above the size limit, so no part is ever written to disk: the photo lives in
+  # memory for the length of the request and nowhere else.
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 2112KB
+      file-size-threshold: 3MB
+
   jpa:
     open-in-view: false
     hibernate:
@@ -221,6 +236,50 @@ delivery:
         # (five scans a day, two attempts each) that is at most about $1.44 a merchant a day in
         # photos, before the prompt and the answer (up to max-tokens, at $25 per million).
         max-long-edge-px: 2236
+
+    # Search by photo (PhotoSearchService, PhotoReader, PhotoQuota): a customer photographs a product and
+    # sees the shops that sell it. The photo is read by the provider scan.vision-provider names, so ONE
+    # switch — CATALOG_SCAN_VISION_PROVIDER=CLAUDE plus the anthropic-api Secret — turns on Blitz,
+    # customer photo search and a merchant's find by photo together (deploy/k3s/README.md).
+    #
+    # Customers are only ever read by a REAL reader: until both owner steps are done they are told there
+    # is no photo search (GET /api/products/search/capabilities says photoSearch:false, the app draws no
+    # camera) and never see sample results. customer-enabled=false keeps customers off while merchants
+    # use Claude. Read per call, so a Config Server change plus /actuator/busrefresh flips it.
+    #
+    # The cost, at Opus 5's $5 per million input and $25 per million output tokens: a photo at 1568 px is
+    # about 2,350 image tokens, plus about 700 of prompt, and low effort answers in 300 to 800 tokens —
+    # about 2 to 4 cents a photo (the token counts are logged per call, with no account and no answer, to
+    # confirm this on dev). The caps bound it: at most $0.40 a customer a day at per-customer-per-day, about
+    # $40 a day for every customer together at platform-per-day, and $1.20 a merchant a day at
+    # merchant-per-day. per-account-per-minute stops a stuck button spending a day's allowance at once.
+    # All counted per account over a rolling day (PhotoQuota), just before the paid call.
+    #
+    # max-concurrent photos are read at once, on request threads, each holding one of the forty until the
+    # provider answers or times out: a fifth is answered 503 PHOTO_READER_BUSY at once rather than queued.
+    # max-source-pixels is the decode budget for one photo — a phone camera's, not the service's 40 MP —
+    # since up to max-concurrent decode at once.
+    photo-search:
+      customer-enabled: ${CUSTOMER_PHOTO_SEARCH_ENABLED:true}
+      per-customer-per-day: 10
+      per-account-per-minute: 3
+      platform-per-day: 1000
+      merchant-per-day: 30
+      max-concurrent: 4
+      max-source-pixels: 16000000
+      claude:
+        # Exact model id, as for Blitz; a cheaper model is a configuration change, reviewed as a pricing
+        # change. Adaptive thinking at this effort, structured output and server-side fallbacks are always
+        # on — see ClaudeVisionProvider.
+        model: claude-opus-5
+        effort: low
+        # The whole call, set on the request, with no retry: somebody is holding their phone up waiting.
+        # Blitz's client keeps its own timeout and retry.
+        timeout: 25s
+        max-tokens: 4000
+        # One product fills most of the photo, so 1568 px on the long edge is detail enough to read a
+        # pack's name and barcode, at about half the tokens of Blitz's 2236.
+        max-long-edge-px: 1568
 
   product:
     # How long a merchant's power declaration (mains, generator, dark) is shown to customers as what

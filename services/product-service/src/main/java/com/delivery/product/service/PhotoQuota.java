@@ -1,0 +1,166 @@
+package com.delivery.product.service;
+
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Optional;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.delivery.product.domain.PhotoSearchUse;
+import com.delivery.product.domain.PhotoSearchUse.Kind;
+import com.delivery.product.domain.PhotoSearchUseRepository;
+import com.delivery.product.service.PhotoSearchException.Scope;
+
+/**
+ * How many photos an account may have read: the cost guard in front of a paid vision call.
+ *
+ * <p>Once real recognition is on, every photo read is a call to Claude of a few cents
+ * ({@code application.yml}, {@code delivery.catalog.photo-search}). So each use is counted before the
+ * call is made, and refused past:
+ * <ul>
+ *   <li>{@code per-customer-per-day} (10) customer searches per account over a rolling day, or
+ *       {@code merchant-per-day} (30) finds by photo for a merchant;
+ *   <li>{@code per-account-per-minute} (3) of either kind in a minute, so a stuck button or a script
+ *       cannot spend the day's allowance in one burst;
+ *   <li>{@code platform-per-day} (1,000) customer searches across the whole platform over a rolling day,
+ *       which bounds the whole bill at about $40 a day however many accounts there are.
+ * </ul>
+ * Rolling rather than per calendar day, as Blitz's quota is, so a burst cannot straddle midnight to
+ * double it.
+ *
+ * <p><strong>One short transaction</strong> ({@link #take}), under a transaction-scoped advisory lock on
+ * the account ({@link PhotoSearchUseRepository#lockAccount}, the pattern of
+ * {@code CatalogScanRepository#lockMerchant}), so three photos sent at once cannot all see room for
+ * one more; a customer search also takes the platform's lock, after the account's, for the platform
+ * count. The same transaction deletes the uses no window counts any more, so the table never holds
+ * more than two days of them. The caller makes the paid call afterwards, outside it: a pooled
+ * connection held across a 25-second call is one taken from every storefront.
+ *
+ * <p>A use is counted just before the reader is asked — after the photo was accepted and decoded, and
+ * after a slot to read it was found — so a refusal for size, type or a busy reader costs the account
+ * nothing. A read that then fails still counts: the call was made.
+ */
+@Component
+public class PhotoQuota {
+
+    private static final Logger log = LoggerFactory.getLogger(PhotoQuota.class);
+
+    /** The longest window a limit counts over. */
+    static final Duration DAY = Duration.ofHours(24);
+
+    /** The burst window. */
+    static final Duration MINUTE = Duration.ofMinutes(1);
+
+    /** Uses older than this answer no limit and are deleted. Twice the longest window, for slack. */
+    static final Duration KEEP = Duration.ofHours(48);
+
+    /** The limits, clamped to at least one each: a zero in the configuration must not refuse everything. */
+    public record Limits(int perCustomerPerDay, int perAccountPerMinute, int platformPerDay,
+                         int merchantPerDay) {
+
+        public Limits {
+            perCustomerPerDay = Math.max(perCustomerPerDay, 1);
+            perAccountPerMinute = Math.max(perAccountPerMinute, 1);
+            platformPerDay = Math.max(platformPerDay, 1);
+            merchantPerDay = Math.max(merchantPerDay, 1);
+        }
+    }
+
+    private final PhotoSearchUseRepository uses;
+    private final Clock clock;
+    private final Limits limits;
+
+    @Autowired
+    public PhotoQuota(PhotoSearchUseRepository uses, Clock clock,
+                      @Value("${delivery.catalog.photo-search.per-customer-per-day:10}") int perCustomerPerDay,
+                      @Value("${delivery.catalog.photo-search.per-account-per-minute:3}") int perAccountPerMinute,
+                      @Value("${delivery.catalog.photo-search.platform-per-day:1000}") int platformPerDay,
+                      @Value("${delivery.catalog.photo-search.merchant-per-day:30}") int merchantPerDay) {
+        this(uses, clock, new Limits(perCustomerPerDay, perAccountPerMinute, platformPerDay,
+                merchantPerDay));
+    }
+
+    public PhotoQuota(PhotoSearchUseRepository uses, Clock clock, Limits limits) {
+        this.uses = uses;
+        this.clock = clock;
+        this.limits = limits;
+    }
+
+    /** The day's limit for this kind of use. */
+    public int perDay(Kind kind) {
+        return kind == Kind.MERCHANT_FIND ? limits.merchantPerDay() : limits.perCustomerPerDay();
+    }
+
+    /**
+     * Counts one use by {@code accountId}, or refuses it.
+     *
+     * @return how many more uses of this kind the account has over the rolling day, after this one
+     * @throws PhotoSearchException a 429 ({@code PHOTO_SEARCH_LIMIT} or {@code PHOTO_FIND_LIMIT}) with
+     *                              the limit, which one, and how many seconds until the next use is
+     *                              allowed; nothing is counted
+     */
+    @Transactional
+    public int take(String accountId, Kind kind) {
+        uses.lockAccount(accountId);
+        Instant now = clock.instant();
+        uses.deleteOlderThan(now.minus(KEEP));
+        boolean merchant = kind == Kind.MERCHANT_FIND;
+
+        int perDay = perDay(kind);
+        Instant dayAgo = now.minus(DAY);
+        long today = uses.countByAccountIdAndKindAndCreatedAtAfter(accountId, kind, dayAgo);
+        if (today >= perDay) {
+            throw PhotoSearchException.limit(merchant, perDay, Scope.DAY, secondsUntilFree(
+                    uses.findFirstByAccountIdAndKindAndCreatedAtAfterOrderByCreatedAtAsc(accountId, kind,
+                            dayAgo), DAY, now));
+        }
+
+        Instant minuteAgo = now.minus(MINUTE);
+        long lastMinute = uses.countByAccountIdAndKindAndCreatedAtAfter(accountId, kind, minuteAgo);
+        if (lastMinute >= limits.perAccountPerMinute()) {
+            throw PhotoSearchException.limit(merchant, limits.perAccountPerMinute(), Scope.MINUTE,
+                    secondsUntilFree(uses.findFirstByAccountIdAndKindAndCreatedAtAfterOrderByCreatedAtAsc(
+                            accountId, kind, minuteAgo), MINUTE, now));
+        }
+
+        if (kind == Kind.CUSTOMER_SEARCH) {
+            // After the account's own lock, never before: one order for both, so they cannot deadlock.
+            uses.lockPlatform();
+            long platform = uses.countByKindAndCreatedAtAfter(kind, dayAgo);
+            if (platform >= limits.platformPerDay()) {
+                log.warn("Customer photo search has reached the platform's {} searches in 24 hours",
+                        limits.platformPerDay());
+                throw PhotoSearchException.limit(false, limits.platformPerDay(), Scope.PLATFORM,
+                        secondsUntilFree(uses.findFirstByKindAndCreatedAtAfterOrderByCreatedAtAsc(kind,
+                                dayAgo), DAY, now));
+            }
+        }
+
+        uses.save(new PhotoSearchUse(accountId, kind, now));
+        return (int) Math.max(0, perDay - today - 1);
+    }
+
+    /** How many uses of this kind the account has left over the rolling day, without counting one. */
+    @Transactional(readOnly = true)
+    public int left(String accountId, Kind kind) {
+        long today = uses.countByAccountIdAndKindAndCreatedAtAfter(accountId, kind,
+                clock.instant().minus(DAY));
+        return (int) Math.max(0, perDay(kind) - today);
+    }
+
+    /** Whole seconds until the oldest use in the window leaves it; at least one. */
+    private static long secondsUntilFree(Optional<PhotoSearchUse> oldest, Duration window, Instant now) {
+        if (oldest.isEmpty()) {
+            return 1L;
+        }
+        Duration wait = Duration.between(now, oldest.get().getCreatedAt().plus(window));
+        long seconds = wait.getSeconds() + (wait.getNano() > 0 ? 1 : 0);
+        return Math.max(1L, seconds);
+    }
+}

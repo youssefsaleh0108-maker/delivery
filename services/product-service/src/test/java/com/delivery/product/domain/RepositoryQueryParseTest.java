@@ -47,6 +47,7 @@ class RepositoryQueryParseTest {
                 .addAnnotatedClass(DeliveryZone.class)
                 .addAnnotatedClass(GeocodeCacheEntry.class)
                 .addAnnotatedClass(OfferModerationAction.class)
+                .addAnnotatedClass(PhotoSearchUse.class)
                 .addAnnotatedClass(Product.class)
                 .addAnnotatedClass(ProductOption.class)
                 .addAnnotatedClass(ProductOptionGroup.class)
@@ -117,6 +118,22 @@ class RepositoryQueryParseTest {
                 HAVING COUNT(DISTINCT other.orderId) >= :minOrdersTogether
                 ORDER BY COUNT(DISTINCT other.orderId) DESC, other.productId ASC
                 """);
+    }
+
+    /**
+     * The photo quota's JPQL: the sweep, read off the repository's annotation, and what its derived
+     * counts and "oldest in the window" reads generate. The two advisory locks are native SQL, which
+     * Hibernate does not parse; PhotoSearchDatabaseTest runs them against PostgreSQL.
+     */
+    @Test
+    void the_photo_quota_queries_parse() throws NoSuchMethodException {
+        parsesMutation(PhotoSearchUseRepository.class.getMethod("deleteOlderThan", java.time.Instant.class)
+                .getAnnotation(org.springframework.data.jpa.repository.Query.class).value());
+        parses("SELECT COUNT(u) FROM PhotoSearchUse u WHERE u.accountId = :accountId AND u.kind = :kind "
+                + "AND u.createdAt > :since");
+        parses("SELECT COUNT(u) FROM PhotoSearchUse u WHERE u.kind = :kind AND u.createdAt > :since");
+        parses("SELECT u FROM PhotoSearchUse u WHERE u.accountId = :accountId AND u.kind = :kind "
+                + "AND u.createdAt > :since ORDER BY u.createdAt ASC");
     }
 
     /**

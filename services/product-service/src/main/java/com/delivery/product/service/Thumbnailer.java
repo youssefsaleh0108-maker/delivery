@@ -200,6 +200,18 @@ public class Thumbnailer {
      * without it.
      */
     public byte[] renderLongEdge(byte[] source, int longEdgePx) {
+        return renderLongEdge(source, longEdgePx, maxSourcePixels);
+    }
+
+    /**
+     * The same, under a caller's own pixel budget when it needs a tighter one than this service's.
+     *
+     * <p>Photo search decodes on request threads, up to its concurrency limit at once, from a photo
+     * the app has already shrunk to 1568 px. The service-wide 40 MP budget, four times over, is most of
+     * the heap; a budget sized to what a phone camera takes keeps a crafted photo from spending it.
+     * Never looser than the service's own.
+     */
+    public byte[] renderLongEdge(byte[] source, int longEdgePx, long pixelBudget) {
         if (source == null || source.length == 0) {
             throw new ThumbnailUnavailableException("nothing to read");
         }
@@ -207,7 +219,7 @@ public class Thumbnailer {
             throw new IllegalArgumentException("A long edge must be at least one pixel");
         }
 
-        BufferedImage decoded = decodeWithinBudget(source);
+        BufferedImage decoded = decodeWithinBudget(source, Math.min(pixelBudget, maxSourcePixels));
         try {
             // Stood upright after shrinking rather than before: a quarter turn only swaps which edge
             // is the long one, so the picture is the same, and turning a 40 MP decode at full size
@@ -230,7 +242,7 @@ public class Thumbnailer {
      * costs a few dozen bytes and runs before the allocation it is protecting against.
      * {@code ImageIO.read} would have allocated first and asked questions afterwards.
      */
-    private BufferedImage decodeWithinBudget(byte[] source) {
+    private BufferedImage decodeWithinBudget(byte[] source, long budget) {
         try (ImageInputStream in = new MemoryCacheImageInputStream(new ByteArrayInputStream(source))) {
             Iterator<ImageReader> readers = ImageIO.getImageReaders(in);
             if (!readers.hasNext()) {
@@ -242,10 +254,10 @@ public class Thumbnailer {
                 reader.setInput(in, true, true);
 
                 long pixels = (long) reader.getWidth(0) * reader.getHeight(0);
-                if (pixels > maxSourcePixels) {
+                if (pixels > budget) {
                     throw new ThumbnailUnavailableException(
                             "source is " + reader.getWidth(0) + "x" + reader.getHeight(0)
-                                    + " (" + pixels + " pixels), over the " + maxSourcePixels
+                                    + " (" + pixels + " pixels), over the " + budget
                                     + "-pixel decode limit");
                 }
 
