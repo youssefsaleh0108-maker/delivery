@@ -329,6 +329,8 @@ const AR = {
       + 'تطلبه منك لوحة مفاتيح التطبيق.',
   'passcode-label': 'رمز الدخول',
   'set-it': 'اعتمده',
+  'account-reprove-note': 'لإكمال إعداد تسجيل الدخول، أكّد بريدك الإلكتروني مرة أخرى. أرسلنا إليه '
+      + 'رمزاً جديداً.',
   'signed-in': 'تمّ تسجيل الدخول',
   'your-documents': 'مستنداتك',
   'documents-note-2': 'صورة أو ملف PDF لكل مستند. يمكنك رفع نسخة أوضح في أي وقت قبل صدور القرار — '
@@ -509,6 +511,14 @@ const state = {
   phone: null,
   phoneToken: null,
   skippedPhone: false,
+  /*
+    What proves the application is this person's when the passcode is set — never the reference,
+    which back office and delivery companies see. The account-setup ticket the submission answered
+    with, or, once the server stops taking it (it lasts half an hour), the proof of a new code on the
+    address. In this variable and nowhere else: not in storage, not in a URL.
+  */
+  accountTicket: null,
+  signInProof: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -1192,6 +1202,9 @@ $('submit').addEventListener('click', async () => {
 
     // The reference is a key, not a sentence: it is written as it arrived in either language.
     writeRaw($('reference'), attempt.body.reference);
+    // Kept for the passcode below and shown nowhere. Absent only from a service older than it, and
+    // then the passcode step asks for a new code instead.
+    state.accountTicket = attempt.body.accountTicket || null;
     $('wizard').hidden = true;
     $('receipt').hidden = false;
     window.scrollTo({ top: 0 });
@@ -1461,11 +1474,19 @@ $('account-save').addEventListener('click', async () => {
       `${API}/api/onboarding/applications/${encodeURIComponent(reference)}/account`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: passcode }),
+        body: JSON.stringify(accountBody(passcode)),
       });
-    const creationError = created.ok
-        ? null
-        : await failureFrom(created, 'passcode-failed');
+    let creationError = null;
+    if (!created.ok) {
+      const refusal = await created.json().catch(() => ({}));
+      if (refusal.code === 'sign-in-proof-rejected' || refusal.code === 'sign-in-proof-missing') {
+        // The ticket's half hour is up, or this page never had one: a new code to the address,
+        // answered in the box that opens below, and its proof in the ticket's place.
+        await askForAccountCode();
+        return;
+      }
+      creationError = refusal.message ? new Error(refusal.message) : new Said('passcode-failed');
+    }
 
     try {
       await signIn(state.email, passcode);
@@ -1474,10 +1495,70 @@ $('account-save').addEventListener('click', async () => {
     }
 
     $('passcode').value = '';
+    // Spent with the sign-in they set up.
+    state.accountTicket = null;
+    state.signInProof = null;
     $('account-note').hidden = true;
     $('account-block').querySelector('.w-verify').hidden = true;
     $('account-done').hidden = false;
     await openDocuments();
+  } catch (e) {
+    showError(errorBox, e);
+  } finally {
+    button.disabled = false;
+    restore(button);
+  }
+});
+
+/** The passcode, and what proves the application is this person's: a fresh proof, else the ticket. */
+function accountBody(passcode) {
+  const body = { password: passcode };
+  if (state.signInProof) body.emailVerificationToken = state.signInProof;
+  else if (state.accountTicket) body.accountTicket = state.accountTicket;
+  return body;
+}
+
+/** Sends a new code to the application's address and opens the box it is answered in. */
+async function askForAccountCode() {
+  state.accountTicket = null;
+  state.signInProof = null;
+  const response = await fetch(`${API}/api/onboarding/verifications`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ channel: 'EMAIL', destination: state.email }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw body.message ? new Error(body.message) : new Said('code-send-failed');
+  $('account-code').value = '';
+  $('account-code-box').hidden = false;
+  $('account-code').focus();
+}
+
+$('account-code-confirm').addEventListener('click', async () => {
+  const button = $('account-code-confirm');
+  const errorBox = $('account-error');
+  const code = $('account-code').value.trim();
+  errorBox.hidden = true;
+  if (!code) {
+    showError(errorBox, new Said('need-code'));
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = t('checking');
+  try {
+    const response = await fetch(`${API}/api/onboarding/verifications/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel: 'EMAIL', destination: state.email, code }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw body.message ? new Error(body.message) : new Said('code-refused');
+
+    state.signInProof = body.token;
+    $('account-code-box').hidden = true;
+    // The passcode is still in its box: set it again, this time with the proof.
+    $('account-save').click();
   } catch (e) {
     showError(errorBox, e);
   } finally {

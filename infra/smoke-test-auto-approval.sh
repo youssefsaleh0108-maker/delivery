@@ -19,7 +19,7 @@ roles() {
     | jq -r '[.realm_access.roles[]|select(.=="DELIVERY" or .=="MERCHANT" or .=="APPLICANT")]|sort|join(",")'
 }
 
-apply() { # apply <kind> <email> <passcode>  -> prints the reference
+apply() { # apply <kind> <email> <passcode>  -> prints "<reference> <account-setup ticket>"
   curl -s -o /dev/null -X POST "$GW/api/onboarding/verifications" -H 'Content-Type: application/json' \
     -d "{\"channel\":\"EMAIL\",\"destination\":\"$2\"}"
   sleep 7
@@ -30,20 +30,25 @@ apply() { # apply <kind> <email> <passcode>  -> prints the reference
     -d "{\"channel\":\"EMAIL\",\"destination\":\"$2\",\"code\":\"$CODE\"}" | jq -r .token)
   curl -s -X POST "$GW/api/onboarding/applications" -H 'Content-Type: application/json' \
     -d "{\"kind\":\"$1\",\"businessName\":\"Auto $1\",\"contactName\":\"Auto Tester\",\"contactEmail\":\"$2\",\"emailVerificationToken\":\"$T\"}" \
-    | jq -r .reference
+    | jq -r '"\(.reference) \(.accountTicket)"'
 }
 
 echo '=== 1. A rider, with nobody reviewing ==========================================='
 RE="qa.autorider$(date +%s)@example.invalid"
-RREF=$(apply RIDER "$RE" 246810)
+APPLIED=$(apply RIDER "$RE" 246810)
+RREF=${APPLIED% *}; RTICKET=${APPLIED#* }
 check 'application submitted' 'yes' "$([ -n "$RREF" ] && [ "$RREF" != null ] && echo yes || echo no)"
 # Still queued until the applicant has a sign-in. Approving before that produced an account with
 # a password nobody knew, and blocked the passcode they went on to choose.
 check 'queued until a sign-in exists' 'SUBMITTED' \
   "$(psql -h postgres -U delivery -d delivery -At -c "select status from onboarding.onboarding_applications where reference='$RREF';")"
 
+# The reference is no secret — back office and delivery companies see it — so it sets no passcode.
+check 'the reference alone sets no passcode' '422' \
+  "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$GW/api/onboarding/applications/$RREF/account" \
+    -H 'Content-Type: application/json' -d '{"password":"000000"}')"
 curl -s -o /dev/null -X POST "$GW/api/onboarding/applications/$RREF/account" \
-  -H 'Content-Type: application/json' -d '{"password":"246810"}'
+  -H 'Content-Type: application/json' -d "{\"password\":\"246810\",\"accountTicket\":\"$RTICKET\"}"
 sleep 8
 check 'decided without a reviewer' 'PROVISIONED' \
   "$(psql -h postgres -U delivery -d delivery -At -c "select status from onboarding.onboarding_applications where reference='$RREF';")"
@@ -68,9 +73,10 @@ check 'claims a job immediately' '200' \
 
 echo '=== 3. A merchant, same ========================================================='
 ME="qa.automerch$(date +%s)@example.invalid"
-MREF=$(apply MERCHANT "$ME" 135791)
+APPLIED=$(apply MERCHANT "$ME" 135791)
+MREF=${APPLIED% *}; MTICKET=${APPLIED#* }
 curl -s -o /dev/null -X POST "$GW/api/onboarding/applications/$MREF/account" \
-  -H 'Content-Type: application/json' -d '{"password":"135791"}'
+  -H 'Content-Type: application/json' -d "{\"password\":\"135791\",\"accountTicket\":\"$MTICKET\"}"
 sleep 8
 check 'decided without a reviewer' 'PROVISIONED' \
   "$(psql -h postgres -U delivery -d delivery -At -c "select status from onboarding.onboarding_applications where reference='$MREF';")"
@@ -85,7 +91,8 @@ check 'may publish (needs an image, so 422 not 403)' '422' \
 
 echo '=== 4. A carrier is still reviewed =============================================='
 CE="qa.autocarrier$(date +%s)@example.invalid"
-CREF=$(apply CARRIER "$CE" 975312)
+APPLIED=$(apply CARRIER "$CE" 975312)
+CREF=${APPLIED% *}
 # Carriers were deliberately left manual: a company signs for a fleet and a payout account.
 check 'carrier still waits for a human' 'SUBMITTED' \
   "$(psql -h postgres -U delivery -d delivery -At -c "select status from onboarding.onboarding_applications where reference='$CREF';")"
