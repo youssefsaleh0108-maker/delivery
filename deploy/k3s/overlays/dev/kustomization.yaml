@@ -28,6 +28,9 @@ configMapGenerator:
       - SMTP_STARTTLS=true
       - EMAIL_FROM=youssef.saleh0108@gmail.com
       - SMS_TEST_INBOX=youssef.saleh0108@gmail.com
+      # Dev only: accept rider positions from anywhere. Emulators report Mountain View, and dev's
+      # riders are mostly emulators. Overrides platform-common's "true"; qa keeps it on.
+      - TRACKING_SERVICE_AREA_ENABLED=false
 
 generatorOptions:
   disableNameSuffixHash: true

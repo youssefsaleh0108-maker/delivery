@@ -64,8 +64,11 @@ class EtaServiceRunTest {
         when(participants.findByCheckoutId(CHECKOUT)).thenReturn(checkout);
         when(participants.findById(any())).thenAnswer(call -> checkout.stream()
                 .filter(o -> o.getOrderId().equals(call.getArgument(0))).findFirst());
-        when(tracking.currentPosition(any(UUID.class), any(), anyBoolean()))
-                .thenAnswer(call -> Optional.ofNullable(fixes.get(call.<UUID>getArgument(0))));
+        when(tracking.sightingFor(any(OrderParticipants.class), any(), anyBoolean()))
+                .thenAnswer(call -> Optional.ofNullable(
+                                fixes.get(call.<OrderParticipants>getArgument(0).getOrderId()))
+                        .map(RiderSighting::visible)
+                        .orElseGet(() -> RiderSighting.nothing(RiderSighting.State.NO_FIX)));
         RouteProviderRegistry providers = new RouteProviderRegistry(
                 List.of(new HaversineRouteProvider(60)), HaversineRouteProvider.NAME);
         eta = new EtaService(tracking, participants, providers, Duration.ofMinutes(5));
@@ -96,7 +99,7 @@ class EtaServiceRunTest {
     @DisplayName("runs through the sibling's shop still ahead, not straight to the door")
     void the_estimate_includes_the_siblings_shop() {
         OrderParticipants a = order(A, "merchant-a", SHOP_A, "PICKED_UP", CUSTOMER);
-        a.stampMilestones(Instant.now().minusSeconds(300));
+        a.stampMilestones("PICKED_UP", Instant.now().minusSeconds(300));
         order(B, "merchant-b", SHOP_B, "READY", CUSTOMER);
         fixOn(A, SHOP_A, Instant.now().minusSeconds(5));
 
@@ -108,35 +111,50 @@ class EtaServiceRunTest {
         assertThat(result.leg()).isEqualTo(Leg.TO_PICKUP);
     }
 
-    /**
-     * The merchant of the sibling asks about their own order: the answer includes the other
-     * shop's detour, computed from the rider's position pinged on the other order — without that
-     * merchant being a participant of it.
-     */
+    /** The customer is on every order of the run, so the freshest fix across it is theirs. */
     @Test
-    @DisplayName("uses the rider's latest fix across the run, whoever of its parties is asking")
+    @DisplayName("uses the rider's latest fix across the run for the customer")
     void the_latest_fix_across_the_run_is_used() {
         OrderParticipants a = order(A, "merchant-a", SHOP_A, "PICKED_UP", CUSTOMER);
-        a.stampMilestones(Instant.now().minusSeconds(300));
+        a.stampMilestones("PICKED_UP", Instant.now().minusSeconds(300));
         order(B, "merchant-b", SHOP_B, "READY", CUSTOMER);
         // Old on B, fresh on A: the fresh one is where the rider is.
         fixOn(B, SHOP_B, Instant.now().minusSeconds(200));
         fixOn(A, SHOP_A, Instant.now().minusSeconds(5));
 
-        EtaResult forB = eta.estimateFor(B, "merchant-b", false);
+        EtaResult forB = eta.estimateFor(B, CUSTOMER, false);
 
         assertThat(forB.available()).isTrue();
         assertThat(forB.remainingMetres()).isCloseTo(via(SHOP_A, SHOP_B, DOOR), within(1d));
         assertThat(forB.fixRecordedAt()).isEqualTo(fixes.get(A).recordedAt());
     }
 
+    /**
+     * The sibling's merchant is not on the other order, so the gate is never asked about it for
+     * them: their estimate is measured from what they may be given, never from the sibling's fix.
+     */
+    @Test
+    @DisplayName("never reads a sibling's fix for a merchant who is not on the sibling")
+    void a_merchant_never_reads_the_siblings_fix() {
+        OrderParticipants a = order(A, "merchant-a", SHOP_A, "PICKED_UP", CUSTOMER);
+        a.stampMilestones("PICKED_UP", Instant.now().minusSeconds(300));
+        order(B, "merchant-b", SHOP_B, "READY", CUSTOMER);
+        fixOn(B, SHOP_B, Instant.now().minusSeconds(200));
+        fixOn(A, SHOP_A, Instant.now().minusSeconds(5));
+
+        EtaResult forB = eta.estimateFor(B, "merchant-b", false);
+
+        assertThat(forB.fixRecordedAt()).isEqualTo(fixes.get(B).recordedAt());
+        assertThat(forB.remainingMetres()).isCloseTo(via(SHOP_B, DOOR), within(1d));
+    }
+
     @Test
     @DisplayName("once everything is collected the leg is to the door, and both orders agree")
     void all_collected_goes_to_the_door() {
         OrderParticipants a = order(A, "merchant-a", SHOP_A, "PICKED_UP", CUSTOMER);
-        a.stampMilestones(Instant.now().minusSeconds(600));
+        a.stampMilestones("PICKED_UP", Instant.now().minusSeconds(600));
         OrderParticipants b = order(B, "merchant-b", SHOP_B, "PICKED_UP", CUSTOMER);
-        b.stampMilestones(Instant.now().minusSeconds(120));
+        b.stampMilestones("PICKED_UP", Instant.now().minusSeconds(120));
         fixOn(B, SHOP_B, Instant.now().minusSeconds(3));
 
         EtaResult forA = eta.estimateFor(A, CUSTOMER, false);
@@ -151,7 +169,7 @@ class EtaServiceRunTest {
     @DisplayName("a sibling shop with no pin makes the journey unmeasurable, not shorter")
     void a_pinless_sibling_is_no_destination() {
         OrderParticipants a = order(A, "merchant-a", SHOP_A, "PICKED_UP", CUSTOMER);
-        a.stampMilestones(Instant.now().minusSeconds(300));
+        a.stampMilestones("PICKED_UP", Instant.now().minusSeconds(300));
         order(B, "merchant-b", null, "READY", CUSTOMER);
         fixOn(A, SHOP_A, Instant.now().minusSeconds(5));
 

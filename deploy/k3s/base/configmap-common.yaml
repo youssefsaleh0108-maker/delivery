@@ -76,5 +76,11 @@ data:
   AUTO_APPROVE_RIDER: "false"
   AUTO_APPROVE_MERCHANT: "false"
   AUTO_APPROVE_CARRIER: "false"
+  # Order Tracking refuses a rider's position from outside Lebanon (plus ~15 km) as
+  # OUTSIDE_SERVICE_AREA: nothing honest reports from there, and what does is a fake — an old app
+  # build's London walk, a spoofing app. On here and restated in qa's platform-env; only dev's
+  # platform-env turns it off, because dev's riders are emulators reporting Mountain View. The box
+  # is delivery.tracking.ping.service-area in order-tracking's application.yml.
+  TRACKING_SERVICE_AREA_ENABLED: "true"
   # Nominatim refuses to be called without an identifying User-Agent.
   NOMINATIM_USER_AGENT: "YouDrop-dev (youssef.saleh0108@gmail.com)"

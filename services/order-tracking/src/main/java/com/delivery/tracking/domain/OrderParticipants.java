@@ -112,7 +112,25 @@ public class OrderParticipants {
         this.updatedAt = Instant.now();
     }
 
+    /**
+     * Applies a snapshot's rider and status, unless the order has already finished.
+     *
+     * <p>A delivered or cancelled order is finished for good. Delivery is at-least-once and not in
+     * order, so a snapshot from before the end (a PICKED_UP redelivered after the DELIVERED, or
+     * one that was simply slow) can land at any time. Applying it would reopen the order: the
+     * rider's pings would be accepted again, it would count as a live delivery for the rider and
+     * the customer, and a finished order's map would start following the rider again. The end is
+     * recognised by a completion time or by a terminal status ({@link #isComplete()}), so an order
+     * that finished before completed_at existed is held just as firmly.
+     *
+     * <p>The cost is that a PICKED_UP snapshot arriving only after the DELIVERED one no longer
+     * stamps {@code picked_up_at}: the order is over, and nothing reads that time for a finished
+     * order except as a label.
+     */
     public void apply(String riderId, String status) {
+        if (isComplete()) {
+            return;
+        }
         this.riderId = riderId;
         this.status = status;
         this.updatedAt = Instant.now();
@@ -179,15 +197,25 @@ public class OrderParticipants {
      * reassigned fleet, a corrected address) carries a later occurredAt: either would move a stop
      * the rider really collected first to second place on the customer's map. The earliest instant
      * any PICKED_UP snapshot reports is the collection, whatever order the messages land in.
+     *
+     * <p>Judged on the status the snapshot itself reports, not on the status the order now holds:
+     * a finished order keeps its terminal status whatever arrives later ({@link #apply}), and a
+     * PICKED_UP replayed after the delivery must neither move the delivery's time nor be lost. A
+     * collection is never stamped after the order finished.
+     *
+     * @param snapshotStatus the status the event reports, as it was applied or refused
      */
-    public void stampMilestones(Instant occurredAt) {
-        if (occurredAt == null) {
+    public void stampMilestones(String snapshotStatus, Instant occurredAt) {
+        if (occurredAt == null || snapshotStatus == null) {
             return;
         }
-        if (isCarrying() && (pickedUpAt == null || occurredAt.isBefore(pickedUpAt))) {
+        if (CARRYING_STATUS.equals(snapshotStatus)
+                && (completedAt == null || !occurredAt.isAfter(completedAt))
+                && (pickedUpAt == null || occurredAt.isBefore(pickedUpAt))) {
             this.pickedUpAt = occurredAt;
         }
-        if (isComplete() && (completedAt == null || occurredAt.isBefore(completedAt))) {
+        if (TERMINAL_STATUSES.contains(snapshotStatus)
+                && (completedAt == null || occurredAt.isBefore(completedAt))) {
             this.completedAt = occurredAt;
         }
     }
@@ -225,9 +253,12 @@ public class OrderParticipants {
      * <p>The trail is closed at this point. Everything a rider's phone reports afterwards is the
      * rider's own movements, not the delivery's, and appending it would both extend a customer's
      * view of a worker past the job and grow the record a dispute is settled from after the fact.
+     *
+     * <p>Final: once a completion time is stamped the order stays complete, whatever a later
+     * snapshot says (see {@link #apply}).
      */
     public boolean isComplete() {
-        return TERMINAL_STATUSES.contains(status);
+        return completedAt != null || TERMINAL_STATUSES.contains(status);
     }
 
     public UUID getCarrierId() {

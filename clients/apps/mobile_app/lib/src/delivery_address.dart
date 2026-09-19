@@ -295,6 +295,7 @@ String custEtaReasonLabel(DeliveryStrings t, EtaUnavailableReason reason) => swi
       EtaUnavailableReason.noDestination => t.etaNoMapPoint,
       EtaUnavailableReason.providerUnavailable => t.etaRouteServiceDown,
       EtaUnavailableReason.orderComplete => t.etaNothingOnItsWay,
+      EtaUnavailableReason.riderOnAnotherDelivery => t.etaRiderOnAnotherDelivery,
       EtaUnavailableReason.unknown => t.etaUnavailable,
     };
 

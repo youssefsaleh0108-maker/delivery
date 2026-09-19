@@ -66,6 +66,12 @@ public class EtaService {
      * or backoffice — and is applied here as well as inside {@link TrackingService}, so the reasons
      * below cannot become an oracle: a stranger gets "not found" before learning whether an order
      * has a fix, a destination or a rider at all.
+     *
+     * <p>What the estimate is measured from follows {@link TrackingService#sightingFor}: while the
+     * rider is on another customer's delivery, or at another customer's door, there is no estimate
+     * at all ({@link Reason#RIDER_ON_ANOTHER_DELIVERY}) — a distance from there points at that
+     * stop. A rider still far from the shop, or a shop's order already collected, gets an estimate
+     * without the position it was measured from.
      */
     @Transactional(readOnly = true)
     public EtaResult estimateFor(UUID orderId, String userId, boolean isBackoffice) {
@@ -77,20 +83,30 @@ public class EtaService {
         }
 
         Instant now = Instant.now();
+        String provider = providers.active().name();
 
         if (order.isComplete()) {
-            return EtaResult.unavailable(orderId, Reason.ORDER_COMPLETE, providers.active().name(),
-                    null, now);
+            return EtaResult.unavailable(orderId, Reason.ORDER_COMPLETE, provider, null, now);
+        }
+
+        RiderSighting sighting = tracking.sightingFor(order, userId, isBackoffice);
+        if (sighting.state() == RiderSighting.State.ON_ANOTHER_DELIVERY) {
+            // Not even the fix's time: nothing about where the rider is now.
+            return EtaResult.unavailable(orderId, Reason.RIDER_ON_ANOTHER_DELIVERY, provider, null,
+                    now);
         }
 
         // When this order's rider also holds siblings of it from the same checkout, the rider's
         // latest fix is the latest across all of them, and the journey runs through the siblings'
-        // shops still ahead (see RunPlan) — the same answer the checkout map gives.
+        // shops still ahead (see RunPlan) — the same answer the checkout map gives. A sibling's
+        // fix is read through the same gate, and only for a caller who is on that sibling.
         List<OrderParticipants> riderOrders = riderOrdersOf(order);
-        Optional<Position> fix = tracking.currentPosition(orderId, userId, isBackoffice);
+        Optional<Position> fix = sighting.measuredFrom();
         for (OrderParticipants sibling : riderOrders) {
-            if (!sibling.getOrderId().equals(orderId)) {
-                fix = RunPlan.later(fix, siblingFix(sibling.getOrderId()));
+            if (!sibling.getOrderId().equals(orderId)
+                    && (isBackoffice || sibling.isVisibleTo(userId))) {
+                fix = RunPlan.later(fix,
+                        tracking.sightingFor(sibling, userId, isBackoffice).measuredFrom());
             }
         }
         return estimate(order, riderOrders, fix, now);
@@ -231,18 +247,6 @@ public class EtaService {
         return orders;
     }
 
-    /**
-     * A sibling's latest fix, read for a caller already authorised through the order they asked
-     * about.
-     *
-     * <p>Read without the per-order participant check because the caller need not be on the
-     * sibling — its shop is not the merchant asking about this one. Nothing about the sibling is
-     * returned: its fix is the same rider's position, folded into this order's estimate.
-     */
-    private Optional<Position> siblingFix(UUID siblingId) {
-        return tracking.currentPosition(siblingId, null, true);
-    }
-
     /** Which part of the journey the estimate covers. */
     public enum Leg {
         /**
@@ -256,7 +260,7 @@ public class EtaService {
 
     /** Why there is no number. Present exactly when {@link EtaResult#available()} is false. */
     public enum Reason {
-        /** The rider has never pinged on this order. */
+        /** No fix of the rider's is on this order: none yet, or their latest went on no order. */
         NO_FIX,
         /** The last ping is older than the acceptable fix age. The rider could be anywhere. */
         STALE_FIX,
@@ -265,7 +269,12 @@ public class EtaService {
         /** The routing provider could not answer. Transient for a real provider. */
         PROVIDER_UNAVAILABLE,
         /** Delivered or cancelled. Nothing is on its way. */
-        ORDER_COMPLETE
+        ORDER_COMPLETE,
+        /**
+         * The rider is on another customer's delivery right now, or still at that customer's door.
+         * No distance and no time are given, since either would point at the other stop.
+         */
+        RIDER_ON_ANOTHER_DELIVERY
     }
 
     /**

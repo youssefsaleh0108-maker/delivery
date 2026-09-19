@@ -1,5 +1,6 @@
 package com.delivery.tracking.api;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -9,6 +10,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -29,6 +31,7 @@ import com.delivery.tracking.domain.DutyState;
 import com.delivery.tracking.domain.RiderDutyEvent;
 import com.delivery.tracking.service.DutySessionService;
 import com.delivery.tracking.service.DutySessionService.HoursOnline;
+import com.delivery.tracking.service.Fix;
 import com.delivery.tracking.service.PresenceService;
 import com.delivery.tracking.service.PresenceService.NoCarrierException;
 import com.delivery.tracking.service.PresenceService.PresenceNotFoundException;
@@ -71,12 +74,16 @@ public class RiderPresenceController {
      * <p>Nothing durable grows per call. The fix updates one row per rider in place; it is
      * deliberately not appended to a history table. See V12 for why an idle rider's trail is not
      * something this platform keeps.
+     *
+     * <p>Only from a rider who is working: declared on duty, or carrying a live order. Anyone else
+     * gets a 409 and nothing is recorded — see {@link PresenceService#recordOffOrderFix}. The fix
+     * itself is judged like an order ping's; refusals are mapped in {@link PingProblems}.
      */
     @PostMapping("/me/ping")
     @PreAuthorize("hasRole('DELIVERY')")
     public ResponseEntity<Void> ping(@Valid @RequestBody PingRequest request) {
-        presence.recordFix(CurrentUser.requireId(),
-                request.lat(), request.lng(), request.accuracyM());
+        presence.recordOffOrderFix(PingProblems.rider(), new Fix(request.lat(), request.lng(),
+                request.accuracyM(), request.recordedAt()));
         return ResponseEntity.accepted().build();
     }
 
@@ -110,12 +117,14 @@ public class RiderPresenceController {
      * Where one rider is.
      *
      * <p>Open to any authenticated caller at the routing layer and then narrowed sharply in
-     * {@link PresenceService#locationOf} — self, backoffice, the employing fleet, or a customer
-     * with a live order in that rider's hands. A caller outside that set gets 404, identical to the
-     * answer for a rider who does not exist, so the endpoint cannot be used to enumerate the fleet.
+     * {@link PresenceService#locationOf} — self; backoffice, with the last known position and its
+     * time; or the employing fleet, with the position only while the rider is on duty. A caller
+     * outside that set gets 404, identical to the answer for a rider who does not exist, so the
+     * endpoint cannot be used to enumerate the fleet. Customers and shops see a rider through their
+     * order instead, under the order's own rule.
      *
-     * <p>A role check here instead would be wrong: the four groups who may ask hold four different
-     * roles, and three of them may only ask about particular riders.
+     * <p>A role check here instead would be wrong: the groups who may ask hold different roles, and
+     * a fleet may only ask about its own riders.
      */
     @GetMapping("/{riderId}/location")
     public RiderPresenceView location(@PathVariable String riderId) {
@@ -133,6 +142,9 @@ public class RiderPresenceController {
      * <p>{@code onDutyOnly} filters on the declared state, not the effective one, and that is on
      * purpose: a rider who declared duty and then went quiet is precisely who a dispatcher needs to
      * see, and filtering them out would hide the problem. They come back marked {@code STALE}.
+     *
+     * <p>A carrier sees each rider's position only while that rider is declared on duty; the back
+     * office sees every rider's last known position, with {@code lastSeenAt} as its time.
      */
     @GetMapping("/roster")
     @PreAuthorize("hasAnyRole('BACKOFFICE','CARRIER')")
@@ -208,11 +220,15 @@ public class RiderPresenceController {
                 "Your delivery company could not be confirmed just now. Please try again.");
     }
 
-    /** Same shape and same bounds as the order-scoped ping — one handset sends both. */
+    /**
+     * Same shape and same bounds as the order-scoped ping — one handset sends both. See
+     * {@link TrackingController.PingRequest} for {@code accuracyM} and {@code recordedAt}.
+     */
     public record PingRequest(
             @NotNull @DecimalMin("-90") @DecimalMax("90") Double lat,
             @NotNull @DecimalMin("-180") @DecimalMax("180") Double lng,
-            Float accuracyM) {
+            @PositiveOrZero Float accuracyM,
+            Instant recordedAt) {
     }
 
     /**

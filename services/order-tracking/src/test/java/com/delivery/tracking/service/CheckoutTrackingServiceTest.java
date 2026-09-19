@@ -119,6 +119,11 @@ class CheckoutTrackingServiceTest {
         when(participants.findByCheckoutId(CHECKOUT)).thenReturn(rows);
         when(tracking.currentPosition(any(UUID.class), any(), anyBoolean()))
                 .thenAnswer(call -> Optional.ofNullable(fixes.get(call.<UUID>getArgument(0))));
+        when(tracking.sightingFor(any(OrderParticipants.class), any(), anyBoolean()))
+                .thenAnswer(call -> Optional.ofNullable(
+                                fixes.get(call.<OrderParticipants>getArgument(0).getOrderId()))
+                        .map(RiderSighting::visible)
+                        .orElseGet(() -> RiderSighting.nothing(RiderSighting.State.NO_FIX)));
 
         // 60 km/h, so kilometres read as minutes.
         RouteProviderRegistry providers = new RouteProviderRegistry(
@@ -147,7 +152,7 @@ class CheckoutTrackingServiceTest {
     private OrderParticipants collected(UUID id, String shop, GeoPoint pin, String rider,
                                         Instant at) {
         OrderParticipants order = order(id, shop, pin, "PICKED_UP", rider);
-        order.stampMilestones(at);
+        order.stampMilestones("PICKED_UP", at);
         return order;
     }
 
@@ -310,7 +315,7 @@ class CheckoutTrackingServiceTest {
             order(C, "Ras Beirut Grocer", SHOP_C, "READY", RIDER);
             riderAt(A, RIDER, new GeoPoint(33.8950, 35.5050), Duration.ofSeconds(20));
             b.apply(RIDER, "CANCELLED");
-            b.stampMilestones(clock.instant());
+            b.stampMilestones("CANCELLED", clock.instant());
 
             CheckoutView view = view();
 
@@ -356,7 +361,7 @@ class CheckoutTrackingServiceTest {
             OrderParticipants a = collected(A, "Hamra Bakery", SHOP_A, RIDER,
                     clock.instant().minusSeconds(900));
             a.apply(RIDER, "DELIVERED");
-            a.stampMilestones(clock.instant().minusSeconds(60));
+            a.stampMilestones("DELIVERED", clock.instant().minusSeconds(60));
             order(B, "Achrafieh Pharmacy", SHOP_B, "PREPARING", null);
             riderAt(A, RIDER, DOOR, Duration.ofSeconds(70));
 

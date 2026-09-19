@@ -150,6 +150,41 @@ delivery:
     # single dropped ping does not push every watcher through to Postgres.
     location-cache-ttl: 60s
 
+    ping:
+      # What a rider's reported position must be before it is recorded (FixPolicy). A refused
+      # report answers 422 with a `reason` and leaves no trace in either store.
+      #
+      # Wider than this and the fix cannot place a rider on a street — it is an "approximate
+      # location" permission or a cell tower. The rider app refuses the same fixes before sending.
+      max-accuracy-m: 100
+      # A fix older than this says where the rider was, not where they are. Well past a slow
+      # mobile round trip; well short of the presence window below.
+      max-fix-age: 60s
+      # How far ahead of ours a phone's clock may be before its fixes are refused as future-dated.
+      # Inside it, a fix is recorded as arriving now, so nothing stored is ever in the future.
+      max-clock-skew: 30s
+      # Faster than this between two fixes and the second is a glitch or a spoof. A scooter or a
+      # car on the coast road stays well under it; a multipath jump of kilometres does not.
+      max-speed-kmh: 150
+      # How long the last accepted fix anchors that speed check. Past it, the next fix starts
+      # fresh — so one bad anchor refuses a rider for at most this long.
+      jump-window: 5m
+      # A fix less than this after the rider's last accepted one is answered 202 and neither
+      # recorded nor pushed; so is one dated at or before it. The app sends at most every 10 s.
+      min-interval: 5s
+      # Where a fix may come from: Lebanon (33.05–34.69 N, 35.10–36.63 E) with about 15 km of
+      # margin. Outside it a fix is refused as OUTSIDE_SERVICE_AREA — the old simulator's London,
+      # an emulator's Mountain View, a spoofing app's default. On unless the environment turns it
+      # off, which only dev does (deploy/k3s/overlays/dev), because dev's riders are emulators.
+      # Off or on, a rider's last fix outside the box is never what the next one is judged
+      # against, so the first real fix after an app upgrade is not refused as a jump.
+      service-area:
+        enabled: ${TRACKING_SERVICE_AREA_ENABLED:true}
+        min-lat: 32.91
+        max-lat: 34.83
+        min-lng: 34.93
+        max-lng: 36.80
+
     presence:
       # How long after the last fix a rider still counts as present. Past this they read as STALE,
       # not ON_DUTY: a phone that died cannot tell us it died, so silence has to be what changes the
@@ -207,6 +242,12 @@ delivery:
         # once the window below has passed, whichever comes first.
         leg-refresh-metres: 150
         leg-refresh-after: 60s
+
+    # How long a delivery's trail is kept: a day's tracking_events partition is dropped once the day
+    # is older than this (TrackingPartitionMaintenance). What survives it is a per-order summary
+    # with no position in it. The rider app's location disclosure states this number
+    # (riderGpsDisclosureKept in delivery_l10n) — change the two together.
+    raw-ping-retention-days: 30
 
     # Shift boundaries are kept far longer than raw GPS: payroll and late disputes ask about them
     # months later, and the table is a few rows per rider per day rather than millions. The same

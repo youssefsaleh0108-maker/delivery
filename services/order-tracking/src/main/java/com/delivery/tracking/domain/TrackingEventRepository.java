@@ -1,5 +1,6 @@
 package com.delivery.tracking.domain;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -12,6 +13,13 @@ public interface TrackingEventRepository extends JpaRepository<TrackingEvent, UU
 
     /** The breadcrumb trail for one delivery, oldest first — what a map draws as a route line. */
     List<TrackingEvent> findByOrderIdOrderByRecordedAtAsc(UUID orderId);
+
+    /**
+     * The trail from a moment on, oldest first: a customer's, which starts when the order was
+     * collected (see {@code TrackingService#history}).
+     */
+    List<TrackingEvent> findByOrderIdAndRecordedAtGreaterThanEqualOrderByRecordedAtAsc(
+            UUID orderId, Instant from);
 
     /**
      * The single most recent ping for an order.

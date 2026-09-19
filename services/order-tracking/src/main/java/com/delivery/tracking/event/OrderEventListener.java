@@ -96,9 +96,10 @@ public class OrderEventListener {
                             orderId, customerId, merchantId, riderId, status)));
             order.applyRoute(carrierId, pickup, dropoff);
             // The checkout map (V17): which checkout the order is part of, the shop it is from, and
-            // when it was collected and finished — stamped from the snapshot just applied.
+            // when it was collected and finished — stamped from the snapshot's own status, which a
+            // finished order no longer takes on (OrderParticipants#apply).
             order.applyCheckout(uuidOrNull(node, "checkoutId"), textOrNull(node, "storeName"));
-            order.stampMilestones(instantOrNow(node, "occurredAt"));
+            order.stampMilestones(status, instantOrNow(node, "occurredAt"));
 
             // Which fleet a rider carries for, inferred from an order that names both. The weakest
             // of the two sources this service has - see CarrierMembership.Source - and the only one

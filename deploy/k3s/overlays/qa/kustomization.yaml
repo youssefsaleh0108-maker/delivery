@@ -24,6 +24,9 @@ configMapGenerator:
       - SMTP_STARTTLS=true
       - EMAIL_FROM=noreply@youdrop.shop
       - SMS_TEST_INBOX=youssef.saleh0108@gmail.com
+      # Rider positions from outside Lebanon (+~15 km) are refused, as in platform-common. Stated
+      # here as well because qa is becoming production: turning it off must be a visible edit.
+      - TRACKING_SERVICE_AREA_ENABLED=true
 
 generatorOptions:
   disableNameSuffixHash: true

@@ -1,5 +1,6 @@
 package com.delivery.tracking.domain;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -10,31 +11,49 @@ import org.springframework.data.repository.query.Param;
 
 public interface OrderParticipantsRepository extends JpaRepository<OrderParticipants, UUID> {
 
+    /** Whether this rider holds any order in one of these statuses. */
+    boolean existsByRiderIdAndStatusIn(String riderId, Set<String> statuses);
+
     /**
-     * Whether this customer has a live delivery in this rider's hands right now.
+     * Whether this rider is carrying a live delivery right now — the second way, besides declared
+     * duty, that a rider earns the right to report an off-order position.
      *
-     * <p>The narrowest reason a customer may read a rider-scoped location. It is deliberately not
-     * "has ever ordered from them": once the food is handed over the customer's interest ends, and
-     * a rider whose whereabouts stay visible to every past customer is being followed home.
+     * <p>"Live" is {@link OrderParticipants#isTrackable()}'s definition, bound rather than
+     * restated. A rider is only ever put on an order when it is READY (a claim, or an errand
+     * created already claimed), so assigned-and-not-finished and trackable are the same set, and
+     * using the one definition keeps "who may report" and "who may be watched" from drifting.
+     */
+    default boolean riderHasLiveOrder(String riderId) {
+        return existsByRiderIdAndStatusIn(riderId, OrderParticipants.trackableStatuses());
+    }
+
+    /**
+     * This rider's orders for customers other than {@code customerId} that end at a known door and
+     * are either still in the rider's hands or finished at or after {@code finishedSince}.
      *
-     * <p>Bound parameters, not string building — {@code riderId} arrives in the request path and is
-     * untrusted like any other user-supplied value. The status list is bound too rather than
-     * inlined, so it cannot drift from {@link OrderParticipants#isTrackable()} and leave the two
-     * definitions of "live" disagreeing about who may look.
+     * <p>These are the doors near which the rider is not shown to {@code customerId}'s side of an
+     * order: a rider standing at another customer's door is handing over that customer's delivery,
+     * and a dot or a trail point there says where that customer lives. See
+     * {@code TrackingService#sightingFor}.
      */
     @Query("""
-            SELECT COUNT(o) > 0 FROM OrderParticipants o
+            SELECT o FROM OrderParticipants o
              WHERE o.riderId = :riderId
-               AND o.customerId = :customerId
-               AND o.status IN :statuses
+               AND o.customerId <> :customerId
+               AND o.dropoffLat IS NOT NULL
+               AND o.dropoffLng IS NOT NULL
+               AND (o.status IN :live OR o.completedAt >= :finishedSince)
             """)
-    boolean customerHasOrderWith(@Param("customerId") String customerId,
-                                 @Param("riderId") String riderId,
-                                 @Param("statuses") Set<String> statuses);
+    List<OrderParticipants> findOtherCustomersDoors(@Param("riderId") String riderId,
+                                                    @Param("customerId") String customerId,
+                                                    @Param("live") Set<String> live,
+                                                    @Param("finishedSince") Instant finishedSince);
 
-    /** {@link #customerHasOrderWith} with the live statuses already applied. */
-    default boolean customerHasLiveOrderWith(String customerId, String riderId) {
-        return customerHasOrderWith(customerId, riderId, OrderParticipants.trackableStatuses());
+    /** {@link #findOtherCustomersDoors} with the live statuses already applied. */
+    default List<OrderParticipants> otherCustomersDoors(String riderId, String customerId,
+                                                        Instant finishedSince) {
+        return findOtherCustomersDoors(riderId, customerId, OrderParticipants.trackableStatuses(),
+                finishedSince);
     }
 
     /** Every order of one checkout, whoever placed it — the back office's read. */
