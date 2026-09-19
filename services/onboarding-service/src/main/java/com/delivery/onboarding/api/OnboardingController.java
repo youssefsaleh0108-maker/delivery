@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -994,21 +993,6 @@ public class OnboardingController {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
                 "message", e.getMessage(),
                 "code", OnboardingService.SignInUnavailableException.CODE));
-    }
-
-    /**
-     * 409: somebody else wrote this application between this request reading it and writing it — an
-     * applicant's sign-in being recorded while a reviewer decided, say. The application carries a
-     * version now, so the later write fails and changes nothing, where it used to overwrite the
-     * earlier one whole. Nothing is half done: opening the application again shows where it stands.
-     */
-    @ExceptionHandler(OptimisticLockingFailureException.class)
-    public ResponseEntity<Map<String, String>> changedMeanwhile(OptimisticLockingFailureException e) {
-        LOG.info("An application changed while a request was writing it", e);
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
-                "message", "This application changed while you were working on it. Open it again "
-                        + "to see where it stands.",
-                "code", "application-changed"));
     }
 
     /**

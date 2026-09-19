@@ -46,6 +46,9 @@ class ApplicantSignInApiTest {
                         mock(PlatformClient.class), mock(CustomerSignUpService.class),
                         mock(ApplicantDocumentService.class), mock(PayoutDetailsService.class),
                         mock(PartnerManagementService.class)))
+                // The 409 for a version conflict lives in the package's advice, as it does in the
+                // running service, where Spring finds it for every controller.
+                .setControllerAdvice(new ApplicationChangedAdvice())
                 .build();
     }
 
