@@ -12500,4 +12500,64 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get svcChatOrderNotFound =>
       'Couldn\'t open this order\'s chat. Reloading the order.';
+
+  @override
+  String get isrchSearchHint => 'Search shops, cuisines and items';
+
+  @override
+  String get isrchNearTitle => 'Items in shops near you';
+
+  @override
+  String get isrchAnywhereTitle => 'Items in shops';
+
+  @override
+  String get isrchSeeAll => 'See all items';
+
+  @override
+  String get isrchFieldHint => 'Search items in shops';
+
+  @override
+  String isrchEmptyNear(String query) {
+    return 'No shops near you sell “$query”';
+  }
+
+  @override
+  String isrchEmptyAnywhere(String query) {
+    return 'No shops sell “$query”';
+  }
+
+  @override
+  String isrchEmptyTruncated(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Only the $count best matches were checked.',
+      one: 'Only the best match was checked.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get isrchNotByDistance =>
+      'Your address has no map pin, so shops aren\'t sorted by distance.';
+
+  @override
+  String isrchMoreInStore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count more in this shop',
+      one: '1 more in this shop',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get isrchCouldNotSearch => 'We couldn\'t search items just now.';
+
+  @override
+  String get isrchTypeMore => 'Type at least 2 letters to search items.';
+
+  @override
+  String get isrchSearching => 'Searching items';
 }

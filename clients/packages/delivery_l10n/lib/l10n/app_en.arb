@@ -6090,5 +6090,22 @@
   "@svcChatClosedOn": {"placeholders":{"date":{"type":"String"}}},
   "svcChatClosed": "Chat about this order has closed",
   "svcChatUnavailable": "Chat is unavailable right now.",
-  "svcChatOrderNotFound": "Couldn't open this order's chat. Reloading the order."
+  "svcChatOrderNotFound": "Couldn't open this order's chat. Reloading the order.",
+  "isrchSearchHint": "Search shops, cuisines and items",
+  "isrchNearTitle": "Items in shops near you",
+  "isrchAnywhereTitle": "Items in shops",
+  "isrchSeeAll": "See all items",
+  "isrchFieldHint": "Search items in shops",
+  "isrchEmptyNear": "No shops near you sell “{query}”",
+  "@isrchEmptyNear": {"placeholders":{"query":{"type":"String"}}},
+  "isrchEmptyAnywhere": "No shops sell “{query}”",
+  "@isrchEmptyAnywhere": {"placeholders":{"query":{"type":"String"}}},
+  "isrchEmptyTruncated": "{count, plural, =1{Only the best match was checked.} other{Only the {count} best matches were checked.}}",
+  "@isrchEmptyTruncated": {"placeholders":{"count":{"type":"int"}}},
+  "isrchNotByDistance": "Your address has no map pin, so shops aren't sorted by distance.",
+  "isrchMoreInStore": "{count, plural, =1{1 more in this shop} other{{count} more in this shop}}",
+  "@isrchMoreInStore": {"placeholders":{"count":{"type":"int"}}},
+  "isrchCouldNotSearch": "We couldn't search items just now.",
+  "isrchTypeMore": "Type at least 2 letters to search items.",
+  "isrchSearching": "Searching items"
 }

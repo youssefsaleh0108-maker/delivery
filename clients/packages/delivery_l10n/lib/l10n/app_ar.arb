@@ -3880,5 +3880,18 @@
   "svcChatClosedOn": "أُغلقت المحادثة بشأن هذا الطلب في {date}",
   "svcChatClosed": "أُغلقت المحادثة بشأن هذا الطلب",
   "svcChatUnavailable": "المحادثة غير متاحة حاليًا.",
-  "svcChatOrderNotFound": "تعذّر فتح محادثة هذا الطلب. نعيد تحميله."
+  "svcChatOrderNotFound": "تعذّر فتح محادثة هذا الطلب. نعيد تحميله.",
+  "isrchSearchHint": "ابحث عن متاجر وأطباق وأصناف",
+  "isrchNearTitle": "أصناف في متاجر قريبة منك",
+  "isrchAnywhereTitle": "أصناف في المتاجر",
+  "isrchSeeAll": "عرض كل الأصناف",
+  "isrchFieldHint": "ابحث عن صنف في المتاجر",
+  "isrchEmptyNear": "لا توجد متاجر قريبة منك تبيع «{query}»",
+  "isrchEmptyAnywhere": "لا توجد متاجر تبيع «{query}»",
+  "isrchEmptyTruncated": "{count, plural, zero{لم نفحص أي نتيجة.} one{لم نفحص إلا أفضل نتيجة.} two{لم نفحص إلا أفضل نتيجتين.} few{لم نفحص إلا أفضل {count} نتائج.} many{لم نفحص إلا أفضل {count} نتيجةً.} other{لم نفحص إلا أفضل {count} نتيجة.}}",
+  "isrchNotByDistance": "عنوانك غير محدد على الخريطة، لذا لم تُرتَّب المتاجر حسب المسافة.",
+  "isrchMoreInStore": "{count, plural, zero{لا مزيد في هذا المتجر} one{صنف آخر في هذا المتجر} two{صنفان آخران في هذا المتجر} few{{count} أصناف أخرى في هذا المتجر} many{{count} صنفًا آخر في هذا المتجر} other{{count} صنف آخر في هذا المتجر}}",
+  "isrchCouldNotSearch": "تعذّر البحث عن الأصناف الآن.",
+  "isrchTypeMore": "اكتب حرفين على الأقل للبحث عن الأصناف.",
+  "isrchSearching": "جارٍ البحث عن الأصناف"
 }
