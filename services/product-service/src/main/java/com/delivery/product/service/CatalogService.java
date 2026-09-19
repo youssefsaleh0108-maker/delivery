@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -119,7 +120,15 @@ public class CatalogService {
     public Page<Product> browseStore(UUID storeId, String viewerId, UUID categoryId, String search,
                                      Pageable pageable) {
         requireShelfShownTo(storeId, viewerId);
-        return products.findActiveInStore(storeId, categoryId, SearchPatterns.like(search), pageable);
+        if (search == null || search.isBlank()) {
+            return products.findActiveInStore(storeId, categoryId, SearchPatterns.like(search), pageable);
+        }
+        // A search matches as the customer item search does, so a shop it found for "احمد" or
+        // "nescafe" opens onto the same products (ProductRepository#findActiveInStoreMatching). That
+        // query orders by how well each product matches, so the page is passed on unsorted.
+        return products.findActiveInStoreMatching(storeId, categoryId != null,
+                categoryId == null ? storeId : categoryId, search.trim(), SearchPatterns.like(search),
+                PageRequest.of(pageable.getPageNumber(), pageable.getPageSize()));
     }
 
     /**

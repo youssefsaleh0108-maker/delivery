@@ -134,6 +134,71 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
                                     Pageable pageable);
 
     /**
+     * A store's shelf searched for a term: {@link #findActiveInStore}'s match, and also the item search's.
+     *
+     * <p>The customer item search ({@link ItemSearchRepository#findCandidateRows}) groups what it finds by
+     * shop and says "5 more in this shop", which opens the shop searched for the same words. If the shelf
+     * only matched {@code LOWER(name) LIKE}, a shop found for "احمد" through its "أحمد" product, or for
+     * "nescafe" through "Nescafé", would open onto nothing. So a product is on this page when its lowered
+     * name contains the term, as before, or when it reaches one of the item search's tiers on
+     * {@code search_name} (V37): the folded term is in the folded name, every folded word of it is, or it
+     * sounds like part of it. Best match first, in the item search's order, then by name.
+     *
+     * <p>Native, because {@code search_name} is unmapped and the tiers need pg_trgm; so it is used only
+     * for a search, and the page's order is this query's own: the caller passes an unsorted page. Out of
+     * stock is not filtered here, as the shelf never has.
+     *
+     * @param inAisle    whether {@code categoryId} narrows the shelf; when false it is ignored, and is
+     *                   never null, since a null bound into native SQL has no type
+     * @param namePattern {@link com.delivery.product.service.SearchPatterns#like} of the term
+     */
+    @Query(value = """
+            SELECT p.*
+              FROM products p
+             CROSS JOIN (SELECT NULLIF(search_fold(CAST(:term AS text)), '') AS f) t
+             WHERE p.status = 'ACTIVE'
+               AND p.store_id = CAST(:storeId AS uuid)
+               AND (NOT CAST(:inAisle AS boolean) OR p.category_id = CAST(:categoryId AS uuid))
+               AND (LOWER(p.name) LIKE CAST(:namePattern AS text) ESCAPE '\\'
+                    OR strpos(p.search_name, t.f) > 0
+                    OR (t.f IS NOT NULL AND NOT EXISTS (
+                            SELECT 1 FROM unnest(string_to_array(t.f, ' ')) AS w(word)
+                             WHERE strpos(p.search_name, w.word) = 0))
+                    OR t.f OPERATOR(public.<%) p.search_name)
+             ORDER BY CASE
+                        WHEN LOWER(p.name) LIKE CAST(:namePattern AS text) ESCAPE '\\'
+                          OR strpos(p.search_name, t.f) > 0 THEN 1
+                        WHEN t.f IS NOT NULL AND NOT EXISTS (
+                               SELECT 1 FROM unnest(string_to_array(t.f, ' ')) AS w(word)
+                                WHERE strpos(p.search_name, w.word) = 0) THEN 2
+                        ELSE 3
+                      END,
+                      COALESCE(public.word_similarity(t.f, p.search_name), 0) DESC,
+                      p.name, p.id
+            """,
+            countQuery = """
+            SELECT count(*)
+              FROM products p
+             CROSS JOIN (SELECT NULLIF(search_fold(CAST(:term AS text)), '') AS f) t
+             WHERE p.status = 'ACTIVE'
+               AND p.store_id = CAST(:storeId AS uuid)
+               AND (NOT CAST(:inAisle AS boolean) OR p.category_id = CAST(:categoryId AS uuid))
+               AND (LOWER(p.name) LIKE CAST(:namePattern AS text) ESCAPE '\\'
+                    OR strpos(p.search_name, t.f) > 0
+                    OR (t.f IS NOT NULL AND NOT EXISTS (
+                            SELECT 1 FROM unnest(string_to_array(t.f, ' ')) AS w(word)
+                             WHERE strpos(p.search_name, w.word) = 0))
+                    OR t.f OPERATOR(public.<%) p.search_name)
+            """,
+            nativeQuery = true)
+    Page<Product> findActiveInStoreMatching(@Param("storeId") UUID storeId,
+                                            @Param("inAisle") boolean inAisle,
+                                            @Param("categoryId") UUID categoryId,
+                                            @Param("term") String term,
+                                            @Param("namePattern") String namePattern,
+                                            Pageable pageable);
+
+    /**
      * The aisles a store actually stocks, with a count each.
      *
      * <p>Driving the Aisles tab from the catalog rather than from the category tree means a store

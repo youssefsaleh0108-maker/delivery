@@ -219,6 +219,21 @@ public class ApiExceptionHandler {
     }
 
     /**
+     * An item search that cannot be run: nothing to search, a term too short or too long, too many terms,
+     * or a barcode that is not 8 to 14 digits.
+     *
+     * <p>400 with the {@code code} a client branches on ({@code ItemSearchService.SEARCH_*}), since the
+     * detail is prose. The detail is the service's own and names the rule, never the query.
+     */
+    @ExceptionHandler(com.delivery.product.service.ItemSearchService.SearchRefusedException.class)
+    public ProblemDetail onSearchRefused(
+            com.delivery.product.service.ItemSearchService.SearchRefusedException e) {
+        ProblemDetail detail = problem(HttpStatus.BAD_REQUEST, "Search refused", e.getMessage());
+        detail.setProperty("code", e.getCode());
+        return detail;
+    }
+
+    /**
      * The geocoder could not answer.
      *
      * <p>503 and never an empty result. An address picker handed an empty list concludes the street

@@ -142,6 +142,16 @@ delivery:
       popular-window-days: 30
       popular-min-delivered-orders: 3
 
+    # The customer item search (ItemSearchService): products of live goods shops that match what the
+    # customer typed, grouped by shop. With the customer's pin, only shops pinned within radius-metres
+    # (and whose own delivery circle reaches the pin) are searched; the radius is the server's, never a
+    # request's. max-candidates caps the matching products one search reads, best matches first, so a
+    # two-letter search in a large catalogue cannot pull it all into memory; an answer that reached the
+    # cap says so (truncated), and the app words an empty one as "among the best matches".
+    item-search:
+      radius-metres: 5000
+      max-candidates: 300
+
     # Merchant Blitz: shelf photos in, a draft catalogue out (CatalogScanService).
     scan:
       # FAKE is deterministic sample data that never leaves the pod; CLAUDE sends the photos to the
