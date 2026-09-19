@@ -3880,5 +3880,18 @@
   "svcChatClosedOn": "أُغلقت المحادثة بشأن هذا الطلب في {date}",
   "svcChatClosed": "أُغلقت المحادثة بشأن هذا الطلب",
   "svcChatUnavailable": "المحادثة غير متاحة حاليًا.",
-  "svcChatOrderNotFound": "تعذّر فتح محادثة هذا الطلب. نعيد تحميله."
+  "svcChatOrderNotFound": "تعذّر فتح محادثة هذا الطلب. نعيد تحميله.",
+  "dareaButton": "منطقة التوصيل",
+  "dareaWithinKm": "ضمن {km} كم من المتجر",
+  "@dareaWithinKm": {"placeholders":{"km":{"type":"String"}}},
+  "dareaAreasCount": "{count, plural, zero{لا مناطق} one{منطقة واحدة} two{منطقتان} few{{count} مناطق} many{{count} منطقة} other{{count} منطقة}}",
+  "@dareaAreasCount": {"placeholders":{"count":{"type":"int"}}},
+  "dareaCircleRule": "يوصّل حتى {km} كم من المتجر",
+  "@dareaCircleRule": {"placeholders":{"km":{"type":"String"}}},
+  "dareaZonesTitle": "يوصّل إلى هذه المناطق",
+  "dareaBothRules": "يجب أن يكون العنوان داخل الدائرة وفي إحدى هذه المناطق.",
+  "dareaZoneLabelsNote": "تشير أسماء المناطق على الخريطة إلى وسط كل منطقة تقريبًا، لا إلى حدودها.",
+  "dareaInside": "عنوانك داخل منطقة التوصيل",
+  "dareaOutside": "عنوانك خارج منطقة التوصيل",
+  "dareaMapUnavailable": "تعذّر تحميل الخريطة الآن. منطقة التوصيل موصوفة أدناه."
 }

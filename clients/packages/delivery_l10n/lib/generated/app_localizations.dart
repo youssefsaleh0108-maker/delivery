@@ -21206,6 +21206,66 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Couldn\'t open this order\'s chat. Reloading the order.'**
   String get svcChatOrderNotFound;
+
+  /// No description provided for @dareaButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery area'**
+  String get dareaButton;
+
+  /// No description provided for @dareaWithinKm.
+  ///
+  /// In en, this message translates to:
+  /// **'Within {km} km of the shop'**
+  String dareaWithinKm(String km);
+
+  /// No description provided for @dareaAreasCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 area} other{{count} areas}}'**
+  String dareaAreasCount(int count);
+
+  /// No description provided for @dareaCircleRule.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivers up to {km} km from the shop'**
+  String dareaCircleRule(String km);
+
+  /// No description provided for @dareaZonesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivers to these areas'**
+  String get dareaZonesTitle;
+
+  /// No description provided for @dareaBothRules.
+  ///
+  /// In en, this message translates to:
+  /// **'An address has to be inside the circle and in one of these areas.'**
+  String get dareaBothRules;
+
+  /// No description provided for @dareaZoneLabelsNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Area names on the map mark roughly the middle of each area, not its edges.'**
+  String get dareaZoneLabelsNote;
+
+  /// No description provided for @dareaInside.
+  ///
+  /// In en, this message translates to:
+  /// **'Your address is inside the delivery area'**
+  String get dareaInside;
+
+  /// No description provided for @dareaOutside.
+  ///
+  /// In en, this message translates to:
+  /// **'Your address is outside the delivery area'**
+  String get dareaOutside;
+
+  /// No description provided for @dareaMapUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The map can\'t load right now. The delivery area is described below.'**
+  String get dareaMapUnavailable;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {
