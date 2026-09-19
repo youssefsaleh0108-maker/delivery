@@ -28,6 +28,7 @@ import com.delivery.platform.security.CurrentUser;
 import com.delivery.tracking.service.EtaService;
 import com.delivery.tracking.service.EtaService.EtaResult;
 import com.delivery.tracking.service.Fix;
+import com.delivery.tracking.service.RiderSighting;
 import com.delivery.tracking.service.TrackingService;
 import com.delivery.tracking.service.TrackingService.Position;
 import com.delivery.tracking.service.TrackingService.TrackingClosedException;
@@ -64,26 +65,49 @@ public class TrackingController {
     @PreAuthorize("hasRole('DELIVERY')")
     public ResponseEntity<Void> ping(@PathVariable UUID orderId,
                                      @Valid @RequestBody PingRequest request) {
-        tracking.ping(orderId, PingProblems.rider(), request.fix()).ifPresent(recorded ->
-                // The live push. Fire-and-forget by design: the position is already durable, and a
-                // subscriber that misses this frame gets it on its next history fetch.
-                // Authorisation happened at SUBSCRIBE (WebSocketConfiguration), so everyone on the
-                // topic may see it.
-                live.convertAndSend("/topic/orders/" + orderId + "/position",
-                        new PositionResponse(recorded.orderId(), recorded.riderId(), recorded.lat(),
-                                recorded.lng(), recorded.accuracyM(), recorded.recordedAt())));
+        tracking.ping(orderId, PingProblems.rider(), request.fix())
+                // The topic reaches the order's customer (the shop may not subscribe), so it only
+                // carries a fix the customer may see — TrackingService#sightingFor, applied to it.
+                .filter(TrackingService.Recorded::live)
+                .ifPresent(recorded -> {
+                    Position p = recorded.position();
+                    // The live push. Fire-and-forget by design: the position is already durable,
+                    // and a subscriber that misses this frame gets it on its next read.
+                    live.convertAndSend("/topic/orders/" + orderId + "/position",
+                            new LiveFrame(p.orderId(), p.riderId(), p.lat(), p.lng(),
+                                    p.accuracyM(), p.recordedAt(), recorded.onTrail()));
+                });
         return ResponseEntity.accepted().build();
     }
 
-    /** "Where is my rider right now" — served from Redis. */
+    /**
+     * "Where is my rider right now", as the rider-visibility rule allows it.
+     *
+     * <p>200 with the position when the caller may see the rider; 204 when there is nothing they
+     * may see — no fix yet, or a position the rule withholds from them. {@code GET .../rider} says
+     * which. Distinct from 404, which means the order is unknown or not yours.
+     */
     @GetMapping("/orders/{orderId}")
     public ResponseEntity<PositionResponse> current(@PathVariable UUID orderId) {
         return tracking.currentPosition(orderId, CurrentUser.requireId(), isBackoffice())
                 .map(TrackingController::toResponse)
                 .map(ResponseEntity::ok)
-                // 204: the order exists and you may see it, but the rider has not pinged yet.
-                // Distinct from 404, which means the order is unknown or not yours.
                 .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    /**
+     * What the caller may know of where the rider is, and why when it is not a position:
+     * {@code VISIBLE} with the position, or {@code HEADING_TO_SHOP}, {@code ON_ANOTHER_DELIVERY},
+     * {@code AFTER_PICKUP}, {@code NO_FIX} or {@code CLOSED} with none (see
+     * {@link com.delivery.tracking.service.RiderSighting.State}). Always 200 with a body, like the
+     * ETA, because the states without a position are the ones a screen has to put into words.
+     */
+    @GetMapping("/orders/{orderId}/rider")
+    public SightingResponse rider(@PathVariable UUID orderId) {
+        RiderSighting sighting = tracking.sightingFor(orderId, CurrentUser.requireId(),
+                isBackoffice());
+        return new SightingResponse(orderId, sighting.state().name(),
+                sighting.shown().map(TrackingController::toResponse).orElse(null));
     }
 
     /**
@@ -107,6 +131,11 @@ public class TrackingController {
         return eta.estimateFor(orderId, CurrentUser.requireId(), isBackoffice());
     }
 
+    /**
+     * The trail: all of it for the back office and the rider; for the customer only from pickup,
+     * only while the order is live and the rider visible to them, and without the points at other
+     * customers' doors; none for the shop. See {@link TrackingService#history}.
+     */
     @GetMapping("/orders/{orderId}/history")
     public List<PositionResponse> history(@PathVariable UUID orderId) {
         return tracking.history(orderId, CurrentUser.requireId(), isBackoffice()).stream()
@@ -166,5 +195,27 @@ public class TrackingController {
             double lng,
             Float accuracyM,
             Instant recordedAt) {
+    }
+
+    /**
+     * A frame on an order's live topic: the position, and whether it is on the trail. A fix on an
+     * order not yet collected moves the rider's dot and is never part of the trail, so a map must
+     * not draw a line through it.
+     */
+    public record LiveFrame(
+            UUID orderId,
+            String riderId,
+            double lat,
+            double lng,
+            Float accuracyM,
+            Instant recordedAt,
+            boolean onTrail) {
+    }
+
+    /**
+     * @param state    the {@link com.delivery.tracking.service.RiderSighting.State} name
+     * @param position present exactly when {@code state} is {@code VISIBLE}
+     */
+    public record SightingResponse(UUID orderId, String state, PositionResponse position) {
     }
 }

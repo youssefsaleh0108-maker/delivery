@@ -64,6 +64,12 @@ public class EtaService {
      * or backoffice — and is applied here as well as inside {@link TrackingService}, so the reasons
      * below cannot become an oracle: a stranger gets "not found" before learning whether an order
      * has a fix, a destination or a rider at all.
+     *
+     * <p>What the estimate is measured from follows {@link TrackingService#sightingFor}: while the
+     * rider is on another customer's delivery, or at another customer's door, there is no estimate
+     * at all ({@link Reason#RIDER_ON_ANOTHER_DELIVERY}) — a distance from there points at that
+     * stop. A rider still far from the shop, or a shop's order already collected, gets an estimate
+     * without the position it was measured from.
      */
     @Transactional(readOnly = true)
     public EtaResult estimateFor(UUID orderId, String userId, boolean isBackoffice) {
@@ -81,7 +87,14 @@ public class EtaService {
             return EtaResult.unavailable(orderId, Reason.ORDER_COMPLETE, provider, null, now);
         }
 
-        Optional<Position> fix = tracking.currentPosition(orderId, userId, isBackoffice);
+        RiderSighting sighting = tracking.sightingFor(order, userId, isBackoffice);
+        if (sighting.state() == RiderSighting.State.ON_ANOTHER_DELIVERY) {
+            // Not even the fix's time: nothing about where the rider is now.
+            return EtaResult.unavailable(orderId, Reason.RIDER_ON_ANOTHER_DELIVERY, provider, null,
+                    now);
+        }
+
+        Optional<Position> fix = sighting.measuredFrom();
         if (fix.isEmpty()) {
             // The rule this endpoint exists to keep. With no fix there is no distance, and a
             // distance guessed from the pickup point would be a number the screen would render as
@@ -166,7 +179,7 @@ public class EtaService {
 
     /** Why there is no number. Present exactly when {@link EtaResult#available()} is false. */
     public enum Reason {
-        /** The rider has never pinged on this order. */
+        /** No fix of the rider's is on this order: none yet, or their latest went on no order. */
         NO_FIX,
         /** The last ping is older than the acceptable fix age. The rider could be anywhere. */
         STALE_FIX,
@@ -175,7 +188,12 @@ public class EtaService {
         /** The routing provider could not answer. Transient for a real provider. */
         PROVIDER_UNAVAILABLE,
         /** Delivered or cancelled. Nothing is on its way. */
-        ORDER_COMPLETE
+        ORDER_COMPLETE,
+        /**
+         * The rider is on another customer's delivery right now, or still at that customer's door.
+         * No distance and no time are given, since either would point at the other stop.
+         */
+        RIDER_ON_ANOTHER_DELIVERY
     }
 
     /**

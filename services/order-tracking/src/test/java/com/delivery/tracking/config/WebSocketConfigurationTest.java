@@ -199,6 +199,28 @@ class WebSocketConfigurationTest {
         }
 
         @Test
+        @DisplayName("to the order you are carrying is allowed")
+        void the_riders_own_order_is_allowed() {
+            orderVisibleTo(CUSTOMER);
+
+            assertThatCode(() -> send(subscribeAs("rider-sub", TOPIC))).doesNotThrowAnyException();
+        }
+
+        /**
+         * The shop sees the rider only until pickup, and a subscription made before it could not be
+         * taken back at it: the topic would carry the rider all the way to the customer's door. The
+         * shop reads the position instead, which follows the rule on every request.
+         */
+        @Test
+        @DisplayName("by the shop is refused, although the shop is on the order")
+        void the_shop_is_refused() {
+            orderVisibleTo(CUSTOMER);
+
+            assertThatThrownBy(() -> send(subscribeAs("merchant-sub", TOPIC)))
+                    .isInstanceOf(SocketRefusedException.class);
+        }
+
+        @Test
         @DisplayName("to somebody else's order is refused")
         void another_customers_order_is_refused() {
             orderVisibleTo(CUSTOMER);

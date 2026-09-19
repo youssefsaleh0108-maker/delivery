@@ -66,6 +66,21 @@ public class PresenceService {
     private static final Logger log = LoggerFactory.getLogger(PresenceService.class);
     private static final String KEY_PREFIX = "delivery:tracking:presence:";
 
+    /** Where {@link LatestFix} lives: the rider's last accepted fix and the order it went on. */
+    private static final String LATEST_FIX_PREFIX = "delivery:tracking:rider-latest-fix:";
+
+    /**
+     * How long the rider's last accepted fix, and the order it went on, is remembered.
+     *
+     * <p>Far longer than the presence window on purpose. A rider who switches to a navigation app
+     * stops reporting (the app shares only in the foreground), and a customer whose order is in
+     * their hands must still be shown the last position that was attached to it, with its time,
+     * rather than nothing. Overwritten by every accepted fix, so the length only matters for a
+     * rider who has gone quiet; and when the key is gone the order-scoped reads show nothing to
+     * anybody but the rider and the back office — they fail closed, never open.
+     */
+    static final Duration LATEST_FIX_TTL = Duration.ofHours(12);
+
     private final RiderPresenceRepository presence;
     private final RiderDutyEventRepository dutyEvents;
     private final DutySessionRepository dutySessions;
@@ -193,13 +208,19 @@ public class PresenceService {
      * does not become the anchor the next fix is compared with. A fix that adds nothing new (not
      * newer than the last one, or too soon after it) is not written either, and is not refused.
      *
+     * <p>Also remembers which order the fix went on ({@link #latestFix}). That is what decides, for
+     * everyone but the back office, whose map may show the rider: the customer of the delivery the
+     * rider's latest fix was attached to, and nobody else's (see
+     * {@link TrackingService#sightingFor}).
+     *
+     * @param orderId the order the fix was reported on, or null for a fix reported on none
      * @return the instant the fix is recorded at — the phone's fix time, never later than now — or
      *         empty when it was not new enough to record
      * @throws FixPolicy.FixRejectedException when the fix is not believable
      */
     @Transactional
-    public Optional<Instant> recordFix(String riderId, Fix fix) {
-        return record(riderId, fix, readCache(riderId));
+    public Optional<Instant> recordFix(String riderId, Fix fix, UUID orderId) {
+        return record(riderId, fix, readCache(riderId), orderId);
     }
 
     /**
@@ -228,10 +249,13 @@ public class PresenceService {
         if (!onDuty && !participants.riderHasLiveOrder(riderId)) {
             throw new OffDutyException();
         }
-        return record(riderId, fix, cached);
+        // Attached to no order, so from here on no customer's or shop's map shows the rider until
+        // a fix goes on one of theirs again.
+        return record(riderId, fix, cached, null);
     }
 
-    private Optional<Instant> record(String riderId, Fix fix, PresenceSnapshot cached) {
+    private Optional<Instant> record(String riderId, Fix fix, PresenceSnapshot cached,
+                                     UUID orderId) {
         Instant now = Instant.now();
 
         if (cached == null) {
@@ -248,6 +272,8 @@ public class PresenceService {
             row.sighted(fix.lat(), fix.lng(), fix.accuracyM(), admission.at());
             presence.save(row);
             cache(PresenceSnapshot.of(row));
+            rememberLatest(new LatestFix(riderId, orderId, fix.lat(), fix.lng(), fix.accuracyM(),
+                    admission.at()));
             return Optional.of(admission.at());
         }
 
@@ -265,7 +291,42 @@ public class PresenceService {
         presence.touchIfDue(riderId, fix.lat(), fix.lng(), fix.accuracyM(), at,
                 at.minus(persistInterval));
         cache(cached.withFix(fix.lat(), fix.lng(), fix.accuracyM(), at));
+        rememberLatest(new LatestFix(riderId, orderId, fix.lat(), fix.lng(), fix.accuracyM(), at));
         return Optional.of(at);
+    }
+
+    /**
+     * The rider's last accepted fix, and the order it was reported on.
+     *
+     * <p>Held in Redis only, under {@link #LATEST_FIX_TTL}: there is no column for the order
+     * without a migration. Empty when the rider has not reported since, or when Redis has lost it
+     * or cannot be reached — and everything that reads it treats empty as "show nobody", so losing
+     * it costs customers the rider's dot until the next fix, and never shows it to the wrong one.
+     */
+    public Optional<LatestFix> latestFix(String riderId) {
+        if (riderId == null) {
+            return Optional.empty();
+        }
+        try {
+            String raw = redis.opsForValue().get(LATEST_FIX_PREFIX + riderId);
+            return raw == null
+                    ? Optional.empty()
+                    : Optional.of(objectMapper.readValue(raw, LatestFix.class));
+        } catch (Exception e) {
+            log.warn("Could not read a rider's latest fix; their position is shown to nobody "
+                    + "outside the back office until the next one", e);
+            return Optional.empty();
+        }
+    }
+
+    private void rememberLatest(LatestFix latest) {
+        try {
+            redis.opsForValue().set(LATEST_FIX_PREFIX + latest.riderId(),
+                    objectMapper.writeValueAsString(latest), LATEST_FIX_TTL);
+        } catch (Exception e) {
+            // Never fails the fix. The reads that need this fail closed without it.
+            log.warn("Could not remember a rider's latest fix", e);
+        }
     }
 
     /**
@@ -516,6 +577,17 @@ public class PresenceService {
                     row.effectiveState(now, presenceWindow), row.getDutyChangedAt(),
                     row.getLastSeenAt(), row.getLastLat(), row.getLastLng(), row.getLastAccuracyM());
         }
+    }
+
+    /**
+     * A rider's last accepted fix and the order it was reported on.
+     *
+     * @param orderId the order the fix went on, or null when it was reported on none (between
+     *                jobs, or with no single delivery the app could attach it to)
+     * @param at      when it was taken, as recorded
+     */
+    public record LatestFix(String riderId, UUID orderId, double lat, double lng,
+                            Float accuracyM, Instant at) {
     }
 
     /** Thrown when a rider is unknown, or when the caller has no business knowing they exist. */

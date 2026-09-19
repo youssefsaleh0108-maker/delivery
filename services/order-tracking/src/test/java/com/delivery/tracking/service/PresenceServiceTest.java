@@ -129,6 +129,14 @@ class PresenceServiceTest {
         return new Fix(lat, lng, 5.0f, Instant.now());
     }
 
+    /** The order the fixes below are reported on. */
+    private static final UUID ON_ORDER = UUID.fromString("0a0a0a0a-0000-4000-8000-000000000001");
+
+    /** A fix reported on {@link #ON_ORDER}, as an order ping records it. */
+    private Optional<Instant> recordOnOrder(Fix fix) {
+        return presence.recordFix(RIDER, fix, ON_ORDER);
+    }
+
     private void employs(String userId, UUID carrierId, CarrierMembership.Kind kind) {
         when(memberships.findById(userId)).thenReturn(Optional.of(new CarrierMembership(
                 userId, carrierId, kind, CarrierMembership.Source.ORDER_EVENT)));
@@ -320,7 +328,7 @@ class PresenceServiceTest {
         /** A rider we have never seen gets a durable row, off duty until they say otherwise. */
         @Test
         void creates_the_durable_row_the_first_time_a_rider_is_seen() {
-            presence.recordFix(RIDER, takenNow(33.89, 35.50));
+            recordOnOrder(takenNow(33.89, 35.50));
 
             verify(presenceRepo).save(any(RiderPresence.class));
         }
@@ -333,7 +341,7 @@ class PresenceServiceTest {
         void only_moves_the_durable_row_when_the_write_throttle_is_due() throws Exception {
             warmCacheFor(DutyState.ON_DUTY);
 
-            presence.recordFix(RIDER, takenNow(33.89, 35.50));
+            recordOnOrder(takenNow(33.89, 35.50));
 
             verify(presenceRepo).touchIfDue(eq(RIDER), anyDouble(), anyDouble(), anyFloat(),
                     any(Instant.class), any(Instant.class));
@@ -348,7 +356,7 @@ class PresenceServiceTest {
         void falls_back_to_writing_the_record_when_the_cache_is_unavailable() {
             doThrow(new IllegalStateException("redis down")).when(values).get(anyString());
 
-            presence.recordFix(RIDER, takenNow(33.89, 35.50));
+            recordOnOrder(takenNow(33.89, 35.50));
 
             verify(presenceRepo).save(any(RiderPresence.class));
         }
@@ -359,7 +367,7 @@ class PresenceServiceTest {
             doThrow(new IllegalStateException("redis down"))
                     .when(values).set(anyString(), anyString(), any(Duration.class));
 
-            presence.recordFix(RIDER, takenNow(33.89, 35.50));
+            recordOnOrder(takenNow(33.89, 35.50));
 
             verify(presenceRepo).save(any(RiderPresence.class));
         }
@@ -391,7 +399,7 @@ class PresenceServiceTest {
             rider(DutyState.ON_DUTY, Duration.ofSeconds(10));
 
             // Tripoli, ten seconds after downtown Beirut: seventy kilometres.
-            assertThatThrownBy(() -> presence.recordFix(RIDER,
+            assertThatThrownBy(() -> recordOnOrder(
                     new Fix(34.4367, 35.8497, 8.0f, Instant.now())))
                     .isInstanceOf(FixPolicy.FixRejectedException.class)
                     .satisfies(e -> assertThat(((FixPolicy.FixRejectedException) e).reason())
@@ -404,7 +412,7 @@ class PresenceServiceTest {
         /** The old simulator's London walk, as an old app build still sends it: refused outright. */
         @Test
         void a_fix_from_outside_the_service_area_writes_nothing() {
-            assertThatThrownBy(() -> presence.recordFix(RIDER,
+            assertThatThrownBy(() -> recordOnOrder(
                     new Fix(51.5074, -0.1278, 8.0f, Instant.now())))
                     .isInstanceOf(FixPolicy.FixRejectedException.class)
                     .satisfies(e -> assertThat(((FixPolicy.FixRejectedException) e).reason())
@@ -416,7 +424,7 @@ class PresenceServiceTest {
         /** And the same build leaves out the fix time: refused, for the same reason, everywhere. */
         @Test
         void a_fix_with_no_fix_time_writes_nothing() {
-            assertThatThrownBy(() -> presence.recordFix(RIDER, new Fix(33.89, 35.50, 8.0f, null)))
+            assertThatThrownBy(() -> recordOnOrder(new Fix(33.89, 35.50, 8.0f, null)))
                     .isInstanceOf(FixPolicy.FixRejectedException.class)
                     .satisfies(e -> assertThat(((FixPolicy.FixRejectedException) e).reason())
                             .isEqualTo(FixPolicy.Reason.FIX_TIME_MISSING));
@@ -434,7 +442,7 @@ class PresenceServiceTest {
                     Instant.now().minus(Duration.ofMinutes(10)), Instant.now().minusSeconds(2),
                     33.89, 35.50, 5.0f));
 
-            assertThat(presence.recordFix(RIDER, takenNow(33.8901, 35.5001))).isEmpty();
+            assertThat(recordOnOrder(takenNow(33.8901, 35.5001))).isEmpty();
 
             verify(presenceRepo, never()).touchIfDue(anyString(), anyDouble(), anyDouble(),
                     anyFloat(), any(Instant.class), any(Instant.class));
@@ -443,7 +451,7 @@ class PresenceServiceTest {
 
         @Test
         void a_fix_too_imprecise_to_place_the_rider_writes_nothing() {
-            assertThatThrownBy(() -> presence.recordFix(RIDER,
+            assertThatThrownBy(() -> recordOnOrder(
                     new Fix(33.89, 35.50, 2_000f, Instant.now())))
                     .isInstanceOf(FixPolicy.FixRejectedException.class);
 
@@ -466,7 +474,7 @@ class PresenceServiceTest {
                     33.89, 35.50, 5.0f));
 
             Optional<Instant> at =
-                    presence.recordFix(RIDER, new Fix(33.8905, 35.5003, 6.0f, Instant.now()));
+                    recordOnOrder(new Fix(33.8905, 35.5003, 6.0f, Instant.now()));
 
             assertThat(at).isPresent();
             verify(presenceRepo).touchIfDue(eq(RIDER), anyDouble(), anyDouble(), anyFloat(),
@@ -479,7 +487,7 @@ class PresenceServiceTest {
             Instant takenAt = Instant.now().minusSeconds(12);
             ArgumentCaptor<RiderPresence> saved = ArgumentCaptor.forClass(RiderPresence.class);
 
-            Optional<Instant> at = presence.recordFix(RIDER, new Fix(33.89, 35.50, 5.0f, takenAt));
+            Optional<Instant> at = recordOnOrder(new Fix(33.89, 35.50, 5.0f, takenAt));
 
             verify(presenceRepo).save(saved.capture());
             assertThat(at).contains(takenAt);
@@ -572,6 +580,77 @@ class PresenceServiceTest {
             String json = new ObjectMapper().registerModule(new JavaTimeModule())
                     .writeValueAsString(snapshot);
             when(values.get(CACHE_KEY)).thenReturn(json);
+        }
+    }
+
+    /**
+     * Which order the rider's latest fix went on is what decides whose map shows them — so it is
+     * remembered with every accepted fix, cleared by a fix on no order, never moved by one that
+     * adds nothing, and read as "nobody" when it cannot be read at all.
+     */
+    @Nested
+    @DisplayName("remembering which order the latest fix went on")
+    class LatestFixMemory {
+
+        private static final String LATEST_KEY = "delivery:tracking:rider-latest-fix:" + RIDER;
+        private final ObjectMapper json = new ObjectMapper().registerModule(new JavaTimeModule());
+
+        private PresenceService.LatestFix remembered() throws Exception {
+            ArgumentCaptor<String> written = ArgumentCaptor.forClass(String.class);
+            verify(values).set(eq(LATEST_KEY), written.capture(),
+                    eq(PresenceService.LATEST_FIX_TTL));
+            return json.readValue(written.getValue(), PresenceService.LatestFix.class);
+        }
+
+        @Test
+        void a_fix_on_an_order_is_remembered_with_that_order() throws Exception {
+            Instant takenAt = Instant.now().minusSeconds(3);
+
+            recordOnOrder(new Fix(33.89, 35.50, 5.0f, takenAt));
+
+            PresenceService.LatestFix latest = remembered();
+            assertThat(latest.orderId()).isEqualTo(ON_ORDER);
+            assertThat(latest.lat()).isEqualTo(33.89);
+            assertThat(latest.at()).isEqualTo(takenAt);
+        }
+
+        /** Between jobs, or with no one delivery to put it on: nobody's map follows the rider. */
+        @Test
+        void a_fix_on_no_order_is_remembered_with_none() throws Exception {
+            rider(DutyState.ON_DUTY, null);
+
+            presence.recordOffOrderFix(RIDER, takenNow(33.89, 35.50));
+
+            assertThat(remembered().orderId()).isNull();
+        }
+
+        @Test
+        void a_fix_that_adds_nothing_leaves_it_as_it_was() throws Exception {
+            String cached = json.writeValueAsString(new PresenceService.PresenceSnapshot(RIDER,
+                    CARRIER, DutyState.ON_DUTY, Instant.now().minus(Duration.ofMinutes(10)),
+                    Instant.now().minusSeconds(2), 33.89, 35.50, 5.0f));
+            when(values.get(CACHE_KEY)).thenReturn(cached);
+
+            assertThat(recordOnOrder(takenNow(33.8901, 35.5001))).isEmpty();
+
+            verify(values, never()).set(eq(LATEST_KEY), anyString(), any(Duration.class));
+        }
+
+        @Test
+        void is_read_back_as_it_was_written() throws Exception {
+            PresenceService.LatestFix written = new PresenceService.LatestFix(RIDER, ON_ORDER,
+                    33.89, 35.50, 5.0f, Instant.parse("2026-09-19T10:00:00Z"));
+            when(values.get(LATEST_KEY)).thenReturn(json.writeValueAsString(written));
+
+            assertThat(presence.latestFix(RIDER)).contains(written);
+        }
+
+        /** Redis gone: the readers are shown nothing, rather than an error or a guess. */
+        @Test
+        void reads_as_nothing_when_it_cannot_be_read() {
+            when(values.get(LATEST_KEY)).thenThrow(new IllegalStateException("redis down"));
+
+            assertThat(presence.latestFix(RIDER)).isEmpty();
         }
     }
 

@@ -79,8 +79,9 @@ class PingRoutesAccessTest {
 
         when(tracking.ping(any(UUID.class), anyString(), any(Fix.class))).thenAnswer(call -> {
             Fix fix = call.getArgument(2);
-            return Optional.of(new TrackingService.Position(call.getArgument(0),
-                    call.getArgument(1), fix.lat(), fix.lng(), fix.accuracyM(), Instant.now()));
+            return Optional.of(new TrackingService.Recorded(new TrackingService.Position(
+                    call.getArgument(0), call.getArgument(1), fix.lat(), fix.lng(),
+                    fix.accuracyM(), Instant.now()), true, true));
         });
         when(presence.recordOffOrderFix(anyString(), any(Fix.class)))
                 .thenReturn(Optional.of(Instant.now()));
@@ -245,6 +246,19 @@ class PingRoutesAccessTest {
 
             verify(live).convertAndSend(eq("/topic/orders/" + ORDER + "/position"),
                     any(Object.class));
+        }
+
+        /** The topic reaches the customer, so a fix the customer may not see is not pushed. */
+        @Test
+        void a_report_the_customer_may_not_see_is_recorded_but_not_pushed() throws Exception {
+            signedInAs(RIDER, "DELIVERY");
+            when(tracking.ping(eq(ORDER), eq(RIDER), any(Fix.class))).thenReturn(Optional.of(
+                    new TrackingService.Recorded(new TrackingService.Position(ORDER, RIDER,
+                            33.8938, 35.5018, 6.5f, Instant.now()), false, false)));
+
+            orderPing(BODY).andExpect(status().isAccepted());
+
+            verifyNoInteractions(live);
         }
 
         @Test

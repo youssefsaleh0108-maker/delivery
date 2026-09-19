@@ -19,6 +19,7 @@ import com.delivery.tracking.domain.OrderParticipants;
 import com.delivery.tracking.domain.OrderParticipantsRepository;
 import com.delivery.tracking.domain.TrackingEvent;
 import com.delivery.tracking.domain.TrackingEventRepository;
+import com.delivery.tracking.route.GeoPoint;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -33,12 +35,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Where the rider is, who is allowed to ask, and what happens when Redis is not there.
+ * How a ping is written, and how the order's own latest position is read back.
  *
- * <p>Two rules do the work. A rider may only write a position onto their own delivery — otherwise
- * any rider could move the pin on somebody else's order and the customer's map would show a
- * stranger. And a cache failure must degrade the read path rather than fail the write path: losing a
- * ping loses the position permanently, while losing the cache entry only costs a Postgres query.
+ * <p>Two rules do the work here. A rider may only write a position onto their own delivery —
+ * otherwise any rider could move the pin on somebody else's order and the customer's map would
+ * show a stranger. And a cache failure must degrade the read path rather than fail the write path:
+ * losing a ping loses the position permanently, while losing the cache entry only costs a Postgres
+ * query. Who may read what is TrackingReadAccessTest, end to end through the routes.
  */
 class TrackingServiceTest {
 
@@ -46,6 +49,7 @@ class TrackingServiceTest {
     private static final String CUSTOMER = "customer-sub";
     private static final String MERCHANT = "merchant-sub";
     private static final String RIDER = "rider-sub";
+    private static final String BACKOFFICE = "backoffice-sub";
     private static final String CACHE_KEY = "delivery:tracking:order:" + ORDER;
 
     private TrackingEventRepository events;
@@ -74,26 +78,28 @@ class TrackingServiceTest {
         when(events.findByOrderIdOrderByRecordedAtAsc(any(UUID.class))).thenReturn(List.of());
         // Presence is where a fix is judged and given its time; standing in for it, every fix is
         // believed and recorded at the phone's time.
-        when(presence.recordFix(anyString(), any(Fix.class))).thenAnswer(call -> {
+        when(presence.recordFix(anyString(), any(Fix.class), any())).thenAnswer(call -> {
             Fix fix = call.getArgument(1);
             return Optional.of(fix.takenAt());
         });
-        orderAssignedTo(RIDER);
+        orderInStatus("PICKED_UP");
     }
 
-    /** A fix the phone took just now. */
+    /** A fix the phone took just now, in downtown Beirut unless told otherwise. */
     private static Fix fix(double lat, double lng, Float accuracyM) {
         return new Fix(lat, lng, accuracyM, Instant.now());
     }
 
-    private void orderAssignedTo(String riderId) {
-        when(participants.findById(ORDER)).thenReturn(Optional.of(
-                new OrderParticipants(ORDER, CUSTOMER, MERCHANT, riderId, "PICKED_UP")));
+    private OrderParticipants orderAssignedTo(String riderId, String status) {
+        OrderParticipants order = new OrderParticipants(ORDER, CUSTOMER, MERCHANT, riderId, status);
+        // The shop is at the fix below, so nothing here is withheld for being far from it.
+        order.applyRoute(null, new GeoPoint(33.89, 35.50), new GeoPoint(33.90, 35.52));
+        when(participants.findById(ORDER)).thenReturn(Optional.of(order));
+        return order;
     }
 
-    private void orderInStatus(String status) {
-        when(participants.findById(ORDER)).thenReturn(Optional.of(
-                new OrderParticipants(ORDER, CUSTOMER, MERCHANT, RIDER, status)));
+    private OrderParticipants orderInStatus(String status) {
+        return orderAssignedTo(RIDER, status);
     }
 
     private TrackingEvent event(double lat, double lng) {
@@ -106,11 +112,12 @@ class TrackingServiceTest {
 
         @Test
         void is_recorded_and_returned() {
-            TrackingService.Position position = tracking.ping(ORDER, RIDER, fix(33.89, 35.50, 5.0f)).orElseThrow();
+            TrackingService.Recorded recorded =
+                    tracking.ping(ORDER, RIDER, fix(33.89, 35.50, 5.0f)).orElseThrow();
 
-            assertThat(position.lat()).isEqualTo(33.89);
-            assertThat(position.lng()).isEqualTo(35.50);
-            assertThat(position.riderId()).isEqualTo(RIDER);
+            assertThat(recorded.position().lat()).isEqualTo(33.89);
+            assertThat(recorded.position().lng()).isEqualTo(35.50);
+            assertThat(recorded.position().riderId()).isEqualTo(RIDER);
             verify(events).save(any(TrackingEvent.class));
         }
 
@@ -119,6 +126,14 @@ class TrackingServiceTest {
             tracking.ping(ORDER, RIDER, fix(33.89, 35.50, 5.0f));
 
             verify(values).set(eq(CACHE_KEY), anyString(), eq(Duration.ofSeconds(60)));
+        }
+
+        /** Presence remembers which order the rider's latest fix went on — the rule reads it. */
+        @Test
+        void tells_presence_which_order_the_fix_went_on() {
+            tracking.ping(ORDER, RIDER, fix(33.89, 35.50, 5.0f));
+
+            verify(presence).recordFix(eq(RIDER), any(Fix.class), eq(ORDER));
         }
 
         /**
@@ -143,7 +158,7 @@ class TrackingServiceTest {
         /** An order nobody is carrying yet has no assigned rider to match against. */
         @Test
         void on_an_unassigned_order_is_refused() {
-            orderAssignedTo(null);
+            orderAssignedTo(null, "READY");
 
             assertThatThrownBy(() -> tracking.ping(ORDER, RIDER, fix(33.89, 35.50, null)))
                     .isInstanceOf(TrackingService.TrackingNotFoundException.class);
@@ -166,27 +181,15 @@ class TrackingServiceTest {
             doThrow(new IllegalStateException("redis down"))
                     .when(values).set(anyString(), anyString(), any(Duration.class));
 
-            TrackingService.Position position = tracking.ping(ORDER, RIDER, fix(33.89, 35.50, null)).orElseThrow();
-
-            assertThat(position).isNotNull();
+            assertThat(tracking.ping(ORDER, RIDER, fix(33.89, 35.50, null))).isPresent();
             verify(events).save(any(TrackingEvent.class));
         }
 
         /** Accuracy is optional — not every handset reports it. */
         @Test
         void without_a_reported_accuracy_is_accepted() {
-            assertThat(tracking.ping(ORDER, RIDER, fix(33.89, 35.50, null)).orElseThrow().accuracyM()).isNull();
-        }
-
-        /**
-         * A rider carrying an order is still a rider who is present. Counting only off-order pings
-         * would empty the on-duty roster of exactly the people who are working.
-         */
-        @Test
-        void also_counts_as_evidence_that_the_rider_is_still_present() {
-            tracking.ping(ORDER, RIDER, fix(33.89, 35.50, 5.0f));
-
-            verify(presence).recordFix(eq(RIDER), any(Fix.class));
+            assertThat(tracking.ping(ORDER, RIDER, fix(33.89, 35.50, null)).orElseThrow()
+                    .position().accuracyM()).isNull();
         }
 
         /**
@@ -228,15 +231,26 @@ class TrackingServiceTest {
         }
 
         /**
-         * A rider on their way to the counter has not collected anything yet, but their position is
-         * exactly what the customer's map is for. Only the terminal statuses close the trail.
+         * Before collection the rider is on their way to the counter: the fix moves the live dot,
+         * and never goes on the trail. A claim happens wherever the rider is — often at home — and
+         * a trail starting there would keep that place for the whole retention window.
          */
         @Test
-        void before_collection_is_still_accepted() {
+        void before_collection_moves_the_live_dot_only() {
             orderInStatus("READY");
 
-            assertThat(tracking.ping(ORDER, RIDER, fix(33.89, 35.50, 5.0f))).isPresent();
+            TrackingService.Recorded recorded =
+                    tracking.ping(ORDER, RIDER, fix(33.89, 35.50, 5.0f)).orElseThrow();
 
+            assertThat(recorded.onTrail()).isFalse();
+            verify(events, never()).save(any(TrackingEvent.class));
+            verify(values).set(eq(CACHE_KEY), anyString(), any(Duration.class));
+        }
+
+        @Test
+        void once_collected_goes_on_the_trail() {
+            assertThat(tracking.ping(ORDER, RIDER, fix(33.89, 35.50, 5.0f)).orElseThrow().onTrail())
+                    .isTrue();
             verify(events).save(any(TrackingEvent.class));
         }
 
@@ -258,7 +272,7 @@ class TrackingServiceTest {
             assertThatThrownBy(() -> tracking.ping(ORDER, "other-rider", fix(33.89, 35.50, null)))
                     .isInstanceOf(TrackingService.TrackingNotFoundException.class);
 
-            verify(presence, never()).recordFix(anyString(), any(Fix.class));
+            verify(presence, never()).recordFix(anyString(), any(Fix.class), any());
         }
 
         /**
@@ -268,11 +282,11 @@ class TrackingServiceTest {
          */
         @Test
         void that_is_not_believable_writes_nothing() {
-            when(presence.recordFix(anyString(), any(Fix.class)))
+            when(presence.recordFix(anyString(), any(Fix.class), any()))
                     .thenThrow(new FixPolicy.FixRejectedException(FixPolicy.Reason.IMPLAUSIBLE_JUMP));
 
             assertThatThrownBy(() -> tracking.ping(ORDER, RIDER,
-                    new Fix(51.5074, -0.1278, 8.0f, Instant.now())))
+                    new Fix(34.4367, 35.8497, 8.0f, Instant.now())))
                     .isInstanceOf(FixPolicy.FixRejectedException.class);
 
             verify(events, never()).save(any(TrackingEvent.class));
@@ -286,7 +300,8 @@ class TrackingServiceTest {
          */
         @Test
         void that_adds_nothing_new_writes_nothing_and_returns_nothing_to_push() {
-            when(presence.recordFix(anyString(), any(Fix.class))).thenReturn(Optional.empty());
+            when(presence.recordFix(anyString(), any(Fix.class), any()))
+                    .thenReturn(Optional.empty());
 
             assertThat(tracking.ping(ORDER, RIDER, fix(33.89, 35.50, 5.0f))).isEmpty();
 
@@ -304,8 +319,8 @@ class TrackingServiceTest {
             Instant takenAt = Instant.now().minusSeconds(20);
             ArgumentCaptor<TrackingEvent> saved = ArgumentCaptor.forClass(TrackingEvent.class);
 
-            TrackingService.Position position =
-                    tracking.ping(ORDER, RIDER, new Fix(33.89, 35.50, 6.0f, takenAt)).orElseThrow();
+            TrackingService.Position position = tracking.ping(ORDER, RIDER,
+                    new Fix(33.89, 35.50, 6.0f, takenAt)).orElseThrow().position();
 
             verify(events).save(saved.capture());
             assertThat(saved.getValue().getRecordedAt()).isEqualTo(takenAt);
@@ -313,8 +328,12 @@ class TrackingServiceTest {
         }
     }
 
+    /**
+     * The order's own latest position — what the back office reads, and what the rider falls back
+     * to before their first fix of the session.
+     */
     @Nested
-    @DisplayName("reading the current position")
+    @DisplayName("reading the order's own latest position")
     class Reading {
 
         @Test
@@ -324,7 +343,7 @@ class TrackingServiceTest {
             when(values.get(CACHE_KEY)).thenReturn(objectMapper.writeValueAsString(cached));
 
             Optional<TrackingService.Position> read =
-                    tracking.currentPosition(ORDER, CUSTOMER, false);
+                    tracking.currentPosition(ORDER, BACKOFFICE, true);
 
             assertThat(read).isPresent();
             assertThat(read.get().lat()).isEqualTo(33.89);
@@ -338,7 +357,7 @@ class TrackingServiceTest {
             when(events.findLatestForOrder(eq(ORDER), any(Pageable.class)))
                     .thenReturn(List.of(event(33.89, 35.50)));
 
-            assertThat(tracking.currentPosition(ORDER, CUSTOMER, false))
+            assertThat(tracking.currentPosition(ORDER, BACKOFFICE, true))
                     .hasValueSatisfying(p -> assertThat(p.lat()).isEqualTo(33.89));
         }
 
@@ -349,7 +368,7 @@ class TrackingServiceTest {
             when(events.findLatestForOrder(eq(ORDER), any(Pageable.class)))
                     .thenReturn(List.of(event(33.89, 35.50)));
 
-            tracking.currentPosition(ORDER, CUSTOMER, false);
+            tracking.currentPosition(ORDER, BACKOFFICE, true);
 
             verify(values).set(eq(CACHE_KEY), anyString(), any(Duration.class));
         }
@@ -361,9 +380,19 @@ class TrackingServiceTest {
             when(events.findLatestForOrder(eq(ORDER), any(Pageable.class)))
                     .thenReturn(List.of(event(33.89, 35.50)));
 
-            assertThat(tracking.currentPosition(ORDER, CUSTOMER, false)).isPresent();
+            assertThat(tracking.currentPosition(ORDER, BACKOFFICE, true)).isPresent();
 
             verify(redis).delete(CACHE_KEY);
+        }
+
+        /** Nor must Redis being down: the order's latest point is in Postgres too. */
+        @Test
+        void reads_through_to_postgres_when_the_cache_is_unreachable() {
+            when(values.get(CACHE_KEY)).thenThrow(new IllegalStateException("redis down"));
+            when(events.findLatestForOrder(eq(ORDER), any(Pageable.class)))
+                    .thenReturn(List.of(event(33.89, 35.50)));
+
+            assertThat(tracking.currentPosition(ORDER, BACKOFFICE, true)).isPresent();
         }
 
         /** An order with no pings yet is empty, not an error. */
@@ -371,11 +400,21 @@ class TrackingServiceTest {
         void is_empty_when_the_rider_has_not_pinged_yet() {
             when(values.get(CACHE_KEY)).thenReturn(null);
 
-            assertThat(tracking.currentPosition(ORDER, CUSTOMER, false)).isEmpty();
+            assertThat(tracking.currentPosition(ORDER, BACKOFFICE, true)).isEmpty();
+        }
+
+        /** The rider's own latest fix, before any of this session's went on this order. */
+        @Test
+        void is_what_the_rider_sees_until_their_latest_fix_is_known() {
+            when(values.get(CACHE_KEY)).thenReturn(null);
+            when(events.findLatestForOrder(eq(ORDER), any(Pageable.class)))
+                    .thenReturn(List.of(event(33.89, 35.50)));
+
+            assertThat(tracking.currentPosition(ORDER, RIDER, false)).isPresent();
         }
 
         @Test
-        void is_visible_to_the_customer_the_merchant_and_the_rider() {
+        void is_empty_rather_than_refused_for_the_customer_and_the_shop_with_no_fix_yet() {
             when(values.get(CACHE_KEY)).thenReturn(null);
 
             for (String participant : List.of(CUSTOMER, MERCHANT, RIDER)) {
@@ -388,14 +427,6 @@ class TrackingServiceTest {
         void is_refused_to_anyone_not_on_the_order() {
             assertThatThrownBy(() -> tracking.currentPosition(ORDER, "stranger-sub", false))
                     .isInstanceOf(TrackingService.TrackingNotFoundException.class);
-        }
-
-        /** Backoffice sees everything — that is the point of the support role. */
-        @Test
-        void is_visible_to_backoffice_without_being_on_the_order() {
-            when(values.get(CACHE_KEY)).thenReturn(null);
-
-            assertThat(tracking.currentPosition(ORDER, "backoffice-sub", true)).isEmpty();
         }
 
         @Test
@@ -412,11 +443,11 @@ class TrackingServiceTest {
     class History {
 
         @Test
-        void comes_back_in_the_order_it_was_recorded() {
+        void comes_back_to_the_back_office_in_the_order_it_was_recorded() {
             when(events.findByOrderIdOrderByRecordedAtAsc(ORDER))
                     .thenReturn(List.of(event(33.80, 35.40), event(33.89, 35.50)));
 
-            List<TrackingService.Position> trail = tracking.history(ORDER, CUSTOMER, false);
+            List<TrackingService.Position> trail = tracking.history(ORDER, BACKOFFICE, true);
 
             assertThat(trail).hasSize(2);
             assertThat(trail.get(0).lat()).isEqualTo(33.80);
@@ -430,18 +461,34 @@ class TrackingServiceTest {
                     .isInstanceOf(TrackingService.TrackingNotFoundException.class);
         }
 
+        /** The shop sees the rider only until pickup, and there is no trail before it. */
         @Test
-        void is_visible_to_backoffice() {
-            assertThat(tracking.history(ORDER, "backoffice-sub", true)).isEmpty();
+        void is_never_the_shops() {
+            when(events.findByOrderIdOrderByRecordedAtAsc(ORDER))
+                    .thenReturn(List.of(event(33.80, 35.40)));
+
+            assertThat(tracking.history(ORDER, MERCHANT, false)).isEmpty();
+            verify(events, never()).findByOrderIdOrderByRecordedAtAsc(ORDER);
         }
 
         /** Never served from the cache — the cache only ever holds the latest point. */
         @Test
         void always_reads_the_full_history_from_postgres() {
-            tracking.history(ORDER, CUSTOMER, false);
+            tracking.history(ORDER, RIDER, false);
 
             verify(events).findByOrderIdOrderByRecordedAtAsc(ORDER);
             verify(values, never()).get(anyString());
+        }
+
+        /** A customer's trail needs the moment of collection; without it, none is shown. */
+        @Test
+        void is_empty_for_the_customer_while_the_collection_time_is_unknown() {
+            when(presence.latestFix(RIDER)).thenReturn(Optional.of(new PresenceService.LatestFix(
+                    RIDER, ORDER, 33.89, 35.50, 5f, Instant.now())));
+
+            assertThat(tracking.history(ORDER, CUSTOMER, false)).isEmpty();
+            verify(events, never()).findByOrderIdAndRecordedAtGreaterThanEqualOrderByRecordedAtAsc(
+                    any(UUID.class), isNull());
         }
     }
 }
