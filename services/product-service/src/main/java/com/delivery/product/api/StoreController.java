@@ -349,14 +349,20 @@ public class StoreController {
         return PageResponse.of(page.map(v -> toCard(v, starred, offersByStore)));
     }
 
-    /** The Merchant Portal's list of its own stores, in any status. */
+    /**
+     * The Merchant Portal's list of its own stores, in any status.
+     *
+     * <p>Without the areas each shop delivers to ({@code deliveryZones} is null, "not read"): they
+     * cost one or two queries a store, and nothing that reads this list draws them. The customer's
+     * shop page reads its store by id ({@link #read}), which carries them.
+     */
     @GetMapping("/mine")
     @PreAuthorize("hasRole('MERCHANT')")
     public PageResponse<StoreResponse> mine(@PageableDefault(size = 20) Pageable pageable) {
         String merchantId = CurrentUser.requireId();
         Set<UUID> starred = storeService.favoriteIdsOf(merchantId);
-        return PageResponse.of(
-                storeService.ownedByView(merchantId, pageable).map(v -> toResponse(v, starred)));
+        return PageResponse.of(storeService.ownedByView(merchantId, pageable)
+                .map(v -> toResponse(v, starred, false)));
     }
 
     /** Platform-wide promotions — the ones not tied to any single shop. */
@@ -717,7 +723,17 @@ public class StoreController {
         return StoreCards.of(v, starred, offersByStore, images);
     }
 
+    /** A whole store, with the areas it delivers to. */
     private StoreResponse toResponse(StoreView v, Set<UUID> starred) {
+        return toResponse(v, starred, true);
+    }
+
+    /**
+     * @param withAreas whether to read the areas the shop delivers to ({@link #servedZonesOf}, one
+     *                  or two queries). False leaves {@code deliveryZones} null, which a client
+     *                  reads as "not said", never as "no areas": for a list nothing draws them from.
+     */
+    private StoreResponse toResponse(StoreView v, Set<UUID> starred, boolean withAreas) {
         Store store = v.store();
         ImageUrl logo = images.resolveImage(store.getLogoRef());
         ImageUrl cover = images.resolveImage(store.getCoverRef());
@@ -756,7 +772,7 @@ public class StoreController {
                 store.getPowerUpdatedAt(),
                 v.powerCurrent(),
                 store.getDeliveryRadiusMetres(),
-                servedZonesOf(store),
+                withAreas ? servedZonesOf(store) : null,
                 store.getServiceCategory());
     }
 

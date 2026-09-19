@@ -7,6 +7,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
 import org.springframework.security.authorization.method.AuthorizationManagerBeforeMethodInterceptor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -31,6 +33,8 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -44,7 +48,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <p>What is pinned is the wire shape the app reads — the area picker's own shape, so the app parses
  * it with the model it has: each area's id, name, region, rank and whether it is still in the picker,
  * its centre only as the back office placed it, and an empty list — never a missing or null one —
- * for a shop whose areas do not limit it.
+ * for a shop whose areas do not limit it. The merchant's own list ({@code /mine}) does not read them
+ * at all.
  */
 @DisplayName("a shop's delivery area on its store read")
 class StoreDeliveryAreaApiTest {
@@ -64,12 +69,18 @@ class StoreDeliveryAreaApiTest {
                 mock(PopularServiceShops.class), zones));
         factory.setProxyTargetClass(true);
         factory.addAdvisor(AuthorizationManagerBeforeMethodInterceptor.preAuthorize());
-        mvc = MockMvcBuilders.standaloneSetup(factory.getProxy()).build();
+        mvc = MockMvcBuilders.standaloneSetup(factory.getProxy())
+                .setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())
+                .build();
 
         // A customer: the store read is theirs to make, and the areas ride on it.
-        Jwt jwt = Jwt.withTokenValue("token").header("alg", "none").subject("shopper-sub").build();
+        signIn("shopper-sub", "ROLE_CUSTOMER");
+    }
+
+    private static void signIn(String subject, String role) {
+        Jwt jwt = Jwt.withTokenValue("token").header("alg", "none").subject(subject).build();
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt,
-                List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))));
+                List.of(new SimpleGrantedAuthority(role))));
     }
 
     @AfterEach
@@ -127,5 +138,28 @@ class StoreDeliveryAreaApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.deliveryZones", hasSize(0)))
                 .andExpect(jsonPath("$.deliveryRadiusMetres").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("the merchant's own list does not read the areas, a query or two a shop nothing draws")
+    void the_merchants_own_list_leaves_the_areas_unread() throws Exception {
+        signIn("merchant-sub", "ROLE_MERCHANT");
+        Store grocer = new Store("merchant-sub", "Hamra Corner Grocer", Store.Vertical.GROCERY);
+        grocer.pinAt(GeoPoint.of(33.897700d, 35.482900d));
+        grocer.setDeliveryRadiusMetres(3_000);
+        Store bakery = new Store("merchant-sub", "Hamra Bakery", Store.Vertical.RESTAURANT);
+        when(storeService.ownedByView(eq("merchant-sub"), any())).thenReturn(new PageImpl<>(List.of(
+                new StoreView(grocer, Store.Availability.OPEN, null, false),
+                new StoreView(bakery, Store.Availability.OPEN, null, false))));
+
+        mvc.perform(get("/api/stores/mine"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.content[0].name").value("Hamra Corner Grocer"))
+                .andExpect(jsonPath("$.content[0].deliveryRadiusMetres").value(3_000))
+                // Null, "not said" — never an empty list, which would claim the areas do not limit it.
+                .andExpect(jsonPath("$.content[0].deliveryZones").doesNotExist())
+                .andExpect(jsonPath("$.content[1].deliveryZones").doesNotExist());
+        verify(zones, never()).servedAreasOf(any());
     }
 }

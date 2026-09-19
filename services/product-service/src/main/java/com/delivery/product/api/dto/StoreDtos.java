@@ -116,7 +116,8 @@ public final class StoreDtos {
              * address that checkout then refuses.
              *
              * <p>Empty means the shop does not limit its deliveries by area, never that it delivers
-             * nowhere. Never null.
+             * nowhere. Null only on the merchant's own list ({@code GET /api/stores/mine}), which
+             * does not read them: "not said", as from a server that predates the field.
              */
             List<ZoneResponse> deliveryZones,
             /** What a SERVICES shop does. Always set for a service shop and null for every other. */
