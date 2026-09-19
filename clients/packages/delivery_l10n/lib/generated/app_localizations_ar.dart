@@ -12664,12 +12664,12 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String isrchEmptyNear(String query) {
-    return 'لا توجد متاجر قريبة منك تبيع «$query»';
+    return 'لا يتوفر «$query» الآن في أي متجر مفتوح قريب منك';
   }
 
   @override
   String isrchEmptyAnywhere(String query) {
-    return 'لا توجد متاجر تبيع «$query»';
+    return 'لا يتوفر «$query» الآن في أي متجر مفتوح';
   }
 
   @override
@@ -12714,4 +12714,8 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get isrchSearching => 'جارٍ البحث عن الأصناف';
+
+  @override
+  String get isrchUseFewerWords =>
+      'استخدم خمس كلمات على الأكثر للبحث عن الأصناف.';
 }

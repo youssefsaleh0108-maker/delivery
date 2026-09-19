@@ -12518,12 +12518,12 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String isrchEmptyNear(String query) {
-    return 'No shops near you sell “$query”';
+    return 'No open shop near you has “$query” right now';
   }
 
   @override
   String isrchEmptyAnywhere(String query) {
-    return 'No shops sell “$query”';
+    return 'No open shop has “$query” right now';
   }
 
   @override
@@ -12560,4 +12560,7 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get isrchSearching => 'Searching items';
+
+  @override
+  String get isrchUseFewerWords => 'Use up to 5 words to search items.';
 }

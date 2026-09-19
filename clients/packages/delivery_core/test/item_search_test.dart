@@ -12,16 +12,19 @@ import 'package:flutter_test/flutter_test.dart';
 /// thing held here is where the customer's pin travels: in the body, never in the URL, where
 /// gateways, proxies and access logs keep it.
 class _Server implements HttpClientAdapter {
-  _Server(this.answer);
+  _Server(this.answer, {this.status = 200});
 
   final Object? Function(RequestOptions options) answer;
+
+  /// The status every answer carries: 200, or the refusal `ApiExceptionHandler` writes.
+  final int status;
   final List<RequestOptions> requests = <RequestOptions>[];
 
   @override
   Future<ResponseBody> fetch(RequestOptions options, Stream<Uint8List>? requestStream,
       Future<void>? cancelFuture) async {
     requests.add(options);
-    return ResponseBody.fromString(jsonEncode(answer(options)), 200,
+    return ResponseBody.fromString(jsonEncode(answer(options)), status,
         headers: <String, List<String>>{
           Headers.contentTypeHeader: <String>[Headers.jsonContentType],
         });
@@ -31,8 +34,9 @@ class _Server implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
-({StoreApi api, _Server server}) _stores(Object? Function(RequestOptions options) answer) {
-  final _Server server = _Server(answer);
+({StoreApi api, _Server server}) _stores(Object? Function(RequestOptions options) answer,
+    {int status = 200}) {
+  final _Server server = _Server(answer, status: status);
   final Dio dio = Dio(BaseOptions(baseUrl: 'http://gateway.test'))..httpClientAdapter = server;
   return (api: StoreApi(dio), server: server);
 }
@@ -159,6 +163,39 @@ void main() {
       expect(page.nearby, isFalse);
       expect(page.content.single.distanceMetres, isNull);
     });
+    test('words the server will not search as asked throw a refusal with its code', () async {
+      for (final String code in <String>[
+        ItemSearchRefusal.tooShort,
+        ItemSearchRefusal.tooManyWords,
+        ItemSearchRefusal.tooLong,
+        ItemSearchRefusal.badBarcode,
+      ]) {
+        final s = _stores(
+            (RequestOptions o) => <String, dynamic>{'status': 400, 'title': 'Search refused', 'code': code},
+            status: 400);
+
+        await expectLater(
+          s.api.searchItems(const ItemSearchQuery.text('a.')),
+          throwsA(isA<ItemSearchRefusal>().having((ItemSearchRefusal r) => r.code, 'code', code)),
+        );
+      }
+    });
+
+    test('a busy server, or half a pin, is not a refusal: it stays the Dio error it is', () async {
+      for (final (int status, Map<String, dynamic> body) in <(int, Map<String, dynamic>)>[
+        (429, <String, dynamic>{'status': 429, 'code': 'SEARCH_RATE_LIMITED', 'retryAfterSeconds': 1}),
+        (503, <String, dynamic>{'status': 503, 'code': 'SEARCH_TIMED_OUT', 'retryAfterSeconds': 5}),
+        (400, <String, dynamic>{'status': 400, 'title': 'Invalid location'}),
+      ]) {
+        final s = _stores((RequestOptions o) => body, status: status);
+
+        await expectLater(
+          s.api.searchItems(const ItemSearchQuery.text('pepsi')),
+          throwsA(isA<DioException>()
+              .having((DioException e) => e.response?.statusCode, 'status', status)),
+        );
+      }
+    });
   });
 
   group('an item search page', () {
@@ -202,5 +239,6 @@ void main() {
       expect(const ItemSearchQuery.text('pepsi'), const ItemSearchQuery.text('pepsi'));
       expect(const ItemSearchQuery.text('pepsi') == const ItemSearchQuery.text('cola'), isFalse);
     });
+
   });
 }

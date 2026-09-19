@@ -21240,13 +21240,13 @@ abstract class DeliveryStrings {
   /// No description provided for @isrchEmptyNear.
   ///
   /// In en, this message translates to:
-  /// **'No shops near you sell “{query}”'**
+  /// **'No open shop near you has “{query}” right now'**
   String isrchEmptyNear(String query);
 
   /// No description provided for @isrchEmptyAnywhere.
   ///
   /// In en, this message translates to:
-  /// **'No shops sell “{query}”'**
+  /// **'No open shop has “{query}” right now'**
   String isrchEmptyAnywhere(String query);
 
   /// No description provided for @isrchEmptyTruncated.
@@ -21284,6 +21284,12 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Searching items'**
   String get isrchSearching;
+
+  /// No description provided for @isrchUseFewerWords.
+  ///
+  /// In en, this message translates to:
+  /// **'Use up to 5 words to search items.'**
+  String get isrchUseFewerWords;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

@@ -6,7 +6,9 @@ import 'store_models.dart';
 /// [q] is what a customer typed. [terms] is how a caller that already has its words asks, such as the
 /// name, Arabic name and brand a photo was read as; both fill the same three slots on the server, [q]
 /// first. [barcode] is 8 to 14 digits, matched exactly. The server refuses a query with none of the
-/// three, or a word under two characters (`SEARCH_TOO_SHORT`).
+/// three, a term under two characters or with no word of two letters or digits once spelled its way
+/// ("a.", [ItemSearchRefusal.tooShort]), or with more than five such words
+/// ([ItemSearchRefusal.tooManyWords]).
 class ItemSearchQuery {
   const ItemSearchQuery({this.q, this.terms = const <String>[], this.barcode});
 
@@ -165,4 +167,27 @@ class ItemSearchPage extends Paged<ItemSearchGroup> {
       nearby: json['nearby'] as bool? ?? false,
     );
   }
+}
+
+/// A search the server refused as it was asked: a 400 whose `code` is one of `ItemSearchService`'s.
+///
+/// The same words asked again get the same answer, so a screen says what to change rather than
+/// offering to try again: [tooShort] when no word has two letters or digits ("a.", "1 l"),
+/// [tooManyWords] past five words, [tooLong] past 100 characters. [tooManyTerms] and [badBarcode] are
+/// a caller's mistake. A busy server is not a refusal: its 429 and 503 stay the Dio errors they are,
+/// and trying again a moment later works.
+class ItemSearchRefusal implements Exception {
+  const ItemSearchRefusal(this.code);
+
+  /// The server's `code`, one of the constants below or a newer one this app does not know yet.
+  final String code;
+
+  static const String tooShort = 'SEARCH_TOO_SHORT';
+  static const String tooLong = 'SEARCH_TOO_LONG';
+  static const String tooManyTerms = 'SEARCH_TOO_MANY_TERMS';
+  static const String tooManyWords = 'SEARCH_TOO_MANY_WORDS';
+  static const String badBarcode = 'SEARCH_BAD_BARCODE';
+
+  @override
+  String toString() => 'ItemSearchRefusal($code)';
 }

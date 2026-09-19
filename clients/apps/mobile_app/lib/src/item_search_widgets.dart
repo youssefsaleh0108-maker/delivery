@@ -12,10 +12,23 @@ import 'store_state_mapping.dart';
 String itemSearchTitle(DeliveryStrings t, {required bool nearby}) =>
     nearby ? t.isrchNearTitle : t.isrchAnywhereTitle;
 
-/// What an item search that found nothing says: no shop near the customer sells it, or none at all
-/// without a pin.
+/// What an item search that found nothing says: no open shop near the customer has it right now, or
+/// none at all without a pin.
+///
+/// Never "no shop sells it": the search leaves out shops that are closed now and items that are out of
+/// stock, so at night an empty answer usually means "not open now", and a shop that sells it may well
+/// open in the morning.
 String itemSearchEmptyTitle(DeliveryStrings t, String query, {required bool nearby}) =>
     nearby ? t.isrchEmptyNear(query) : t.isrchEmptyAnywhere(query);
+
+/// What to change when the server would not search the words as typed ([ItemSearchRefusal]): too
+/// many words, or too long; otherwise the words were too short, such as "a." or "1 l". Asking again
+/// would get the same answer, so a screen shows this with no retry.
+String itemSearchRefusalText(DeliveryStrings t, ItemSearchRefusal refusal) =>
+    switch (refusal.code) {
+      ItemSearchRefusal.tooManyWords || ItemSearchRefusal.tooLong => t.isrchUseFewerWords,
+      _ => t.isrchTypeMore,
+    };
 
 /// What a truncated answer adds to that: only the best [ItemSearchPage.candidateLimit] matches were
 /// looked at, so "no shop sells it" is not the whole truth. Null when nothing needs adding.

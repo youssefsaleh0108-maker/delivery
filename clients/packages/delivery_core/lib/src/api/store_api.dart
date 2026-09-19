@@ -185,8 +185,10 @@ class StoreApi {
   /// the best match; without one every live goods shop is, and [ItemSearchPage.nearby] is false.
   ///
   /// A JSON body rather than query parameters, so the pin is never in a URL, where gateways and access
-  /// logs keep it. [size] is at most 20 on the server. Refusals arrive as the [DioException] they are:
-  /// a 400 with a `code` for a query too short or a barcode that is not one, and 400 for half a pin.
+  /// logs keep it. [size] is at most 20 on the server. A query the server will not search as asked
+  /// throws [ItemSearchRefusal] with its `code` (too short, too many words, too long, not a barcode);
+  /// anything else arrives as the [DioException] it is: 400 for half a pin, and 429 or 503, with a
+  /// Retry-After, when the account searched too often or the database was too busy.
   Future<ItemSearchPage> searchItems(
     ItemSearchQuery query, {
     double? latitude,
@@ -195,16 +197,26 @@ class StoreApi {
     int size = 10,
   }) async {
     final bool pinned = latitude != null && longitude != null;
-    final Response<dynamic> response = await _dio.post<dynamic>(
-      '/api/products/search/items',
-      data: <String, dynamic>{
-        ...query.toJson(),
-        if (pinned) 'latitude': latitude,
-        if (pinned) 'longitude': longitude,
-        'page': page,
-        'size': size,
-      },
-    );
+    final Response<dynamic> response;
+    try {
+      response = await _dio.post<dynamic>(
+        '/api/products/search/items',
+        data: <String, dynamic>{
+          ...query.toJson(),
+          if (pinned) 'latitude': latitude,
+          if (pinned) 'longitude': longitude,
+          'page': page,
+          'size': size,
+        },
+      );
+    } on DioException catch (e) {
+      final Object? body = e.response?.data;
+      final Object? code = body is Map ? body['code'] : null;
+      if (e.response?.statusCode == 400 && code is String && code.startsWith('SEARCH_')) {
+        throw ItemSearchRefusal(code);
+      }
+      rethrow;
+    }
     final Object? body = response.data;
     return ItemSearchPage.fromJson(body is Map<String, dynamic> ? body : const <String, dynamic>{});
   }

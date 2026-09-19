@@ -16,7 +16,10 @@ import 'item_search_widgets.dart';
 /// Drawn once the search reaches [ItemSearchQuery.minLength] characters: the first three shops that
 /// sell a match, each with its best two items and an Add, then "See all items", which opens
 /// [ItemSearchScreen] on the same words. "See all items" is drawn only when there is more than this
-/// shows: another shop, or a match this card leaves out.
+/// shows: another shop, or a match this card leaves out. When nothing is found, one line says no open
+/// shop near the customer has it right now ([itemSearchEmptyTitle]: closed shops and sold-out items
+/// are left out, so it never says nobody sells it), and when the server stopped at its ceiling, a
+/// second line says how far it looked, as the results screen does.
 ///
 /// Never in the way: while the app knows it is offline, and whenever the search fails, the section is
 /// not drawn at all, and the shop grid under it carries on as it always did. It follows the words
@@ -207,12 +210,21 @@ class _HomeItemSearchSectionState extends State<HomeItemSearchSection> {
                 ),
               ),
             )
-          else if (page.content.isEmpty)
+          else if (page.content.isEmpty) ...<Widget>[
             Text(
               itemSearchEmptyTitle(t, query.label, nearby: nearby),
               style: const TextStyle(fontSize: 13, color: DeliveryColors.muted, height: 1.35),
-            )
-          else
+            ),
+            // As on the results screen: when the server stopped at its ceiling, nothing here is not
+            // the whole truth, and the line says how far it looked.
+            if (itemSearchTruncatedNote(t, page) case final String note) ...<Widget>[
+              const SizedBox(height: DeliverySpacing.xs),
+              Text(
+                note,
+                style: const TextStyle(fontSize: 12, color: DeliveryColors.muted, height: 1.35),
+              ),
+            ],
+          ] else
             AnimatedBuilder(
               animation: Listenable.merge(<Listenable>[widget.cart, MarketRates.instance]),
               builder: (BuildContext context, _) => Column(

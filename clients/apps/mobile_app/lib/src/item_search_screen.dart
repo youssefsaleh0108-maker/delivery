@@ -230,6 +230,11 @@ class _ItemSearchScreenState extends State<ItemSearchScreen> {
     if (_groups.isLoadingFirstPage) {
       return const Center(child: CircularProgressIndicator(color: DeliveryColors.brand));
     }
+    // The server would not search these words as typed ("a.", six words): asking again gets the same
+    // answer, so the screen says what to change and offers no retry.
+    if (_groups.error case final ItemSearchRefusal refusal when _groups.isEmpty) {
+      return YdEmptyState(icon: Icons.search_rounded, title: itemSearchRefusalText(t, refusal));
+    }
     if (_groups.isEmpty && _groups.error != null) {
       return YdEmptyState(
         icon: Icons.cloud_off_rounded,

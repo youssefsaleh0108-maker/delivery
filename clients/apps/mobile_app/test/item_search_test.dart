@@ -113,11 +113,13 @@ void main() {
   final List<RequestOptions> reads = <RequestOptions>[];
 
   /// A fake gateway: [search] answers the item search from the request body, or null to fail it with
-  /// a 500; [options] gives a product's option groups (none by default). The rest of what the shell
-  /// and a shop page read on start is answered empty.
+  /// a 500; with a [searchStatus] other than 200 its answer is the error body of that status, as
+  /// `ApiExceptionHandler` writes a refusal. [options] gives a product's option groups (none by
+  /// default). The rest of what the shell and a shop page read on start is answered empty.
   Dio gateway(
     Map<String, dynamic>? Function(Map<String, dynamic> body) search, {
     Map<String, List<Map<String, dynamic>>> options = const <String, List<Map<String, dynamic>>>{},
+    int searchStatus = 200,
   }) {
     final Dio dio = Dio(BaseOptions(baseUrl: 'http://127.0.0.1:1'));
     dio.interceptors.add(InterceptorsWrapper(
@@ -128,7 +130,16 @@ void main() {
           final Map<String, dynamic> sent = Map<String, dynamic>.from(o.data as Map<dynamic, dynamic>);
           searches.add(sent);
           body = search(sent);
-          if (body == null) status = 500;
+          if (body == null) {
+            status = 500;
+          } else if (searchStatus != 200) {
+            h.reject(DioException(
+              requestOptions: o,
+              type: DioExceptionType.badResponse,
+              response: Response<dynamic>(requestOptions: o, statusCode: searchStatus, data: body),
+            ));
+            return;
+          }
         } else if (o.method == 'GET') {
           reads.add(o);
           final String path = o.path;
@@ -283,6 +294,28 @@ void main() {
       await tester.pumpAndSettle();
       expect(searches, hasLength(1));
       expect(find.text(en.isrchAnywhereTitle), findsOneWidget);
+    });
+
+    testWidgets('nothing open has it: says so, and says how far the server looked when it stopped',
+        (WidgetTester tester) async {
+      await pumpShell(tester,
+          gateway((_) => answerOf(const <Map<String, dynamic>>[], nearby: false, truncated: true)));
+
+      await type(tester, 'pepsi');
+
+      expect(find.text(en.isrchEmptyAnywhere('pepsi')), findsOneWidget);
+      expect(find.text(en.isrchEmptyTruncated(300)), findsOneWidget);
+      expect(find.text(en.isrchSeeAll), findsNothing);
+    });
+
+    testWidgets('nothing open has it, and the server looked at everything: no note',
+        (WidgetTester tester) async {
+      await pumpShell(tester, gateway((_) => answerOf(const <Map<String, dynamic>>[], nearby: false)));
+
+      await type(tester, 'pepsi');
+
+      expect(find.text(en.isrchEmptyAnywhere('pepsi')), findsOneWidget);
+      expect(find.text(en.isrchEmptyTruncated(300)), findsNothing);
     });
 
     testWidgets('a failed search draws nothing, and the shop grid carries on',
@@ -476,6 +509,44 @@ void main() {
       expect(find.text(en.tryAgain), findsOneWidget);
     });
 
+    testWidgets('words the server will not search say what to change, with nothing to retry',
+        (WidgetTester tester) async {
+      await pumpResults(
+          tester,
+          gateway((_) => <String, dynamic>{'status': 400, 'code': 'SEARCH_TOO_SHORT'},
+              searchStatus: 400));
+
+      expect(find.text(en.isrchTypeMore), findsOneWidget);
+      expect(find.text(en.isrchCouldNotSearch), findsNothing);
+      expect(find.text(en.tryAgain), findsNothing);
+
+      // A new screen, not the old one's state asked again.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await pumpResults(
+          tester,
+          gateway((_) => <String, dynamic>{'status': 400, 'code': 'SEARCH_TOO_MANY_WORDS'},
+              searchStatus: 400));
+
+      expect(find.text(en.isrchUseFewerWords), findsOneWidget);
+      expect(find.text(en.tryAgain), findsNothing);
+    });
+
+    testWidgets('a server too busy to search now offers to try again', (WidgetTester tester) async {
+      for (final (int status, String code) in <(int, String)>[
+        (429, 'SEARCH_RATE_LIMITED'),
+        (503, 'SEARCH_TIMED_OUT'),
+      ]) {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await pumpResults(
+            tester,
+            gateway((_) => <String, dynamic>{'status': status, 'code': code, 'retryAfterSeconds': 5},
+                searchStatus: status));
+
+        expect(find.text(en.isrchCouldNotSearch), findsOneWidget, reason: code);
+        expect(find.text(en.tryAgain), findsOneWidget, reason: code);
+      }
+    });
+
     testWidgets('fits a 320dp phone, busy shop and long names included', (WidgetTester tester) async {
       await pumpResults(
         tester,
@@ -516,6 +587,16 @@ void main() {
       expect(find.text(ar.statusBusy), findsOneWidget);
       expect(find.text(ar.dekkaneDistanceMetres(350)), findsOneWidget);
     });
+  });
+
+  // ------------------------------------------------------------------------------ the words
+
+  test('an empty answer says no open shop has it right now, never that no shop sells it', () {
+    expect(en.isrchEmptyNear('pepsi'), 'No open shop near you has “pepsi” right now');
+    expect(en.isrchEmptyAnywhere('pepsi'), 'No open shop has “pepsi” right now');
+    expect(ar.isrchEmptyNear('بيبسي'), 'لا يتوفر «بيبسي» الآن في أي متجر مفتوح قريب منك');
+    expect(ar.isrchEmptyAnywhere('بيبسي'), 'لا يتوفر «بيبسي» الآن في أي متجر مفتوح');
+    expect(ar.isrchUseFewerWords, isNot(en.isrchUseFewerWords));
   });
 
   // ------------------------------------------------------------------------------ the section alone

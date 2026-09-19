@@ -6096,9 +6096,9 @@
   "isrchAnywhereTitle": "Items in shops",
   "isrchSeeAll": "See all items",
   "isrchFieldHint": "Search items in shops",
-  "isrchEmptyNear": "No shops near you sell “{query}”",
+  "isrchEmptyNear": "No open shop near you has “{query}” right now",
   "@isrchEmptyNear": {"placeholders":{"query":{"type":"String"}}},
-  "isrchEmptyAnywhere": "No shops sell “{query}”",
+  "isrchEmptyAnywhere": "No open shop has “{query}” right now",
   "@isrchEmptyAnywhere": {"placeholders":{"query":{"type":"String"}}},
   "isrchEmptyTruncated": "{count, plural, =1{Only the best match was checked.} other{Only the {count} best matches were checked.}}",
   "@isrchEmptyTruncated": {"placeholders":{"count":{"type":"int"}}},
@@ -6107,5 +6107,6 @@
   "@isrchMoreInStore": {"placeholders":{"count":{"type":"int"}}},
   "isrchCouldNotSearch": "We couldn't search items just now.",
   "isrchTypeMore": "Type at least 2 letters to search items.",
-  "isrchSearching": "Searching items"
+  "isrchSearching": "Searching items",
+  "isrchUseFewerWords": "Use up to 5 words to search items."
 }
