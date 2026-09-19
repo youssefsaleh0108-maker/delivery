@@ -481,7 +481,14 @@ public class OnboardingService {
         }
 
         application.approve(reviewer, outstanding);
-        applications.save(application);
+        // Flushed here, before anything leaves this service. The row's version is checked by this
+        // UPDATE, so a write that landed since the application was read (a sign-in being recorded,
+        // another reviewer's decision) fails now, while nothing has happened yet. Left to the commit,
+        // the check ran after the engine had granted roles in Keycloak, attached a rider to their
+        // company in Order Manager, taken APPLICANT away and told the applicant — and the 409 then
+        // left all of that done for an application nobody had decided. From here to the commit the
+        // row stays locked, so no other write can get in between.
+        applications.saveAndFlush(application);
         completeReview(application, true);
 
         if (outstanding == null) {
@@ -933,6 +940,10 @@ public class OnboardingService {
      * <p>Inside the transaction and before the engine tells them, on purpose — the pattern
      * suspension follows. If Keycloak refuses, the rejection rolls back and is never announced, so the
      * record cannot claim a decision whose access change did not happen; the reviewer tries again.
+     *
+     * <p>The decision is written to the database first, and flushed, so that somebody else's write
+     * since the application was read fails before Keycloak or the engine is asked anything. Both
+     * decisions work this way; see {@link #approve(UUID, String, boolean)}.
      */
     @Transactional
     public OnboardingApplication reject(UUID id, String reviewer, String reason) {
@@ -942,7 +953,10 @@ public class OnboardingService {
         } catch (IllegalArgumentException e) {
             throw new ApplicationRuleException(e.getMessage());
         }
-        applications.save(application);
+        // Flushed before Keycloak or the engine hears of it, for the reason approve gives: a
+        // version conflict has to surface while nothing has been done, not at the commit, after
+        // the role was taken and the applicant told.
+        applications.saveAndFlush(application);
         withdrawLiveRoleOnRejection(application);
         completeReview(application, false);
         log.info("{} declined application {}: {}", reviewer, application.getId(), reason);

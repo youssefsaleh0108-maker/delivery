@@ -123,7 +123,9 @@ class ApplicantSignInTest {
         // Every read by id is a fresh copy of the row, as another transaction reads it: what the
         // approval changes in its own copy is only ever the database's if its transaction commits.
         when(applications.findById(sam.getId())).thenAnswer(call -> Optional.of(storedCopy()));
-        when(applications.save(any())).thenAnswer(call -> {
+        // A decision is written with saveAndFlush, so that a version conflict surfaces before the
+        // engine does anything remote.
+        when(applications.saveAndFlush(any())).thenAnswer(call -> {
             events.add(where("save " + call.<OnboardingApplication>getArgument(0).getStatus()));
             return call.getArgument(0);
         });
