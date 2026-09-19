@@ -177,19 +177,21 @@ check('and allows the method the form uses',
   /access-control-allow-methods:.*POST/i.test(preflight), 'POST');
 
 const tag = Date.now().toString(36).slice(-6);
-const email = `website-${tag}@example.test`;
+const email = `website-${tag}@youdrop.test`;
 
 const post = (path, body) => split(sh(`curl -s -X POST -w "~~%{http_code}" "${GW}${path}"`
   + ` -H "Origin: ${SITE}" -H "Content-Type: application/json"`
   + ` -d "${JSON.stringify(body).replace(/"/g, '\\"')}"`));
 
 // An application now needs a proved address, so the suite has to earn one the same way a visitor
-// does. The code is read from the delivery log, which is this environment's stand-in for an inbox.
+// does. The code is read from Notifications Manager's test code sink, this environment's stand-in
+// for an inbox: the delivery log masks every code, and the sink keeps them only for @youdrop.test
+// addresses where TEST_CODE_SINK_ENABLED is on.
 const asked = post('/api/onboarding/verifications', { channel: 'EMAIL', destination: email });
 check('the site can ask for a verification code', asked.code === '200', `HTTP ${asked.code}`);
 
 const message = sh('docker exec delivery-postgres psql -U delivery -d delivery -tAc '
-  + `"SELECT body FROM notification.notification_log WHERE recipient = '${email}'`
+  + `"SELECT code FROM notification.test_code_sink WHERE recipient = '${email}'`
   + ' ORDER BY created_at DESC LIMIT 1"').trim();
 const code = (message.match(/\b(\d{6})\b/) || [])[1];
 // Asserted before it is used: without this, a missing code turns every check below into a test of

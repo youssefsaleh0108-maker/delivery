@@ -631,6 +631,72 @@ class VerificationServiceTest {
         }
     }
 
+    /**
+     * The passcode step's other secret: a code answered on the application's address recently, for
+     * an applicant whose account-setup ticket is lost or expired. A confirmed proof otherwise lives
+     * until it is spent; something that sets a passcode needs one that says the inbox is held now.
+     */
+    @Nested
+    @DisplayName("a proof fresh enough to set a passcode")
+    class Fresh {
+
+        private final Duration halfAnHour = Duration.ofMinutes(30);
+
+        private ContactVerification known(ContactVerification proof) {
+            when(verifications.findByToken(proof.getToken())).thenReturn(Optional.of(proof));
+            return proof;
+        }
+
+        @Test
+        void one_confirmed_just_now_for_this_address_is() {
+            ContactVerification proof = known(confirmedFor(Channel.EMAIL, "sam@example.test"));
+
+            assertThat(service.isFreshlyVerified(proof.getToken(), Channel.EMAIL, "Sam@Example.test",
+                    halfAnHour)).isTrue();
+            // Looked at, not spent: the sign-in it sets up spends it.
+            assertThat(proof.getConsumedAt()).isNull();
+        }
+
+        @Test
+        void one_confirmed_an_hour_ago_is_not() {
+            ContactVerification proof = known(confirmedFor(Channel.EMAIL, "sam@example.test"));
+            org.springframework.test.util.ReflectionTestUtils.setField(
+                    proof, "confirmedAt", Instant.now().minus(Duration.ofHours(1)));
+
+            assertThat(service.isFreshlyVerified(proof.getToken(), Channel.EMAIL, "sam@example.test",
+                    halfAnHour)).isFalse();
+        }
+
+        @Test
+        void a_spent_one_another_address_a_reset_proof_or_nothing_is_not() {
+            ContactVerification spent = known(confirmedFor(Channel.EMAIL, "sam@example.test"));
+            spent.consume();
+            ContactVerification elsewhere = known(confirmedFor(Channel.EMAIL, "mallory@example.test"));
+            ContactVerification.Issued reset = ContactVerification.issue(
+                    Channel.EMAIL, "sam@example.test", ContactVerification.Purpose.PASSWORD_RESET);
+            reset.verification().confirm(reset.code());
+            known(reset.verification());
+
+            assertThat(service.isFreshlyVerified(spent.getToken(), Channel.EMAIL, "sam@example.test",
+                    halfAnHour)).isFalse();
+            assertThat(service.isFreshlyVerified(elsewhere.getToken(), Channel.EMAIL,
+                    "sam@example.test", halfAnHour)).isFalse();
+            assertThat(service.isFreshlyVerified(reset.verification().getToken(), Channel.EMAIL,
+                    "sam@example.test", halfAnHour)).isFalse();
+            assertThat(service.isFreshlyVerified(null, Channel.EMAIL, "sam@example.test", halfAnHour))
+                    .isFalse();
+        }
+
+        @Test
+        void an_unanswered_challenge_is_not() {
+            ContactVerification asked = known(
+                    ContactVerification.issue(Channel.EMAIL, "sam@example.test").verification());
+
+            assertThat(service.isFreshlyVerified(asked.getToken(), Channel.EMAIL, "sam@example.test",
+                    halfAnHour)).isFalse();
+        }
+    }
+
     /** Guards the assumption the rest of this file rests on: both channels behave the same way. */
     @Test
     void both_channels_are_covered_by_the_same_rules() {

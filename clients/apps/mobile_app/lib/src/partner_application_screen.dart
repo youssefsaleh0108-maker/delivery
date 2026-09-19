@@ -53,6 +53,24 @@ enum PartnerKind {
   carrier,
 }
 
+/// A region's name in the reader's language: the five a delivery company registers with, and any
+/// other name exactly as it came.
+///
+/// The five are the carrier wizard's coverage chips, and the only registered regions the server ever
+/// shows a rider (onboarding-service `HiringCompanies.REGISTRATION_REGIONS`) — a company with no zones
+/// is listed with them, spelled in English whatever the phone's language. They are matched by that
+/// exact spelling and nothing looser, because anything else is a zone a company drew and named
+/// itself: its own words, which no translation here could know. Display only — the English name is
+/// what travels to the server, and what it matches.
+String areaLabel(DeliveryStrings t, String name) => switch (name) {
+      'Beirut' => t.riderRegionAreaBeirut,
+      'Mount Lebanon' => t.riderRegionAreaMountLebanon,
+      'North' => t.riderRegionAreaNorth,
+      'South' => t.riderRegionAreaSouth,
+      'Bekaa' => t.riderRegionAreaBekaa,
+      _ => name,
+    };
+
 /// What a rider drives (Figma `vehicle-grid` 22:503).
 ///
 /// The wire token is sent rather than the label: a reviewer in the backoffice must see the same
@@ -223,6 +241,14 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   String? _verifiedEmail;
   String? _phoneToken;
   String? _verifiedPhone;
+
+  /// The address and the number as they were typed when their codes were confirmed — what
+  /// [_heldProof] compares the fields with, because the server's spelling ([_verifiedEmail],
+  /// [_verifiedPhone]) is not what the field shows: a number gains its country code, an address
+  /// loses its capitals.
+  String? _emailProvedAs;
+  String? _phoneProvedAs;
+
   bool _busy = false;
   String? _error;
 
@@ -231,6 +257,25 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   /// Close rather than a "Try again" that could only ever repeat the same answer.
   bool _applicationClosed = false;
   String? _reference;
+
+  /// The account-setup ticket the submission answered with: what lets this applicant — and not
+  /// whoever else can read the [_reference] — choose the passcode.
+  ///
+  /// The reference is a display id: back office sees it, a rider's delivery company sees it and its
+  /// portal prints it. So `POST /applications/{reference}/account` asks for this as well, in the body.
+  /// Held in memory only, for the half hour the server honours it, and dropped once the sign-in is
+  /// made. Null when it was never given (a server older than tickets) or has been refused — the
+  /// passcode step then proves the address again instead ([_reproveEmail]).
+  String? _accountTicket;
+
+  /// A fresh proof of the application's address, from a code answered after the ticket was refused
+  /// or never came: what the passcode step sends in the ticket's place.
+  String? _signInProof;
+
+  /// True while the email round is proving the address again for the sign-in — after the
+  /// application is in — rather than for the application itself. The code screen then says why it is
+  /// asking twice, its answer goes to [_finishAccount], and back returns to the finishing screen.
+  bool _reprovingEmail = false;
 
   /// True once the account exists. Creating it is not retryable — the server refuses a second
   /// sign-in for one application — so a later failure must retry the sign-in alone.
@@ -412,7 +457,15 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         setState(() {
           _error = null;
           _emailCode.clear();
-          _phase = _Phase.wizard;
+          if (_reprovingEmail) {
+            // The application is in: back is back to where its sign-in waits, whose Try again asks
+            // for a code once more — never to a wizard whose answers were already sent.
+            _reprovingEmail = false;
+            _phase = _Phase.finishing;
+            _error = DeliveryStrings.of(context).wizAccountProofRejected;
+          } else {
+            _phase = _Phase.wizard;
+          }
         });
       case _Phase.verifyPhone:
         setState(() {
@@ -452,19 +505,16 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   ///
   /// An account applying skips the email round — its address is already proved — and goes to the
   /// phone round only when a number was typed, exactly as the open form does after its email.
+  ///
+  /// A round whose proof is still held is not run again. That is the rider the server sent back to
+  /// choose another company ([_companyRefused]): the refusal comes before the application is
+  /// recorded, and a proof is only spent with the record, so both proofs are as good as when they
+  /// were made. Asking for fresh codes instead made them wait for two more messages for nothing —
+  /// and a code asked for within a minute of the last is refused (429), which stranded the rider on
+  /// a code that never came.
   Future<void> _beginSubmit() async {
-    if (_forAccount) {
-      if (_phone.text.trim().isEmpty) {
-        await _send();
-        return;
-      }
-      try {
-        await _sendCode('PHONE', _phone.text.trim());
-      } catch (_) {
-        return;
-      }
-      if (!mounted) return;
-      setState(() => _phase = _Phase.verifyPhone);
+    if (_forAccount || _heldProof(_emailToken, _emailProvedAs, _email)) {
+      await _phoneRound();
       return;
     }
     try {
@@ -476,18 +526,59 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
     setState(() => _phase = _Phase.verifyEmail);
   }
 
+  /// Whether a proof from an earlier round can go out again as it is: there is one, and the field
+  /// still says what was proved. A changed address or number needs its own code — its proof names
+  /// the old one, and sending that would apply under a contact the applicant has just replaced.
+  bool _heldProof(String? token, String? provedAs, TextEditingController field) =>
+      token != null && provedAs != null && field.text.trim() == provedAs;
+
+  /// The number's round, once the address is proved: none when no number was typed, none when the
+  /// number already has a proof held ([_heldProof]), and otherwise a code to it.
+  Future<void> _phoneRound() async {
+    final String phone = _phone.text.trim();
+    if (phone.isEmpty) {
+      // No number now, so no proof of one either: a number cleared since it was proved must not
+      // travel with the application.
+      _verifiedPhone = null;
+      _phoneToken = null;
+      _phoneProvedAs = null;
+      await _send();
+      return;
+    }
+    if (_heldProof(_phoneToken, _phoneProvedAs, _phone)) {
+      await _send();
+      return;
+    }
+    try {
+      await _sendCode('PHONE', phone);
+    } catch (_) {
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _phase = _Phase.verifyPhone);
+  }
+
   Future<void> _confirmEmail() async {
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      final ({String token, String destination}) result = await widget.api
-          .confirmCode('EMAIL', _email.text.trim(), _emailCode.text.trim());
-      // The server's spelling, not what was typed. The application has to carry exactly what was
-      // verified or it is refused for a reason nobody can see on screen.
-      _verifiedEmail = result.destination;
-      _emailToken = result.token;
+      if (_reprovingEmail) {
+        // The application's own address, as the server spelled it: the proof has to name the
+        // address on the application, or the passcode step refuses it.
+        _signInProof = (await widget.api
+                .confirmCode('EMAIL', _verifiedEmail!, _emailCode.text.trim()))
+            .token;
+      } else {
+        final ({String token, String destination}) result = await widget.api
+            .confirmCode('EMAIL', _email.text.trim(), _emailCode.text.trim());
+        // The server's spelling, not what was typed. The application has to carry exactly what was
+        // verified or it is refused for a reason nobody can see on screen.
+        _verifiedEmail = result.destination;
+        _emailToken = result.token;
+        _emailProvedAs = _email.text.trim();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -498,19 +589,41 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
       return;
     }
     if (!mounted) return;
-    setState(() => _busy = false);
-
-    if (_phone.text.trim().isEmpty) {
-      await _send();
+    if (_reprovingEmail) {
+      setState(() {
+        _busy = false;
+        _reprovingEmail = false;
+        _phase = _Phase.finishing;
+      });
+      await _finishAccount();
       return;
     }
+    setState(() => _busy = false);
+    await _phoneRound();
+  }
+
+  /// Proves the application's address again, for the passcode step alone: a new code to it, and the
+  /// code screen.
+  ///
+  /// For when the account-setup ticket cannot carry the step — refused as spent or past its half hour
+  /// (an applicant who left the retry for later), or never given. The reference cannot stand in: it
+  /// is no secret. A fresh code on the address can, and only the applicant can answer one.
+  Future<void> _reproveEmail() async {
+    _accountTicket = null;
+    _signInProof = null;
+    _emailCode.clear();
     try {
-      await _sendCode('PHONE', _phone.text.trim());
+      await _sendCode('EMAIL', _verifiedEmail!);
     } catch (_) {
+      // Already on screen, in the server's words — a code asked for too soon, say. Try again on the
+      // finishing screen asks once more.
       return;
     }
     if (!mounted) return;
-    setState(() => _phase = _Phase.verifyPhone);
+    setState(() {
+      _reprovingEmail = true;
+      _phase = _Phase.verifyEmail;
+    });
   }
 
   Future<void> _confirmPhone() async {
@@ -523,6 +636,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
           .confirmCode('PHONE', _phone.text.trim(), _phoneCode.text.trim());
       _verifiedPhone = result.destination;
       _phoneToken = result.token;
+      _phoneProvedAs = _phone.text.trim();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -543,6 +657,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
     _phone.clear();
     _verifiedPhone = null;
     _phoneToken = null;
+    _phoneProvedAs = null;
     await _send();
   }
 
@@ -574,13 +689,20 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
       put('vehicleYear', _vehicleYear.text);
       put('dateOfBirth', _dateOfBirth.text);
       put('nationalId', _nationalId.text);
-      put('preferredArea', _preferredArea.text);
-      // The pin, when there is one. Sent as numbers rather than a formatted string so a reviewer's
-      // console can put it back on a map; absent entirely when the applicant never placed one,
-      // because "no answer" and "0, 0" are different answers and the second is in the Atlantic.
-      if (_workPin != null) {
-        details['workLatitude'] = _workPin!.latitude;
-        details['workLongitude'] = _workPin!.longitude;
+      // Where they will work is only theirs to say when they ride for YouDrop. A rider joining a
+      // company works where the company works: they were shown its region, read-only, and the server
+      // records that region from its own list — so nothing typed or pinned before they picked the
+      // company travels with the application.
+      if (_company == null) {
+        put('preferredArea', _preferredArea.text);
+        // The pin, when there is one. Sent as numbers rather than a formatted string so a
+        // reviewer's console can put it back on a map; absent entirely when the applicant never
+        // placed one, because "no answer" and "0, 0" are different answers and the second is in the
+        // Atlantic.
+        if (_workPin != null) {
+          details['workLatitude'] = _workPin!.latitude;
+          details['workLongitude'] = _workPin!.longitude;
+        }
       }
       details['ridesFor'] = _company == null ? 'YOUDROP' : _company!.name;
     } else {
@@ -603,42 +725,47 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
       return;
     }
     try {
-      _reference ??= _isRider
-          ? await widget.api.applyAsRider(
-              name: _name.text.trim(),
-              email: _verifiedEmail!,
-              emailVerificationToken: _emailToken!,
-              // Null when they chose us. The server reads that as an application to YouDrop's own
-              // fleet and routes it to the backoffice rather than to a company.
-              companyId: _company?.id,
-              phone: _verifiedPhone,
-              phoneVerificationToken: _phoneToken,
-              notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
-              details: _details,
-            )
-          : _isCarrier
-              ? await widget.api.applyAsCarrier(
-                  companyName: _business.text.trim(),
-                  contactName: _name.text.trim(),
-                  email: _verifiedEmail!,
-                  emailVerificationToken: _emailToken!,
-                  phone: _verifiedPhone,
-                  phoneVerificationToken: _phoneToken,
-                  notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
-                  details: _details,
-                )
-              : await widget.api.applyAsMerchant(
-                  businessName: _business.text.trim(),
-                  contactName: _name.text.trim(),
-                  email: _verifiedEmail!,
-                  emailVerificationToken: _emailToken!,
-                  phone: _verifiedPhone,
-                  phoneVerificationToken: _phoneToken,
-                  notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
-                  details: _details,
-                );
+      if (_reference == null) {
+        final ({String reference, String? accountTicket}) submitted = _isRider
+            ? await widget.api.applyAsRider(
+                name: _name.text.trim(),
+                email: _verifiedEmail!,
+                emailVerificationToken: _emailToken!,
+                // Null when they chose us. The server reads that as an application to YouDrop's own
+                // fleet and routes it to the backoffice rather than to a company.
+                companyId: _company?.id,
+                phone: _verifiedPhone,
+                phoneVerificationToken: _phoneToken,
+                notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+                details: _details,
+              )
+            : _isCarrier
+                ? await widget.api.applyAsCarrier(
+                    companyName: _business.text.trim(),
+                    contactName: _name.text.trim(),
+                    email: _verifiedEmail!,
+                    emailVerificationToken: _emailToken!,
+                    phone: _verifiedPhone,
+                    phoneVerificationToken: _phoneToken,
+                    notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+                    details: _details,
+                  )
+                : await widget.api.applyAsMerchant(
+                    businessName: _business.text.trim(),
+                    contactName: _name.text.trim(),
+                    email: _verifiedEmail!,
+                    emailVerificationToken: _emailToken!,
+                    phone: _verifiedPhone,
+                    phoneVerificationToken: _phoneToken,
+                    notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+                    details: _details,
+                  );
+        _reference = submitted.reference;
+        _accountTicket = submitted.accountTicket;
+      }
     } catch (e) {
       if (!mounted) return;
+      if (_companyRefused(e)) return;
       setState(() {
         _busy = false;
         _error = _messageFrom(e);
@@ -670,6 +797,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
           .reference;
     } catch (e) {
       if (!mounted) return;
+      if (_companyRefused(e)) return;
       setState(() {
         _busy = false;
         _error = _accountRefusalFrom(e);
@@ -694,6 +822,11 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   /// fails, because the application already has a sign-in — so a failure after that point must
   /// retry only the sign-in. Without that distinction a single hiccup left somebody tapping a
   /// button against a call that could never succeed again.
+  ///
+  /// Creating it shows the account-setup ticket from the submission, straight from memory — or,
+  /// when the server would not take the ticket (spent, or older than its half hour) or never gave
+  /// one, a proof of the address answered just now ([_reproveEmail]). The reference alone would be
+  /// refused: anybody holding it could otherwise choose this applicant's passcode.
   Future<void> _finishAccount() async {
     final DeliveryStrings t = DeliveryStrings.of(context);
     setState(() {
@@ -711,11 +844,33 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         _session ??= await widget.authService.refresh();
       } else {
         if (!_accountCreated) {
-          await widget.api.createApplicantAccount(
-            reference: _reference!,
-            password: _passcode.text,
-          );
+          if (_accountTicket == null && _signInProof == null) {
+            // Nothing that proves the application is theirs: prove the address first.
+            await _reproveEmail();
+            return;
+          }
+          try {
+            await widget.api.createApplicantAccount(
+              reference: _reference!,
+              password: _passcode.text,
+              accountTicket: _signInProof == null ? _accountTicket : null,
+              emailVerificationToken: _signInProof,
+            );
+          } catch (e) {
+            if (isSignInProofRefused(e)) {
+              // The ticket's half hour ran out while this screen waited, or the proof went stale:
+              // a new code to the address, and its proof in their place.
+              await _reproveEmail();
+              return;
+            }
+            // Already made: an earlier try went through and its answer was lost. Straight on to
+            // signing in with the passcode it was made with — see [isSignInExists].
+            if (!isSignInExists(e)) rethrow;
+          }
           _accountCreated = true;
+          // Spent with the sign-in they set up; nothing left worth holding.
+          _accountTicket = null;
+          _signInProof = null;
         }
         _session ??= await widget.authService
             .signInWithPassword(_verifiedEmail!, _passcode.text);
@@ -1121,7 +1276,8 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
           children: <Widget>[
             for (final String area in _lebanonAreas)
               YdChip(
-                label: area,
+                // Said in the reader's language; the English name is what is sent.
+                label: areaLabel(t, area),
                 selected: _coverage.contains(area),
                 onTap: () => setState(() => _coverage.contains(area)
                     ? _coverage.remove(area)
@@ -1614,7 +1770,22 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         ),
       ];
 
-  List<Widget> _riderZone(DeliveryStrings t) => <Widget>[
+  List<Widget> _riderZone(DeliveryStrings t) {
+    final HiringCompany? company = _company;
+    return <Widget>[
+      // Who they ride for comes first, because it decides the rest of the step. It also decides who
+      // reads the application: a rider who names a company is that company's to hire, and one who
+      // does not is ours.
+      AuthFieldLabel(label: t.whoWillYouRideFor, uppercase: true),
+      const SizedBox(height: DeliverySpacing.sm),
+      _companyPicker(t),
+      const SizedBox(height: DeliverySpacing.lg),
+      // A rider joining a company works where the company works (owner, 2026-09), so its region is
+      // shown in place of anything to choose. Riding for YouDrop — or not having said yet — keeps
+      // the pin, the area and the zones card: that rider does say where they will work.
+      if (company != null)
+        ..._companyRegion(t, company)
+      else ...<Widget>[
         _workAreaPicker(t),
         const SizedBox(height: DeliverySpacing.lg),
         AuthField(
@@ -1654,12 +1825,69 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
             padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.sm),
           ),
         ),
-        const SizedBox(height: DeliverySpacing.lg),
-        // Kept from the flow this replaces, because it decides who reads the application: a rider
-        // who names a company is that company's to hire, and one who does not is ours.
-        AuthFieldLabel(label: t.whoWillYouRideFor, uppercase: true),
+      ],
+    ];
+  }
+
+  /// The region of the company a rider chose, read-only (owner, 2026-09: the rider does not select a
+  /// region; the app displays the registered delivery company's).
+  ///
+  /// The names come from the same list the company was picked from, onboarding-service's: the
+  /// company's active zones, or — for a company that has drawn none — the regions it registered with
+  /// (owner, 2026-09). The server records that same region on the application. There is nothing here
+  /// for the rider to choose, so nothing here is drawn as a field. A dash when the company has
+  /// neither: the platform has no region to show for it, and saying so beats inventing one. The
+  /// registered regions arrive in English and are said in the reader's language ([areaLabel]); a
+  /// zone's name is the company's own and is shown as it is.
+  List<Widget> _companyRegion(DeliveryStrings t, HiringCompany company) => <Widget>[
+        AuthFieldLabel(label: t.riderRegionLabel, uppercase: true),
         const SizedBox(height: DeliverySpacing.sm),
-        _companyPicker(t),
+        YdCard.bordered(
+          child: company.regions.isEmpty
+              ? Semantics(
+                  label: t.riderRegionNoneListed,
+                  excludeSemantics: true,
+                  child: const Text(
+                    '—',
+                    style: TextStyle(fontSize: 15, color: DeliveryColors.muted),
+                  ),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    for (int i = 0; i < company.regions.length; i++) ...<Widget>[
+                      if (i > 0) const SizedBox(height: DeliverySpacing.sm),
+                      Row(
+                        children: <Widget>[
+                          const Icon(Icons.place_outlined,
+                              size: 18, color: DeliveryColors.brand),
+                          const SizedBox(width: DeliverySpacing.sm),
+                          Expanded(
+                            child: Text(
+                              areaLabel(t, company.regions[i]),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: DeliveryColors.ink,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+        ),
+        const SizedBox(height: DeliverySpacing.sm),
+        Text(
+          t.riderRegionSetBy(company.name),
+          style: const TextStyle(
+            fontSize: 12,
+            color: DeliveryColors.muted,
+            height: 1.4,
+          ),
+        ),
       ];
 
   /// `map-canvas-container` (Figma 22:624), as a real map with a pin the applicant places.
@@ -1806,6 +2034,39 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) setState(() => _mapTilesFailed = true);
     });
+  }
+
+  /// A refusal about the company a rider named, handled on the open form and the signed-in path
+  /// alike. False for anything else, which the caller reports as it always has.
+  ///
+  /// `company-not-hiring` means the list the rider chose from is out of date: the company stopped
+  /// taking riders, or never was one that hires. The same application can never succeed, so the
+  /// finishing step's "Try again" would be a button that cannot work — the rider is taken back to
+  /// this step instead, with the list read again, nothing chosen, and the reason in their own
+  /// language. The proofs of their address and number are kept: the server refuses the company
+  /// before it records anything, so it has spent neither, and Submit sends them again rather than
+  /// asking for new codes (see [_beginSubmit]). `hiring-companies-unavailable` means nothing was
+  /// judged: "Try again" is exactly right for it, and only the sentence needs translating.
+  bool _companyRefused(Object e) {
+    final String? message = riderCompanyRefusal(DeliveryStrings.of(context), e);
+    if (message == null) return false;
+    final bool chooseAgain = isCompanyNotHiring(e);
+    if (chooseAgain) {
+      _emailCode.clear();
+      _phoneCode.clear();
+    }
+    setState(() {
+      _busy = false;
+      _error = message;
+      if (chooseAgain) {
+        _company = null;
+        _ridesForUs = false;
+        _companies = widget.api.hiringCompanies();
+        _phase = _Phase.wizard;
+        _step = totalSteps - 1;
+      }
+    });
+    return true;
   }
 
   Widget _companyPicker(DeliveryStrings t) {
@@ -2111,6 +2372,11 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
           height: 18 / 14,
         ),
       ),
+      // Asked a second time, after the application went in — say why, or it reads like a fault.
+      if (_reprovingEmail) ...<Widget>[
+        const SizedBox(height: DeliverySpacing.md),
+        SoftNote(text: t.wizAccountConfirmAgain, icon: Icons.lock_outline),
+      ],
       const SizedBox(height: DeliverySpacing.lg),
       OneTimeCodeField(
         controller: email ? _emailCode : _phoneCode,
@@ -2125,8 +2391,11 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
           action: t.sendAnother,
           onTap: _busy
               ? null
-              : () => _sendCode(email ? 'EMAIL' : 'PHONE',
-                      email ? _email.text.trim() : _phone.text.trim())
+              : () => _sendCode(
+                      email ? 'EMAIL' : 'PHONE',
+                      email
+                          ? (_reprovingEmail ? _verifiedEmail! : _email.text.trim())
+                          : _phone.text.trim())
                   .catchError((Object _) {}),
         ),
       ),

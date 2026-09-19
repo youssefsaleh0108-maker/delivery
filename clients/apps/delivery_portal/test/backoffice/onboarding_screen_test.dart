@@ -297,6 +297,21 @@ void main() {
       expect(find.text('APPLICANT'), findsOneWidget);
     });
 
+    testWidgets('shows a list the application carries as names, not as a list',
+        (WidgetTester tester) async {
+      // A rider who applied to a company: the server recorded the company's region as a list.
+      queueJson = '''
+[${_application(id: 'a5', name: 'Nadia Haddad', kind: 'RIDER', details: '{"vehicleType":"MOTORCYCLE","ridesFor":"Swift Couriers","companyRegions":["Achrafieh","Hamra"]}')}]''';
+      await pump(tester);
+
+      await tester.tap(find.text('Nadia Haddad').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('COMPANY REGIONS'), findsOneWidget);
+      expect(find.text('Achrafieh, Hamra'), findsOneWidget);
+      expect(find.text('[Achrafieh, Hamra]'), findsNothing);
+    });
+
     testWidgets('reviews the uploaded papers one by one', (WidgetTester tester) async {
       documentsJson = '[${_document(id: 'd1')}, ${_document(id: 'd2', kind: 'DRIVING_LICENCE', status: 'APPROVED')}]';
       await pump(tester);

@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +72,21 @@ public class KeycloakAdminClient {
     }
 
     /**
+     * Keycloak's 409, and only its 409: an account already holds the address being signed up.
+     *
+     * <p>Still a {@link ProvisioningException}, so every caller catching that keeps working. Its own
+     * type because the applicant's sign-up answers it differently from every other failure: the
+     * account may be that applicant's own, created by an earlier attempt that failed before the
+     * application recorded it, and taking it up again is then the only way they ever sign in (see
+     * {@code OnboardingService.createApplicantAccount}).
+     */
+    public static class AccountExistsException extends ProvisioningException {
+        public AccountExistsException(String message) {
+            super(message);
+        }
+    }
+
+    /**
      * Creates a partner's account and gives it the role their portal requires.
      *
      * @return the Keycloak {@code sub}, which is the id every service in the platform uses
@@ -116,6 +132,23 @@ public class KeycloakAdminClient {
     }
 
     /**
+     * The user attribute {@link #createApplicant} stamps on every account it makes: the id of the
+     * application the account was made for.
+     *
+     * <p>It is what lets a later attempt at the same sign-up tell its own leftover from anybody
+     * else's account on the address (see {@code OnboardingService.createApplicantAccount}), so its
+     * holder must never be able to write it. The realm's user profile declares it view and edit
+     * {@code admin} only — invisible in the account console and the login flow's profile forms, and
+     * skipped when a user updates their own profile — and nothing maps it into a token. Keycloak
+     * drops an attribute its user profile does not declare, silently; a realm without the
+     * declaration therefore leaves every account unstamped, and nothing is ever taken up.
+     *
+     * <p>The application's id, not its reference: the reference is the secret that finishes a
+     * sign-up, and an attribute is read by anybody who can read the account.
+     */
+    public static final String APPLICATION_STAMP = "onboardingApplicationId";
+
+    /**
      * The account an applicant signs in with while their application is being decided.
      *
      * <p>Carries BOTH the role they applied for and APPLICANT. The first is what makes every screen
@@ -127,11 +160,16 @@ public class KeycloakAdminClient {
      * <p>{@code emailVerified} is true because it genuinely is: the application could not have been
      * submitted without a code answered on this address.
      *
+     * <p>Stamped with {@link #APPLICATION_STAMP} in the same request that creates it, so there is no
+     * moment at which this service has made an account that does not say which application it is for.
+     *
+     * @param applicationId the application the account is for; see {@link #APPLICATION_STAMP}
      * @return the Keycloak {@code sub}
      */
     public String createApplicant(String email, String firstName, String lastName,
                                   String role,
-                                  String password) {
+                                  String password,
+                                  UUID applicationId) {
         String bearer = adminToken();
 
         Map<String, Object> user = Map.of(
@@ -141,6 +179,7 @@ public class KeycloakAdminClient {
                 "lastName", lastName == null ? "" : lastName,
                 "enabled", true,
                 "emailVerified", true,
+                "attributes", Map.of(APPLICATION_STAMP, List.of(applicationId.toString())),
                 "credentials", List.of(Map.of(
                         "type", "password",
                         "value", password,
@@ -160,7 +199,7 @@ public class KeycloakAdminClient {
             userId = idFromLocation(created);
         } catch (HttpClientErrorException.Conflict e) {
             log.warn("An account already exists for applicant {}", email);
-            throw new ProvisioningException("An account already exists for that email address");
+            throw new AccountExistsException("An account already exists for that email address");
         } catch (Exception e) {
             log.error("Could not create an applicant account for {}", email, e);
             throw new ProvisioningException(
@@ -170,8 +209,14 @@ public class KeycloakAdminClient {
         // Both roles. The real one so every screen works and they can explore what they applied
         // for; APPLICANT so the committing acts — publishing goods, claiming a delivery — refuse
         // until somebody approves. Approval removes APPLICANT and changes nothing else.
-        assignRealmRole(bearer, userId, role);
+        //
+        // APPLICANT FIRST, so an interrupted sign-up can never leave a live role unguarded. Stopped
+        // between the two, the account holds APPLICANT alone and can do nothing, instead of a live
+        // role with nothing holding it back. The retry that finishes it recognises the account by
+        // its stamp, not by its roles (see OnboardingService.createApplicantAccount). The signed-in
+        // path grants in the same order.
         assignRealmRole(bearer, userId, "APPLICANT");
+        assignRealmRole(bearer, userId, role);
         log.info("Applicant {} can sign in as {} while their application is decided", email, role);
         return userId;
     }
@@ -405,11 +450,85 @@ public class KeycloakAdminClient {
     }
 
     /**
+     * The realm roles an account holds directly, by name.
+     *
+     * <p>Asked before an applicant's sign-up takes up the account its own earlier attempt left, so
+     * that what the take-up grants — and only that — can be taken back if the account turns out to
+     * be recorded elsewhere (see {@code OnboardingService.createApplicantAccount}). Direct mappings
+     * are exactly what {@link #grantRealmRole} adds and {@link #revokeRealmRole} removes. It says
+     * nothing about whose account it is: rights also come from client roles, groups and composites,
+     * which this does not read — {@link #applicationStampOf} is what says that.
+     */
+    public List<String> realmRolesOf(String userRef) {
+        String bearer = adminToken();
+        JsonNode roles = keycloak.get()
+                .uri("/admin/realms/{realm}/users/{id}/role-mappings/realm", realm, userRef)
+                .header("Authorization", "Bearer " + bearer)
+                .retrieve()
+                .body(JsonNode.class);
+
+        List<String> names = new java.util.ArrayList<>();
+        if (roles != null && roles.isArray()) {
+            for (JsonNode role : roles) {
+                if (role.hasNonNull("name")) {
+                    names.add(role.path("name").asText());
+                }
+            }
+        }
+        return names;
+    }
+
+    /**
+     * The application {@link #createApplicant} stamped this account for, if it stamped it at all.
+     *
+     * <p>Empty for every account this service did not make for an applicant — a customer's, a
+     * Google sign-in's, staff's, a partner provisioned the old way — and for one made before the
+     * stamp existed. Only an admin can write the attribute; see {@link #APPLICATION_STAMP}.
+     */
+    public Optional<String> applicationStampOf(String userRef) {
+        String bearer = adminToken();
+        JsonNode user = keycloak.get()
+                .uri("/admin/realms/{realm}/users/{id}", realm, userRef)
+                .header("Authorization", "Bearer " + bearer)
+                .retrieve()
+                .body(JsonNode.class);
+
+        JsonNode values = user == null ? null : user.path("attributes").path(APPLICATION_STAMP);
+        if (values == null || !values.isArray() || values.size() != 1 || !values.get(0).isTextual()) {
+            // Absent, or not the single value createApplicant writes: not a stamp this service made.
+            return Optional.empty();
+        }
+        return Optional.of(values.get(0).asText());
+    }
+
+    /**
+     * Whether the account is linked to an identity provider — somebody has signed in to it through
+     * Google.
+     *
+     * <p>An account that was ever used that way is somebody's sign-in, whatever else it looks like,
+     * and an applicant's sign-up never finishes on top of one.
+     */
+    public boolean isLinkedToIdentityProvider(String userRef) {
+        String bearer = adminToken();
+        JsonNode links = keycloak.get()
+                .uri("/admin/realms/{realm}/users/{id}/federated-identity", realm, userRef)
+                .header("Authorization", "Bearer " + bearer)
+                .retrieve()
+                .body(JsonNode.class);
+        // Anything but a plain empty list counts as linked: unsure is the answer that refuses.
+        return links == null || !links.isArray() || !links.isEmpty();
+    }
+
+    /**
      * Replaces an account's passcode with one its owner just chose.
      *
-     * <p>The one caller is the password-reset flow, and it calls this only after a one-time code
-     * sent to the account's own address was answered — that proof, not this method, is the
-     * security boundary. {@code temporary} is false for the same reason it is at sign-up: this is
+     * <p>Two callers, and a proof of the inbox stands behind each — that proof, not this method, is
+     * the security boundary. The password-reset flow calls it once a one-time code sent to the
+     * account's own address was answered. An applicant finishing a sign-up that an earlier attempt
+     * left half made calls it for the account that attempt created, and only for an account stamped
+     * for that very application, never linked to Google, on an address nobody edited since the code
+     * proved it ({@code OnboardingService.createApplicantAccount}): its reference went to that person
+     * alone. {@code temporary} is false for the same reason it is at sign-up: this is
      * the passcode the person chose and expects to use, and a forced-change screen at the next
      * sign-in would demand a second new passcode for no reason.
      *

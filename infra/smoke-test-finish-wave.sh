@@ -62,10 +62,13 @@ check 'stats are numbers from real orders' 'yes' "$([ "$CLAIMED" -ge "$DELIV" ] 
 check 'customer refused rider stats' '403' "$(curl -s -o /dev/null -w '%{http_code}' "$GW/api/orders/riders/me/performance" -H "Authorization: Bearer $CUST")"
 
 echo '=== 4. Password reset ==========================================================='
-E="qa.reset$(date +%s)@example.invalid"
+E="qa.reset$(date +%s)@youdrop.test"
 curl -s -o /dev/null -X POST "$GW/api/onboarding/verifications" -H 'Content-Type: application/json' -d "{\"channel\":\"EMAIL\",\"destination\":\"$E\"}"
 sleep 6
-CODE=$(psql -h postgres -U delivery -d delivery -At -c "select body from notification.notification_log where recipient='$E' order by created_at desc limit 1;" | grep -oE '[0-9]{6}' | head -1)
+# Codes come from Notifications Manager's test code sink: the delivery log masks every code, and the
+# sink keeps them only for @youdrop.test addresses (nobody can own one) where TEST_CODE_SINK_ENABLED.
+code_for() { psql -h postgres -U delivery -d delivery -At -c "select code from notification.test_code_sink where recipient='$1' order by created_at desc limit 1;"; }
+CODE=$(code_for "$E")
 T=$(curl -s -X POST "$GW/api/onboarding/verifications/confirm" -H 'Content-Type: application/json' -d "{\"channel\":\"EMAIL\",\"destination\":\"$E\",\"code\":\"$CODE\"}" | jq -r .token)
 # Asserted, not fire-and-forget. This silently 400'd on a guessed payload shape, so no account
 # existed — and the reset below then answered 422, which the contract defines as the CORRECT reply
@@ -77,7 +80,7 @@ check 'unknown email still 202'  '202' "$(curl -s -o /dev/null -w '%{http_code}'
 sleep 65   # the per-address cooldown is shared with the signup code sent above — by design
 check 'reset requested' '202' "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$GW/api/onboarding/password-reset" -H 'Content-Type: application/json' -d "{\"email\":\"$E\"}")"
 sleep 6
-RCODE=$(psql -h postgres -U delivery -d delivery -At -c "select body from notification.notification_log where recipient='$E' order by created_at desc limit 1;" | grep -oE '[0-9]{6}' | head -1)
+RCODE=$(code_for "$E")
 check 'confirm sets new passcode' '204' "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$GW/api/onboarding/password-reset/confirm" -H 'Content-Type: application/json' -d "{\"email\":\"$E\",\"code\":\"$RCODE\",\"newPassword\":\"$NEW_PC\"}")"
 check 'new passcode signs in' 'yes' "$([ "$(tok "$E" "$NEW_PC")" != null ] && echo yes || echo no)"
 check 'old passcode dead' 'null' "$(tok "$E" "$OLD_PC")"

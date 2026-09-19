@@ -88,6 +88,13 @@ class OnboardingApplicationDetailsTest {
                 "sam@example.test", Instant.now(), null, null, "corner shop", details, null);
     }
 
+    /** What a submission hands back: the application, and the ticket its submitter alone is told. */
+    private static com.delivery.onboarding.service.ApplicationIntake.Recorded recorded(
+            OnboardingApplication application) {
+        return new com.delivery.onboarding.service.ApplicationIntake.Recorded(application,
+                "account-ticket");
+    }
+
     private static String requestBody(Map<String, Object> details) throws Exception {
         Map<String, Object> body = new java.util.HashMap<>(Map.of(
                 "kind", "MERCHANT",
@@ -109,7 +116,7 @@ class OnboardingApplicationDetailsTest {
         void details_reach_the_service_exactly_as_sent() throws Exception {
             when(onboarding.submit(any(), anyString(), anyString(), anyString(), anyString(),
                     any(), any(), any(), any(), any()))
-                    .thenReturn(application(WIZARD_DETAILS));
+                    .thenReturn(recorded(application(WIZARD_DETAILS)));
 
             mvc.perform(post("/api/onboarding/applications")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -146,7 +153,7 @@ class OnboardingApplicationDetailsTest {
         void the_unauthenticated_receipt_does_not_leak_them() throws Exception {
             when(onboarding.submit(any(), anyString(), anyString(), anyString(), anyString(),
                     any(), any(), any(), any(), any()))
-                    .thenReturn(application(WIZARD_DETAILS));
+                    .thenReturn(recorded(application(WIZARD_DETAILS)));
 
             mvc.perform(post("/api/onboarding/applications")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -250,7 +257,7 @@ class OnboardingApplicationDetailsTest {
             OnboardingApplication application = application(null);
             when(onboarding.submit(any(), anyString(), anyString(), anyString(), anyString(),
                     any(), any(), any(), any(), any()))
-                    .thenReturn(application);
+                    .thenReturn(recorded(application));
 
             mvc.perform(post("/api/onboarding/applications")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -290,7 +297,7 @@ class OnboardingApplicationDetailsTest {
         void just_under_the_budget_passes() throws Exception {
             when(onboarding.submit(any(), anyString(), anyString(), anyString(), anyString(),
                     any(), any(), any(), any(), any()))
-                    .thenReturn(application(null));
+                    .thenReturn(recorded(application(null)));
 
             Map<String, Object> nearLimit = Map.of("blob", "x".repeat(15 * 1024));
             mvc.perform(post("/api/onboarding/applications")

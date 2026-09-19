@@ -38,6 +38,10 @@ import com.fasterxml.jackson.databind.JsonNode;
  * Service owns both — the category switch is its configuration, read per call — so asking it is what
  * keeps this service from holding a second copy that drifts the first time a category opens. The
  * service token is used because the open application form has no caller token to forward.
+ *
+ * <p>And one list from Order Manager, for a rider applying to a delivery company: who is hiring, and
+ * each company's region, which the application records in place of an area the rider would otherwise
+ * choose. See {@link #hiringCompanies()}.
  */
 @Component
 public class PlatformClient {
@@ -47,6 +51,8 @@ public class PlatformClient {
     private final RestClient orderManager;
     private final RestClient notifications;
     private final RestClient productService;
+    /** Order Manager again, for the one read on the application path, with its bounded wait. */
+    private final RestClient orderManagerReads;
     private final RestClient keycloak;
     private final String realm;
     private final String clientId;
@@ -68,6 +74,8 @@ public class PlatformClient {
         this.orderManager = builder.clone().baseUrl(orderManagerUrl).build();
         this.notifications = builder.clone().baseUrl(notificationsUrl).build();
         this.productService = builder.clone().baseUrl(productServiceUrl)
+                .requestFactory(boundedWait()).build();
+        this.orderManagerReads = builder.clone().baseUrl(orderManagerUrl)
                 .requestFactory(boundedWait()).build();
         this.keycloak = builder.clone().baseUrl(baseUrl).build();
         this.realm = realm;
@@ -319,13 +327,107 @@ public class PlatformClient {
     }
 
     /**
-     * Timeouts for the two Product Service reads, which the provisioning calls above do without.
+     * Order Manager could not say which delivery companies are hiring. Never a refusal, exactly as
+     * {@link CatalogUnavailableException} is not: nothing about the application was judged, so the
+     * applicant is told to try again rather than to choose another company.
+     */
+    public static class CompaniesUnavailableException extends RuntimeException {
+
+        /** What the 503 carries, so the app says "try again" in the reader's own language. */
+        public static final String CODE = "hiring-companies-unavailable";
+
+        public CompaniesUnavailableException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+
+    /**
+     * A delivery company taking riders, as Order Manager's public list describes it.
+     *
+     * @param regions the names of the company's active coverage zones; empty when it has drawn none
+     */
+    public record HiringCompany(UUID id, String name, List<String> regions) {
+    }
+
+    /**
+     * The delivery companies taking riders right now, each with its region.
+     *
+     * <p>Order Manager's public list ({@code GET /api/delivery-providers/hiring}) — the one the app
+     * shows a rider — so a company is judged hiring by the rule that put it on their screen, and the
+     * region recorded on the application is the region they were shown. Read per call, never
+     * remembered: a company suspended a minute ago must not take one more application.
+     *
+     * <p>Asked with no token, as the app asks. The list is open to anybody, and a service token would
+     * only add a way to fail: a Keycloak hiccup refusing an application that needed no authority.
+     *
+     * <p>A company listed without a {@code regions} field comes from an Order Manager older than this
+     * service, and the whole answer is treated as no answer rather than as companies with no region.
+     * Recording an empty region for a company that has one would record something untrue, and the
+     * rider can simply try again once Order Manager is up to date — which is why Order Manager
+     * deploys first.
+     *
+     * @throws CompaniesUnavailableException when Order Manager cannot be asked or answers nonsense
+     */
+    public List<HiringCompany> hiringCompanies() {
+        JsonNode body;
+        try {
+            body = orderManagerReads.get()
+                    .uri("/api/delivery-providers/hiring")
+                    .retrieve()
+                    .body(JsonNode.class);
+        } catch (RuntimeException e) {
+            // A refused connection, a timeout, a 5xx. All the same to the applicant: nothing was
+            // judged, so this is "try again", never "that company is not hiring".
+            log.warn("Could not read the hiring delivery companies from Order Manager: {}",
+                    e.getMessage());
+            throw companiesUnavailable(e);
+        }
+        if (body == null || !body.isArray()) {
+            log.warn("Order Manager answered the hiring delivery companies with something that is "
+                    + "not a list");
+            throw companiesUnavailable(null);
+        }
+        List<HiringCompany> companies = new ArrayList<>();
+        for (JsonNode company : body) {
+            if (!company.path("regions").isArray()) {
+                log.warn("Order Manager listed a hiring company without its regions: it is older than "
+                        + "this service, and has to be deployed first");
+                throw companiesUnavailable(null);
+            }
+            UUID id;
+            try {
+                id = UUID.fromString(company.path("id").asText());
+            } catch (IllegalArgumentException notAnId) {
+                log.warn("Order Manager listed a hiring company whose id is not a UUID; skipped");
+                continue;
+            }
+            List<String> regions = new ArrayList<>();
+            for (JsonNode region : company.path("regions")) {
+                if (region.isTextual() && !region.asText().isBlank()) {
+                    regions.add(region.asText().trim());
+                }
+            }
+            companies.add(new HiringCompany(id, company.path("name").asText(""),
+                    List.copyOf(regions)));
+        }
+        return List.copyOf(companies);
+    }
+
+    private static CompaniesUnavailableException companiesUnavailable(Throwable cause) {
+        return new CompaniesUnavailableException(
+                "We could not check that delivery company just now. Please try again in a moment.",
+                cause);
+    }
+
+    /**
+     * Timeouts for the reads on the application path — Product Service's two lists and Order
+     * Manager's list of who is hiring — which the provisioning calls above do without.
      *
      * <p>These sit on the application path itself — an applicant is waiting, and the open signup form
-     * asks them too — and the default request factory has no timeout at all, so a Product Service
-     * that stopped answering would hold a request thread for as long as it liked. They are asked
-     * before the application's transaction opens (see ApplicationIntake), so the wait holds no
-     * database connection.
+     * asks them too — and the default request factory has no timeout at all, so a service that
+     * stopped answering would hold a request thread for as long as it liked. They are asked before
+     * the application's transaction opens (see ApplicationIntake), so the wait holds no database
+     * connection.
      */
     private static SimpleClientHttpRequestFactory boundedWait() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();

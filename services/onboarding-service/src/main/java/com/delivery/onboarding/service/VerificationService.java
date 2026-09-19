@@ -246,6 +246,8 @@ public class VerificationService {
         String smsBody = code + " is your YouDrop verification code. It expires in "
                 + minutes + " minutes. Never share it with anyone.";
 
+        // Notifications Manager masks the code for exactly these two purposes
+        // (NotificationDispatchService.CODE_PURPOSES): rename one and rename it there too.
         String notifyPurpose = purpose == Purpose.PASSWORD_RESET
                 ? "onboarding.password-reset" : "onboarding.verification";
 
@@ -254,8 +256,13 @@ public class VerificationService {
                 // The code is in the subject as well as the body. That is deliberate and it is a
                 // trade: it means somebody can read the code from a preview without opening the
                 // mail, which is the fastest path for the person who asked for it and also visible
-                // to anyone looking at their screen. Every large provider makes the same call, and
-                // the code is already in the body, so this adds no exposure inside our own logs.
+                // to anyone looking at their screen. Every large provider makes the same call.
+                //
+                // Neither copy is kept on our side. Notifications Manager masks the code in both
+                // before it writes its delivery log, for these two purposes, and finds it as a run
+                // of four or more digits (OneTimeCodes in platform-notifications). A code that
+                // stopped being all digits, or a new purpose that carries one, has to change that
+                // rule too, or its codes would be logged in full again.
                 String subject = purpose == Purpose.PASSWORD_RESET
                         ? code + " is your YouDrop passcode reset code"
                         : code + " is your YouDrop verification code";
@@ -395,6 +402,33 @@ public class VerificationService {
                 // unverified there for the same reason consume refuses it.
                 .filter(v -> v.getPurpose() == Purpose.SIGNUP)
                 .filter(v -> v.getDestination().equals(normalise(channel, destination)))
+                .isPresent();
+    }
+
+    /**
+     * Whether a sign-up proof for this address was earned recently, without spending it.
+     *
+     * <p>For the passcode step, which accepts a code answered on the application's address in place
+     * of an account-setup ticket that expired. A confirmed proof otherwise lives until it is spent —
+     * right for a form somebody takes ten minutes over, wrong for something that sets a passcode: the
+     * proof has to say somebody holds the inbox now, not that somebody once did.
+     *
+     * @param within how long ago it may have been confirmed
+     */
+    @Transactional(readOnly = true)
+    public boolean isFreshlyVerified(String token, Channel channel, String destination,
+                                     Duration within) {
+        if (token == null || token.isBlank()) {
+            return false;
+        }
+        Instant since = Instant.now().minus(within);
+        return verifications.findByToken(token)
+                .filter(ContactVerification::isUsable)
+                .filter(v -> v.getChannel() == channel)
+                .filter(v -> v.getPurpose() == Purpose.SIGNUP)
+                .filter(v -> v.getConfirmedAt().isAfter(since))
+                .filter(v -> normaliseQuietly(channel, destination)
+                        .map(v.getDestination()::equals).orElse(false))
                 .isPresent();
     }
 

@@ -111,6 +111,16 @@ http:
         maxRequestBodyBytes: 10551296
         memRequestBodyBytes: 1048576
 
+    # The same limit for an applicant's identity and vehicle papers (FilePurpose.MERCHANT_KYC), PUT
+    # straight to MinIO with a URL onboarding-service signed — the middleware deploy/k3s puts on the
+    # same route. 10 MiB is onboarding-service's delivery.storage.minio.max-upload-size-bytes — keep the
+    # two in step — plus the same 64 KiB of slack. Separate from the one above although the numbers
+    # match, because each follows a different service's setting.
+    merchant-kyc-upload-limit:
+      buffering:
+        maxRequestBodyBytes: 10551296
+        memRequestBodyBytes: 1048576
+
   routers:
     # ------------------------------------------------------------------ product-service (8103)
     product-service:
@@ -374,10 +384,10 @@ http:
     # what the signer produced. Stripping anything here would invalidate every URL.
     #
     # Routing a bucket does not make it public: MinIO still rejects anything without a valid
-    # signature, which is why this needs no auth middleware of its own. Only the two buckets clients
-    # actually fetch are listed — merchant-kyc, receipts and delivery-proof stay unrouted, because
-    # an identity document has no business being one guessed URL away from the internet even with a
-    # signature in front of it.
+    # signature, which is why this needs no auth middleware of its own. Routed are the buckets a
+    # client reaches with a URL a service minted: product-images and apk (public), user-avatars here,
+    # and order-attachments and merchant-kyc on routers of their own below, for their upload limits.
+    # delivery-proof and receipts stay unrouted only because no service signs a URL into either yet.
     #
     # No rate-limit middleware: one product page pulls a gallery's worth of objects, and the
     # platform limiter is sized for API calls, not images.
@@ -407,6 +417,18 @@ http:
       priority: 90
       entryPoints: [web, https]
       middlewares: [order-attachment-upload-limit@file, security-headers@file]
+
+    # merchant-kyc, the same way and for the same reason — the route deploy/k3s serves. PRIVATE and
+    # presigned both ways: the rider and merchant wizards PUT an applicant's id, licence and vehicle
+    # papers with URLs onboarding-service signed, and a reviewer opens one with a GET signed for them.
+    # Unrouted, every such upload met a 404 here and never reached MinIO. Used only when
+    # MINIO_PUBLIC_ENDPOINT is this hostname, as for order-attachments above.
+    merchant-kyc:
+      rule: Host(`api-dev.youdrop.shop`) && PathPrefix(`/merchant-kyc`)
+      service: minio-s3
+      priority: 90
+      entryPoints: [web, https]
+      middlewares: [merchant-kyc-upload-limit@file, security-headers@file]
 
     # The landing page at the root of monitoring-dev, so somebody arriving there is told what is
     # under it rather than meeting a 404.
