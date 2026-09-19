@@ -37,6 +37,7 @@ export 'src/models/chat_models.dart';
 export 'src/models/neighbourhood_chat_models.dart';
 export 'src/models/shop_chat_models.dart';
 export 'src/models/geo_models.dart';
+export 'src/models/item_search_models.dart';
 export 'src/models/promo_models.dart';
 export 'src/models/rating_models.dart';
 export 'src/models/rider_money_models.dart';
