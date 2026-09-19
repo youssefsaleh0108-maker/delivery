@@ -21236,6 +21236,36 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'We couldn\'t check that delivery company just now. Try again in a moment.'**
   String get riderRegionCompaniesUnavailable;
+
+  /// No description provided for @riderRegionAreaBeirut.
+  ///
+  /// In en, this message translates to:
+  /// **'Beirut'**
+  String get riderRegionAreaBeirut;
+
+  /// No description provided for @riderRegionAreaMountLebanon.
+  ///
+  /// In en, this message translates to:
+  /// **'Mount Lebanon'**
+  String get riderRegionAreaMountLebanon;
+
+  /// No description provided for @riderRegionAreaNorth.
+  ///
+  /// In en, this message translates to:
+  /// **'North'**
+  String get riderRegionAreaNorth;
+
+  /// No description provided for @riderRegionAreaSouth.
+  ///
+  /// In en, this message translates to:
+  /// **'South'**
+  String get riderRegionAreaSouth;
+
+  /// No description provided for @riderRegionAreaBekaa.
+  ///
+  /// In en, this message translates to:
+  /// **'Bekaa'**
+  String get riderRegionAreaBekaa;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

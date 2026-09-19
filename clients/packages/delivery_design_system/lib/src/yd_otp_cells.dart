@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import 'tokens.dart';
@@ -120,68 +121,154 @@ class _YdOtpCellsState extends State<YdOtpCells> {
     return Semantics(
       label: widget.semanticLabel,
       textField: true,
-      child: LayoutBuilder(
-        builder: (BuildContext context, BoxConstraints constraints) {
-          final double available = constraints.maxWidth;
-          final double totalGap = widget.gap * (widget.length - 1);
-          final double side = available.isFinite
-              ? math.min(widget.cellSize, (available - totalGap) / widget.length)
-              : widget.cellSize;
+      child: _CellRowSize(
+        length: widget.length,
+        cellSize: widget.cellSize,
+        gap: widget.gap,
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            final double side =
+                _cellSide(constraints.maxWidth, widget.length, widget.cellSize, widget.gap);
 
-          return Stack(
-            children: <Widget>[
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  for (int i = 0; i < widget.length; i++) ...<Widget>[
-                    if (i > 0) SizedBox(width: widget.gap),
-                    _YdOtpCell(
-                      size: side,
-                      digit: i < value.length ? value[i] : null,
-                      // The caret sits in the first empty cell, and only while focused.
-                      active: focused && i == value.length,
-                      hasError: widget.hasError,
+            return Stack(
+              children: <Widget>[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    for (int i = 0; i < widget.length; i++) ...<Widget>[
+                      if (i > 0) SizedBox(width: widget.gap),
+                      _YdOtpCell(
+                        size: side,
+                        digit: i < value.length ? value[i] : null,
+                        // The caret sits in the first empty cell, and only while focused.
+                        active: focused && i == value.length,
+                        hasError: widget.hasError,
+                      ),
+                    ],
+                  ],
+                ),
+                // The real field: full-bleed and invisible, so a tap anywhere focuses it and the
+                // platform keyboard drives the cells above.
+                Positioned.fill(
+                  child: TextField(
+                    controller: _controller,
+                    focusNode: _focusNode,
+                    autofocus: widget.autofocus,
+                    enabled: widget.enabled,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.done,
+                    autofillHints: const <String>[AutofillHints.oneTimeCode],
+                    inputFormatters: <TextInputFormatter>[
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(widget.length),
+                    ],
+                    showCursor: false,
+                    enableInteractiveSelection: false,
+                    style: const TextStyle(color: Colors.transparent, height: 1),
+                    cursorColor: Colors.transparent,
+                    decoration: const InputDecoration(
+                      filled: false,
+                      isDense: true,
+                      counterText: '',
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      disabledBorder: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
                     ),
-                  ],
-                ],
-              ),
-              // The real field: full-bleed and invisible, so a tap anywhere focuses it and the
-              // platform keyboard drives the cells above.
-              Positioned.fill(
-                child: TextField(
-                  controller: _controller,
-                  focusNode: _focusNode,
-                  autofocus: widget.autofocus,
-                  enabled: widget.enabled,
-                  keyboardType: TextInputType.number,
-                  textInputAction: TextInputAction.done,
-                  autofillHints: const <String>[AutofillHints.oneTimeCode],
-                  inputFormatters: <TextInputFormatter>[
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(widget.length),
-                  ],
-                  showCursor: false,
-                  enableInteractiveSelection: false,
-                  style: const TextStyle(color: Colors.transparent, height: 1),
-                  cursorColor: Colors.transparent,
-                  decoration: const InputDecoration(
-                    filled: false,
-                    isDense: true,
-                    counterText: '',
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    disabledBorder: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
                   ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }
+}
+
+/// The edge of each square cell when the row has [available] width: the design's [cellSize], or
+/// less so that [length] cells and the gaps between them still fit.
+double _cellSide(double available, int length, double cellSize, double gap) {
+  final double totalGap = gap * (length - 1);
+  return available.isFinite ? math.min(cellSize, (available - totalGap) / length) : cellSize;
+}
+
+/// Answers the size questions the row's [LayoutBuilder] cannot.
+///
+/// A layout that measures its content before laying it out — a [SliverFillRemaining] with
+/// `hasScrollBody: false`, as the partner wizard's code step sits in, or an [IntrinsicHeight] — asks
+/// the row how tall it would be at a width. A [LayoutBuilder] cannot say without running its builder:
+/// it throws in a debug build and answers zero in release, which under-measures the screen by the
+/// whole row. The answer needs no builder — the cells are square, as wide as [_cellSide] makes them
+/// at that width — so this gives it, by the same rule the row lays out by. Layout itself passes
+/// straight through.
+class _CellRowSize extends SingleChildRenderObjectWidget {
+  const _CellRowSize({
+    required this.length,
+    required this.cellSize,
+    required this.gap,
+    required Widget super.child,
+  });
+
+  final int length;
+  final double cellSize;
+  final double gap;
+
+  @override
+  _RenderCellRowSize createRenderObject(BuildContext context) =>
+      _RenderCellRowSize(length: length, cellSize: cellSize, gap: gap);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderCellRowSize renderObject) {
+    renderObject
+      ..length = length
+      ..cellSize = cellSize
+      ..gap = gap;
+  }
+}
+
+class _RenderCellRowSize extends RenderProxyBox {
+  _RenderCellRowSize({required int length, required double cellSize, required double gap})
+      : _length = length,
+        _cellSize = cellSize,
+        _gap = gap;
+
+  int _length;
+  set length(int value) {
+    if (value == _length) return;
+    _length = value;
+    markNeedsLayout();
+  }
+
+  double _cellSize;
+  set cellSize(double value) {
+    if (value == _cellSize) return;
+    _cellSize = value;
+    markNeedsLayout();
+  }
+
+  double _gap;
+  set gap(double value) {
+    if (value == _gap) return;
+    _gap = value;
+    markNeedsLayout();
+  }
+
+  /// The row at the design's own size: every cell full-size.
+  double get _naturalWidth => _length * _cellSize + _gap * (_length - 1);
+
+  @override
+  double computeMinIntrinsicWidth(double height) => _naturalWidth;
+
+  @override
+  double computeMaxIntrinsicWidth(double height) => _naturalWidth;
+
+  @override
+  double computeMinIntrinsicHeight(double width) => _cellSide(width, _length, _cellSize, _gap);
+
+  @override
+  double computeMaxIntrinsicHeight(double width) => _cellSide(width, _length, _cellSize, _gap);
 }
 
 class _YdOtpCell extends StatelessWidget {

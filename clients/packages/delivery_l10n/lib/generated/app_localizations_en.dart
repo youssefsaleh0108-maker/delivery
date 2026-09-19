@@ -12519,4 +12519,19 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get riderRegionCompaniesUnavailable =>
       'We couldn\'t check that delivery company just now. Try again in a moment.';
+
+  @override
+  String get riderRegionAreaBeirut => 'Beirut';
+
+  @override
+  String get riderRegionAreaMountLebanon => 'Mount Lebanon';
+
+  @override
+  String get riderRegionAreaNorth => 'North';
+
+  @override
+  String get riderRegionAreaSouth => 'South';
+
+  @override
+  String get riderRegionAreaBekaa => 'Bekaa';
 }

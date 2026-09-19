@@ -53,6 +53,24 @@ enum PartnerKind {
   carrier,
 }
 
+/// A region's name in the reader's language: the five a delivery company registers with, and any
+/// other name exactly as it came.
+///
+/// The five are the carrier wizard's coverage chips, and the only registered regions the server ever
+/// shows a rider (onboarding-service `HiringCompanies.REGISTRATION_REGIONS`) — a company with no zones
+/// is listed with them, spelled in English whatever the phone's language. They are matched by that
+/// exact spelling and nothing looser, because anything else is a zone a company drew and named
+/// itself: its own words, which no translation here could know. Display only — the English name is
+/// what travels to the server, and what it matches.
+String areaLabel(DeliveryStrings t, String name) => switch (name) {
+      'Beirut' => t.riderRegionAreaBeirut,
+      'Mount Lebanon' => t.riderRegionAreaMountLebanon,
+      'North' => t.riderRegionAreaNorth,
+      'South' => t.riderRegionAreaSouth,
+      'Bekaa' => t.riderRegionAreaBekaa,
+      _ => name,
+    };
+
 /// What a rider drives (Figma `vehicle-grid` 22:503).
 ///
 /// The wire token is sent rather than the label: a reviewer in the backoffice must see the same
@@ -223,6 +241,14 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   String? _verifiedEmail;
   String? _phoneToken;
   String? _verifiedPhone;
+
+  /// The address and the number as they were typed when their codes were confirmed — what
+  /// [_heldProof] compares the fields with, because the server's spelling ([_verifiedEmail],
+  /// [_verifiedPhone]) is not what the field shows: a number gains its country code, an address
+  /// loses its capitals.
+  String? _emailProvedAs;
+  String? _phoneProvedAs;
+
   bool _busy = false;
   String? _error;
 
@@ -452,19 +478,16 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   ///
   /// An account applying skips the email round — its address is already proved — and goes to the
   /// phone round only when a number was typed, exactly as the open form does after its email.
+  ///
+  /// A round whose proof is still held is not run again. That is the rider the server sent back to
+  /// choose another company ([_companyRefused]): the refusal comes before the application is
+  /// recorded, and a proof is only spent with the record, so both proofs are as good as when they
+  /// were made. Asking for fresh codes instead made them wait for two more messages for nothing —
+  /// and a code asked for within a minute of the last is refused (429), which stranded the rider on
+  /// a code that never came.
   Future<void> _beginSubmit() async {
-    if (_forAccount) {
-      if (_phone.text.trim().isEmpty) {
-        await _send();
-        return;
-      }
-      try {
-        await _sendCode('PHONE', _phone.text.trim());
-      } catch (_) {
-        return;
-      }
-      if (!mounted) return;
-      setState(() => _phase = _Phase.verifyPhone);
+    if (_forAccount || _heldProof(_emailToken, _emailProvedAs, _email)) {
+      await _phoneRound();
       return;
     }
     try {
@@ -474,6 +497,38 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
     }
     if (!mounted) return;
     setState(() => _phase = _Phase.verifyEmail);
+  }
+
+  /// Whether a proof from an earlier round can go out again as it is: there is one, and the field
+  /// still says what was proved. A changed address or number needs its own code — its proof names
+  /// the old one, and sending that would apply under a contact the applicant has just replaced.
+  bool _heldProof(String? token, String? provedAs, TextEditingController field) =>
+      token != null && provedAs != null && field.text.trim() == provedAs;
+
+  /// The number's round, once the address is proved: none when no number was typed, none when the
+  /// number already has a proof held ([_heldProof]), and otherwise a code to it.
+  Future<void> _phoneRound() async {
+    final String phone = _phone.text.trim();
+    if (phone.isEmpty) {
+      // No number now, so no proof of one either: a number cleared since it was proved must not
+      // travel with the application.
+      _verifiedPhone = null;
+      _phoneToken = null;
+      _phoneProvedAs = null;
+      await _send();
+      return;
+    }
+    if (_heldProof(_phoneToken, _phoneProvedAs, _phone)) {
+      await _send();
+      return;
+    }
+    try {
+      await _sendCode('PHONE', phone);
+    } catch (_) {
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _phase = _Phase.verifyPhone);
   }
 
   Future<void> _confirmEmail() async {
@@ -488,6 +543,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
       // verified or it is refused for a reason nobody can see on screen.
       _verifiedEmail = result.destination;
       _emailToken = result.token;
+      _emailProvedAs = _email.text.trim();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -499,18 +555,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
     }
     if (!mounted) return;
     setState(() => _busy = false);
-
-    if (_phone.text.trim().isEmpty) {
-      await _send();
-      return;
-    }
-    try {
-      await _sendCode('PHONE', _phone.text.trim());
-    } catch (_) {
-      return;
-    }
-    if (!mounted) return;
-    setState(() => _phase = _Phase.verifyPhone);
+    await _phoneRound();
   }
 
   Future<void> _confirmPhone() async {
@@ -523,6 +568,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
           .confirmCode('PHONE', _phone.text.trim(), _phoneCode.text.trim());
       _verifiedPhone = result.destination;
       _phoneToken = result.token;
+      _phoneProvedAs = _phone.text.trim();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -543,6 +589,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
     _phone.clear();
     _verifiedPhone = null;
     _phoneToken = null;
+    _phoneProvedAs = null;
     await _send();
   }
 
@@ -1130,7 +1177,8 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
           children: <Widget>[
             for (final String area in _lebanonAreas)
               YdChip(
-                label: area,
+                // Said in the reader's language; the English name is what is sent.
+                label: areaLabel(t, area),
                 selected: _coverage.contains(area),
                 onTap: () => setState(() => _coverage.contains(area)
                     ? _coverage.remove(area)
@@ -1689,7 +1737,9 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   /// company's active zones, or — for a company that has drawn none — the regions it registered with
   /// (owner, 2026-09). The server records that same region on the application. There is nothing here
   /// for the rider to choose, so nothing here is drawn as a field. A dash when the company has
-  /// neither: the platform has no region to show for it, and saying so beats inventing one.
+  /// neither: the platform has no region to show for it, and saying so beats inventing one. The
+  /// registered regions arrive in English and are said in the reader's language ([areaLabel]); a
+  /// zone's name is the company's own and is shown as it is.
   List<Widget> _companyRegion(DeliveryStrings t, HiringCompany company) => <Widget>[
         AuthFieldLabel(label: t.riderRegionLabel, uppercase: true),
         const SizedBox(height: DeliverySpacing.sm),
@@ -1715,7 +1765,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
                           const SizedBox(width: DeliverySpacing.sm),
                           Expanded(
                             child: Text(
-                              company.regions[i],
+                              areaLabel(t, company.regions[i]),
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
@@ -1894,8 +1944,10 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   /// taking riders, or never was one that hires. The same application can never succeed, so the
   /// finishing step's "Try again" would be a button that cannot work — the rider is taken back to
   /// this step instead, with the list read again, nothing chosen, and the reason in their own
-  /// language. `hiring-companies-unavailable` means nothing was judged: "Try again" is exactly right
-  /// for it, and only the sentence needs translating.
+  /// language. The proofs of their address and number are kept: the server refuses the company
+  /// before it records anything, so it has spent neither, and Submit sends them again rather than
+  /// asking for new codes (see [_beginSubmit]). `hiring-companies-unavailable` means nothing was
+  /// judged: "Try again" is exactly right for it, and only the sentence needs translating.
   bool _companyRefused(Object e) {
     final String? message = riderCompanyRefusal(DeliveryStrings.of(context), e);
     if (message == null) return false;

@@ -6096,5 +6096,10 @@
   "@riderRegionSetBy": {"placeholders":{"company":{"type":"String"}}},
   "riderRegionNoneListed": "No delivery region listed yet",
   "riderRegionCompanyNotHiring": "That delivery company isn't taking riders right now. Choose another company, or ride for YouDrop.",
-  "riderRegionCompaniesUnavailable": "We couldn't check that delivery company just now. Try again in a moment."
+  "riderRegionCompaniesUnavailable": "We couldn't check that delivery company just now. Try again in a moment.",
+  "riderRegionAreaBeirut": "Beirut",
+  "riderRegionAreaMountLebanon": "Mount Lebanon",
+  "riderRegionAreaNorth": "North",
+  "riderRegionAreaSouth": "South",
+  "riderRegionAreaBekaa": "Bekaa"
 }

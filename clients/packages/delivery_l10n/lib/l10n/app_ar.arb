@@ -3885,5 +3885,10 @@
   "riderRegionSetBy": "تحدّدها {company}. ستوصّل حيث توصّل الشركة، فلا حاجة لاختيار منطقة.",
   "riderRegionNoneListed": "لم تُحدَّد منطقة توصيل بعد",
   "riderRegionCompanyNotHiring": "شركة التوصيل هذه لا تستقبل سائقين حالياً. اختر شركة أخرى، أو انضم إلى أسطول YouDrop.",
-  "riderRegionCompaniesUnavailable": "تعذّر التحقق من شركة التوصيل الآن. حاول بعد قليل."
+  "riderRegionCompaniesUnavailable": "تعذّر التحقق من شركة التوصيل الآن. حاول بعد قليل.",
+  "riderRegionAreaBeirut": "بيروت",
+  "riderRegionAreaMountLebanon": "جبل لبنان",
+  "riderRegionAreaNorth": "الشمال",
+  "riderRegionAreaSouth": "الجنوب",
+  "riderRegionAreaBekaa": "البقاع"
 }

@@ -12665,4 +12665,19 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get riderRegionCompaniesUnavailable =>
       'تعذّر التحقق من شركة التوصيل الآن. حاول بعد قليل.';
+
+  @override
+  String get riderRegionAreaBeirut => 'بيروت';
+
+  @override
+  String get riderRegionAreaMountLebanon => 'جبل لبنان';
+
+  @override
+  String get riderRegionAreaNorth => 'الشمال';
+
+  @override
+  String get riderRegionAreaSouth => 'الجنوب';
+
+  @override
+  String get riderRegionAreaBekaa => 'البقاع';
 }
