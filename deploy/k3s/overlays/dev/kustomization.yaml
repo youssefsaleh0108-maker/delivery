@@ -47,7 +47,7 @@ patches:
 - patch: |-
     - op: add
       path: /spec/template/metadata/annotations/youdrop.shop~1order-manager-build
-      value: "bbc10ce"
+      value: "429ce9e"
   target:
     kind: Deployment
     name: order-manager
