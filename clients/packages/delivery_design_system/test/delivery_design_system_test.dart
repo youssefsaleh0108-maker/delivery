@@ -607,4 +607,40 @@ void main() {
       );
     });
   });
+
+  group('YdOtpCells', () {
+    // The partner wizard's code step sits in a SliverFillRemaining that measures its content before
+    // laying it out. The row's LayoutBuilder could not be measured: it threw in a debug build, and in
+    // release answered zero, under-measuring the screen by the whole row.
+    testWidgets('says how tall it is, so a screen that measures before laying out can hold it',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(375, 700);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(
+          body: CustomScrollView(
+            slivers: <Widget>[
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(children: <Widget>[YdOtpCells(length: 6, autofocus: false)]),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ));
+
+      expect(tester.takeException(), isNull);
+      final RenderBox row = tester.renderObject<RenderBox>(find.byType(YdOtpCells));
+      // Six cells shrunk to fit 327 wide: (327 - 5 gaps of 16) / 6 each, and as tall as wide.
+      expect(row.size.height, closeTo((327 - 5 * 16) / 6, 0.01));
+      expect(row.getMaxIntrinsicHeight(327), closeTo(row.size.height, 0.01));
+      // With room to spare the cells keep the design's 64.
+      expect(row.getMaxIntrinsicHeight(1000), 64);
+    });
+  });
 }

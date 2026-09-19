@@ -43,6 +43,30 @@ void main() {
     expect(find.text('—'), findsNWidgets(2));
   });
 
+  testWidgets("a company rider's region is the company's, read as names rather than a list",
+      (WidgetTester tester) async {
+    await pumpDirectory(
+        tester,
+        FleetStub(applications: <Map<String, dynamic>>[
+          applicationJson(
+            id: 'app-1',
+            name: 'Nadia Haddad',
+            riderRef: nadia,
+            // What the server records for a rider who applied to this company: its region, as a
+            // list. An area an older app typed as well does not win over it.
+            details: const <String, Object?>{
+              'companyRegions': <String>['Achrafieh', 'Hamra'],
+              'preferredArea': 'Verdun',
+              'vehicleType': 'MOTORCYCLE',
+            },
+          ),
+        ]));
+
+    expect(find.text('Achrafieh, Hamra'), findsOneWidget);
+    expect(find.text('[Achrafieh, Hamra]'), findsNothing);
+    expect(find.text('Verdun'), findsNothing);
+  });
+
   testWidgets('every rating and every standing comes from a fleet-wide read, never one per rider',
       (WidgetTester tester) async {
     // Six plus two per rider used to go out at once — more than eighty for forty riders — into the
@@ -254,6 +278,57 @@ void main() {
     expect(find.text('Nadia Haddad'), findsNothing);
     // Nobody the platform attached directly gave a region, so they are not in it either.
     expect(find.text('RIDER-BB'), findsNothing);
+  });
+
+  // A company rider's region is the company's list of regions, which the card shows as one line.
+  // The filter offered that line as one zone, which matched only riders with exactly that list.
+  testWidgets("the zone filter offers each of a company rider's regions on its own, and finds them under each",
+      (WidgetTester tester) async {
+    await pumpDirectory(
+        tester,
+        FleetStub(
+          riders: const <String>[nadia, direct, 'rider-cccccccc'],
+          applications: <Map<String, dynamic>>[
+            applicationJson(
+              id: 'app-1',
+              name: 'Nadia Haddad',
+              riderRef: nadia,
+              details: const <String, Object?>{
+                'companyRegions': <String>['Achrafieh', 'Hamra'],
+              },
+            ),
+            applicationJson(
+              id: 'app-3',
+              name: 'Omar Khoury',
+              riderRef: 'rider-cccccccc',
+              details: const <String, Object?>{
+                'companyRegions': <String>['Hamra'],
+              },
+            ),
+          ],
+        ));
+
+    await tester.tap(find.text(en.carrRidersZoneAll));
+    await tester.pumpAndSettle();
+    // The menu offers each region once; the card still reads as the list.
+    expect(find.text('Achrafieh'), findsOneWidget);
+    expect(find.text('Hamra'), findsNWidgets(2), reason: "Omar's card, and the menu");
+    expect(find.text('Achrafieh, Hamra'), findsOneWidget, reason: "Nadia's card only");
+    await tester.tap(find.text('Hamra').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text(en.carrRidersZoneValue('Hamra')), findsOneWidget);
+    expect(find.text('Nadia Haddad'), findsOneWidget);
+    expect(find.text('Omar Khoury'), findsOneWidget);
+    expect(find.text('RIDER-BB'), findsNothing);
+
+    await tester.tap(find.text(en.carrRidersZoneValue('Hamra')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Achrafieh').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nadia Haddad'), findsOneWidget);
+    expect(find.text('Omar Khoury'), findsNothing);
   });
 
   testWidgets('the vehicle filter narrows by the vehicle riders gave, in the reader\'s words',

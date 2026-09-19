@@ -27,14 +27,30 @@
 // It writes real data: one Keycloak account and one application per kind per run, tagged with the
 // run id so they can be told apart from a person's.
 import { execSync } from 'node:child_process';
+import { randomInt } from 'node:crypto';
 
 const ENV = process.argv[2] || 'dev';
 const API = `https://api-${ENV}.youdrop.shop`;
 const IAM = `https://iam-${ENV}.youdrop.shop`;
 const NS = `delivery-${ENV}`;
 
+// The demo logins' passwords come from the environment's demo-logins Secret — one ssh call for all
+// of them, held in memory — or from DEMO_<USER>_PASSWORD if set. They were literals here, and the
+// repository was public.
+let demoLogins = null;
+const demoPassword = (user) => {
+  const fromEnv = process.env[`DEMO_${user.toUpperCase()}_PASSWORD`];
+  if (fromEnv) return fromEnv;
+  demoLogins ??= JSON.parse(execSync(`ssh delivery-vps "kubectl -n ${NS} get secret demo-logins -o json"`,
+    { encoding: 'utf8' })).data;
+  if (!demoLogins?.[user]) throw new Error(`demo-logins in ${NS} has no ${user}`);
+  return Buffer.from(demoLogins[user], 'base64').toString('utf8');
+};
+
 const RUN = Date.now().toString(36).toUpperCase();
-const PASSCODE = '778899';
+// Random per run. The accounts this creates stay on the environment, and a fixed passcode in a
+// public file made every one of them — riders and merchants among them — a login anybody could use.
+const PASSCODE = String(randomInt(0, 1_000_000)).padStart(6, '0');
 
 let pass = 0;
 let fail = 0;
@@ -73,9 +89,11 @@ const rolesOf = (token) => {
 };
 
 /// The environment's inbox. A person reads the code in their mail client; there is no mail client
-/// here, and the notification log is the row the mail relay sends from.
+/// here. The notification log masks every code now, so it comes from Notifications Manager's test
+/// code sink, which keeps codes only for @youdrop.test addresses (a domain nobody can own) and only
+/// where the environment switched it on (TEST_CODE_SINK_ENABLED, dev and qa).
 const codeSentTo = (address) => {
-  const sql = `SELECT body FROM notification.notification_log WHERE recipient = '${address}' `
+  const sql = `SELECT code FROM notification.test_code_sink WHERE recipient = '${address}' `
     + 'ORDER BY created_at DESC LIMIT 1';
   const out = execSync(
     `ssh delivery-vps "kubectl -n ${NS} exec postgres-0 -- psql -U delivery -d delivery -t -c \\"${sql}\\""`,
@@ -88,7 +106,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 console.log(`\n=== a stranger becomes a partner on ${ENV} ===\n`);
 
-const backoffice = await signIn('backoffice', '400004', 'delivery-portal');
+const backoffice = await signIn('backoffice', demoPassword('backoffice'), 'delivery-portal');
 backoffice ? ok('an operator signs in to the portal') : bad('backoffice sign-in', 'no token');
 if (!backoffice) process.exit(1);
 

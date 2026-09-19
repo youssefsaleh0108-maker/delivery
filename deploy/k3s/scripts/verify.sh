@@ -49,6 +49,11 @@ api /api/accounting/statements accounting-service
 api /api/orders/8f2 order-manager
 api /api/products/8f2 product-service
 api /product-images/8f2.png minio
+api /user-avatars/8f2.jpg minio
+api /order-attachments/8f2.pdf minio
+api /merchant-kyc/applications/8f2/8f2.jpg minio
+api /delivery-proof/8f2.jpg UNROUTED
+api /receipts/8f2.pdf UNROUTED
 api /webhooks/dlr sms-connector
 '
 
@@ -107,6 +112,21 @@ for env in dev qa; do
   done
 done
 [ ! -f "$tmp/failed" ] || fails=$((fails + $(wc -l < "$tmp/failed" | tr -d ' ')))
+
+echo "== presigned uploads meet their body limit before storage =="
+# Neither a presigned PUT nor MinIO can cap a body, so the route's own middleware is the only limit a
+# file meets before MinIO stores it. It sits in the four lines after the route's match.
+for env in dev qa; do
+  for pair in order-attachments:order-attachment-upload-limit merchant-kyc:merchant-kyc-upload-limit; do
+    prefix=${pair%%:*}
+    limit=${pair#*:}
+    if grep -F -A4 "PathPrefix(\`/$prefix\`)" "overlays/$env/ingress.yaml" | grep -q "name: $limit }"; then
+      ok "$env /$prefix carries $limit"
+    else
+      fail "$env /$prefix is routed without $limit"
+    fi
+  done
+done
 
 echo "== every YAML alias resolves =="
 # A ConfigMap's `data:` values are strings to Kubernetes, so a dangling `*alias` inside one is
@@ -171,6 +191,46 @@ grep -q '/metrics/per-object' base/data-layer.yaml \
 grep -q 'Draining a dead-letter queue' README.md \
   && ok "the drain procedure is documented" \
   || fail "README.md documents no drain procedure"
+
+echo "== credentials stay out of the repository =="
+# 2026-09: the repository was public and carried working dev/qa credentials. These keep them out.
+realm=base/assets/keycloak/realm-delivery-platform.json
+# "value" also names protocol-mapper config values; only credentials and client secrets matter.
+cred_literals=$(awk '/"type": "password"/ { getline; if ($0 !~ /"value": "\$\{[A-Z][A-Z0-9_]*\}"/) n++ } END { print n + 0 }' "$realm")
+secret_literals=$(grep -E '"secret": "' "$realm" | grep -c -v -E '"secret": "\$\{[A-Z][A-Z0-9_]*\}"' || true)
+[ "$cred_literals" = 0 ] && [ "$secret_literals" = 0 ] \
+  && ok "the realm file's client secrets and passwords are all \${...} placeholders" \
+  || fail "the realm file carries $secret_literals literal client secret(s) and $cred_literals literal password(s)"
+# A placeholder Keycloak cannot resolve is imported as its own text, so every one must come from a
+# Secret on the keycloak container.
+for name in $(grep -o '"\${[A-Z][A-Z0-9_]*}"' "$realm" | tr -d '"${}' | sort -u); do
+  grep -A1 -- "- name: $name\$" base/identity.yaml | grep -q secretKeyRef \
+    && ok "placeholder $name is fed from a Secret" \
+    || fail "placeholder $name has no secretKeyRef on the keycloak container: it would import as literal text"
+done
+for secret in $( { grep -h -o 'secretKeyRef: { name: [a-z0-9-]*' base/*.yaml | awk '{print $4}'
+                   grep -h -A1 'secretKeyRef:$' base/*.yaml | grep -o 'name: [a-z0-9-]*' | awk '{print $2}'
+                   grep -h -o 'secret: [a-z0-9-]*' overlays/ingress.template.yaml | awk '{print $2}'; } | sort -u); do
+  [ "$secret" = anthropic-api ] && continue   # optional, created by hand (README.md)
+  grep -q -E "(mint|create secret generic) $secret( |\\\\|\$)" scripts/gen-secrets.sh \
+    && ok "Secret $secret is minted by gen-secrets.sh" \
+    || fail "Secret $secret is referenced but gen-secrets.sh never creates it"
+done
+grep -q -E '^\s+WHATSAPP_(APP_SECRET|VERIFY_TOKEN):' base/configmap-common.yaml \
+  && fail "platform-common carries a WhatsApp secret again" \
+  || ok "platform-common carries no WhatsApp secret"
+grep -r -l -E '\$(2[aby]|apr1)\$' base cluster overlays scripts >/dev/null 2>&1 \
+  && fail "a password hash is in the repository: $(grep -r -l -E '\$(2[aby]|apr1)\$' base cluster overlays scripts | tr '\n' ' ')" \
+  || ok "no password hash in base, cluster, overlays or scripts"
+grep -q 'keycloak\.client-secret=' base/assets/vault/bootstrap.sh \
+  && fail "vault/bootstrap.sh seeds a Keycloak client secret" \
+  || ok "the Vault seed carries no Keycloak client secret"
+grep -q -E 'tok (customer|rider|merchant|backoffice|carrier) [^)]' scripts/e2e-smoke.sh || grep -q -E 'password=[^$"]' scripts/e2e-smoke.sh \
+  && fail "scripts/e2e-smoke.sh carries a password" \
+  || ok "scripts/e2e-smoke.sh reads the demo logins from their Secret"
+for t in scripts/test/gen-secrets.test.sh scripts/test/e2e-smoke.test.sh; do
+  sh "$t" > "$tmp/test.out" 2>&1 && ok "$t" || { fail "$t:"; grep FAIL "$tmp/test.out"; }
+done
 
 echo
 if [ "$fails" -eq 0 ]; then

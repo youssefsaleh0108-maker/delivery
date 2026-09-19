@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import '../models/catalog_models.dart';
 import '../models/geo_models.dart';
 import '../models/gift_models.dart';
+import '../models/item_search_models.dart';
 import '../models/store_models.dart';
 
 /// Typed client for the storefront half of the Product Service.
@@ -173,6 +174,51 @@ class StoreApi {
       return const <NearbyStore>[];
     }
     return rows.map(NearbyStore.maybeFromJson).whereType<NearbyStore>().toList();
+  }
+
+  /// The shops that sell what [query] names — `POST /api/products/search/items`.
+  ///
+  /// Live, in-stock products of live goods shops that are open now, grouped by shop: each
+  /// [ItemSearchGroup] carries the shop's card, its best matches (at most three) and how many matched
+  /// in all. Around the customer's pin ([latitude] and [longitude], both or neither), only shops within
+  /// the server's own radius whose delivery circle reaches the pin are searched, nearest first after
+  /// the best match; without one every live goods shop is, and [ItemSearchPage.nearby] is false.
+  ///
+  /// A JSON body rather than query parameters, so the pin is never in a URL, where gateways and access
+  /// logs keep it. [size] is at most 20 on the server. A query the server will not search as asked
+  /// throws [ItemSearchRefusal] with its `code` (too short, too many words, too long, not a barcode);
+  /// anything else arrives as the [DioException] it is: 400 for half a pin, and 429 or 503, with a
+  /// Retry-After, when the account searched too often or the database was too busy.
+  Future<ItemSearchPage> searchItems(
+    ItemSearchQuery query, {
+    double? latitude,
+    double? longitude,
+    int page = 0,
+    int size = 10,
+  }) async {
+    final bool pinned = latitude != null && longitude != null;
+    final Response<dynamic> response;
+    try {
+      response = await _dio.post<dynamic>(
+        '/api/products/search/items',
+        data: <String, dynamic>{
+          ...query.toJson(),
+          if (pinned) 'latitude': latitude,
+          if (pinned) 'longitude': longitude,
+          'page': page,
+          'size': size,
+        },
+      );
+    } on DioException catch (e) {
+      final Object? body = e.response?.data;
+      final Object? code = body is Map ? body['code'] : null;
+      if (e.response?.statusCode == 400 && code is String && code.startsWith('SEARCH_')) {
+        throw ItemSearchRefusal(code);
+      }
+      rethrow;
+    }
+    final Object? body = response.data;
+    return ItemSearchPage.fromJson(body is Map<String, dynamic> ? body : const <String, dynamic>{});
   }
 
   Future<Paged<StoreCard>> favorites({int page = 0, int size = 20}) async {

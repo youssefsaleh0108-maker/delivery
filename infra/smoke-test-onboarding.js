@@ -52,21 +52,23 @@ const waitFor = (predicate, what, attempts = 40) => {
 };
 
 const tag = Date.now().toString(36).slice(-6);
-const carrierEmail = `fleet-${tag}@example.test`;
-const merchantEmail = `shop-${tag}@example.test`;
+const carrierEmail = `fleet-${tag}@youdrop.test`;
+const merchantEmail = `shop-${tag}@youdrop.test`;
 
 const psql = (q) => sh('docker exec delivery-postgres psql -U delivery -d delivery -tAc '
   + `"${q.replace(/"/g, '\\"')}"`).trim();
 
-// Earns a real verification the way a person does: ask for a code, read it out of the delivery
-// log (this environment's stand-in for an inbox), and confirm it.
+// Earns a real verification the way a person does: ask for a code, read it out of Notifications
+// Manager's test code sink (this environment's stand-in for an inbox), and confirm it. The delivery
+// log masks every code; the sink keeps them only for @youdrop.test addresses, which nobody can own,
+// where TEST_CODE_SINK_ENABLED is on.
 //
 // An application needs a proved address now, so this suite has to prove one. Applying without a
 // token is no longer a shortcut — it is a different test, and it belongs with the refusals
 // rather than at the top pretending to be the happy path.
 const verify = (address) => {
   send('POST', '/api/onboarding/verifications', { channel: 'EMAIL', destination: address }, null);
-  const message = psql('SELECT body FROM notification.notification_log WHERE recipient = '
+  const message = psql('SELECT code FROM notification.test_code_sink WHERE recipient = '
     + `'${address}' ORDER BY created_at DESC LIMIT 1`);
   const code = (message.match(/\b(\d{6})\b/) || [])[1];
   if (!code) return null;
@@ -143,7 +145,7 @@ check('and the notes the applicant wrote',
   queued && (queued.notes || '').includes('smoke test'), 'present');
 
 console.log('\n--- a rejection has to say why ---');
-const rejected = apply('MERCHANT', `Doomed Shop ${tag}`, `doomed-${tag}@example.test`);
+const rejected = apply('MERCHANT', `Doomed Shop ${tag}`, `doomed-${tag}@youdrop.test`);
 const doomedId = get('/api/onboarding/applications', backoffice)
   .find((a) => a.reference === JSON.parse(rejected.body).reference).id;
 check('rejecting with no reason is refused',

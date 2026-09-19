@@ -8,6 +8,8 @@ import 'package:mobile_app/src/one_time_code.dart';
 import 'package:mobile_app/src/sign_in_screen.dart';
 import 'package:mobile_app/src/splash_screen.dart';
 
+import 'support/demo_logins.dart';
+
 /// Cold start to a signed-in customer, against the real dev backend.
 ///
 /// <p>The bug report this exists for is one sentence on the sign-in screen — "We could not reach
@@ -63,11 +65,11 @@ void main() {
   const String navHome = 'Home'; // navHome
   const String navBasket = 'Basket'; // navBasket
 
-  // The seeded demo customer on dev. Six digits exactly: `_submitCredentials` rejects any other
-  // length with passcodeMustBeSixDigits before a request is ever made, so a typo here would look
-  // like a validation bug rather than a wrong constant.
+  // The seeded demo customer on dev; its passcode is supplied at run time (DemoLogins). Six digits
+  // exactly: `_submitCredentials` rejects any other length with passcodeMustBeSixDigits before a
+  // request is ever made, so a wrong define looks like a validation bug rather than a wrong password.
   const String username = 'customer';
-  const String passcode = '100001';
+  final String passcode = DemoLogins.passwordOf('customer');
 
   /// Pumps real frames until [ready] holds or [timeout] elapses, and reports which.
   ///
@@ -113,7 +115,7 @@ void main() {
   }
 
   testWidgets(
-    'a cold start signs customer/100001 in against the live dev backend',
+    'a cold start signs the demo customer in against the live dev backend',
     (WidgetTester tester) async {
       // The real entrypoint, not a hand-rolled `pumpWidget(DeliveryMobileApp())`. Awaiting it
       // matters more than it looks: main() awaits `Firebase.initializeApp()` before runApp, and

@@ -745,6 +745,10 @@ services:
       # an ERROR every thirteen seconds in every service: noise that hides real errors.
       OTEL_SDK_DISABLED: "true"
       MANAGEMENT_TRACING_ENABLED: "false"
+      # The delivery log masks every one-time code. This keeps the codes sent to @youdrop.test
+      # addresses (a reserved domain nobody can own) in notification.test_code_sink, where the
+      # smoke tests read them. A dev stack only: never set this for production.
+      TEST_CODE_SINK_ENABLED: "true"
     depends_on:
       config-server:
         condition: service_healthy

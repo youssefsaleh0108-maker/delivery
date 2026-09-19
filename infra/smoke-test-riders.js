@@ -55,10 +55,14 @@ const carrier = token('carrier');
 
 // ---------------------------------------------------------------- a verified applicant
 
-/** Earns a real verification the same way a person does: ask for a code, read it, confirm it. */
+/**
+ * Earns a real verification the same way a person does: ask for a code, read it, confirm it. The
+ * code comes from Notifications Manager's test code sink, which keeps codes only for @youdrop.test
+ * addresses where TEST_CODE_SINK_ENABLED is on; the delivery log masks every code.
+ */
 const verifiedEmail = (address) => {
   send('POST', '/api/onboarding/verifications', { channel: 'EMAIL', destination: address }, null);
-  const message = psql('SELECT body FROM notification.notification_log WHERE recipient = '
+  const message = psql('SELECT code FROM notification.test_code_sink WHERE recipient = '
     + `'${address}' ORDER BY created_at DESC LIMIT 1`);
   const code = (message.match(/\b(\d{6})\b/) || [])[1];
   if (!code) return null;
@@ -75,7 +79,7 @@ if (!company) {
 console.log(`    hiring company: ${company.name} (${company.id})\n`);
 
 const tag = Date.now().toString(36).slice(-6);
-const riderEmail = `rider-${tag}@example.test`;
+const riderEmail = `rider-${tag}@youdrop.test`;
 
 console.log('--- a rider applies to one company ---');
 const emailToken = verifiedEmail(riderEmail);
@@ -161,7 +165,7 @@ if (provisioned) {
 }
 
 console.log('\n--- turning somebody down ---');
-const otherEmail = `rider-no-${tag}@example.test`;
+const otherEmail = `rider-no-${tag}@youdrop.test`;
 const otherToken = verifiedEmail(otherEmail);
 send('POST', '/api/onboarding/applications', {
   kind: 'RIDER', businessName: `Rider No ${tag}`, contactName: 'Sami Rider',

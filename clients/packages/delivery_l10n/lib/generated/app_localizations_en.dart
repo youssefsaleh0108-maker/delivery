@@ -12502,6 +12502,135 @@ class DeliveryStringsEn extends DeliveryStrings {
       'Couldn\'t open this order\'s chat. Reloading the order.';
 
   @override
+  String get riderRegionLabel => 'Delivery region';
+
+  @override
+  String riderRegionSetBy(String company) {
+    return 'Set by $company. You deliver where the company delivers, so there is no area to choose.';
+  }
+
+  @override
+  String get riderRegionNoneListed => 'No delivery region listed yet';
+
+  @override
+  String get riderRegionCompanyNotHiring =>
+      'That delivery company isn\'t taking riders right now. Choose another company, or ride for YouDrop.';
+
+  @override
+  String get riderRegionCompaniesUnavailable =>
+      'We couldn\'t check that delivery company just now. Try again in a moment.';
+
+  @override
+  String get riderRegionAreaBeirut => 'Beirut';
+
+  @override
+  String get riderRegionAreaMountLebanon => 'Mount Lebanon';
+
+  @override
+  String get riderRegionAreaNorth => 'North';
+
+  @override
+  String get riderRegionAreaSouth => 'South';
+
+  @override
+  String get riderRegionAreaBekaa => 'Bekaa';
+
+  @override
+  String get wizAccountExists =>
+      'This email address already has an account. Sign in with that account, or apply with a different email.';
+
+  @override
+  String get wizAccountSignInUnavailable =>
+      'Sign-in can\'t be set up right now. Please try again in a minute.';
+
+  @override
+  String get wizAccountSignInExists =>
+      'Your sign-in is already set up. Sign in with your email and the passcode you chose.';
+
+  @override
+  String get wizAccountApplicationDecided =>
+      'This application has already been decided, so a sign-in can\'t be set up for it here. Please contact support.';
+
+  @override
+  String get wizAccountEmailChanged =>
+      'The email on this application was changed after it was verified, so a sign-in can\'t be set up for it. Please contact support.';
+
+  @override
+  String get wizAccountProofMissing =>
+      'This version of the app can\'t finish setting up your sign-in. Please update the app and try again.';
+
+  @override
+  String get wizAccountProofRejected =>
+      'Your confirmation has expired. Confirm your email with a new code to finish setting up your sign-in.';
+
+  @override
+  String get wizAccountConfirmAgain =>
+      'To finish setting up your sign-in, confirm your email once more. It keeps anyone else from choosing your passcode.';
+
+  @override
+  String get isrchSearchHint => 'Search shops, cuisines and items';
+
+  @override
+  String get isrchNearTitle => 'Items in shops near you';
+
+  @override
+  String get isrchAnywhereTitle => 'Items in shops';
+
+  @override
+  String get isrchSeeAll => 'See all items';
+
+  @override
+  String get isrchFieldHint => 'Search items in shops';
+
+  @override
+  String isrchEmptyNear(String query) {
+    return 'No open shop near you has “$query” right now';
+  }
+
+  @override
+  String isrchEmptyAnywhere(String query) {
+    return 'No open shop has “$query” right now';
+  }
+
+  @override
+  String isrchEmptyTruncated(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Only the $count best matches were checked.',
+      one: 'Only the best match was checked.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get isrchNotByDistance =>
+      'Your address has no map pin, so shops aren\'t sorted by distance.';
+
+  @override
+  String isrchMoreInStore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count more in this shop',
+      one: '1 more in this shop',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get isrchCouldNotSearch => 'We couldn\'t search items just now.';
+
+  @override
+  String get isrchTypeMore => 'Type at least 2 letters to search items.';
+
+  @override
+  String get isrchSearching => 'Searching items';
+
+  @override
+  String get isrchUseFewerWords => 'Use up to 5 words to search items.';
+
+  @override
   String get dareaButton => 'Delivery area';
 
   @override

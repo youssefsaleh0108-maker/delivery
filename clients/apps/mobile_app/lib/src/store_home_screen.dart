@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
 import 'address_sheet.dart';
@@ -13,6 +14,7 @@ import 'notification_inbox.dart';
 import 'notifications_screen.dart';
 import 'product_detail_screen.dart' show CoverCard, CustomerPhoto;
 import 'friend_split_screen.dart';
+import 'home_item_search_section.dart';
 import 'hyperlocal_screen.dart';
 import 'neighbourhood_chat_screen.dart';
 import 'shops_listing_screen.dart';
@@ -49,6 +51,7 @@ class StoreHomeScreen extends StatefulWidget {
     required this.onSignOut,
     required this.onOpenBasket,
     this.onOpenGiftHub,
+    this.connectivity,
   });
 
   final StoreApi storeApi;
@@ -99,6 +102,10 @@ class StoreHomeScreen extends StatefulWidget {
   /// What a dekkane shop page draws above its basket bar, from the shell — handed to the
   /// neighbourhood browse, which passes it to every shop it opens. Null draws nothing.
   final ShopChatActionBuilder? shopChatAction;
+
+  /// Whether YouDrop can be reached, from the shell. While it cannot, the items section under the
+  /// search box is not drawn. Null is always online.
+  final ValueListenable<bool>? connectivity;
 
   @override
   State<StoreHomeScreen> createState() => _StoreHomeScreenState();
@@ -455,6 +462,21 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                   SliverToBoxAdapter(child: _neighbourhoodRow(t)),
                   if (_railFavorites.isNotEmpty)
                     SliverToBoxAdapter(child: _featuredSection()),
+                  // Products on shop shelves that match the search, above the shops whose names
+                  // do. Draws nothing below two characters, offline, or when the search fails.
+                  SliverToBoxAdapter(
+                    child: HomeItemSearchSection(
+                      query: _filters.search,
+                      storeApi: widget.storeApi,
+                      orderApi: widget.orderApi,
+                      cart: widget.cart,
+                      addresses: widget.addresses,
+                      connectivity: widget.connectivity,
+                      onOpenBasket: widget.onOpenBasket,
+                      onOpenShop: _openStore,
+                      onFavoriteChanged: _applyFavorite,
+                    ),
+                  ),
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsetsDirectional.fromSTEB(
@@ -716,7 +738,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
       alignment: Alignment.center,
       child: YdSearchField(
         controller: _searchController,
-        hintText: t.searchShops,
+        hintText: t.isrchSearchHint,
         animatedHint: _chips.isEmpty
             ? null
             : AnimatedSwitcher(
@@ -746,7 +768,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                 ),
               ),
         onChanged: _onSearchChanged,
-        searchSemanticLabel: t.searchShops,
+        searchSemanticLabel: t.isrchSearchHint,
         filterSemanticLabel: t.custFilters,
         filterIcon: Icons.tune,
         onFilterTap: () => setState(() => _filtersOpen = !_filtersOpen),

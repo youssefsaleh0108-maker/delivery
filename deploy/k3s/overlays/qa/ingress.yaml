@@ -107,6 +107,23 @@ spec:
     maxRequestBodyBytes: 10551296
     memRequestBodyBytes: 1048576
 ---
+# The same limit for an applicant's identity and vehicle papers (FilePurpose.MERCHANT_KYC), which the
+# rider and merchant wizards PUT straight to MinIO with a URL onboarding-service signed for that
+# applicant's own application. onboarding-service refuses an oversized file when the upload is
+# confirmed; this refuses it on the way in, before MinIO stores a byte of somebody's licence.
+#
+# 10 MiB is onboarding-service's delivery.storage.minio.max-upload-size-bytes — keep the two in step —
+# plus the same 64 KiB of slack. A separate middleware rather than the one above, although the numbers
+# match today, because each follows a different service's setting.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: merchant-kyc-upload-limit
+spec:
+  buffering:
+    maxRequestBodyBytes: 10551296
+    memRequestBodyBytes: 1048576
+---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
@@ -188,9 +205,18 @@ spec:
       services: [{ name: sms-connector, port: 8112 }]
       middlewares: *api-mw
     # Object storage over the API hostname. The prefix is NOT stripped: an S3 signature covers
-    # host and path, and the bucket name is the first path segment. Only the public buckets, the
-    # APK drop and order-attachments (the rule after this one) are routed — merchant-kyc, receipts
-    # and delivery-proof stay unreachable.
+    # host and path, and the bucket name is the first path segment.
+    #
+    # Routed: every bucket a client reaches with a URL a service minted for it. That is the two
+    # public ones (product-images, the apk drop) and the private ones a phone or a browser uses with a
+    # presigned URL — user-avatars on this rule, order-attachments and merchant-kyc on rules of their
+    # own below, for their upload limits. Routing a private bucket does not open it: MinIO checks
+    # every request's signature itself, so a request without one (a guessed URL, a bucket listing) is
+    # refused with AccessDenied where an unrouted one met a 404. Only somebody holding a URL a service
+    # signed after its own checks gets in, and only until it expires.
+    #
+    # Unrouted: delivery-proof and receipts. No service signs a URL into either today, so a route
+    # would serve nobody. Route one the way merchant-kyc is routed once something does.
     #
     # The 90 below is under this rule's own length (116) and so demotes it, which is harmless only
     # because no other rule matches these three prefixes. Do not read it as the priority band the
@@ -214,6 +240,20 @@ spec:
       services: [{ name: minio, port: 9000 }]
       middlewares:
         - { name: order-attachment-upload-limit }
+        - { name: security-headers }
+    # merchant-kyc, the same way and for the same reason: PRIVATE, and presigned in both directions.
+    # The rider and merchant wizards PUT an applicant's id, licence and vehicle papers with URLs
+    # onboarding-service signs for that applicant's own application, and a reviewer — back office, or
+    # the delivery company a rider applied to — opens one with a GET signed for them, valid for ten
+    # minutes. Unrouted, every one of those uploads met Traefik's own 404 and the papers an application
+    # is judged on never reached storage. Its own limit runs first; the same 90, deciding nothing,
+    # since no other rule matches this prefix.
+    - kind: Rule
+      match: Host(`api-qa.youdrop.shop`) && PathPrefix(`/merchant-kyc`)
+      priority: 90
+      services: [{ name: minio, port: 9000 }]
+      middlewares:
+        - { name: merchant-kyc-upload-limit }
         - { name: security-headers }
 ---
 # Keycloak owns its whole origin: /realms, /resources, the account and admin consoles.

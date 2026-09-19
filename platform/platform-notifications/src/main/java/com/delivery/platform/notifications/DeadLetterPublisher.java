@@ -21,6 +21,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *
  * <p>The reason is attached as a header rather than folded into the body so the original command
  * can be replayed onto a dispatch queue unchanged once the underlying problem is fixed.
+ *
+ * <p><strong>Except a one-time code, which is parked masked</strong> (see {@link OneTimeCodes}). The
+ * queue keeps what it is given until somebody empties it, and a code in it is a working credential
+ * for anyone who can read the queue. Nothing is lost by masking it: a code lives ten minutes, so
+ * one replayed after an outage has been fixed is dead on arrival, and the person waiting for it
+ * asks for a new one.
  */
 public class DeadLetterPublisher {
 
@@ -36,7 +42,10 @@ public class DeadLetterPublisher {
         this.queue = queue;
     }
 
-    public void park(IdempotentCommand command, String reason) {
+    public void park(IdempotentCommand failed, String reason) {
+        IdempotentCommand command = failed instanceof NotificationCommand notification
+                ? OneTimeCodes.masked(notification)
+                : failed;
         try {
             MessageProperties props = new MessageProperties();
             props.setContentType(MessageProperties.CONTENT_TYPE_JSON);

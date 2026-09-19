@@ -54,22 +54,42 @@ public class ApplicationIntake {
     }
 
     /**
-     * Spends the proofs and records the application, all or nothing.
+     * An application just recorded by the open form, and the account-setup ticket issued with it.
+     *
+     * <p>The ticket travels here and in the answer to the submission, and nowhere else: the record
+     * keeps only its hash, and nothing logs it. Whoever submitted is the only one who ever sees it.
+     */
+    public record Recorded(OnboardingApplication application, String accountTicket) {
+
+        /** Never the ticket: a record's generated toString would put it in any log that printed one. */
+        @Override
+        public String toString() {
+            return "Recorded[application=" + application.getId() + "]";
+        }
+    }
+
+    /**
+     * Spends the proofs, records the application and issues its account-setup ticket, all or
+     * nothing.
      *
      * <p>REQUIRES_NEW so this commits by itself even if a caller ever wraps it. The proofs are spent
      * in the same transaction as the insert deliberately: a token consumed against an application
      * that then failed to save would be a proof somebody can no longer use and cannot get back.
      *
+     * <p>The ticket is what the passcode step asks for (see
+     * {@link OnboardingService#createApplicantAccount}). It is issued in the insert because the
+     * reference is no secret, and the submitter must leave with something that is.
+     *
      * @param details checked before this transaction began, so an answer the applicant has to change
      *                — or a Product Service outage — has cost them no proof
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public OnboardingApplication record(OnboardingApplication.Kind kind, String businessName,
-                                        String contactName, String contactEmail,
-                                        String emailVerificationToken, String contactPhone,
-                                        String phoneVerificationToken, String notes,
-                                        ServiceProviderAnswers.Checked details,
-                                        java.util.UUID targetProviderId) {
+    public Recorded record(OnboardingApplication.Kind kind, String businessName,
+                           String contactName, String contactEmail,
+                           String emailVerificationToken, String contactPhone,
+                           String phoneVerificationToken, String notes,
+                           ServiceProviderAnswers.Checked details,
+                           java.util.UUID targetProviderId) {
 
         Instant emailVerifiedAt = verifications.consume(
                 emailVerificationToken, Channel.EMAIL, contactEmail);
@@ -84,6 +104,7 @@ public class ApplicationIntake {
                 verifications.normalise(Channel.EMAIL, contactEmail), emailVerifiedAt,
                 phone == null ? null : verifications.normalise(Channel.PHONE, phone),
                 phoneVerifiedAt, notes, details.details(), targetProviderId);
+        String accountTicket = application.issueAccountTicket(Instant.now());
 
         try {
             applications.saveAndFlush(application);
@@ -94,7 +115,7 @@ public class ApplicationIntake {
             throw new OnboardingService.ApplicationRuleException(
                     "You already have an application in progress for this business");
         }
-        return application;
+        return new Recorded(application, accountTicket);
     }
 
     /**
@@ -151,6 +172,68 @@ public class ApplicationIntake {
             // application per account. Both mean the same thing to the person asking.
             throw new OnboardingService.ApplicationRuleException(
                     "You already have an application in progress for this business");
+        }
+        return application;
+    }
+
+    /**
+     * Records the sign-in an applicant just chose against their application, spends what proved it
+     * was theirs, and commits.
+     *
+     * <p>The open path's counterpart of the attach {@link #recordForAccount} makes in its insert, and
+     * REQUIRES_NEW for the reason this class exists: it commits on its own, before anything is tried
+     * on top of it. What is tried next is auto-approval, and an approval that fails must never take
+     * the sign-in with it. It used to, when both were one transaction: the applicant was told their
+     * sign-in could not be set up while Keycloak kept the account (see
+     * {@link OnboardingService#createApplicantAccount}).
+     *
+     * <p>The same account arriving twice is not a second sign-in — two taps racing both bring the
+     * account the first one made or took up. Any other account on the row is.
+     *
+     * <p><strong>The row is read again here, and judged again.</strong> The caller judged the copy it
+     * read before Keycloak was asked anything, and a reviewer may have decided the application since:
+     * a sign-in is never recorded on a decided application. A decision that commits between this read
+     * and this write is caught by the row's version instead — this write then fails and records
+     * nothing, where it used to put SUBMITTED back over the decision.
+     *
+     * <p>The ticket and the email proof are spent here, in the same commit as the sign-in: an attempt
+     * that fails before this point leaves them for the retry, and the one that records a sign-in uses
+     * them up.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public OnboardingApplication attachApplicantAccount(java.util.UUID applicationId, String userRef,
+                                                        OnboardingService.SignInProof proof) {
+        OnboardingApplication application = applications.findById(applicationId)
+                .orElseThrow(() -> new OnboardingService.ApplicationRuleException(
+                        "No application with that reference"));
+        if (userRef.equals(application.getApplicantUserRef())) {
+            return application;
+        }
+        if (application.getApplicantUserRef() != null) {
+            throw OnboardingService.signInExists();
+        }
+        if (application.isDecided()) {
+            throw OnboardingService.applicationDecided();
+        }
+        application.applicantAccountCreated(userRef);
+        application.spendAccountTicket(Instant.now());
+        if (proof.emailToken() != null) {
+            try {
+                verifications.consume(proof.emailToken(), Channel.EMAIL, application.getContactEmail());
+            } catch (VerificationService.VerificationException spent) {
+                // Spent by another request since the caller looked at it. The code is used up either
+                // way; the applicant asks for another.
+                throw OnboardingService.proofRejected();
+            }
+        }
+        try {
+            applications.saveAndFlush(application);
+        } catch (DataIntegrityViolationException e) {
+            // One application per account: applicant_user_ref is unique. The caller checked before it
+            // took an existing account up, so this is another application getting there first — and
+            // to the applicant it means what that check means: the address has an account already.
+            // The caller takes back what its take-up granted (OnboardingService.createApplicantAccount).
+            throw OnboardingService.accountExists();
         }
         return application;
     }

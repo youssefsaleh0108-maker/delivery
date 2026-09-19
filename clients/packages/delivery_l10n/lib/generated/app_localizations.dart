@@ -21207,6 +21207,198 @@ abstract class DeliveryStrings {
   /// **'Couldn\'t open this order\'s chat. Reloading the order.'**
   String get svcChatOrderNotFound;
 
+  /// No description provided for @riderRegionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery region'**
+  String get riderRegionLabel;
+
+  /// No description provided for @riderRegionSetBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Set by {company}. You deliver where the company delivers, so there is no area to choose.'**
+  String riderRegionSetBy(String company);
+
+  /// No description provided for @riderRegionNoneListed.
+  ///
+  /// In en, this message translates to:
+  /// **'No delivery region listed yet'**
+  String get riderRegionNoneListed;
+
+  /// No description provided for @riderRegionCompanyNotHiring.
+  ///
+  /// In en, this message translates to:
+  /// **'That delivery company isn\'t taking riders right now. Choose another company, or ride for YouDrop.'**
+  String get riderRegionCompanyNotHiring;
+
+  /// No description provided for @riderRegionCompaniesUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t check that delivery company just now. Try again in a moment.'**
+  String get riderRegionCompaniesUnavailable;
+
+  /// No description provided for @riderRegionAreaBeirut.
+  ///
+  /// In en, this message translates to:
+  /// **'Beirut'**
+  String get riderRegionAreaBeirut;
+
+  /// No description provided for @riderRegionAreaMountLebanon.
+  ///
+  /// In en, this message translates to:
+  /// **'Mount Lebanon'**
+  String get riderRegionAreaMountLebanon;
+
+  /// No description provided for @riderRegionAreaNorth.
+  ///
+  /// In en, this message translates to:
+  /// **'North'**
+  String get riderRegionAreaNorth;
+
+  /// No description provided for @riderRegionAreaSouth.
+  ///
+  /// In en, this message translates to:
+  /// **'South'**
+  String get riderRegionAreaSouth;
+
+  /// No description provided for @riderRegionAreaBekaa.
+  ///
+  /// In en, this message translates to:
+  /// **'Bekaa'**
+  String get riderRegionAreaBekaa;
+
+  /// No description provided for @wizAccountExists.
+  ///
+  /// In en, this message translates to:
+  /// **'This email address already has an account. Sign in with that account, or apply with a different email.'**
+  String get wizAccountExists;
+
+  /// No description provided for @wizAccountSignInUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in can\'t be set up right now. Please try again in a minute.'**
+  String get wizAccountSignInUnavailable;
+
+  /// No description provided for @wizAccountSignInExists.
+  ///
+  /// In en, this message translates to:
+  /// **'Your sign-in is already set up. Sign in with your email and the passcode you chose.'**
+  String get wizAccountSignInExists;
+
+  /// No description provided for @wizAccountApplicationDecided.
+  ///
+  /// In en, this message translates to:
+  /// **'This application has already been decided, so a sign-in can\'t be set up for it here. Please contact support.'**
+  String get wizAccountApplicationDecided;
+
+  /// No description provided for @wizAccountEmailChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The email on this application was changed after it was verified, so a sign-in can\'t be set up for it. Please contact support.'**
+  String get wizAccountEmailChanged;
+
+  /// No description provided for @wizAccountProofMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'This version of the app can\'t finish setting up your sign-in. Please update the app and try again.'**
+  String get wizAccountProofMissing;
+
+  /// No description provided for @wizAccountProofRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Your confirmation has expired. Confirm your email with a new code to finish setting up your sign-in.'**
+  String get wizAccountProofRejected;
+
+  /// No description provided for @wizAccountConfirmAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'To finish setting up your sign-in, confirm your email once more. It keeps anyone else from choosing your passcode.'**
+  String get wizAccountConfirmAgain;
+
+  /// No description provided for @isrchSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search shops, cuisines and items'**
+  String get isrchSearchHint;
+
+  /// No description provided for @isrchNearTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Items in shops near you'**
+  String get isrchNearTitle;
+
+  /// No description provided for @isrchAnywhereTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Items in shops'**
+  String get isrchAnywhereTitle;
+
+  /// No description provided for @isrchSeeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'See all items'**
+  String get isrchSeeAll;
+
+  /// No description provided for @isrchFieldHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search items in shops'**
+  String get isrchFieldHint;
+
+  /// No description provided for @isrchEmptyNear.
+  ///
+  /// In en, this message translates to:
+  /// **'No open shop near you has “{query}” right now'**
+  String isrchEmptyNear(String query);
+
+  /// No description provided for @isrchEmptyAnywhere.
+  ///
+  /// In en, this message translates to:
+  /// **'No open shop has “{query}” right now'**
+  String isrchEmptyAnywhere(String query);
+
+  /// No description provided for @isrchEmptyTruncated.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Only the best match was checked.} other{Only the {count} best matches were checked.}}'**
+  String isrchEmptyTruncated(int count);
+
+  /// No description provided for @isrchNotByDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Your address has no map pin, so shops aren\'t sorted by distance.'**
+  String get isrchNotByDistance;
+
+  /// No description provided for @isrchMoreInStore.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 more in this shop} other{{count} more in this shop}}'**
+  String isrchMoreInStore(int count);
+
+  /// No description provided for @isrchCouldNotSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t search items just now.'**
+  String get isrchCouldNotSearch;
+
+  /// No description provided for @isrchTypeMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Type at least 2 letters to search items.'**
+  String get isrchTypeMore;
+
+  /// No description provided for @isrchSearching.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching items'**
+  String get isrchSearching;
+
+  /// No description provided for @isrchUseFewerWords.
+  ///
+  /// In en, this message translates to:
+  /// **'Use up to 5 words to search items.'**
+  String get isrchUseFewerWords;
+
   /// No description provided for @dareaButton.
   ///
   /// In en, this message translates to:

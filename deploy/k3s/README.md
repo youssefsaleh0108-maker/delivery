@@ -30,7 +30,8 @@ base/                         # everything both environments share
 overlays/dev, overlays/qa     # namespace, platform-env ConfigMap, ingress with the env's hosts
 overlays/ingress.template.yaml  # single source for both ingress files
 scripts/render-overlays.sh    # regenerates both ingress.yaml files from the template
-scripts/gen-secrets.sh        # creates platform-secrets in a namespace (run on the box)
+scripts/gen-secrets.sh        # creates a new namespace's Secrets (run on the box)
+scripts/rotate-secrets.sh     # replaces credentials in a running namespace, and proves it (on the box)
 ```
 
 ## Deploying (on the box)
@@ -44,8 +45,8 @@ kubectl apply -k /opt/delivery/k3s/overlays/dev
 ```
 
 `gen-secrets.sh` mints fresh credentials per environment and refuses to overwrite existing ones —
-regenerating passwords under stateful volumes would strand the data. The one value it does not
-invent is the onboarding client secret, which must match what the realm import creates.
+regenerating passwords under stateful volumes would strand the data. See *Secrets, and rotating
+them* below for what it creates and who reads each one.
 
 ## What to know
 
@@ -98,7 +99,34 @@ invent is the onboarding client secret, which must match what the realm import c
   `platform-secrets`, as onboarding-service gets them; the Vault seed carries them too from the next
   vault pod start. order-manager's image must be built against platform-storage 0.1.3, published to
   GitHub Packages.
-- **The demo logins** come from the realm import: customer/rider/merchant/backoffice/carrier.
+- **Applicant documents reach storage the same way.** `/merchant-kyc` is routed on the API hostname
+  like `/order-attachments` — prefix kept, presigned requests only, MinIO refusing unsigned ones —
+  behind `merchant-kyc-upload-limit`, a 413 over 10 MiB (keep it in step with onboarding-service's
+  `delivery.storage.minio.max-upload-size-bytes`). Until it was, every rider's and merchant's id,
+  licence and registration upload met Traefik's own 404 and never reached MinIO. The bucket has
+  existed since the first bootstrap, so the next sync of each overlay is the whole deployment. To
+  confirm, an unsigned request must now get MinIO's XML `AccessDenied`, not `404 page not found`:
+
+  ```sh
+  curl -s -X PUT https://api-dev.youdrop.shop/merchant-kyc/probe   # and api-qa
+  ```
+
+  The storage routes, then: `product-images` and `apk` (public), `user-avatars`,
+  `order-attachments` and `merchant-kyc` (private, presigned). `delivery-proof` and `receipts` stay
+  unrouted because no service signs a URL into either yet; `scripts/verify.sh` checks both halves.
+- **The demo logins** (customer/rider/merchant/backoffice/carrier) come from the realm import, and
+  their passwords from the `demo-logins` Secret — see below.
+- **The realm import runs only against a fresh database**, so a change to the realm file reaches an
+  environment that already has one only by hand. The user profile now declares
+  `onboardingApplicationId`, admin-only to view and to edit: onboarding-service stamps it on every
+  account it makes for an applicant's passcode, and finishes an interrupted sign-up only on an
+  account stamped for that application. Keycloak silently drops an undeclared attribute, so until
+  dev and qa declare it an interrupted sign-up is refused with `account-exists` (safe, but it cannot
+  be finished). Declare it with `scripts/rotate-secrets.sh <namespace> user-profile-stamp` (done on
+  dev on 2026-09-19; qa gets it with its own rotation), or by hand in the admin console: Realm
+  settings → User profile → Create attribute, name `onboardingApplicationId`, display name `Onboarding application`, not required,
+  and only admins may view or edit it. (Do not run `infra/keycloak/apply-realm-updates.sh` here: it
+  re-asserts the compose stack's dev client secrets.)
 - **order-manager's image** is the one Docker Hub pull (its own repo/pipeline); everything else
   pulls public GHCR packages.
 - **The portal** serves whatever is under `/opt/delivery/sites/<env>/portal` on the node — sync a
@@ -107,6 +135,53 @@ invent is the onboarding client secret, which must match what the realm import c
   in the repository. Routes for it can join the template when the content exists.
 - **probes are TCP**, matching what the compose stack verified; actuator-based HTTP probes are a
   cheap later upgrade if /actuator/health is permitted unauthenticated.
+
+## Secrets, and rotating them
+
+Until 2026-09 the public repository carried working credentials for dev and qa: the realm file's
+service-account client secrets and demo passwords, the WhatsApp webhook secret and verify token
+in `platform-common`, and the ops basic-auth hash in `gen-secrets.sh`. None of that is in git now;
+`scripts/verify.sh` fails if it comes back. Each value lives in one Secret, on the box only:
+
+| Secret | keys | read by |
+| --- | --- | --- |
+| `platform-secrets` | infrastructure passwords (Postgres, Redis, RabbitMQ, MinIO, Keycloak admin, Config Server, Vault), `SMTP_PASSWORD` | every Spring service (whole, via envFrom), the data layer, Vault, Keycloak |
+| `keycloak-clients` | `ONBOARDING_CLIENT_SECRET`, `ACCOUNTING_CLIENT_SECRET`, `NOTIFICATIONS_CLIENT_SECRET` | Keycloak's first-boot import; each of those three services, its own key |
+| `demo-logins` | `customer`, `rider`, `merchant`, `backoffice`, `carrier` | Keycloak's first-boot import; `scripts/e2e-smoke.sh` |
+| `whatsapp-webhook` | `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN` | whatsapp-service |
+| `sms-dlr` | `SMS_DEV_DLR_SECRET` | sms-connector |
+| `ops-auth-users` | `users` (an apr1 hash) | Traefik, for monitoring-<env> |
+| `anthropic-api` | `ANTHROPIC_API_KEY` (optional, by hand) | product-service |
+
+- **The realm file holds `${NAME}` placeholders**, which Keycloak fills from its own environment
+  while it imports a realm at startup — and only then, only for a realm that does not exist yet.
+  A placeholder it cannot resolve is imported as its own text, which is why every one is a
+  non-optional `secretKeyRef` on the keycloak container. (The Google identity provider's
+  `$(env:GOOGLE_CLIENT_ID)` is keycloak-config-cli syntax, not Keycloak's: the import keeps it
+  literally, harmless while that provider is disabled.)
+- **The demo logins' passwords**: six-digit passcodes for the four that sign in on the phone (the
+  app accepts nothing else), a long password for backoffice, which signs in only through the
+  portal's Keycloak page. Read one on the box, onto your own terminal:
+
+  ```sh
+  kubectl -n delivery-dev get secret demo-logins -o jsonpath='{.data.customer}' | base64 -d; echo
+  ```
+
+  `e2e-smoke.sh` reads the Secret itself (run it on the box). The Flutter live tests take
+  `--dart-define=DEMO_<USER>_PASSWORD=...` (or `--dart-define-from-file`), never a value in git.
+- **The ops password** is written by `gen-secrets.sh` (and `rotate-secrets.sh ops-auth`) to
+  `/root/ops-auth-password-<env>.txt`, mode 600, user `ops`. Only its hash is in the Secret.
+- **Never `kubectl apply` a Secret.** Apply copies every value into a
+  `last-applied-configuration` annotation, which `kubectl describe` prints. Create, replace, patch.
+- **Rotating** a value in a running environment is `scripts/rotate-secrets.sh <ns> <step>`, one
+  step at a time: each checks its preconditions, changes one thing, restarts what reads it, and
+  proves the new value works and the old one is refused. `gen-secrets.sh` never rotates anything.
+- **Still in the repository, deliberately:** the per-service database roles' passwords, derived
+  from the role name in `postgres-init/02-service-roles.sql` and repeated in `vault/bootstrap.sh`
+  and two services' `application.yml`. Postgres answers only inside the cluster, and every Spring
+  pod already holds the superuser password through `platform-secrets`, so they add little; replacing
+  them means changing the roles, the Vault seed and two Deployments together — the production
+  secrets refactor. The roles nothing logs in as cannot log in at all.
 
 ## The connection budget
 

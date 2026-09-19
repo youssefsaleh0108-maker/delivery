@@ -251,9 +251,9 @@ class _RidersDirectoryScreenState extends State<RidersDirectoryScreen> {
   Widget _filters(CarrierFleet fleet, DeliveryStrings t) {
     // Only values somebody actually has: a filter option that can only ever produce an empty grid
     // is a control that cannot work.
+    // One entry per region, so a company rider working in "Achrafieh, Hamra" is found under each.
     final List<String> zones = <String>{
-      for (final String r in fleet.riders)
-        if (fleet.regionOf(r) != null) fleet.regionOf(r)!,
+      for (final String r in fleet.riders) ...fleet.regionsOf(r),
     }.toList()
       ..sort();
     final List<String> vehicles = <String>{
@@ -346,7 +346,7 @@ class _RidersDirectoryScreenState extends State<RidersDirectoryScreen> {
 
   bool _matches(CarrierFleet fleet, String rider) {
     if (_bucket != null && fleet.bucketOf(rider) != _bucket) return false;
-    if (_zone != null && fleet.regionOf(rider) != _zone) return false;
+    if (_zone != null && !fleet.regionsOf(rider).contains(_zone)) return false;
     if (_vehicle != null && fleet.vehicleOf(rider) != _vehicle) return false;
     if (_query.isEmpty) return true;
     final String needle = _query.toLowerCase();

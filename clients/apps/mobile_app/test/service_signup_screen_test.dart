@@ -461,8 +461,11 @@ void main() {
     expect(application['contactEmail'], 'sam@example.test');
     expect(application['emailVerificationToken'], 'proof-EMAIL');
     expect((application['details'] as Map<String, dynamic>)['businessType'], 'SERVICES');
+    // The passcode, with the ticket the submission answered with: the reference names the
+    // application, and proves nothing.
     expect(server.bodies['POST /api/onboarding/applications/ref-open/account'], <String, dynamic>{
       'password': '246810',
+      'accountTicket': 'ticket-open',
     });
 
     // Signed in with the passcode just chosen, so the documents can travel — as on the other path.
@@ -475,6 +478,170 @@ void main() {
     expect(find.text(_en.svcPendingTitle), findsOneWidget);
     expect(find.text(_en.svcPendingBody('sam@example.test')), findsOneWidget);
     expect(find.text(_en.svcDocsSent), findsOneWidget);
+  });
+
+  testWidgets("an address that already has an account is said in the app's words at the passcode",
+      (WidgetTester tester) async {
+    _phone(tester);
+    final _Server server = _Server(_Keycloak())
+      ..accountRefusal = (
+        status: 422,
+        body: <String, Object?>{
+          'code': 'account-exists',
+          'message': 'An account already uses this email address. Sign in with it, or apply with a '
+              'different email.',
+        },
+      );
+    final Dio dio = Dio(BaseOptions(baseUrl: 'https://api.test'))..httpClientAdapter = server;
+
+    await tester.pumpWidget(_app(ServiceProviderSignupScreen(
+      api: OnboardingApi(dio),
+      documentsApi: _Documents(),
+      authService: _PasswordGrant(server.keycloak),
+      pickDocument: _pickScan,
+      onFinished: (AuthSession _) {},
+      onClose: () {},
+    )));
+    await tester.pumpAndSettle();
+
+    await fillPrintShop(tester);
+    await tester.enterText(_field(_en.authOwnerFullName), 'Sam Salem');
+    await tester.enterText(_field(_en.authContactEmail), 'Sam@Example.test');
+    await tester.enterText(_field(_en.password), '246810');
+    await tester.pump();
+    await tapApply(tester);
+    await tester.enterText(
+        find.descendant(of: find.byType(OneTimeCodeField), matching: find.byType(TextField)),
+        '123456');
+    await _pump(tester);
+    if (!server.calls.contains('POST /api/onboarding/verifications/confirm')) {
+      await tester.tap(find.widgetWithText(AuthPrimaryButton, _en.verify));
+      await _pump(tester);
+    }
+
+    expect(server.calls, contains('POST /api/onboarding/applications/ref-open/account'));
+    // Where a bare 500 used to read "That did not go through", the refusal is named — in the app's
+    // own words, not the server's English.
+    expect(find.text('${_en.couldNotCreateSignIn} ${_en.wizAccountExists}'), findsOneWidget);
+    expect(find.textContaining('An account already uses'), findsNothing);
+  });
+
+  testWidgets('a sign-in already made goes straight on to signing in with the passcode chosen',
+      (WidgetTester tester) async {
+    // A retry whose earlier answer was lost: the sign-in was made and recorded, then the 201 never
+    // arrived. Making it again can never succeed, and it does not need to.
+    _phone(tester);
+    final _Server server = _Server(_Keycloak())
+      ..accountRefusal = (
+        status: 422,
+        body: <String, Object?>{
+          'code': 'sign-in-exists',
+          'message': 'That application already has a sign-in. Sign in with its email address and '
+              'the passcode you chose.',
+        },
+      );
+    final Dio dio = Dio(BaseOptions(baseUrl: 'https://api.test'))..httpClientAdapter = server;
+    final _PasswordGrant auth = _PasswordGrant(server.keycloak);
+
+    await tester.pumpWidget(_app(ServiceProviderSignupScreen(
+      api: OnboardingApi(dio),
+      documentsApi: _Documents(),
+      authService: auth,
+      pickDocument: _pickScan,
+      onFinished: (AuthSession _) {},
+      onClose: () {},
+    )));
+    await tester.pumpAndSettle();
+
+    await fillPrintShop(tester);
+    await tester.enterText(_field(_en.authOwnerFullName), 'Sam Salem');
+    await tester.enterText(_field(_en.authContactEmail), 'Sam@Example.test');
+    await tester.enterText(_field(_en.password), '246810');
+    await tester.pump();
+    await tapApply(tester);
+    await tester.enterText(
+        find.descendant(of: find.byType(OneTimeCodeField), matching: find.byType(TextField)),
+        '123456');
+    await _pump(tester);
+    if (!server.calls.contains('POST /api/onboarding/verifications/confirm')) {
+      await tester.tap(find.widgetWithText(AuthPrimaryButton, _en.verify));
+      await _pump(tester);
+    }
+
+    expect(server.calls, contains('POST /api/onboarding/applications/ref-open/account'));
+    // Signed in with the proved address and the passcode, and on to the documents as after a
+    // sign-in made just now — nothing to read, nothing to retry.
+    expect(auth.grants, <String>['sam@example.test 246810']);
+    expect(find.text(_en.svcDocsTitle), findsOneWidget);
+    expect(find.textContaining(_en.couldNotCreateSignIn), findsNothing);
+    expect(find.textContaining('already has a sign-in'), findsNothing);
+  });
+
+  testWidgets(
+      'a ticket the server no longer takes is replaced by a new code on the address, and its proof',
+      (WidgetTester tester) async {
+    // The ticket's half hour ran out before the passcode reached the server. The reference cannot
+    // stand in — delivery companies and back office see references — so the address is proved again.
+    _phone(tester);
+    final _Server server = _Server(_Keycloak())
+      ..refuseOnce = true
+      ..accountRefusal = (
+        status: 422,
+        body: <String, Object?>{
+          'code': 'sign-in-proof-rejected',
+          'message': 'That confirmation has expired or was already used.',
+        },
+      );
+    final Dio dio = Dio(BaseOptions(baseUrl: 'https://api.test'))..httpClientAdapter = server;
+    final _PasswordGrant auth = _PasswordGrant(server.keycloak);
+
+    await tester.pumpWidget(_app(ServiceProviderSignupScreen(
+      api: OnboardingApi(dio),
+      documentsApi: _Documents(),
+      authService: auth,
+      pickDocument: _pickScan,
+      onFinished: (AuthSession _) {},
+      onClose: () {},
+    )));
+    await tester.pumpAndSettle();
+
+    await fillPrintShop(tester);
+    await tester.enterText(_field(_en.authOwnerFullName), 'Sam Salem');
+    await tester.enterText(_field(_en.authContactEmail), 'Sam@Example.test');
+    await tester.enterText(_field(_en.password), '246810');
+    await tester.pump();
+    await tapApply(tester);
+    Future<void> answer(String digits) async {
+      final int before = server.confirmed;
+      await tester.enterText(
+          find.descendant(of: find.byType(OneTimeCodeField), matching: find.byType(TextField)),
+          digits);
+      await _pump(tester);
+      if (server.confirmed == before) {
+        await tester.tap(find.widgetWithText(AuthPrimaryButton, _en.verify));
+        await _pump(tester);
+      }
+    }
+
+    await answer('123456');
+
+    // Refused with the ticket; a second code went to the application's address, and the code screen
+    // says why it is asking again.
+    expect(server.accountBodies.single['accountTicket'], 'ticket-open');
+    expect(server.codesSent, <String>['sam@example.test', 'sam@example.test']);
+    expect(find.text(_en.wizAccountConfirmAgain), findsOneWidget);
+    expect(auth.grants, isEmpty);
+
+    await answer('654321');
+
+    expect(server.accountBodies.last, <String, dynamic>{
+      'password': '246810',
+      'emailVerificationToken': 'proof-EMAIL-2',
+    });
+    // The application went once; the sign-in is made and signed in, and the documents follow.
+    expect(server.calls.where((String c) => c == 'POST /api/onboarding/applications'), hasLength(1));
+    expect(auth.grants, <String>['sam@example.test 246810']);
+    expect(find.text(_en.svcDocsTitle), findsOneWidget);
   });
 }
 
@@ -522,14 +689,20 @@ class _Keycloak implements OidcClient {
 class _PasswordGrant extends AuthService {
   _PasswordGrant(_Keycloak keycloak) : super(config: _config, oidcClient: keycloak);
 
+  /// Who signed in with what, in order.
+  final List<String> grants = <String>[];
+
   @override
-  Future<AuthSession> signInWithPassword(String username, String password) async => AuthSession(
-        accessToken: 'applicant-token',
-        refreshToken: null,
-        expiresAt: DateTime.now().add(const Duration(minutes: 5)),
-        roles: const <DeliveryRole>{DeliveryRole.merchant, DeliveryRole.applicant},
-        subject: 'sam-open',
-      );
+  Future<AuthSession> signInWithPassword(String username, String password) async {
+    grants.add('$username $password');
+    return AuthSession(
+      accessToken: 'applicant-token',
+      refreshToken: null,
+      expiresAt: DateTime.now().add(const Duration(minutes: 5)),
+      roles: const <DeliveryRole>{DeliveryRole.merchant, DeliveryRole.applicant},
+      subject: 'sam-open',
+    );
+  }
 }
 
 /// The applicant's document endpoints as the signup meets them, without the storage round trip a
@@ -577,6 +750,21 @@ class _Server implements HttpClientAdapter {
   /// Refuses the next signed-in application with this answer, once.
   ({int status, Map<String, Object?> body})? refusal;
 
+  /// Answers the open form's passcode with this instead of making the sign-in.
+  ({int status, Map<String, Object?> body})? accountRefusal;
+
+  /// Whether [accountRefusal] answers the next passcode only, and then the sign-in is made.
+  bool refuseOnce = false;
+
+  /// Every body the passcode step was sent, in order.
+  final List<Map<String, dynamic>> accountBodies = <Map<String, dynamic>>[];
+
+  /// Where each code was sent, in order.
+  final List<String> codesSent = <String>[];
+
+  /// How many codes were confirmed: each proof names its number, so an old one tells from a new one.
+  int confirmed = 0;
+
   /// Grants MERCHANT without APPLICANT, as auto-approval does.
   bool automatic = false;
 
@@ -610,16 +798,28 @@ class _Server implements HttpClientAdapter {
         if (!automatic) keycloak.roles.add('APPLICANT');
         return _json(201, _receipt(automatic ? 'APPROVED' : 'SUBMITTED', 'ref-1'));
       case 'POST /api/onboarding/verifications':
+        codesSent.add(((data! as Map<String, dynamic>)['destination'] as String).toLowerCase());
         return _json(202, <String, Object?>{'expiresAt': '2026-09-14T10:10:00Z'});
       case 'POST /api/onboarding/verifications/confirm':
         final Map<String, dynamic> code = data! as Map<String, dynamic>;
+        confirmed++;
         return _json(200, <String, Object?>{
-          'token': 'proof-${code['channel']}',
+          // The first proof keeps its plain name; a later one says which it is.
+          'token': confirmed == 1 ? 'proof-${code['channel']}' : 'proof-${code['channel']}-$confirmed',
           'destination': (code['destination'] as String).toLowerCase(),
         });
       case 'POST /api/onboarding/applications':
-        return _json(201, _receipt('SUBMITTED', 'ref-open'));
+        return _json(201, <String, Object?>{
+          ..._receipt('SUBMITTED', 'ref-open'),
+          'accountTicket': 'ticket-open',
+        });
       case 'POST /api/onboarding/applications/ref-open/account':
+        accountBodies.add(Map<String, dynamic>.of(data! as Map<String, dynamic>));
+        final ({int status, Map<String, Object?> body})? refusedAccount = accountRefusal;
+        if (refusedAccount != null) {
+          if (refuseOnce) accountRefusal = null;
+          return _json(refusedAccount.status, refusedAccount.body);
+        }
         return _json(201, <String, Object?>{});
     }
     return _json(404, <String, Object?>{'message': 'not expected in this test: $route'});

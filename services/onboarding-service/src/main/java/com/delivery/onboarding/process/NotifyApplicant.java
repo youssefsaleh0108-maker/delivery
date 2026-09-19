@@ -75,7 +75,7 @@ public class NotifyApplicant implements JavaDelegate {
             // email — the applicant can still see the outcome against their reference, which is
             // worse than being told but far better than being un-decided.
             log.error("Could not email the decision on application {} — it stands regardless",
-                    application.getReference(), e);
+                    application.getId(), e);
         }
 
         // And a push, because they are holding the app. An email about a decision they have been
@@ -95,7 +95,7 @@ public class NotifyApplicant implements JavaDelegate {
                 // Same reasoning as the email above, and more so: this is the second of two ways
                 // they are being told.
                 log.error("Could not push the decision on application {} — it stands regardless",
-                        application.getReference(), e);
+                        application.getId(), e);
             }
         }
     }

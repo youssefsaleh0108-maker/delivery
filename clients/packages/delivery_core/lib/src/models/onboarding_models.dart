@@ -50,16 +50,41 @@ enum OnboardingStatus {
 
 /// A delivery company somebody could apply to ride for.
 ///
-/// An id and a name, which is all the public list returns. Everything else on the record — payout
-/// state, score, contact details, the fleet — stays behind a token.
+/// An id, a name and where it delivers, which is all the public list returns. Everything else on the
+/// record — payout state, score, contact details, the fleet — stays behind a token.
 class HiringCompany {
-  const HiringCompany({required this.id, required this.name});
+  const HiringCompany({
+    required this.id,
+    required this.name,
+    this.regions = const <String>[],
+  });
 
   final String id;
   final String name;
 
-  factory HiringCompany.fromJson(Map<String, dynamic> json) =>
-      HiringCompany(id: json['id'] as String, name: json['name'] as String? ?? '');
+  /// Where the company delivers: the names of its active coverage zones, or — for a company that has
+  /// drawn none — the regions it registered with (owner, 2026-09).
+  ///
+  /// A rider who joins the company works there rather than choosing an area, so the rider wizard
+  /// shows this read-only, and the server records the same region on the application. Empty when
+  /// the company has neither — and when the server is older than the field, which says nothing
+  /// either way: there is no region to show, and the wizard shows a dash rather than inventing one.
+  final List<String> regions;
+
+  factory HiringCompany.fromJson(Map<String, dynamic> json) => HiringCompany(
+        id: json['id'] as String,
+        name: json['name'] as String? ?? '',
+        regions: _regions(json['regions']),
+      );
+
+  /// Anything but a list reads as no region, and an entry that is not a name is skipped.
+  static List<String> _regions(dynamic value) {
+    if (value is! List) return const <String>[];
+    return List<String>.unmodifiable(<String>[
+      for (final dynamic region in value)
+        if (region is String && region.trim().isNotEmpty) region.trim(),
+    ]);
+  }
 }
 
 class OnboardingApplication {
@@ -82,6 +107,7 @@ class OnboardingApplication {
     required this.provisionedUserRef,
     required this.provisionedEntityId,
     this.details = const <String, String>{},
+    this.detailLists = const <String, List<String>>{},
     this.suspended,
     this.service,
   });
@@ -140,6 +166,13 @@ class OnboardingApplication {
   /// must therefore treat "no details" as ordinary, not as an error.
   final Map<String, String> details;
 
+  /// The details that arrived as lists, entry by entry: what [details] joins into one line with
+  /// commas, for the reader that has to tell the entries apart — a company's roster, whose zone
+  /// filter offers each region a rider works in, from the `companyRegions` the server records.
+  /// Splitting the joined line again would not do: a zone's name is the company's own, and can hold
+  /// a comma. Empty lists are left out, as they are from [details].
+  final Map<String, List<String>> detailLists;
+
   bool get emailVerified => emailVerifiedAt != null;
   bool get phoneVerified => phoneVerifiedAt != null;
 
@@ -165,6 +198,7 @@ class OnboardingApplication {
         provisionedUserRef: json['provisionedUserRef'] as String?,
         provisionedEntityId: json['provisionedEntityId'] as String?,
         details: _details(json['details']),
+        detailLists: _detailLists(json['details']),
         suspended: json['suspended'] as bool?,
         service: ServiceApplicationAnswers.fromJson(json['service']),
       );
@@ -172,13 +206,44 @@ class OnboardingApplication {
   /// Anything that is not a JSON object reads as no details at all, including the null the receipt
   /// shape sends. Values are stringified rather than filtered, so an answer of `false` or `0`
   /// survives instead of vanishing.
+  ///
+  /// A list reads as its entries joined with commas — "Beirut, Mount Lebanon", which is what a
+  /// reviewer and a company's roster show, rather than Dart's "[Beirut, Mount Lebanon]" — and an
+  /// empty list is no answer, left out like a null rather than shown as a blank.
   static Map<String, String> _details(dynamic value) {
     if (value is! Map) return const <String, String>{};
-    return <String, String>{
-      for (final MapEntry<dynamic, dynamic> e in value.entries)
-        if (e.value != null) e.key.toString(): e.value.toString(),
-    };
+    final Map<String, String> details = <String, String>{};
+    for (final MapEntry<dynamic, dynamic> e in value.entries) {
+      final String? text = _detailText(e.value);
+      if (text != null) details[e.key.toString()] = text;
+    }
+    return details;
   }
+
+  static String? _detailText(dynamic value) {
+    if (value == null) return null;
+    if (value is! List) return value.toString();
+    final List<String> entries = _listEntries(value);
+    return entries.isEmpty ? null : entries.join(', ');
+  }
+
+  /// The list details, kept as lists — see [detailLists].
+  static Map<String, List<String>> _detailLists(dynamic value) {
+    if (value is! Map) return const <String, List<String>>{};
+    final Map<String, List<String>> lists = <String, List<String>>{};
+    for (final MapEntry<dynamic, dynamic> e in value.entries) {
+      if (e.value is! List) continue;
+      final List<String> entries = _listEntries(e.value as List<dynamic>);
+      if (entries.isNotEmpty) lists[e.key.toString()] = List<String>.unmodifiable(entries);
+    }
+    return lists;
+  }
+
+  /// A list's entries as text: blanks and nulls are no answer and are left out.
+  static List<String> _listEntries(List<dynamic> value) => <String>[
+        for (final dynamic entry in value)
+          if (entry != null && entry.toString().trim().isNotEmpty) entry.toString().trim(),
+      ];
 
   static DateTime? _time(dynamic value) =>
       value == null ? null : DateTime.tryParse(value as String)?.toLocal();

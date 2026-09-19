@@ -110,6 +110,17 @@ service_account_client accounting-service "Accounting Service service account" \
 #
 # `view` still includes "user" on both, so a customer can see their own number and see that it is
 # confirmed. There is nothing private about showing somebody their own phone number.
+#
+# ---- onboardingApplicationId, and why nobody but an admin may even see it ----
+#
+# onboarding-service stamps every account it makes for an applicant's passcode with the id of the
+# application it was made for. When a later attempt at that sign-up meets Keycloak's 409, the stamp
+# is how it knows the account is its own leftover — safe to finish, passcode and all — rather than
+# somebody else's account on the same address, which it must never touch. A stamp the account's
+# holder could write would let anybody claim to be that leftover, so this is `edit: ["admin"]`, and
+# `view: ["admin"]` as well because nobody needs to read it about themselves. Undeclared, Keycloak
+# drops the stamp without a word (see above), and every interrupted sign-up then stays refused with
+# account-exists: safe, but nobody can finish one.
 # ---------------------------------------------------------------------------------------------
 echo "==> Declaring contact attributes in the user profile"
 cat > /tmp/user-profile.json <<'PROFILE'
@@ -143,6 +154,9 @@ cat > /tmp/user-profile.json <<'PROFILE'
       "permissions": { "view": ["admin"], "edit": ["admin", "user"] },
       "multivalued": false },
     { "name": "bankAccountRef", "displayName": "Settlement account",
+      "permissions": { "view": ["admin"], "edit": ["admin"] },
+      "multivalued": false },
+    { "name": "onboardingApplicationId", "displayName": "Onboarding application",
       "permissions": { "view": ["admin"], "edit": ["admin"] },
       "multivalued": false }
   ],

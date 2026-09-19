@@ -255,7 +255,7 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": true,
-      "secret": "notifications-manager-dev-secret",
+      "secret": "${NOTIFICATIONS_CLIENT_SECRET}",
       "protocol": "openid-connect"
     },
     {
@@ -269,7 +269,7 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": true,
-      "secret": "onboarding-service-dev-secret",
+      "secret": "${ONBOARDING_CLIENT_SECRET}",
       "protocol": "openid-connect"
     },
     {
@@ -283,7 +283,7 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": true,
-      "secret": "accounting-service-dev-secret",
+      "secret": "${ACCOUNTING_CLIENT_SECRET}",
       "protocol": "openid-connect"
     }
   ],
@@ -295,7 +295,7 @@
         "subComponents": {},
         "config": {
           "kc.user.profile.config": [
-            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"email\",\"displayName\":\"${email}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"email\":{},\"length\":{\"max\":255}},\"required\":{\"roles\":[\"user\"]},\"multivalued\":false},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"required\":{\"roles\":[\"user\"]},\"multivalued\":false},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"required\":{\"roles\":[\"user\"]},\"multivalued\":false},{\"name\":\"phoneNumber\",\"displayName\":\"Mobile number\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"validations\":{\"pattern\":{\"pattern\":\"^\\\\+[1-9]\\\\d{7,14}$\",\"error-message\":\"Must be an E.164 number, e.g. +15550100001\"}},\"multivalued\":false},{\"name\":\"phoneNumberVerified\",\"displayName\":\"Mobile number verified\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"validations\":{\"options\":{\"options\":[\"true\",\"false\"]}},\"multivalued\":false},{\"name\":\"fcmToken\",\"displayName\":\"Push device token\",\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"bankAccountRef\",\"displayName\":\"Settlement account\",\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]},\"multivalued\":false}],\"groups\":[{\"name\":\"user-metadata\",\"displayHeader\":\"User metadata\",\"displayDescription\":\"Attributes the platform keeps about a person\"}]}"
+            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"email\",\"displayName\":\"${email}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"email\":{},\"length\":{\"max\":255}},\"required\":{\"roles\":[\"user\"]},\"multivalued\":false},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"required\":{\"roles\":[\"user\"]},\"multivalued\":false},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"required\":{\"roles\":[\"user\"]},\"multivalued\":false},{\"name\":\"phoneNumber\",\"displayName\":\"Mobile number\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"validations\":{\"pattern\":{\"pattern\":\"^\\\\+[1-9]\\\\d{7,14}$\",\"error-message\":\"Must be an E.164 number, e.g. +15550100001\"}},\"multivalued\":false},{\"name\":\"phoneNumberVerified\",\"displayName\":\"Mobile number verified\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"validations\":{\"options\":{\"options\":[\"true\",\"false\"]}},\"multivalued\":false},{\"name\":\"fcmToken\",\"displayName\":\"Push device token\",\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"bankAccountRef\",\"displayName\":\"Settlement account\",\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]},\"multivalued\":false},{\"name\":\"onboardingApplicationId\",\"displayName\":\"Onboarding application\",\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]},\"multivalued\":false}],\"groups\":[{\"name\":\"user-metadata\",\"displayHeader\":\"User metadata\",\"displayDescription\":\"Attributes the platform keeps about a person\"}]}"
           ]
         }
       }
@@ -369,7 +369,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "100001",
+          "value": "${DEMO_CUSTOMER_PASSWORD}",
           "temporary": false
         }
       ],
@@ -402,7 +402,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "300003",
+          "value": "${DEMO_RIDER_PASSWORD}",
           "temporary": false
         }
       ],
@@ -435,7 +435,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "200002",
+          "value": "${DEMO_MERCHANT_PASSWORD}",
           "temporary": false
         }
       ],
@@ -468,7 +468,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "400004",
+          "value": "${DEMO_BACKOFFICE_PASSWORD}",
           "temporary": false
         }
       ],
@@ -487,7 +487,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "500005",
+          "value": "${DEMO_CARRIER_PASSWORD}",
           "temporary": false
         }
       ],
