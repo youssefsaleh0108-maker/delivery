@@ -12553,5 +12553,60 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get riderGpsSharingNote =>
-      'Customers see your location only while YouDrop is open.';
+      'Shared only while YouDrop is open: with the customer you\'re delivering to, the shop until you collect, your delivery company while you\'re on duty, and YouDrop support.';
+
+  @override
+  String get riderGpsLegUnknownTitle =>
+      'Customers can\'t see you — which delivery are you on?';
+
+  @override
+  String get riderGpsLegUnknownBody =>
+      'You\'re carrying orders to more than one address. Open the one you\'re heading to and tap Start navigation.';
+
+  @override
+  String get riderGpsDisclosureTitle => 'Who sees your location';
+
+  @override
+  String get riderGpsDisclosureIntro =>
+      'While you work, YouDrop shares your location with:';
+
+  @override
+  String get riderGpsDisclosureCustomer =>
+      'The customer of the delivery you\'re on';
+
+  @override
+  String get riderGpsDisclosureShop => 'The shop, until you collect the order';
+
+  @override
+  String get riderGpsDisclosureCompany =>
+      'Your delivery company, while you\'re on duty';
+
+  @override
+  String get riderGpsDisclosureSupport => 'YouDrop support';
+
+  @override
+  String get riderGpsDisclosureWhen =>
+      'Only while YouDrop is open on your screen, and only while you\'re on duty or carrying an order. Never in the background.';
+
+  @override
+  String get riderGpsDisclosureKept =>
+      'Your route on each delivery is kept for 30 days, then deleted. YouDrop support keeps the last place your phone reported until it reports a new one.';
+
+  @override
+  String get riderGpsDisclosureContinue => 'Continue';
+
+  @override
+  String get riderGpsDisclosureNotNow => 'Not now';
+
+  @override
+  String get etaRiderOnAnotherDelivery =>
+      'Your rider is finishing another delivery first';
+
+  @override
+  String get custRiderShownNearShop =>
+      'Your rider appears on the map once they\'re near the shop';
+
+  @override
+  String get custRouteAfterPickup =>
+      'Your rider\'s route is drawn once they pick up your order.';
 }

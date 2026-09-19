@@ -12696,5 +12696,58 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get riderGpsAllow => 'اسمح بالموقع';
 
   @override
-  String get riderGpsSharingNote => 'يرى الزبائن موقعك فقط أثناء فتح YouDrop.';
+  String get riderGpsSharingNote =>
+      'يُشارَك موقعك فقط أثناء فتح YouDrop: مع الزبون الذي توصل إليه، ومع المتجر حتى تستلم الطلب، ومع شركة التوصيل التي تعمل لديها أثناء مناوبتك، ومع دعم YouDrop.';
+
+  @override
+  String get riderGpsLegUnknownTitle =>
+      'لا يراك الزبائن — أي توصيلة تقوم بها الآن؟';
+
+  @override
+  String get riderGpsLegUnknownBody =>
+      'تحمل طلبات إلى أكثر من عنوان. افتح الطلب الذي تتجه إليه واضغط «بدء التوجيه».';
+
+  @override
+  String get riderGpsDisclosureTitle => 'من يرى موقعك';
+
+  @override
+  String get riderGpsDisclosureIntro => 'أثناء عملك، يشارك YouDrop موقعك مع:';
+
+  @override
+  String get riderGpsDisclosureCustomer => 'زبون التوصيلة التي تقوم بها الآن';
+
+  @override
+  String get riderGpsDisclosureShop => 'المتجر، حتى تستلم الطلب';
+
+  @override
+  String get riderGpsDisclosureCompany =>
+      'شركة التوصيل التي تعمل لديها، أثناء مناوبتك';
+
+  @override
+  String get riderGpsDisclosureSupport => 'فريق دعم YouDrop';
+
+  @override
+  String get riderGpsDisclosureWhen =>
+      'فقط أثناء فتح YouDrop على شاشتك، وفقط أثناء مناوبتك أو حملك طلبًا. لا يُشارَك أبدًا في الخلفية.';
+
+  @override
+  String get riderGpsDisclosureKept =>
+      'يُحفظ مسارك في كل توصيلة 30 يومًا ثم يُحذف. ويحتفظ دعم YouDrop بآخر مكان أبلغ عنه هاتفك إلى أن يُبلغ عن مكان جديد.';
+
+  @override
+  String get riderGpsDisclosureContinue => 'متابعة';
+
+  @override
+  String get riderGpsDisclosureNotNow => 'ليس الآن';
+
+  @override
+  String get etaRiderOnAnotherDelivery => 'السائق ينهي توصيلة أخرى أولًا';
+
+  @override
+  String get custRiderShownNearShop =>
+      'يظهر السائق على الخريطة حين يقترب من المتجر';
+
+  @override
+  String get custRouteAfterPickup =>
+      'يُرسم مسار السائق على الخريطة حين يستلم طلبك.';
 }

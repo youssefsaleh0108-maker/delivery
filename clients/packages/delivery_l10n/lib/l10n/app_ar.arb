@@ -3894,5 +3894,20 @@
   "riderGpsClockTitle": "موقعك مرفوض",
   "riderGpsClockBody": "يبدو أن تاريخ هاتفك ووقته غير صحيحين. اضبطهما على الوضع التلقائي.",
   "riderGpsAllow": "اسمح بالموقع",
-  "riderGpsSharingNote": "يرى الزبائن موقعك فقط أثناء فتح YouDrop."
+  "riderGpsSharingNote": "يُشارَك موقعك فقط أثناء فتح YouDrop: مع الزبون الذي توصل إليه، ومع المتجر حتى تستلم الطلب، ومع شركة التوصيل التي تعمل لديها أثناء مناوبتك، ومع دعم YouDrop.",
+  "riderGpsLegUnknownTitle": "لا يراك الزبائن — أي توصيلة تقوم بها الآن؟",
+  "riderGpsLegUnknownBody": "تحمل طلبات إلى أكثر من عنوان. افتح الطلب الذي تتجه إليه واضغط «بدء التوجيه».",
+  "riderGpsDisclosureTitle": "من يرى موقعك",
+  "riderGpsDisclosureIntro": "أثناء عملك، يشارك YouDrop موقعك مع:",
+  "riderGpsDisclosureCustomer": "زبون التوصيلة التي تقوم بها الآن",
+  "riderGpsDisclosureShop": "المتجر، حتى تستلم الطلب",
+  "riderGpsDisclosureCompany": "شركة التوصيل التي تعمل لديها، أثناء مناوبتك",
+  "riderGpsDisclosureSupport": "فريق دعم YouDrop",
+  "riderGpsDisclosureWhen": "فقط أثناء فتح YouDrop على شاشتك، وفقط أثناء مناوبتك أو حملك طلبًا. لا يُشارَك أبدًا في الخلفية.",
+  "riderGpsDisclosureKept": "يُحفظ مسارك في كل توصيلة 30 يومًا ثم يُحذف. ويحتفظ دعم YouDrop بآخر مكان أبلغ عنه هاتفك إلى أن يُبلغ عن مكان جديد.",
+  "riderGpsDisclosureContinue": "متابعة",
+  "riderGpsDisclosureNotNow": "ليس الآن",
+  "etaRiderOnAnotherDelivery": "السائق ينهي توصيلة أخرى أولًا",
+  "custRiderShownNearShop": "يظهر السائق على الخريطة حين يقترب من المتجر",
+  "custRouteAfterPickup": "يُرسم مسار السائق على الخريطة حين يستلم طلبك."
 }

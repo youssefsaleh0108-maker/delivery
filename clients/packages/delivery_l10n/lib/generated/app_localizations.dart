@@ -21288,8 +21288,98 @@ abstract class DeliveryStrings {
   /// No description provided for @riderGpsSharingNote.
   ///
   /// In en, this message translates to:
-  /// **'Customers see your location only while YouDrop is open.'**
+  /// **'Shared only while YouDrop is open: with the customer you\'re delivering to, the shop until you collect, your delivery company while you\'re on duty, and YouDrop support.'**
   String get riderGpsSharingNote;
+
+  /// No description provided for @riderGpsLegUnknownTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers can\'t see you — which delivery are you on?'**
+  String get riderGpsLegUnknownTitle;
+
+  /// No description provided for @riderGpsLegUnknownBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re carrying orders to more than one address. Open the one you\'re heading to and tap Start navigation.'**
+  String get riderGpsLegUnknownBody;
+
+  /// No description provided for @riderGpsDisclosureTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Who sees your location'**
+  String get riderGpsDisclosureTitle;
+
+  /// No description provided for @riderGpsDisclosureIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'While you work, YouDrop shares your location with:'**
+  String get riderGpsDisclosureIntro;
+
+  /// No description provided for @riderGpsDisclosureCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'The customer of the delivery you\'re on'**
+  String get riderGpsDisclosureCustomer;
+
+  /// No description provided for @riderGpsDisclosureShop.
+  ///
+  /// In en, this message translates to:
+  /// **'The shop, until you collect the order'**
+  String get riderGpsDisclosureShop;
+
+  /// No description provided for @riderGpsDisclosureCompany.
+  ///
+  /// In en, this message translates to:
+  /// **'Your delivery company, while you\'re on duty'**
+  String get riderGpsDisclosureCompany;
+
+  /// No description provided for @riderGpsDisclosureSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'YouDrop support'**
+  String get riderGpsDisclosureSupport;
+
+  /// No description provided for @riderGpsDisclosureWhen.
+  ///
+  /// In en, this message translates to:
+  /// **'Only while YouDrop is open on your screen, and only while you\'re on duty or carrying an order. Never in the background.'**
+  String get riderGpsDisclosureWhen;
+
+  /// No description provided for @riderGpsDisclosureKept.
+  ///
+  /// In en, this message translates to:
+  /// **'Your route on each delivery is kept for 30 days, then deleted. YouDrop support keeps the last place your phone reported until it reports a new one.'**
+  String get riderGpsDisclosureKept;
+
+  /// No description provided for @riderGpsDisclosureContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get riderGpsDisclosureContinue;
+
+  /// No description provided for @riderGpsDisclosureNotNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get riderGpsDisclosureNotNow;
+
+  /// No description provided for @etaRiderOnAnotherDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider is finishing another delivery first'**
+  String get etaRiderOnAnotherDelivery;
+
+  /// No description provided for @custRiderShownNearShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider appears on the map once they\'re near the shop'**
+  String get custRiderShownNearShop;
+
+  /// No description provided for @custRouteAfterPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider\'s route is drawn once they pick up your order.'**
+  String get custRouteAfterPickup;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {
