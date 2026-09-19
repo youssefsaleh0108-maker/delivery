@@ -28,6 +28,11 @@ configMapGenerator:
       - SMTP_STARTTLS=true
       - EMAIL_FROM=youssef.saleh0108@gmail.com
       - SMS_TEST_INBOX=youssef.saleh0108@gmail.com
+      # Notifications Manager's test code sink. The delivery log masks every one-time code, so the
+      # smoke tests read theirs from notification.test_code_sink, which keeps codes ONLY for
+      # @youdrop.test addresses (a reserved domain nobody can own). A test environment's switch:
+      # never copy it into a production overlay.
+      - TEST_CODE_SINK_ENABLED=true
 
 generatorOptions:
   disableNameSuffixHash: true
