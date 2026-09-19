@@ -1,5 +1,6 @@
 package com.delivery.product.domain;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,6 +13,12 @@ public interface DeliveryZoneRepository extends JpaRepository<DeliveryZone, UUID
     List<DeliveryZone> findByActiveTrueOrderBySortOrderAscNameAsc();
 
     List<DeliveryZone> findAllByOrderBySortOrderAscNameAsc();
+
+    /**
+     * These areas, retired or not, in the picker's order — so a shop's areas read in the order a
+     * customer already knows them from the address sheet.
+     */
+    List<DeliveryZone> findByIdInOrderBySortOrderAscNameAsc(Collection<UUID> ids);
 
     Optional<DeliveryZone> findByNameIgnoreCase(String name);
 

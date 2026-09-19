@@ -323,6 +323,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
         cart: widget.cart,
         storeId: store.id,
         preview: store,
+        addresses: widget.addresses,
         onFavoriteChanged: _applyFavorite,
         onOpenBasket: widget.onOpenBasket,
       ),
@@ -973,6 +974,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
         cart: widget.cart,
         initialVertical: vertical,
         chips: _chips,
+        addresses: widget.addresses,
         onOpenBasket: widget.onOpenBasket,
       ),
     ));
@@ -1477,6 +1479,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
             orderApi: widget.orderApi,
             cart: widget.cart,
             storeId: banner.linkTarget!,
+            addresses: widget.addresses,
             onFavoriteChanged: _applyFavorite,
             onOpenBasket: widget.onOpenBasket,
           ),

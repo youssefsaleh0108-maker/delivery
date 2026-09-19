@@ -69,7 +69,8 @@ class StoreOpeningApiTest {
         ProxyFactory factory = new ProxyFactory(new StoreController(storeService,
                 mock(CatalogService.class), mock(ProductImageService.class),
                 mock(StoreImageService.class), mock(ReviewService.class),
-                mock(PopularServiceShops.class)));
+                mock(PopularServiceShops.class),
+                mock(com.delivery.product.service.DeliveryZoneService.class)));
         factory.setProxyTargetClass(true);
         factory.addAdvisor(AuthorizationManagerBeforeMethodInterceptor.preAuthorize());
 

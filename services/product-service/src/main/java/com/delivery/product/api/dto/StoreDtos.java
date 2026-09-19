@@ -14,6 +14,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import com.delivery.product.api.dto.DeliveryZoneDtos.ZoneResponse;
 import com.delivery.product.domain.Store;
 import com.delivery.product.domain.StoreOffer;
 
@@ -107,6 +108,18 @@ public final class StoreDtos {
             boolean powerCurrent,
             /** The merchant's delivery circle, or null for zones-only. */
             Integer deliveryRadiusMetres,
+            /**
+             * The areas this shop delivers to, in the picker's order and in the picker's own shape
+             * ({@link ZoneResponse}) — the other half of where it delivers, beside the circle above.
+             * Exactly the areas order placement serves ({@code DeliveryZoneService#servedAreasOf}),
+             * retired ones included ({@code active} false), so the shop page's map cannot promise an
+             * address that checkout then refuses.
+             *
+             * <p>Empty means the shop does not limit its deliveries by area, never that it delivers
+             * nowhere. Null only on the merchant's own list ({@code GET /api/stores/mine}), which
+             * does not read them: "not said", as from a server that predates the field.
+             */
+            List<ZoneResponse> deliveryZones,
             /** What a SERVICES shop does. Always set for a service shop and null for every other. */
             Store.ServiceCategory serviceCategory) {
     }

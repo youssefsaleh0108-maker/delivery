@@ -136,6 +136,8 @@ class _ItemSearchScreenState extends State<ItemSearchScreen> {
     _groups.refresh();
   }
 
+  /// The shop line and "N more in this shop". With the customer's address book, as Home opens a
+  /// shop, so the shop's "Delivery area" map can say whether the chosen address is inside it.
   void _openShop(StoreCard store, {String? search}) {
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (BuildContext _) => StorePageScreen(
@@ -144,6 +146,7 @@ class _ItemSearchScreenState extends State<ItemSearchScreen> {
         cart: widget.cart,
         storeId: store.id,
         preview: store,
+        addresses: widget.addresses,
         onFavoriteChanged: widget.onFavoriteChanged,
         onOpenBasket: widget.onOpenBasket,
         initialSearch: search,

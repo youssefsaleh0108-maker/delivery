@@ -77,17 +77,17 @@ jobs:
 
       # -am builds the platform libraries this module depends on, as the build job does. The test
       # filter matches nothing in them, which failIfNoSpecifiedTests=false allows.
-      - name: Storefront isolation and item search against PostGIS
+      - name: Storefront isolation, item search and delivery areas against PostGIS
         env:
           PRODUCT_TEST_DB_URL: jdbc:postgresql://localhost:5432/postgres
         run: >-
           mvn -B -U -pl services/product-service -am test
-          -Dtest=ServicesVerticalDatabaseTest,ItemSearchDatabaseTest
+          -Dtest=ServicesVerticalDatabaseTest,ItemSearchDatabaseTest,DeliveryAreaDatabaseTest
           -Dsurefire.failIfNoSpecifiedTests=false
 
       - name: Fail if the database tests did not run
         run: |
-          for test in ServicesVerticalDatabaseTest ItemSearchDatabaseTest; do
+          for test in ServicesVerticalDatabaseTest ItemSearchDatabaseTest DeliveryAreaDatabaseTest; do
             report=services/product-service/target/surefire-reports/TEST-com.delivery.product.domain.$test.xml
             if [ ! -f "$report" ]; then
               echo "::error::No report at $report, so the database tests did not run."

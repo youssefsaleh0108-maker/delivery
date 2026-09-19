@@ -1578,9 +1578,9 @@ that does not exist, and a screen listed here with no tick is one nobody has dri
 
   - [ ] Back — pops to Home.  `YdScreenHeader`
   - [ ] Search field, hint t.isrchFieldHint = "Search items in shops" — 350ms-debounced; searches again from 2 characters.  `YdSearchField`
-  - [ ] Shop line (logo, name, Busy/Closing-soon StoreStatePill, t.etaRange, fee, distance only with a pin) — pushes StorePageScreen with preview.  `InkWell in ItemSearchGroupCard`
+  - [ ] Shop line (logo, name, Busy/Closing-soon StoreStatePill, t.etaRange, fee, distance only with a pin) — pushes StorePageScreen with preview and the address book, so its Delivery area map says inside/outside.  `InkWell in ItemSearchGroupCard`
   - [ ] Item row — tap: BasketAdd.open -> ProductDetailScreen; AddButton: BasketAdd.add; with the product in the basket, remove + count as on the shelf.  `InkWell + AddButton`
-  - [ ] t.isrchMoreInStore(n) = "{n} more in this shop" — only when the shop matched more than the card shows; pushes StorePageScreen(initialSearch: the words): shelf searched, field open.  `TextButton.icon`
+  - [ ] t.isrchMoreInStore(n) = "{n} more in this shop" — only when the shop matched more than the card shows; pushes StorePageScreen(initialSearch: the words, and the address book): shelf searched, field open.  `TextButton.icon`
   - [ ] Basket bar t.viewBasket — once the basket has something; onOpenBasket to the shell's Basket tab. No shortfall advice here.  `StickyBasketBar`
   - [ ] Infinite scroll — 10 shops a page.  `PagedList + NotificationListener`
 
@@ -1621,6 +1621,7 @@ that does not exist, and a screen listed here with no tick is one nobody has dri
   - [ ] Stat: etaLabel / t.custDeliveryTime = "Delivery Time" — Read-only.  `Text column`
   - [ ] Stat: minOrder or t.free = "Free" / t.custMinOrderStat = "Min. Order" — Read-only.  `Text column`
   - [ ] Store state pill (availability.labelIn) — Drawn only when the shop is not OPEN.  `StoreStatePill`
+  - [ ] t.dareaButton = "Delivery area" + summary (t.dareaWithinKm = "Within {km} km of the shop" · t.dareaAreasCount, counting only areas still in the picker) — Pushes DeliveryAreaMapScreen. NOT DRAWN AT ALL until the full store arrives, for a shop with no circle and no area a customer can pick (areas all retired count as none), or for a store read without deliveryZones. Under the stat strip here; a card under the hero on the dekkane layout; under the identity on a service provider's page, and there only when one of its offers is delivered.  `DeliveryAreaButton → YdListRow (delivery_area_button.dart)`
   - [ ] t.custGeneratorBanner = "Generator hours — delivery may take longer" / t.custDarkBanner = "This shop is dark right now — orders may wait for power" — Read-only. Nothing at all for mains or undeclared.  `amber / grey Container strip`
   - [ ] t.tabShop = "Shop" — TabController index 0 — the paged shelf.  `Hand-built InkWell tab with a 24x3 bar (NOT a TabBar)`
   - [ ] t.tabAislesCount(n) = "Aisles ({n})" — index 1.  `InkWell tab`
@@ -1646,6 +1647,19 @@ that does not exist, and a screen listed here with no tick is one nobody has dri
   - [ ] t.startNewBasket = "Start a new basket?" — Body is t.basketFromShopReplace(shop) + t.basketFromAnotherShopSingle = "We can only deliver from one shop at a time."  `AlertDialog title`
   - [ ] t.keepIt = "Keep it" — Pops false — nothing added, basket untouched.  `TextButton`
   - [ ] **[destructive]** t.startHere = "Start here" — cart.switchTo(newShop) then adds. DESTRUCTIVE — silently discards the entire basket from the other shop, with no undo.  `FilledButton (brand)`
+
+### DeliveryAreaMapScreen
+*Where a shop delivers, drawn as the ordering rules define it: the delivery circle as a ring around the pin, each placed area's name at its centre (never a region — an area is the name an address picks), every area still in the picker in words, and the customer's chosen address with a plain inside/outside line. An area retired from the picker is neither counted, named nor listed, yet an address saved in it still reads inside, as order placement still serves it.*
+
+- file: `D:/workspace/delivery/clients/apps/mobile_app/lib/src/delivery_area_map_screen.dart` (the rules: shop_delivery_area.dart)
+- reached by: StorePageScreen (either layout) or a service provider's page -> t.dareaButton = "Delivery area".
+- covered by: test/delivery_area_test.dart — the ring to the metre, names only for placed areas, retired areas judged but never shown, the inside / outside / silent lines, the words-only screen, the tiles-unreachable fallback, 320dp in English and Arabic.
+- states: Map over the words · Words only, when nothing can be placed (unplaced areas around a shop with no pin) · Tiles unreachable: t.dareaMapUnavailable where the map was, the words still below · No inside/outside line when the address has neither a pin (for the circle) nor an area (for the areas) — or when the page that opened it had no address book (Reorder, an order's shop card).
+
+  - [ ] Back, Semantics t.back = "Back" — maybePop.  `YdScreenHeader (title t.dareaButton, the shop's name under it)`
+  - [ ] The map — drag, pinch, double-tap zoom. The shop pin (Semantics: its name); the address pin (Semantics t.custYourAddress) only for an address with a pin.  `OsmBasemap: CircleLayer + MarkerLayer`
+  - [ ] t.dareaInside = "Your address is inside the delivery area" / t.dareaOutside — Read-only, with the address under it. The same two rules checkout applies: isOutsideDeliveryRadius for the circle, the areas as placement serves them.  `tinted Container`
+  - [ ] t.dareaCircleRule · t.dareaZonesTitle + area names · t.dareaBothRules · t.dareaZoneLabelsNote — Read-only; the names are labels, not chips.  `Text / Wrap of labels`
 
 ### ProductDetailScreen
 *Photo gallery, dual-price card, option groups re-priced against the catalogue on every change, quantity, and the cross-sell rail.*

@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 
 import 'basket_add.dart';
 import 'cart.dart';
+import 'delivery_address.dart';
+import 'delivery_area_button.dart';
 import 'product_detail_screen.dart';
 import 'store_power_chip.dart';
 import 'store_state_mapping.dart';
@@ -47,6 +49,7 @@ class StorePageScreen extends StatefulWidget {
     required this.storeId,
     required this.onOpenBasket,
     this.preview,
+    this.addresses,
     this.orderApi,
     this.onFavoriteChanged,
     this.layout = StorePageLayout.standard,
@@ -86,6 +89,10 @@ class StorePageScreen extends StatefulWidget {
   /// The card the customer tapped. Lets the header render immediately instead of showing a spinner
   /// over information the previous screen already had.
   final StoreCard? preview;
+
+  /// The customer's address book, for the "Delivery area" map's "your address is inside/outside"
+  /// line ([DeliveryAreaButton]). Null draws the area without the address.
+  final DeliveryAddressStore? addresses;
 
   /// Optional: without it the Buy Again tab explains it has no history rather than failing.
   final OrderApi? orderApi;
@@ -380,6 +387,7 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
             _hero(),
             SliverToBoxAdapter(child: _powerBanner()),
             SliverToBoxAdapter(child: _statStrip()),
+            SliverToBoxAdapter(child: DeliveryAreaButton(store: _store, addresses: widget.addresses)),
             if (_searchOpen) SliverToBoxAdapter(child: _searchBar()),
             SliverPersistentHeader(
               pinned: true,
@@ -473,6 +481,11 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
           child: CustomScrollView(
             slivers: <Widget>[
               SliverToBoxAdapter(child: _dekkaneHero(t, card)),
+              SliverToBoxAdapter(
+                  child: DeliveryAreaButton(
+                      store: _store,
+                      addresses: widget.addresses,
+                      style: DeliveryAreaButtonStyle.card)),
               if (_aisles.isNotEmpty) SliverToBoxAdapter(child: _dekkaneAisles(t)),
               SliverToBoxAdapter(
                 child: Padding(

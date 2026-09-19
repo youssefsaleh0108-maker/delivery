@@ -6127,5 +6127,18 @@
   "isrchCouldNotSearch": "We couldn't search items just now.",
   "isrchTypeMore": "Type at least 2 letters to search items.",
   "isrchSearching": "Searching items",
-  "isrchUseFewerWords": "Use up to 5 words to search items."
+  "isrchUseFewerWords": "Use up to 5 words to search items.",
+  "dareaButton": "Delivery area",
+  "dareaWithinKm": "Within {km} km of the shop",
+  "@dareaWithinKm": {"placeholders":{"km":{"type":"String"}}},
+  "dareaAreasCount": "{count, plural, =1{1 area} other{{count} areas}}",
+  "@dareaAreasCount": {"placeholders":{"count":{"type":"int"}}},
+  "dareaCircleRule": "Delivers up to {km} km from the shop",
+  "@dareaCircleRule": {"placeholders":{"km":{"type":"String"}}},
+  "dareaZonesTitle": "Delivers to these areas",
+  "dareaBothRules": "An address has to be inside the circle and in one of these areas.",
+  "dareaZoneLabelsNote": "Area names on the map mark roughly the middle of each area, not its edges.",
+  "dareaInside": "Your address is inside the delivery area",
+  "dareaOutside": "Your address is outside the delivery area",
+  "dareaMapUnavailable": "The map can't load right now. The delivery area is described below."
 }

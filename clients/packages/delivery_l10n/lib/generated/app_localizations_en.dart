@@ -12629,4 +12629,49 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get isrchUseFewerWords => 'Use up to 5 words to search items.';
+
+  @override
+  String get dareaButton => 'Delivery area';
+
+  @override
+  String dareaWithinKm(String km) {
+    return 'Within $km km of the shop';
+  }
+
+  @override
+  String dareaAreasCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count areas',
+      one: '1 area',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String dareaCircleRule(String km) {
+    return 'Delivers up to $km km from the shop';
+  }
+
+  @override
+  String get dareaZonesTitle => 'Delivers to these areas';
+
+  @override
+  String get dareaBothRules =>
+      'An address has to be inside the circle and in one of these areas.';
+
+  @override
+  String get dareaZoneLabelsNote =>
+      'Area names on the map mark roughly the middle of each area, not its edges.';
+
+  @override
+  String get dareaInside => 'Your address is inside the delivery area';
+
+  @override
+  String get dareaOutside => 'Your address is outside the delivery area';
+
+  @override
+  String get dareaMapUnavailable =>
+      'The map can\'t load right now. The delivery area is described below.';
 }

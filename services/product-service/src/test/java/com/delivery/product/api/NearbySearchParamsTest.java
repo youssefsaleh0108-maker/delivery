@@ -66,7 +66,8 @@ class NearbySearchParamsTest {
         mvc = MockMvcBuilders.standaloneSetup(new StoreController(storeService,
                         mock(CatalogService.class), mock(ProductImageService.class),
                         mock(StoreImageService.class), mock(ReviewService.class),
-                        mock(com.delivery.product.service.PopularServiceShops.class)))
+                        mock(com.delivery.product.service.PopularServiceShops.class),
+                        mock(com.delivery.product.service.DeliveryZoneService.class)))
                 // What Spring Data's web support registers in the real app; a standalone setup
                 // does not know how to build a Pageable without it.
                 .setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())

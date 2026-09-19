@@ -12784,4 +12784,53 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get isrchUseFewerWords =>
       'استخدم خمس كلمات على الأكثر للبحث عن الأصناف.';
+
+  @override
+  String get dareaButton => 'منطقة التوصيل';
+
+  @override
+  String dareaWithinKm(String km) {
+    return 'ضمن $km كم من المتجر';
+  }
+
+  @override
+  String dareaAreasCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count منطقة',
+      many: '$count منطقة',
+      few: '$count مناطق',
+      two: 'منطقتان',
+      one: 'منطقة واحدة',
+      zero: 'لا مناطق',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String dareaCircleRule(String km) {
+    return 'يوصّل حتى $km كم من المتجر';
+  }
+
+  @override
+  String get dareaZonesTitle => 'يوصّل إلى هذه المناطق';
+
+  @override
+  String get dareaBothRules =>
+      'يجب أن يكون العنوان داخل الدائرة وفي إحدى هذه المناطق.';
+
+  @override
+  String get dareaZoneLabelsNote =>
+      'تشير أسماء المناطق على الخريطة إلى وسط كل منطقة تقريبًا، لا إلى حدودها.';
+
+  @override
+  String get dareaInside => 'عنوانك داخل منطقة التوصيل';
+
+  @override
+  String get dareaOutside => 'عنوانك خارج منطقة التوصيل';
+
+  @override
+  String get dareaMapUnavailable =>
+      'تعذّر تحميل الخريطة الآن. منطقة التوصيل موصوفة أدناه.';
 }
