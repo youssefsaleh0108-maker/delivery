@@ -112,6 +112,12 @@ delivery:
     # Short enough that a corrected phone number takes effect quickly, long enough that one order's
     # worth of notifications does not make five identical calls to Keycloak's admin API.
     recipient-cache-ttl: 5m
+    # Keeps the one-time codes sent to @youdrop.test addresses in notification.test_code_sink, where
+    # smoke tests read them now that the delivery log masks every code. OFF unless the environment
+    # turns it on: the dev and qa overlays do, a production overlay must not. Even on, it keeps
+    # nothing for any other address — see TestCodeSink.
+    test-code-sink:
+      enabled: ${TEST_CODE_SINK_ENABLED:false}
     keycloak:
       base-url: ${KEYCLOAK_INTERNAL_URL:http://localhost:8180}
       realm: delivery-platform

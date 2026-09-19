@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import com.delivery.platform.notifications.DeliveryOutcome;
 import com.delivery.platform.notifications.NotificationCommand;
+import com.delivery.platform.notifications.OneTimeCodes;
 import com.delivery.platform.notifications.ProviderClient;
 
 /**
@@ -59,9 +60,14 @@ public class DevPassthroughSmsClient implements ProviderClient {
         // Log-only keeps the rest of the chain — outbox, manager, receipt — exercised. It does give
         // up the SMTP hop and the failure classification below, which is a genuine loss; point
         // delivery.sms.dev-passthrough.test-inbox at a mailbox that accepts the mail to get it back.
+        //
+        // A one-time code is masked in that line (OneTimeCodes). The log is kept, and read by more
+        // people than the phone it was meant for, and a code in it is a working credential for its
+        // ten minutes. A test that needs the code reads it where Notifications Manager keeps codes
+        // for the reserved test domain, not here.
         if (testInbox == null || testInbox.isBlank()) {
             log.info("SMS for {} not sent: no dev test inbox is configured. Body: {}",
-                    command.recipient(), command.body());
+                    command.recipient(), OneTimeCodes.masked(command).body());
             return DeliveryOutcome.sent(NAME, "devlog-" + command.notificationId());
         }
 

@@ -159,7 +159,7 @@ Map<String, dynamic> applicationJson({
   required String name,
   String status = 'PROVISIONED',
   String? riderRef,
-  Map<String, String> details = const <String, String>{},
+  Map<String, Object?> details = const <String, Object?>{},
   bool? suspended = false,
   bool decided = true,
 }) =>

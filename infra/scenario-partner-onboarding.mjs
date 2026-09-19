@@ -89,9 +89,11 @@ const rolesOf = (token) => {
 };
 
 /// The environment's inbox. A person reads the code in their mail client; there is no mail client
-/// here, and the notification log is the row the mail relay sends from.
+/// here. The notification log masks every code now, so it comes from Notifications Manager's test
+/// code sink, which keeps codes only for @youdrop.test addresses (a domain nobody can own) and only
+/// where the environment switched it on (TEST_CODE_SINK_ENABLED, dev and qa).
 const codeSentTo = (address) => {
-  const sql = `SELECT body FROM notification.notification_log WHERE recipient = '${address}' `
+  const sql = `SELECT code FROM notification.test_code_sink WHERE recipient = '${address}' `
     + 'ORDER BY created_at DESC LIMIT 1';
   const out = execSync(
     `ssh delivery-vps "kubectl -n ${NS} exec postgres-0 -- psql -U delivery -d delivery -t -c \\"${sql}\\""`,

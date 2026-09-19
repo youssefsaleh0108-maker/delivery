@@ -88,10 +88,25 @@
     <bpmn:serviceTask id="create-entity" name="Create the shop or the fleet"
                       camunda:delegateExpression="${createPartnerRecord}">
       <bpmn:incoming>to-create-entity</bpmn:incoming>
+      <bpmn:outgoing>to-release</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:sequenceFlow id="to-release" sourceRef="create-entity" targetRef="release" />
+
+    <!--
+      Taking APPLICANT away is what lets a partner act, so it is the last step that can fail. The
+      steps run in the reviewer's transaction and a failure rolls the decision back, but Keycloak is
+      outside it: done any earlier - it used to be part of "Create the account" - a rider whose
+      attach then failed was back in the queue, undecided, on an account already able to claim
+      deliveries. Telling them comes after, and never fails a decision.
+    -->
+    <bpmn:serviceTask id="release" name="Let them act"
+                      camunda:delegateExpression="${releaseApplicant}">
+      <bpmn:incoming>to-release</bpmn:incoming>
       <bpmn:outgoing>to-welcome</bpmn:outgoing>
     </bpmn:serviceTask>
 
-    <bpmn:sequenceFlow id="to-welcome" sourceRef="create-entity" targetRef="welcome" />
+    <bpmn:sequenceFlow id="to-welcome" sourceRef="release" targetRef="welcome" />
 
     <bpmn:serviceTask id="welcome" name="Tell them they are in"
                       camunda:delegateExpression="${notifyApplicant}">
@@ -145,11 +160,14 @@
       <bpmndi:BPMNShape id="s-create-entity" bpmnElement="create-entity">
         <dc:Bounds x="790" y="80" width="100" height="80" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="s-welcome" bpmnElement="welcome">
+      <bpmndi:BPMNShape id="s-release" bpmnElement="release">
         <dc:Bounds x="930" y="80" width="100" height="80" />
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-welcome" bpmnElement="welcome">
+        <dc:Bounds x="1070" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="s-live" bpmnElement="live">
-        <dc:Bounds x="1080" y="102" width="36" height="36" />
+        <dc:Bounds x="1220" y="102" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="s-decline" bpmnElement="decline">
         <dc:Bounds x="650" y="250" width="100" height="80" />
@@ -172,11 +190,14 @@
       <bpmndi:BPMNEdge id="e-to-create-entity" bpmnElement="to-create-entity">
         <di:waypoint x="750" y="120" /><di:waypoint x="790" y="120" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="e-to-welcome" bpmnElement="to-welcome">
+      <bpmndi:BPMNEdge id="e-to-release" bpmnElement="to-release">
         <di:waypoint x="890" y="120" /><di:waypoint x="930" y="120" />
       </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-to-welcome" bpmnElement="to-welcome">
+        <di:waypoint x="1030" y="120" /><di:waypoint x="1070" y="120" />
+      </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="e-to-live" bpmnElement="to-live">
-        <di:waypoint x="1030" y="120" /><di:waypoint x="1080" y="120" />
+        <di:waypoint x="1170" y="120" /><di:waypoint x="1220" y="120" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="e-rejected" bpmnElement="rejected">
         <di:waypoint x="575" y="223" /><di:waypoint x="575" y="290" /><di:waypoint x="650" y="290" />

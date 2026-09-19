@@ -49,6 +49,11 @@ api /api/accounting/statements accounting-service
 api /api/orders/8f2 order-manager
 api /api/products/8f2 product-service
 api /product-images/8f2.png minio
+api /user-avatars/8f2.jpg minio
+api /order-attachments/8f2.pdf minio
+api /merchant-kyc/applications/8f2/8f2.jpg minio
+api /delivery-proof/8f2.jpg UNROUTED
+api /receipts/8f2.pdf UNROUTED
 api /webhooks/dlr sms-connector
 '
 
@@ -107,6 +112,21 @@ for env in dev qa; do
   done
 done
 [ ! -f "$tmp/failed" ] || fails=$((fails + $(wc -l < "$tmp/failed" | tr -d ' ')))
+
+echo "== presigned uploads meet their body limit before storage =="
+# Neither a presigned PUT nor MinIO can cap a body, so the route's own middleware is the only limit a
+# file meets before MinIO stores it. It sits in the four lines after the route's match.
+for env in dev qa; do
+  for pair in order-attachments:order-attachment-upload-limit merchant-kyc:merchant-kyc-upload-limit; do
+    prefix=${pair%%:*}
+    limit=${pair#*:}
+    if grep -F -A4 "PathPrefix(\`/$prefix\`)" "overlays/$env/ingress.yaml" | grep -q "name: $limit }"; then
+      ok "$env /$prefix carries $limit"
+    else
+      fail "$env /$prefix is routed without $limit"
+    fi
+  done
+done
 
 echo "== every YAML alias resolves =="
 # A ConfigMap's `data:` values are strings to Kubernetes, so a dangling `*alias` inside one is

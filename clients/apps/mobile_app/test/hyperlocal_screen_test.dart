@@ -322,7 +322,7 @@ void main() {
       expect(find.text(en.chatShopWith('Abu Hassan Mini Market')), findsNothing);
     });
 
-    testWidgets('Home has a way into the neighbourhood chat, under the browse',
+    testWidgets('Home has a way into the neighbourhood chat, beside the browse',
         (WidgetTester tester) async {
       await pumpShell(tester, withChat: true);
 

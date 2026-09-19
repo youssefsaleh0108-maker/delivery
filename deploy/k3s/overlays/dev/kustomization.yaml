@@ -27,6 +27,14 @@ configMapGenerator:
   - SMTP_STARTTLS=true
   - EMAIL_FROM=noreply@youdrop.shop
   - SMS_TEST_INBOX=youssef.saleh0108@gmail.com
+  # Notifications Manager's test code sink. The delivery log masks every one-time code, so the
+  # smoke tests read theirs from notification.test_code_sink, which keeps codes ONLY for
+  # @youdrop.test addresses (a reserved domain nobody can own). A test environment's switch:
+  # never copy it into a production overlay.
+  - TEST_CODE_SINK_ENABLED=true
+  # Riders are approved as soon as their email is verified (the owner's decision, 2026-09-19).
+  # A value set from the portal's auto-approval screen wins over this one; dev has none for riders.
+  - AUTO_APPROVE_RIDER=true
   name: platform-env
 
 generatorOptions:

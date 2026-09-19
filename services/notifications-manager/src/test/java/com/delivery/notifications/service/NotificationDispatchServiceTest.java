@@ -32,6 +32,7 @@ import com.delivery.notifications.domain.NotificationTemplate;
 import com.delivery.notifications.domain.NotificationTemplateRepository;
 import com.delivery.notifications.link.NotificationLink;
 import com.delivery.notifications.link.NotificationLinkTarget;
+import com.delivery.platform.notifications.OneTimeCodes;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -67,6 +68,7 @@ class NotificationDispatchServiceTest {
     private NotificationTemplateRepository templates;
     private NotificationLogRepository logs;
     private NotificationPreferenceService preferences;
+    private TestCodeSink testCodes;
     private RabbitTemplate rabbit;
     private ObjectMapper objectMapper;
     private NotificationDispatchService dispatch;
@@ -82,8 +84,9 @@ class NotificationDispatchServiceTest {
         // the service's catch-all, which would make every assertion here fail for the wrong reason.
         objectMapper = new ObjectMapper()
                 .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
-        dispatch = new NotificationDispatchService(
-                templates, logs, preferences, rabbit, objectMapper, "delivery.events", "en");
+        testCodes = mock(TestCodeSink.class);
+        dispatch = new NotificationDispatchService(templates, logs, preferences, testCodes, rabbit,
+                objectMapper, "delivery.events", "en");
 
         // Everything below is about who hears what, not about opt-outs; the preference cases have
         // their own nested class and override this.
@@ -544,7 +547,7 @@ class NotificationDispatchServiceTest {
                             CUSTOMER, call.getArgument(1), call.getArgument(2), false)));
 
             NotificationDispatchService withRealPreferences = new NotificationDispatchService(
-                    templates, logs, new NotificationPreferenceService(stored), rabbit,
+                    templates, logs, new NotificationPreferenceService(stored), testCodes, rabbit,
                     objectMapper, "delivery.events", "en");
 
             when(templates.findByEventTypeAndLocale("account.password_changed", "en"))
@@ -574,7 +577,7 @@ class NotificationDispatchServiceTest {
                             CUSTOMER, call.getArgument(1), call.getArgument(2), false)));
 
             NotificationDispatchService withRealPreferences = new NotificationDispatchService(
-                    templates, logs, new NotificationPreferenceService(stored), rabbit,
+                    templates, logs, new NotificationPreferenceService(stored), testCodes, rabbit,
                     objectMapper, "delivery.events", "en");
 
             templatesFor(template("EMAIL", "s", "body"));
@@ -617,8 +620,8 @@ class NotificationDispatchServiceTest {
 
         @BeforeEach
         void arabicConfigured() {
-            arabic = new NotificationDispatchService(
-                    templates, logs, preferences, rabbit, objectMapper, "delivery.events", "ar");
+            arabic = new NotificationDispatchService(templates, logs, preferences, testCodes,
+                    rabbit, objectMapper, "delivery.events", "ar");
         }
 
         private List<NotificationLog> dispatchInArabic(UUID order) {
@@ -760,6 +763,149 @@ class NotificationDispatchServiceTest {
 
             verify(rabbit, org.mockito.Mockito.times(2))
                     .send(anyString(), anyString(), any(Message.class));
+        }
+    }
+
+    /**
+     * A one-time code goes out in its message and is kept nowhere.
+     *
+     * <p>The log used to hold every code in full, and back office reads the log: anybody with that
+     * role could ask for a code to any address, read it back, and take the account. What the log
+     * still has to say — who, what, whether it went — is pinned here alongside the absence of the
+     * code, so the fix cannot drift into a log that no longer answers "did it arrive".
+     */
+    @Nested
+    @DisplayName("a one-time code")
+    class OneTimeCode {
+
+        private static final String CODE = "482913";
+        private static final String SUBJECT = CODE + " is your YouDrop verification code";
+        private static final String BODY = CODE + "\n\nUse this code to confirm your email address"
+                + " for YouDrop. It expires in 10 minutes and can be used once.";
+
+        private NotificationLog logged() {
+            ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
+            verify(logs).saveAndFlush(captor.capture());
+            return captor.getValue();
+        }
+
+        /** The command as the worker reads it: the JSON that crossed the bus. */
+        private com.fasterxml.jackson.databind.JsonNode sent() throws Exception {
+            List<Message> messages = published();
+            assertThat(messages).hasSize(1);
+            return new ObjectMapper().readTree(messages.get(0).getBody());
+        }
+
+        @Test
+        void is_masked_in_the_log_row_and_delivered_in_full() throws Exception {
+            dispatch.sendDirect("EMAIL", "sam@example.com", SUBJECT, BODY,
+                    "onboarding.verification", "corr-1");
+
+            NotificationLog row = logged();
+            assertThat(row.getSubject())
+                    .isEqualTo(OneTimeCodes.MASK + " is your YouDrop verification code");
+            assertThat(row.getBody()).doesNotContain(CODE).contains("It expires in 10 minutes");
+            // What support reads the row for is all still there.
+            assertThat(row.getRecipient()).isEqualTo("sam@example.com");
+            assertThat(row.getEventType()).isEqualTo("onboarding.verification");
+            assertThat(row.getStatus()).isEqualTo(NotificationLog.Status.PENDING);
+
+            com.fasterxml.jackson.databind.JsonNode command = sent();
+            assertThat(command.path("subject").asText()).isEqualTo(SUBJECT);
+            assertThat(command.path("body").asText()).isEqualTo(BODY);
+            // The mark the workers mask by before they keep a copy.
+            assertThat(command.path("metadata").path(OneTimeCodes.FLAG).asText()).isEqualTo("true");
+        }
+
+        @Test
+        void a_passcode_reset_code_and_a_code_by_sms_are_masked_too() {
+            dispatch.sendDirect("EMAIL", "sam@example.com",
+                    CODE + " is your YouDrop passcode reset code", BODY,
+                    "onboarding.password-reset", "corr-1");
+            dispatch.sendDirect("SMS", "+9613123456", null,
+                    CODE + " is your YouDrop verification code. It expires in 10 minutes.",
+                    "onboarding.verification", "corr-2");
+
+            ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
+            verify(logs, org.mockito.Mockito.times(2)).saveAndFlush(captor.capture());
+            assertThat(captor.getAllValues()).allSatisfy(row -> {
+                assertThat(row.getBody()).doesNotContain(CODE);
+                assertThat(String.valueOf(row.getSubject())).doesNotContain(CODE);
+            });
+        }
+
+        /** A purpose spelled another way is the same purpose, not a way round the mask. */
+        @Test
+        void a_purpose_spelled_differently_is_masked_all_the_same() {
+            dispatch.sendDirect("EMAIL", "sam@example.com", SUBJECT, BODY,
+                    " Onboarding.Verification ", "corr-1");
+
+            assertThat(logged().getBody()).doesNotContain(CODE);
+        }
+
+        /** Everything else is kept as sent: the log is still the answer to "what did they get". */
+        @Test
+        void any_other_message_is_logged_as_sent_and_carries_no_mark() throws Exception {
+            dispatch.sendDirect("EMAIL", "sam@example.com", "You are approved",
+                    "Your reference is 20260919.", "onboarding.decision", "corr-1");
+
+            assertThat(logged().getBody()).isEqualTo("Your reference is 20260919.");
+            assertThat(sent().path("metadata").has(OneTimeCodes.FLAG)).isFalse();
+            verify(testCodes, never()).capture(any(), any(), any(), any(), any());
+        }
+
+        /** The rule belongs to the purpose, so a template for one would be masked the same way. */
+        @Test
+        void a_template_for_a_code_bearing_event_is_masked_too() throws Exception {
+            when(templates.findByEventTypeAndLocale("onboarding.verification", "en"))
+                    .thenReturn(List.of(template("onboarding.verification", "EMAIL",
+                            "{{code}} is your code", "{{code}}", null)));
+
+            List<NotificationLog> created = dispatch.dispatch("onboarding.verification", null,
+                    CUSTOMER, Map.of("EMAIL", "sam@example.com"), Map.of("code", CODE), "corr-1");
+            commit();
+
+            assertThat(created).singleElement().satisfies(row -> {
+                assertThat(row.getSubject()).doesNotContain(CODE);
+                assertThat(row.getBody()).doesNotContain(CODE);
+            });
+            assertThat(sent().path("body").asText()).isEqualTo(CODE);
+        }
+
+        /** The sink sees the code as delivered, and decides for itself whether to keep it. */
+        @Test
+        void the_test_sink_is_offered_the_code_as_delivered() {
+            dispatch.sendDirect("EMAIL", "qa.one@youdrop.test", SUBJECT, BODY,
+                    "onboarding.verification", "corr-1");
+
+            verify(testCodes).capture("EMAIL", "qa.one@youdrop.test", "onboarding.verification",
+                    SUBJECT, BODY);
+        }
+
+        /**
+         * The finding, end to end at this level: the row the service wrote, read back through the
+         * back-office log endpoint that exposed it.
+         */
+        @Test
+        void back_office_reading_the_log_finds_no_code() {
+            dispatch.sendDirect("EMAIL", "victim@example.com",
+                    CODE + " is your YouDrop passcode reset code", BODY,
+                    "onboarding.password-reset", "corr-1");
+            NotificationLog row = logged();
+            when(logs.findByRecipientIdOrderByCreatedAtDesc(
+                    NotificationDispatchService.ANONYMOUS_RECIPIENT)).thenReturn(List.of(row));
+
+            List<com.delivery.notifications.api.NotificationLogController.LogEntry> seen =
+                    new com.delivery.notifications.api.NotificationLogController(logs)
+                            .forRecipient(NotificationDispatchService.ANONYMOUS_RECIPIENT);
+
+            assertThat(seen).singleElement().satisfies(entry -> {
+                assertThat(entry.subject()).doesNotContain(CODE);
+                assertThat(entry.body()).doesNotContain(CODE);
+                assertThat(entry.recipient()).isEqualTo("victim@example.com");
+                assertThat(entry.eventType()).isEqualTo("onboarding.password-reset");
+                assertThat(entry.status()).isEqualTo("PENDING");
+            });
         }
     }
 }

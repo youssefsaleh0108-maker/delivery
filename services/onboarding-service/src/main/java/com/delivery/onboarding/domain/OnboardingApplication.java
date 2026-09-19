@@ -1,8 +1,13 @@
 package com.delivery.onboarding.domain;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.HexFormat;
 import java.util.Map;
 import java.util.UUID;
 
@@ -15,6 +20,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 /**
  * Somebody asking to join the platform as a business.
@@ -154,14 +160,56 @@ public class OnboardingApplication {
     private Status status = Status.SUBMITTED;
 
     /**
-     * What the applicant is given to check their own progress.
+     * What the applicant is given to check their own progress, and what support, back office and a
+     * rider's delivery company quote it by.
      *
-     * <p>Long and random because it is the only thing standing between a stranger and somebody
-     * else's application: the applicant has no account yet, so there is no token to authenticate
-     * them with. A sequential number here would let anybody read every application ever made.
+     * <p>Long and random so that nobody reads applications by counting. It is an id, not a secret:
+     * back office sees it on every application, a delivery company on every rider applying to it,
+     * and it travels in URL paths that access logs keep. So it opens the thin receipt and nothing
+     * that acts — setting a passcode takes the {@link #accountTicketHash account-setup ticket} or a
+     * fresh code answered on the address.
      */
     @Column(name = "reference", nullable = false, updatable = false, length = 64)
     private String reference;
+
+    /**
+     * How long an account-setup ticket may start a sign-in: long enough for the passcode step to
+     * follow the submission, retries after a failure on the platform's side included; short enough
+     * that a ticket copied out of a phone later is worth nothing. After it, the applicant proves the
+     * address again with a one-time code.
+     */
+    public static final Duration ACCOUNT_TICKET_LIFETIME = Duration.ofMinutes(30);
+
+    /**
+     * The SHA-256 of the account-setup ticket: the secret that lets whoever submitted this
+     * application — and nobody who merely knows its {@link #reference} — choose its passcode.
+     *
+     * <p>256 random bits, handed out once, in the answer to the submission, and never stored: a
+     * database read gives nobody a working ticket. Unsalted, because a salt protects guessable
+     * secrets and nobody guesses 256 bits. Null for an application made by a signed-in account, which
+     * already has its sign-in, and for every application taken before tickets existed.
+     */
+    @Column(name = "account_ticket_hash", length = 64, updatable = false)
+    private String accountTicketHash;
+
+    @Column(name = "account_ticket_expires_at", updatable = false)
+    private Instant accountTicketExpiresAt;
+
+    /** When the ticket's one sign-in was recorded. A spent ticket starts nothing. */
+    @Column(name = "account_ticket_used_at")
+    private Instant accountTicketUsedAt;
+
+    /**
+     * Optimistic locking, because the requests that change one application do not queue.
+     *
+     * <p>The applicant's passcode step records a sign-in on the same row a reviewer is deciding, and
+     * Hibernate writes whole rows: without a version, the later commit wrote its stale copy over the
+     * earlier one — a sign-in recorded on a rejected application, or SUBMITTED put back over the
+     * decision. With it, the later of two overlapping writes fails and changes nothing.
+     */
+    @Version
+    @Column(name = "version", nullable = false)
+    private long version;
 
     @Column(name = "process_instance_id", length = 64)
     private String processInstanceId;
@@ -262,6 +310,77 @@ public class OnboardingApplication {
         byte[] bytes = new byte[20];
         RANDOM.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    // ---------------------------------------------------------------- the account-setup ticket
+
+    /** What a ticket presented for this application turned out to be. */
+    public enum TicketCheck {
+        /** It is this application's, unspent and in time: it may start the sign-in. */
+        VALID,
+        /** It is this application's, and its one sign-in is already recorded. */
+        SPENT,
+        /** It is this application's, and it came too late. */
+        EXPIRED,
+        /** It is not this application's ticket — or this application never had one. */
+        WRONG
+    }
+
+    /**
+     * Issues the account-setup ticket, keeping only its hash. Once, at the intake.
+     *
+     * @return the ticket itself, which this record never holds: the caller hands it to the submitter
+     *         and forgets it
+     */
+    public String issueAccountTicket(Instant now) {
+        if (accountTicketHash != null) {
+            throw new IllegalStateException("This application already has an account-setup ticket");
+        }
+        byte[] bytes = new byte[32];
+        RANDOM.nextBytes(bytes);
+        String ticket = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        this.accountTicketHash = sha256(ticket);
+        this.accountTicketExpiresAt = now.plus(ACCOUNT_TICKET_LIFETIME);
+        return ticket;
+    }
+
+    /**
+     * Judges a presented ticket against this application's, in constant time.
+     *
+     * <p>Whose it is comes first, then whether it is spent, then whether it is late: a ticket that is
+     * not this application's says nothing about this application, and only its holder learns that
+     * its sign-in was already made.
+     */
+    public TicketCheck checkAccountTicket(String presented, Instant now) {
+        if (presented == null || presented.isBlank() || accountTicketHash == null
+                || !MessageDigest.isEqual(sha256(presented).getBytes(StandardCharsets.UTF_8),
+                        accountTicketHash.getBytes(StandardCharsets.UTF_8))) {
+            return TicketCheck.WRONG;
+        }
+        if (accountTicketUsedAt != null) {
+            return TicketCheck.SPENT;
+        }
+        return now.isBefore(accountTicketExpiresAt) ? TicketCheck.VALID : TicketCheck.EXPIRED;
+    }
+
+    /**
+     * Spends the ticket, with the sign-in it set up. Also when the sign-in came by an email code
+     * instead: this application has its sign-in, so its ticket has nothing left to start.
+     */
+    public void spendAccountTicket(Instant now) {
+        if (accountTicketHash != null && accountTicketUsedAt == null) {
+            this.accountTicketUsedAt = now;
+        }
+    }
+
+    private static String sha256(String value) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            // Required of every JVM; its absence is not something this record can work around.
+            throw new IllegalStateException("SHA-256 is unavailable", e);
+        }
     }
 
     public void startedAs(String processInstanceId) {

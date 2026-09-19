@@ -57,13 +57,15 @@ for (const [what, method, path] of [
 
 console.log('\n--- steps 2-4: prove an address, skip the phone, apply ---');
 const tag = Date.now().toString(36).slice(-6);
-const email = `app-rider-${tag}@example.test`;
+const email = `app-rider-${tag}@youdrop.test`;
 
 check('a code can be asked for',
   anon('POST', '/api/onboarding/verifications', { channel: 'EMAIL', destination: email })
     .code === '200', 'sent');
 
-const message = psql('SELECT body FROM notification.notification_log WHERE recipient = '
+// From Notifications Manager's test code sink: the delivery log masks every code, and the sink
+// keeps them only for @youdrop.test addresses where TEST_CODE_SINK_ENABLED is on.
+const message = psql('SELECT code FROM notification.test_code_sink WHERE recipient = '
   + `'${email}' ORDER BY created_at DESC LIMIT 1`);
 const code = (message.match(/\b(\d{6})\b/) || [])[1];
 check('and it reaches the address', !!code, code ? 'delivered' : 'NOTHING SENT');

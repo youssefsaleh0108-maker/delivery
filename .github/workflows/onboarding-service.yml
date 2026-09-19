@@ -28,7 +28,60 @@ on:
       - 'pom.xml'
 
 jobs:
+  # The application's version (V46) against a real PostgreSQL: a mock can be told to throw a
+  # conflict, only a database decides whether two real writes produce one. A job of this caller's
+  # own, as product-service has, and `ci` waits for it.
+  database-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          # Throwaway, and reachable only from this job. The test's user and password default to
+          # postgres, so only the URL has to be passed below.
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 24
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+
+      - name: Application version against PostgreSQL
+        env:
+          ONBOARDING_TEST_DB_URL: jdbc:postgresql://localhost:5432/postgres
+        run: >-
+          mvn -B -U -pl services/onboarding-service -am test
+          -Dtest=ApplicationVersionDatabaseTest
+          -Dsurefire.failIfNoSpecifiedTests=false
+
+      - name: Fail if the database tests did not run
+        run: |
+          report=services/onboarding-service/target/surefire-reports/TEST-com.delivery.onboarding.domain.ApplicationVersionDatabaseTest.xml
+          if [ ! -f "$report" ]; then
+            echo "::error::No report at $report, so the database tests did not run."
+            exit 1
+          fi
+          if ! grep -q 'tests="[1-9]' "$report" || grep -q 'skipped="[1-9]' "$report"; then
+            echo "::error::The database tests were skipped. Is ONBOARDING_TEST_DB_URL set?"
+            exit 1
+          fi
+
   ci:
+    needs: database-tests
     uses: ./.github/workflows/reusable-service-ci.yml
     with:
       service-name: onboarding-service

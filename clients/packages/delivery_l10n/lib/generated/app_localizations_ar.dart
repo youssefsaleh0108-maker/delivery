@@ -12646,4 +12646,70 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get svcChatOrderNotFound => 'تعذّر فتح محادثة هذا الطلب. نعيد تحميله.';
+
+  @override
+  String get riderRegionLabel => 'منطقة التوصيل';
+
+  @override
+  String riderRegionSetBy(String company) {
+    return 'تحدّدها $company. ستوصّل حيث توصّل الشركة، فلا حاجة لاختيار منطقة.';
+  }
+
+  @override
+  String get riderRegionNoneListed => 'لم تُحدَّد منطقة توصيل بعد';
+
+  @override
+  String get riderRegionCompanyNotHiring =>
+      'شركة التوصيل هذه لا تستقبل سائقين حالياً. اختر شركة أخرى، أو انضم إلى أسطول YouDrop.';
+
+  @override
+  String get riderRegionCompaniesUnavailable =>
+      'تعذّر التحقق من شركة التوصيل الآن. حاول بعد قليل.';
+
+  @override
+  String get riderRegionAreaBeirut => 'بيروت';
+
+  @override
+  String get riderRegionAreaMountLebanon => 'جبل لبنان';
+
+  @override
+  String get riderRegionAreaNorth => 'الشمال';
+
+  @override
+  String get riderRegionAreaSouth => 'الجنوب';
+
+  @override
+  String get riderRegionAreaBekaa => 'البقاع';
+
+  @override
+  String get wizAccountExists =>
+      'لهذا البريد الإلكتروني حساب بالفعل. سجّل الدخول بذلك الحساب، أو قدّم طلبك ببريد إلكتروني آخر.';
+
+  @override
+  String get wizAccountSignInUnavailable =>
+      'تعذّر إعداد تسجيل الدخول الآن. يُرجى المحاولة مجدداً بعد دقيقة.';
+
+  @override
+  String get wizAccountSignInExists =>
+      'تسجيل دخولك جاهز بالفعل. سجّل الدخول ببريدك الإلكتروني ورمز الدخول الذي اخترته.';
+
+  @override
+  String get wizAccountApplicationDecided =>
+      'تم البتّ في هذا الطلب بالفعل، لذا لا يمكن إعداد تسجيل دخول له من هنا. يُرجى التواصل مع الدعم.';
+
+  @override
+  String get wizAccountEmailChanged =>
+      'تم تغيير البريد الإلكتروني في هذا الطلب بعد التحقق منه، لذا لا يمكن إعداد تسجيل دخول له. يُرجى التواصل مع الدعم.';
+
+  @override
+  String get wizAccountProofMissing =>
+      'لا يستطيع هذا الإصدار من التطبيق إكمال إعداد تسجيل دخولك. يُرجى تحديث التطبيق والمحاولة مجدداً.';
+
+  @override
+  String get wizAccountProofRejected =>
+      'انتهت صلاحية التأكيد. أكّد بريدك الإلكتروني برمز جديد لإكمال إعداد تسجيل الدخول.';
+
+  @override
+  String get wizAccountConfirmAgain =>
+      'لإكمال إعداد تسجيل الدخول، أكّد بريدك الإلكتروني مرة أخرى. هكذا لا يستطيع أحد غيرك اختيار رمز دخولك.';
 }

@@ -143,6 +143,10 @@ public class PartnerManagementController {
      * Corrects a partner's business fields. BACKOFFICE, because this edits a record the platform
      * decided on — the partner's own way to change details is to talk to support, precisely so a
      * person with this role stands behind every change. Every changed field leaves an audit row.
+     *
+     * <p>An edit that races another write to the application (a sign-in being recorded, a decision)
+     * is refused with 409 {@code application-changed} by {@link ApplicationChangedAdvice}, and
+     * changes nothing.
      */
     @PatchMapping("/applications/{id}")
     @PreAuthorize("hasRole('BACKOFFICE')")

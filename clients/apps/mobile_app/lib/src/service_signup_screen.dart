@@ -142,6 +142,18 @@ class _ServiceProviderSignupScreenState extends State<ServiceProviderSignupScree
   /// The recorded application's reference. Once set, a retry never records a second application.
   String? _reference;
 
+  /// The account-setup ticket the submission answered with — what lets this applicant, and not
+  /// whoever else can read the reference, choose the passcode. In memory only, and dropped once the
+  /// sign-in is made. Null when it was never given or was refused; see [_reproveEmail].
+  String? _accountTicket;
+
+  /// A fresh proof of the application's address, sent in the ticket's place once that is gone.
+  String? _signInProof;
+
+  /// True while the email code proves the address again for the sign-in, after the application is
+  /// in — so its answer goes to the sign-in, and back returns to where the sign-in waits.
+  bool _reprovingEmail = false;
+
   /// What the signed-in endpoint answered — the application, created or handed back.
   OnboardingApplication? _receipt;
 
@@ -276,13 +288,19 @@ class _ServiceProviderSignupScreenState extends State<ServiceProviderSignupScree
       _error = null;
     });
     try {
-      final ({String token, String destination}) proof =
-          await widget.api.confirmCode('EMAIL', address, _emailCode.text.trim());
-      // The server's spelling of the address, not the typed one: the application has to carry
-      // exactly what was verified or it is refused for a reason nobody can see.
-      _verifiedEmail = proof.destination;
-      _emailToken = proof.token;
-      _provedEmail = address;
+      if (_reprovingEmail) {
+        // The application's own address, as the server spelled it: the proof must name it.
+        _signInProof =
+            (await widget.api.confirmCode('EMAIL', _verifiedEmail!, _emailCode.text.trim())).token;
+      } else {
+        final ({String token, String destination}) proof =
+            await widget.api.confirmCode('EMAIL', address, _emailCode.text.trim());
+        // The server's spelling of the address, not the typed one: the application has to carry
+        // exactly what was verified or it is refused for a reason nobody can see.
+        _verifiedEmail = proof.destination;
+        _emailToken = proof.token;
+        _provedEmail = address;
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -293,8 +311,32 @@ class _ServiceProviderSignupScreenState extends State<ServiceProviderSignupScree
       return;
     }
     if (!mounted) return;
+    if (_reprovingEmail) {
+      setState(() {
+        _busy = false;
+        _reprovingEmail = false;
+      });
+      // The application is in, so this goes straight to the sign-in, with the proof.
+      await _send();
+      return;
+    }
     setState(() => _busy = false);
     await _afterEmail();
+  }
+
+  /// Proves the application's address again, for the sign-in alone, when the account-setup ticket
+  /// cannot carry it — refused as spent or past its half hour, or never given. The reference cannot
+  /// stand in: back office and delivery companies see references. A fresh code on the address can.
+  Future<void> _reproveEmail() async {
+    _accountTicket = null;
+    _signInProof = null;
+    _emailCode.clear();
+    if (await _sendCode('EMAIL', _verifiedEmail!) && mounted) {
+      setState(() {
+        _reprovingEmail = true;
+        _phase = _Phase.verifyEmail;
+      });
+    }
   }
 
   Future<void> _confirmPhone() async {
@@ -360,21 +402,47 @@ class _ServiceProviderSignupScreenState extends State<ServiceProviderSignupScree
         // put somebody back where they started.
         _session ??= await widget.authService.refresh();
       } else {
-        _reference ??= await widget.api.applyAsMerchant(
-          businessName: _business.text.trim(),
-          contactName: _contactName,
-          email: _verifiedEmail!,
-          emailVerificationToken: _emailToken!,
-          phone: _verifiedPhone,
-          phoneVerificationToken: _phoneToken,
-          details: _details,
-        );
-        if (!_accountCreated) {
-          await widget.api.createApplicantAccount(
-            reference: _reference!,
-            password: _passcode.text,
+        if (_reference == null) {
+          final ({String reference, String? accountTicket}) submitted =
+              await widget.api.applyAsMerchant(
+            businessName: _business.text.trim(),
+            contactName: _contactName,
+            email: _verifiedEmail!,
+            emailVerificationToken: _emailToken!,
+            phone: _verifiedPhone,
+            phoneVerificationToken: _phoneToken,
+            details: _details,
           );
+          _reference = submitted.reference;
+          _accountTicket = submitted.accountTicket;
+        }
+        if (!_accountCreated) {
+          if (_accountTicket == null && _signInProof == null) {
+            // Nothing that proves the application is theirs: prove the address first.
+            await _reproveEmail();
+            return;
+          }
+          try {
+            // The ticket from the submission, straight from memory — or the proof that replaced it.
+            await widget.api.createApplicantAccount(
+              reference: _reference!,
+              password: _passcode.text,
+              accountTicket: _signInProof == null ? _accountTicket : null,
+              emailVerificationToken: _signInProof,
+            );
+          } catch (e) {
+            if (isSignInProofRefused(e)) {
+              // Spent, or past its half hour while this screen waited: a new code, and its proof.
+              await _reproveEmail();
+              return;
+            }
+            // Already made: an earlier try went through and its answer was lost. Straight on to
+            // signing in with the passcode it was made with — see [isSignInExists].
+            if (!isSignInExists(e)) rethrow;
+          }
           _accountCreated = true;
+          _accountTicket = null;
+          _signInProof = null;
         }
         _session ??= await widget.authService.signInWithPassword(_verifiedEmail!, _passcode.text);
       }
@@ -480,7 +548,15 @@ class _ServiceProviderSignupScreenState extends State<ServiceProviderSignupScree
           _error = null;
           _emailCode.clear();
           _phoneCode.clear();
-          _phase = _Phase.form;
+          if (_reprovingEmail) {
+            // The application is in: back is back to where its sign-in waits, whose Try again asks
+            // for a code once more — never to a form whose answers were already sent.
+            _reprovingEmail = false;
+            _phase = _Phase.sending;
+            _error = DeliveryStrings.of(context).wizAccountProofRejected;
+          } else {
+            _phase = _Phase.form;
+          }
         });
       case _Phase.sending:
         // Once the application is in, the form's answers can no longer change it.
@@ -728,7 +804,9 @@ class _ServiceProviderSignupScreenState extends State<ServiceProviderSignupScree
 
   Widget _verification(DeliveryStrings t) {
     final bool email = _phase == _Phase.verifyEmail;
-    final String destination = email ? _email.text.trim() : (_phoneNumber ?? _phone.text.trim());
+    final String destination = email
+        ? (_reprovingEmail ? _verifiedEmail! : _email.text.trim())
+        : (_phoneNumber ?? _phone.text.trim());
 
     return ListView(
       padding: const EdgeInsets.all(DeliverySpacing.lg),
@@ -738,6 +816,11 @@ class _ServiceProviderSignupScreenState extends State<ServiceProviderSignupScree
         Text(email ? t.authVerifyYourEmail : t.authVerifyYourNumber, style: _titleStyle),
         const SizedBox(height: DeliverySpacing.xs),
         Text(t.codeSentTo(destination), style: _bodyStyle),
+        // Asked a second time, after the application went in — say why, or it reads like a fault.
+        if (_reprovingEmail) ...<Widget>[
+          const SizedBox(height: DeliverySpacing.md),
+          SoftNote(text: t.wizAccountConfirmAgain, icon: Icons.lock_outline),
+        ],
         const SizedBox(height: DeliverySpacing.lg),
         if (_error != null) ...<Widget>[
           SoftNote(text: _error!, accent: DeliveryAccent.critical, icon: Icons.error_outline),

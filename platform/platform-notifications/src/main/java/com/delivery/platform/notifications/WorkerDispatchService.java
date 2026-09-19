@@ -54,8 +54,12 @@ public class WorkerDispatchService {
             command = objectMapper.readValue(payload, NotificationCommand.class);
         } catch (Exception e) {
             // No notificationId means there is nothing to report a receipt against and nothing to
-            // dead-letter usefully. Log the raw payload and ack, rather than poison the queue.
-            log.error("Unreadable {} command, dropping: {}", channel, payload, e);
+            // dead-letter usefully. Log the payload and ack, rather than poison the queue.
+            //
+            // Masked, because a payload that cannot be read cannot say whether it carries a one-time
+            // code either, and a code in a log file is a credential in a log file. What is left is
+            // still enough to see why it did not parse.
+            log.error("Unreadable {} command, dropping: {}", channel, OneTimeCodes.mask(payload), e);
             return;
         }
 

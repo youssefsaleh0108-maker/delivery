@@ -99,8 +99,34 @@ them* below for what it creates and who reads each one.
   `platform-secrets`, as onboarding-service gets them; the Vault seed carries them too from the next
   vault pod start. order-manager's image must be built against platform-storage 0.1.3, published to
   GitHub Packages.
+- **Applicant documents reach storage the same way.** `/merchant-kyc` is routed on the API hostname
+  like `/order-attachments` — prefix kept, presigned requests only, MinIO refusing unsigned ones —
+  behind `merchant-kyc-upload-limit`, a 413 over 10 MiB (keep it in step with onboarding-service's
+  `delivery.storage.minio.max-upload-size-bytes`). Until it was, every rider's and merchant's id,
+  licence and registration upload met Traefik's own 404 and never reached MinIO. The bucket has
+  existed since the first bootstrap, so the next sync of each overlay is the whole deployment. To
+  confirm, an unsigned request must now get MinIO's XML `AccessDenied`, not `404 page not found`:
+
+  ```sh
+  curl -s -X PUT https://api-dev.youdrop.shop/merchant-kyc/probe   # and api-qa
+  ```
+
+  The storage routes, then: `product-images` and `apk` (public), `user-avatars`,
+  `order-attachments` and `merchant-kyc` (private, presigned). `delivery-proof` and `receipts` stay
+  unrouted because no service signs a URL into either yet; `scripts/verify.sh` checks both halves.
 - **The demo logins** (customer/rider/merchant/backoffice/carrier) come from the realm import, and
   their passwords from the `demo-logins` Secret — see below.
+- **The realm import runs only against a fresh database**, so a change to the realm file reaches an
+  environment that already has one only by hand. The user profile now declares
+  `onboardingApplicationId`, admin-only to view and to edit: onboarding-service stamps it on every
+  account it makes for an applicant's passcode, and finishes an interrupted sign-up only on an
+  account stamped for that application. Keycloak silently drops an undeclared attribute, so until
+  dev and qa declare it an interrupted sign-up is refused with `account-exists` (safe, but it cannot
+  be finished). Declare it with `scripts/rotate-secrets.sh <namespace> user-profile-stamp` (done on
+  dev on 2026-09-19; qa gets it with its own rotation), or by hand in the admin console: Realm
+  settings → User profile → Create attribute, name `onboardingApplicationId`, display name `Onboarding application`, not required,
+  and only admins may view or edit it. (Do not run `infra/keycloak/apply-realm-updates.sh` here: it
+  re-asserts the compose stack's dev client secrets.)
 - **order-manager's image** is the one Docker Hub pull (its own repo/pipeline); everything else
   pulls public GHCR packages.
 - **The portal** serves whatever is under `/opt/delivery/sites/<env>/portal` on the node — sync a
