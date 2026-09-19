@@ -24,11 +24,13 @@ import 'service_fixtures.dart'
 /// "When entering the shop, a button to open regions on the map": the shop page's "Delivery area"
 /// row and the map behind it.
 ///
-/// Pinned: the row is there only when there is a real area to show (a circle, or areas, from a
-/// server that said which) and never as a dead control; a service provider shows it only when one
-/// of its offers is delivered; the map draws the circle to the metre and writes a placed area's name
-/// at its centre, never a region around it; and the "inside/outside" line is decided by the same
-/// two rules checkout applies — said only when it can be, in Arabic right to left, at 320dp.
+/// Pinned: the row is there only when there is a real area to show (a circle, or areas a customer
+/// can pick, from a server that said which) and never as a dead control; a service provider shows it
+/// only when one of its offers is delivered; the map draws the circle to the metre and writes a
+/// placed area's name at its centre, never a region around it; an area retired from the picker is
+/// never counted, named or listed, yet still judges an address saved in it; and the
+/// "inside/outside" line is decided by the same two rules checkout applies — said only when it can
+/// be, in Arabic right to left, at 320dp.
 void main() {
   final DeliveryStrings en = lookupDeliveryStrings(const Locale('en'));
   final DeliveryStrings ar = lookupDeliveryStrings(const Locale('ar'));
@@ -147,6 +149,18 @@ void main() {
       expect(ShopDeliveryArea.of(store(zones: absent)), isNull);
     });
 
+    test('nothing, as with no areas at all, when every area is retired and there is no circle', () {
+      expect(ShopDeliveryArea.of(store(radius: null, zones: <dynamic>[rasBeirut])), isNull);
+      // A radius with no pin is no circle, whatever the areas are.
+      expect(
+          ShopDeliveryArea.of(
+              store(latitude: null, longitude: null, zones: <dynamic>[rasBeirut])),
+          isNull);
+      // One area still in the picker is enough.
+      expect(ShopDeliveryArea.of(store(radius: null, zones: <dynamic>[rasBeirut, achrafieh])),
+          isNotNull);
+    });
+
     test('a service provider only when one of its offers is delivered', () {
       final Store provider = store(vertical: 'SERVICES');
       expect(ShopDeliveryArea.of(provider, offersDeliver: true), isNotNull);
@@ -208,6 +222,50 @@ void main() {
           ShopDeliveryArea.of(store(radius: null, zones: <dynamic>[hamra]))!;
       expect(areas.verdictFor(at(latitude: north(100), longitude: shopLng)),
           DeliveryAreaVerdict.unknown);
+    });
+  });
+
+  group('an area retired from the picker', () {
+    test('judges an address, but is never counted, named or framed', () {
+      final ShopDeliveryArea area =
+          ShopDeliveryArea.of(store(zones: <dynamic>[hamra, achrafieh, rasBeirut]))!;
+
+      // Judged by every area the shop serves, as order placement is.
+      expect(area.zones.map((DeliveryZone z) => z.id),
+          <String>['z-hamra', 'z-achrafieh', 'z-ras-beirut']);
+      expect(area.limitsByArea, isTrue);
+      expect(area.verdictFor(at(zoneId: 'z-ras-beirut')), DeliveryAreaVerdict.inside);
+      expect(
+          area.verdictFor(at(latitude: north(500), longitude: shopLng, zoneId: 'z-ras-beirut')),
+          DeliveryAreaVerdict.inside);
+      expect(area.verdictFor(at(zoneId: 'z-jounieh')), DeliveryAreaVerdict.outside);
+
+      // Shown: only what the address sheet still offers.
+      expect(area.shownZones.map((DeliveryZone z) => z.name), <String>['Hamra', 'Achrafieh']);
+      expect(area.placedZones.map((DeliveryZone z) => z.name), <String>['Hamra'],
+          reason: 'Ras Beirut is placed, but retired.');
+      expect(area.summary(en), '${en.dareaWithinKm('3.0')} · ${en.dareaAreasCount(2)}');
+      // The camera frames what is drawn, and Ras Beirut is not.
+      expect(area.framePoints, contains((33.8960, 35.4800)));
+      expect(area.framePoints, isNot(contains((33.9010, 35.4730))));
+    });
+
+    test('a shop whose areas are all retired shows its circle alone, and still judges by them',
+        () {
+      final ShopDeliveryArea area = ShopDeliveryArea.of(store(zones: <dynamic>[rasBeirut]))!;
+
+      expect(area.shownZones, isEmpty);
+      expect(area.placedZones, isEmpty);
+      expect(area.summary(en), en.dareaWithinKm('3.0'));
+      // Order placement still refuses every other area there, and still serves the retired one.
+      expect(area.limitsByArea, isTrue);
+      expect(area.verdictFor(at(latitude: north(500), longitude: shopLng, zoneId: 'z-hamra')),
+          DeliveryAreaVerdict.outside);
+      expect(
+          area.verdictFor(at(latitude: north(500), longitude: shopLng, zoneId: 'z-ras-beirut')),
+          DeliveryAreaVerdict.inside);
+      expect(area.verdictFor(at(latitude: north(500), longitude: shopLng)),
+          DeliveryAreaVerdict.inside);
     });
   });
 
@@ -324,6 +382,29 @@ void main() {
       expect(find.text(en.dareaButton), findsNothing);
     });
 
+    testWidgets('no row for a shop with no circle whose areas are all retired',
+        (WidgetTester tester) async {
+      await pumpShop(tester, shopJson(radius: null, zones: <dynamic>[rasBeirut]));
+
+      expect(find.text(en.dareaButton), findsNothing);
+      expect(find.byType(YdListRow), findsNothing);
+    });
+
+    testWidgets('the row counts only the areas a customer can pick', (WidgetTester tester) async {
+      await pumpShop(tester, shopJson(zones: <dynamic>[hamra, achrafieh, rasBeirut]));
+
+      expect(find.text('${en.dareaWithinKm('3.0')} · ${en.dareaAreasCount(2)}'), findsOneWidget);
+      expect(find.text('${en.dareaWithinKm('3.0')} · ${en.dareaAreasCount(3)}'), findsNothing);
+    });
+
+    testWidgets('a circle and nothing but retired areas: the circle alone, with no count',
+        (WidgetTester tester) async {
+      await pumpShop(tester, shopJson(zones: <dynamic>[rasBeirut]));
+
+      final YdListRow row = tester.widget<YdListRow>(find.widgetWithText(YdListRow, en.dareaButton));
+      expect(row.subtitle, en.dareaWithinKm('3.0'));
+    });
+
     testWidgets('the dekkane page shows it as a card under the hero', (WidgetTester tester) async {
       await pumpShop(tester, shopJson(radius: null, zones: <dynamic>[hamra]),
           layout: StorePageLayout.dekkane);
@@ -339,7 +420,8 @@ void main() {
           locale: const Locale('ar'), size: const Size(320, 1200));
 
       expect(find.text(ar.dareaButton), findsOneWidget);
-      expect(find.text('${ar.dareaWithinKm('3.0')} · ${ar.dareaAreasCount(3)}'), findsOneWidget);
+      // Ras Beirut is retired, so two areas, not three.
+      expect(find.text('${ar.dareaWithinKm('3.0')} · ${ar.dareaAreasCount(2)}'), findsOneWidget);
       expect(Directionality.of(tester.element(find.text(ar.dareaButton))), TextDirection.rtl);
       expect(tester.takeException(), isNull);
     });
@@ -379,12 +461,14 @@ void main() {
       expect(ring.point.latitude, shopLat);
       expect(ring.point.longitude, shopLng);
 
-      // Placed areas get their name on the map; every area is in the words below it.
+      // Placed areas get their name on the map; every area a customer can pick is in the words
+      // below it. Ras Beirut is placed but retired, so it is in neither.
       final Iterable<String> onMap = tester
           .widgetList<DeliveryAreaZoneName>(find.byType(DeliveryAreaZoneName))
           .map((DeliveryAreaZoneName n) => n.name);
-      expect(onMap, unorderedEquals(<String>['Hamra', 'Ras Beirut']));
+      expect(onMap, <String>['Hamra']);
       expect(find.text('Achrafieh'), findsOneWidget);
+      expect(find.text('Ras Beirut'), findsNothing);
       expect(find.text(en.dareaCircleRule('3.0')), findsOneWidget);
       expect(find.text(en.dareaZonesTitle), findsOneWidget);
       expect(find.text(en.dareaBothRules), findsOneWidget);
@@ -447,6 +531,57 @@ void main() {
       // With no map there are no names on one to explain.
       expect(find.text(en.dareaZoneLabelsNote), findsNothing);
       expect(find.text(en.dareaCircleRule('3.0')), findsNothing);
+    });
+
+    testWidgets('a retired area is neither named nor listed, yet a saved address in it is inside',
+        (WidgetTester tester) async {
+      await pumpMap(tester, store(radius: null, zones: <dynamic>[hamra, achrafieh, rasBeirut]),
+          chosen: at(zoneId: 'z-ras-beirut'));
+
+      expect(find.text(en.dareaInside), findsOneWidget,
+          reason: 'Order placement still serves an address saved in a retired area.');
+      expect(find.text('Ras Beirut'), findsNothing);
+      expect(
+          tester
+              .widgetList<DeliveryAreaZoneName>(find.byType(DeliveryAreaZoneName))
+              .map((DeliveryAreaZoneName n) => n.name),
+          <String>['Hamra']);
+      expect(find.text('Achrafieh'), findsOneWidget);
+      expect(find.text(en.dareaZonesTitle), findsOneWidget);
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('areas all retired, around a circle: the circle alone, and no list',
+        (WidgetTester tester) async {
+      await pumpMap(tester, store(zones: <dynamic>[rasBeirut]),
+          chosen: at(latitude: north(500), longitude: shopLng, zoneId: 'z-ras-beirut'));
+
+      expect(find.byType(CircleLayer), findsOneWidget);
+      expect(find.text(en.dareaCircleRule('3.0')), findsOneWidget);
+      expect(find.text(en.dareaInside), findsOneWidget);
+      // No "Delivers to these areas" over nothing, and no "one of these areas" either.
+      expect(find.text(en.dareaZonesTitle), findsNothing);
+      expect(find.text(en.dareaBothRules), findsNothing);
+      expect(find.text(en.dareaZoneLabelsNote), findsNothing);
+      expect(find.byType(DeliveryAreaZoneName), findsNothing);
+      expect(find.text('Ras Beirut'), findsNothing);
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets("a retired area's centre alone puts nothing on a map",
+        (WidgetTester tester) async {
+      // No pin, no circle: the only placed area is retired, so there is nothing to draw.
+      await pumpMap(
+          tester,
+          store(
+              latitude: null,
+              longitude: null,
+              radius: null,
+              zones: <dynamic>[achrafieh, rasBeirut]));
+
+      expect(find.byType(OsmBasemap), findsNothing);
+      expect(find.text('Achrafieh'), findsOneWidget);
+      expect(find.text('Ras Beirut'), findsNothing);
     });
 
     for (final (Locale locale, DeliveryStrings t) in <(Locale, DeliveryStrings)>[

@@ -22,12 +22,18 @@ import 'order_placement.dart';
 ///
 /// An area is a NAME, not a shape. Its centre, where the back office placed it, is roughly the
 /// middle of the neighbourhood and is never a boundary: nothing decides by distance from it. So the
-/// map writes each placed area's name at its centre and lists every area in words, and it never
+/// map writes each placed area's name at its centre and lists the areas in words, and it never
 /// draws a region around a centre that no rule has.
 ///
 /// The inside/outside answer ([verdictFor]) is computed from those same two rules — the circle
 /// through the very function checkout calls — so the map cannot call an address inside that
 /// checkout would refuse, nor outside one it would accept.
+///
+/// **Retired areas judge but are not shown.** The shop still serves an area the back office has
+/// retired from the picker ([DeliveryZone.active] false), and an address saved in it before still
+/// orders there, so [verdictFor] and [limitsByArea] read every area ([zones]). But no customer can
+/// pick a retired area any more, so the control counts, the map names and the words list only the
+/// areas still in the picker ([shownZones]).
 class ShopDeliveryArea {
   const ShopDeliveryArea._(this.store);
 
@@ -36,17 +42,18 @@ class ShopDeliveryArea {
   /// * the store read did not say which areas the shop serves ([Store.deliveryZones] null — a
   ///   server from before it did). A circle drawn alone could be only half the area, and "inside"
   ///   would then be a guess;
-  /// * the shop has neither a circle nor any areas: it goes wherever the platform does, and a map
-  ///   of "everywhere" is not a delivery area;
+  /// * the shop has neither a circle nor any area a customer can pick ([shownZones]) — no areas
+  ///   at all, where it goes wherever the platform does and a map of "everywhere" is not a
+  ///   delivery area, or only retired ones, which nobody can choose any more and which are never
+  ///   shown;
   /// * [offersDeliver] is not true for a [StoreVertical.services] shop. A service provider delivers
   ///   only through offers that say so; a pickup-only provider has no delivery area to show, and
   ///   null — its offers unknown — shows none rather than guess.
   static ShopDeliveryArea? of(Store store, {bool? offersDeliver}) {
     if (store.vertical == StoreVertical.services && offersDeliver != true) return null;
-    final List<DeliveryZone>? zones = store.deliveryZones;
-    if (zones == null) return null;
+    if (store.deliveryZones == null) return null;
     final ShopDeliveryArea area = ShopDeliveryArea._(store);
-    return area.hasCircle || zones.isNotEmpty ? area : null;
+    return area.hasCircle || area.shownZones.isNotEmpty ? area : null;
   }
 
   final Store store;
@@ -57,15 +64,24 @@ class ShopDeliveryArea {
   /// The circle's radius; only meaningful when [hasCircle].
   int get radiusMetres => store.deliveryRadiusMetres!;
 
-  /// The areas the shop delivers to, in the picker's order. Empty when areas do not limit it.
+  /// Every area the shop delivers to, retired ones included, in the picker's order: what order
+  /// placement accepts, so what [verdictFor] judges by. Empty when areas do not limit it. Never
+  /// drawn as it is — see [shownZones].
   List<DeliveryZone> get zones => store.deliveryZones ?? const <DeliveryZone>[];
 
-  /// Whether the shop goes only to [zones].
+  /// Whether the shop goes only to [zones]. True for a shop whose areas are all retired too: order
+  /// placement still refuses every other area there.
   bool get limitsByArea => zones.isNotEmpty;
 
-  /// The areas the map can write a name for: those the back office has placed.
+  /// The areas a customer is shown — counted in [summary], listed under the map, named on it: those
+  /// still in the picker. A retired area stays in [zones] for the verdict, but nobody can choose it
+  /// for an address any more, so listing it would offer a place the address sheet does not.
+  List<DeliveryZone> get shownZones =>
+      zones.where((DeliveryZone zone) => zone.active).toList(growable: false);
+
+  /// The [shownZones] the map can write a name for: those the back office has placed.
   List<DeliveryZone> get placedZones =>
-      zones.where((DeliveryZone zone) => zone.isPlaced).toList(growable: false);
+      shownZones.where((DeliveryZone zone) => zone.isPlaced).toList(growable: false);
 
   /// "3.0" — the radius in kilometres to one decimal, as checkout's own refusal words it
   /// ([DeliveryStrings.custOutsideDeliveryArea]), so the two never disagree about the number.
@@ -74,7 +90,7 @@ class ShopDeliveryArea {
   /// The one-line summary under the control's title: how far, how many areas, or both.
   String summary(DeliveryStrings t) => <String>[
         if (hasCircle) t.dareaWithinKm(radiusKm),
-        if (limitsByArea) t.dareaAreasCount(zones.length),
+        if (shownZones.isNotEmpty) t.dareaAreasCount(shownZones.length),
       ].join(' · ');
 
   /// Whether [address] is inside this area, by the same two rules checkout applies.
@@ -98,8 +114,9 @@ class ShopDeliveryArea {
   }
 
   /// The points the map has to show, to frame its camera on: the circle's four extremes (so the
-  /// whole ring is in view, not just its centre), the shop's pin, and every placed area. Empty when
-  /// there is nothing to put on a map at all — areas nobody has placed, around a shop with no pin.
+  /// whole ring is in view, not just its centre), the shop's pin, and every area it names
+  /// ([placedZones] — never a retired one). Empty when there is nothing to put on a map at all —
+  /// areas nobody has placed, around a shop with no pin.
   List<(double, double)> get framePoints {
     final List<(double, double)> points = <(double, double)>[
       if (store.hasPin) (store.latitude!, store.longitude!),

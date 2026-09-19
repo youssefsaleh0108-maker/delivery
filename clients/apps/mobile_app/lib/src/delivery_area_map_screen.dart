@@ -14,9 +14,11 @@ import 'shop_delivery_area.dart';
 /// Drawn exactly as the rules that accept an order define the area ([ShopDeliveryArea]):
 ///
 /// * **the circle** as a ring of the shop's delivery radius around its pin, to the metre;
-/// * **the areas** in words, every one of them — and, for each the back office has placed, its name
-///   written where it sits. Never a region around that point: an area is decided by the name an
-///   address picks, not by distance, and a drawn edge would be a rule nobody has;
+/// * **the areas** in words, every one a customer can still pick ([ShopDeliveryArea.shownZones]) —
+///   and, for each the back office has placed, its name written where it sits. Never a region
+///   around that point: an area is decided by the name an address picks, not by distance, and a
+///   drawn edge would be a rule nobody has. An area retired from the picker is neither listed nor
+///   named, though an address saved in it still reads inside;
 /// * **the customer's chosen address**, when it has a pin, and a plain line saying whether it is
 ///   inside or outside — only when that can be told by the same rules checkout applies.
 ///
@@ -249,6 +251,9 @@ class DeliveryAreaDetails extends StatelessWidget {
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
     final DeliveryAddress? home = address;
+    // Only the areas a customer can still pick. A shop whose areas are all retired shows its circle
+    // alone: no list, and no "one of these areas" with nothing under it.
+    final List<DeliveryZone> listed = area.shownZones;
     return Padding(
       padding: const EdgeInsetsDirectional.all(DeliverySpacing.md),
       child: Column(
@@ -285,9 +290,9 @@ class DeliveryAreaDetails extends StatelessWidget {
                 ),
               ],
             ),
-          if (area.hasCircle && area.limitsByArea)
+          if (area.hasCircle && listed.isNotEmpty)
             const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
-          if (area.limitsByArea) ...<Widget>[
+          if (listed.isNotEmpty) ...<Widget>[
             Text(
               t.dareaZonesTitle,
               style: const TextStyle(
@@ -302,11 +307,11 @@ class DeliveryAreaDetails extends StatelessWidget {
               spacing: 6,
               runSpacing: 6,
               children: <Widget>[
-                for (final DeliveryZone zone in area.zones) _ZoneTag(name: zone.name),
+                for (final DeliveryZone zone in listed) _ZoneTag(name: zone.name),
               ],
             ),
           ],
-          if (area.hasCircle && area.limitsByArea) ...<Widget>[
+          if (area.hasCircle && listed.isNotEmpty) ...<Widget>[
             const SizedBox(height: DeliverySpacing.sm),
             Text(t.dareaBothRules, style: _note),
           ],

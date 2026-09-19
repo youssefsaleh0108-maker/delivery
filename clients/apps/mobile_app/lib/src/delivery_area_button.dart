@@ -22,9 +22,9 @@ enum DeliveryAreaButtonStyle {
 ///
 /// It draws nothing at all — not a disabled row — whenever [ShopDeliveryArea.of] finds nothing true
 /// to show: before the full store has arrived, for a shop that neither drew a circle nor priced an
-/// area, for a store read that did not say which areas the shop serves, and for a service provider
-/// none of whose offers is delivered. A control is only drawn when the map behind it has a real
-/// area to show.
+/// area a customer can still pick (its areas all retired count as none), for a store read that did
+/// not say which areas the shop serves, and for a service provider none of whose offers is
+/// delivered. A control is only drawn when the map behind it has a real area to show.
 ///
 /// Its own file, and one line on each page that shows it, so a page's other work never has to
 /// merge around it.

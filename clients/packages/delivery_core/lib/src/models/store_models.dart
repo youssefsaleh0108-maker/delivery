@@ -522,7 +522,8 @@ class Store {
   /// Null: the server did not say, as one built before the store read carried areas does not, and
   /// then nothing may be drawn or concluded from areas at all — an empty list would claim a fact
   /// nobody sent. Includes areas retired from the picker ([DeliveryZone.active] false) that the
-  /// shop still serves, because a saved address naming one still orders there.
+  /// shop still serves, because a saved address naming one still orders there: judge an address
+  /// by all of them, but show a customer only the active ones, the only ones they can pick.
   final List<DeliveryZone>? deliveryZones;
 
   /// Whether there is a pin to draw or to measure "near me" from.
