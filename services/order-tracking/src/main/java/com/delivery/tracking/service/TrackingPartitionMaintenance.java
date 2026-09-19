@@ -142,11 +142,10 @@ public class TrackingPartitionMaintenance {
      * metres between the two points — how long the rider was tracked and roughly how far —
      * and no coordinate.
      *
-     * <p>The four coordinate columns are NOT NULL (V11), and this change came without a migration,
-     * so they are written as {@code NaN}: "not a number", no position, rather than any made-up
-     * point. Rows rolled up before this change keep the coordinates they were written with;
-     * nothing here deletes or rewrites them. Dropping the NOT NULLs and turning {@code NaN} into
-     * NULL is a one-line migration for whenever one is allowed.
+     * <p>The four coordinate columns are written as NULL — V18 dropped their NOT NULL for this —
+     * rather than any made-up point, and nothing reads them: no entity, repository or endpoint
+     * maps this table. Rows rolled up before this change keep the coordinates they were written
+     * with; nothing here deletes or rewrites them (see V18 for why that is safe).
      *
      * <p>Reads from the partition directly rather than the parent, so the scan touches only the day
      * being retired instead of the whole table.
@@ -166,10 +165,10 @@ public class TrackingPartitionMaintenance {
                            count(*),
                            min(recorded_at),
                            max(recorded_at),
-                           'NaN'::double precision,
-                           'NaN'::double precision,
-                           'NaN'::double precision,
-                           'NaN'::double precision,
+                           NULL::double precision,
+                           NULL::double precision,
+                           NULL::double precision,
+                           NULL::double precision,
                            public.ST_Distance(
                                (array_agg(location ORDER BY recorded_at))[1],
                                (array_agg(location ORDER BY recorded_at DESC))[1])

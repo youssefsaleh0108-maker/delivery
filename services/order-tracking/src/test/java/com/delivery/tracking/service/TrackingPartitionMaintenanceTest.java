@@ -60,8 +60,10 @@ class TrackingPartitionMaintenanceTest {
 
         assertThat(sql).contains("INSERT INTO tracking_event_rollup")
                 .contains("FROM tracking_events_" + expired.format(SUFFIX));
-        // The four coordinate columns are written as "not a number", never from the points.
-        assertThat(sql.split("'NaN'::double precision", -1)).hasSize(5);
+        // The four coordinate columns are written as NULL, never from the points — and never as a
+        // NaN, which a JSON writer would render as a number that is not one.
+        assertThat(sql.split("NULL::double precision", -1)).hasSize(5);
+        assertThat(sql).doesNotContainIgnoringCase("nan");
         assertThat(sql).doesNotContain("array_agg(lat").doesNotContain("array_agg(lng");
         // What a late dispute can still be told: how many points, when, how far apart.
         assertThat(sql).contains("count(*)").contains("min(recorded_at)")
