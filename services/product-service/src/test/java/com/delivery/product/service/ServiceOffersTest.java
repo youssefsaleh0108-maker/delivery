@@ -52,6 +52,7 @@ import com.delivery.product.service.StoreService.StoreNotFoundException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -707,7 +708,13 @@ class ServiceOffersTest {
             assertThatThrownBy(() -> catalog.browseStoreByIds(listedPress.getId(), null,
                     List.of(UUID.randomUUID()), PageRequest.of(0, 20)))
                     .isInstanceOf(StoreNotFoundException.class);
+            // Searched, the shelf goes to its own query (the item search's matching), and is refused first.
+            assertThatThrownBy(() -> catalog.browseStore(listedPress.getId(), "customer-sub", null,
+                    "cards", PageRequest.of(0, 20)))
+                    .isInstanceOf(StoreNotFoundException.class);
             verify(products, never()).findActiveInStore(any(), any(), anyString(), any(Pageable.class));
+            verify(products, never()).findActiveInStoreMatching(any(), anyBoolean(), any(), anyString(),
+                    anyString(), anyString(), any(Pageable.class));
             verify(products, never()).findActiveInStoreByIds(any(), any(), any(Pageable.class));
         }
 

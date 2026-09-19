@@ -40,6 +40,10 @@ jobs:
   # A job of this caller's own rather than a service container in reusable-service-ci.yml, which the
   # other services share and none of them needs. `ci` waits for it, so an image whose exclusions no
   # longer hold is never built, pushed or rolled out.
+  #
+  # ItemSearchDatabaseTest runs here too, for the same reason: the customer item search matches words
+  # in SQL (V37's fold, pg_trgm and the trigram index), which no mock can check, and its Arabic matching
+  # depends on this image's locale.
   database-tests:
     runs-on: ubuntu-latest
     permissions:
@@ -73,25 +77,27 @@ jobs:
 
       # -am builds the platform libraries this module depends on, as the build job does. The test
       # filter matches nothing in them, which failIfNoSpecifiedTests=false allows.
-      - name: Storefront isolation against PostGIS
+      - name: Storefront isolation, item search and delivery areas against PostGIS
         env:
           PRODUCT_TEST_DB_URL: jdbc:postgresql://localhost:5432/postgres
         run: >-
           mvn -B -U -pl services/product-service -am test
-          -Dtest=ServicesVerticalDatabaseTest
+          -Dtest=ServicesVerticalDatabaseTest,ItemSearchDatabaseTest,DeliveryAreaDatabaseTest
           -Dsurefire.failIfNoSpecifiedTests=false
 
       - name: Fail if the database tests did not run
         run: |
-          report=services/product-service/target/surefire-reports/TEST-com.delivery.product.domain.ServicesVerticalDatabaseTest.xml
-          if [ ! -f "$report" ]; then
-            echo "::error::No report at $report, so the database tests did not run."
-            exit 1
-          fi
-          if ! grep -q 'tests="[1-9]' "$report" || grep -q 'skipped="[1-9]' "$report"; then
-            echo "::error::The database tests were skipped. Is PRODUCT_TEST_DB_URL set?"
-            exit 1
-          fi
+          for test in ServicesVerticalDatabaseTest ItemSearchDatabaseTest DeliveryAreaDatabaseTest; do
+            report=services/product-service/target/surefire-reports/TEST-com.delivery.product.domain.$test.xml
+            if [ ! -f "$report" ]; then
+              echo "::error::No report at $report, so the database tests did not run."
+              exit 1
+            fi
+            if ! grep -q 'tests="[1-9]' "$report" || grep -q 'skipped="[1-9]' "$report"; then
+              echo "::error::$test was skipped. Is PRODUCT_TEST_DB_URL set?"
+              exit 1
+            fi
+          done
 
   ci:
     needs: database-tests

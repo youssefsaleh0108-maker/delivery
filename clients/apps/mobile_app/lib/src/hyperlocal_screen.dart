@@ -282,6 +282,7 @@ class _HyperlocalScreenState extends State<HyperlocalScreen> {
         cart: widget.cart,
         storeId: store.id,
         preview: store,
+        addresses: widget.addresses,
         onOpenBasket: widget.onOpenBasket,
         layout: StorePageLayout.dekkane,
         shopChatAction: widget.shopChatAction,

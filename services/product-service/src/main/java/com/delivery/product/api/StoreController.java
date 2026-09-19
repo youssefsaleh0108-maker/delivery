@@ -32,6 +32,7 @@ import com.delivery.product.api.dto.CatalogDtos.PageResponse;
 import com.delivery.product.api.dto.CatalogDtos.PresignUploadRequest;
 import com.delivery.product.api.dto.CatalogDtos.PresignUploadResponse;
 import com.delivery.product.api.dto.CatalogDtos.ProductResponse;
+import com.delivery.product.api.dto.DeliveryZoneDtos.ZoneResponse;
 import com.delivery.product.api.dto.GeoDtos.LocationRequest;
 import com.delivery.product.api.dto.GeoDtos.NearbyPageResponse;
 import com.delivery.product.api.dto.GeoDtos.NearbyStoreResponse;
@@ -57,6 +58,7 @@ import com.delivery.product.domain.StoreOffer;
 import com.delivery.product.domain.StoreReview;
 import com.delivery.product.service.CatalogService;
 import com.delivery.product.service.CatalogService.ProductView;
+import com.delivery.product.service.DeliveryZoneService;
 import com.delivery.product.service.PopularServiceShops;
 import com.delivery.product.service.ProductImageService;
 import com.delivery.product.service.ProductImageService.ImageUrl;
@@ -122,15 +124,20 @@ public class StoreController {
     private final ReviewService reviewService;
     private final PopularServiceShops popularServiceShops;
 
+    /** For the areas a shop delivers to, which ride on the store as {@code deliveryZones}. */
+    private final DeliveryZoneService deliveryZones;
+
     public StoreController(StoreService storeService, CatalogService catalog,
                            ProductImageService images, StoreImageService storeImages,
-                           ReviewService reviewService, PopularServiceShops popularServiceShops) {
+                           ReviewService reviewService, PopularServiceShops popularServiceShops,
+                           DeliveryZoneService deliveryZones) {
         this.storeService = storeService;
         this.catalog = catalog;
         this.images = images;
         this.storeImages = storeImages;
         this.reviewService = reviewService;
         this.popularServiceShops = popularServiceShops;
+        this.deliveryZones = deliveryZones;
     }
 
     // ---------------------------------------------------------------- storefront
@@ -342,14 +349,20 @@ public class StoreController {
         return PageResponse.of(page.map(v -> toCard(v, starred, offersByStore)));
     }
 
-    /** The Merchant Portal's list of its own stores, in any status. */
+    /**
+     * The Merchant Portal's list of its own stores, in any status.
+     *
+     * <p>Without the areas each shop delivers to ({@code deliveryZones} is null, "not read"): they
+     * cost one or two queries a store, and nothing that reads this list draws them. The customer's
+     * shop page reads its store by id ({@link #read}), which carries them.
+     */
     @GetMapping("/mine")
     @PreAuthorize("hasRole('MERCHANT')")
     public PageResponse<StoreResponse> mine(@PageableDefault(size = 20) Pageable pageable) {
         String merchantId = CurrentUser.requireId();
         Set<UUID> starred = storeService.favoriteIdsOf(merchantId);
-        return PageResponse.of(
-                storeService.ownedByView(merchantId, pageable).map(v -> toResponse(v, starred)));
+        return PageResponse.of(storeService.ownedByView(merchantId, pageable)
+                .map(v -> toResponse(v, starred, false)));
     }
 
     /** Platform-wide promotions — the ones not tied to any single shop. */
@@ -704,47 +717,23 @@ public class StoreController {
 
     // ---------------------------------------------------------------- mapping
 
+    /** A shop's card, as every list draws it ({@link StoreCards}). */
     private StoreCardResponse toCard(StoreView v, Set<UUID> starred,
                                      Map<UUID, List<StoreOffer>> offersByStore) {
-        Store store = v.store();
-        List<StoreOffer> storeOffers = offersByStore.getOrDefault(store.getId(), List.of());
-        // Both sizes come out of one lookup per slot, so the storefront grid costs exactly the
-        // metadata queries it did before.
-        ImageUrl logo = images.resolveImage(store.getLogoRef());
-        ImageUrl cover = images.resolveImage(store.getCoverRef());
-        return new StoreCardResponse(
-                store.getId(),
-                store.getSlug(),
-                store.getName(),
-                store.getVertical(),
-                store.getTagline(),
-                store.getTags(),
-                store.getRating(),
-                store.getRatingCount(),
-                store.getDeliveryFee(),
-                store.getMinOrder(),
-                store.getEtaMinMinutes(),
-                store.getEtaMaxMinutes(),
-                v.availability(),
-                ImageUrl.fullOf(logo),
-                ImageUrl.fullOf(cover),
-                ImageUrl.thumbOf(logo),
-                ImageUrl.thumbOf(cover),
-                starred.contains(store.getId()),
-                storeOffers.isEmpty() ? null : toOffer(storeOffers.get(0)),
-                store.getNeighborhood(),
-                store.isVerifiedLocal(),
-                store.getPowerStatus(),
-                store.getPowerNote(),
-                store.getPowerUpdatedAt(),
-                v.powerCurrent(),
-                store.getLatitude(),
-                store.getLongitude(),
-                store.getDeliveryRadiusMetres(),
-                store.getServiceCategory());
+        return StoreCards.of(v, starred, offersByStore, images);
     }
 
+    /** A whole store, with the areas it delivers to. */
     private StoreResponse toResponse(StoreView v, Set<UUID> starred) {
+        return toResponse(v, starred, true);
+    }
+
+    /**
+     * @param withAreas whether to read the areas the shop delivers to ({@link #servedZonesOf}, one
+     *                  or two queries). False leaves {@code deliveryZones} null, which a client
+     *                  reads as "not said", never as "no areas": for a list nothing draws them from.
+     */
+    private StoreResponse toResponse(StoreView v, Set<UUID> starred, boolean withAreas) {
         Store store = v.store();
         ImageUrl logo = images.resolveImage(store.getLogoRef());
         ImageUrl cover = images.resolveImage(store.getCoverRef());
@@ -783,19 +772,20 @@ public class StoreController {
                 store.getPowerUpdatedAt(),
                 v.powerCurrent(),
                 store.getDeliveryRadiusMetres(),
+                withAreas ? servedZonesOf(store) : null,
                 store.getServiceCategory());
     }
 
+    /**
+     * Where a shop delivers by area, for its shop page's map, in the area picker's own shape: on
+     * the full store only, never on a card, so the storefront grid costs no query per shop for it.
+     */
+    private List<ZoneResponse> servedZonesOf(Store store) {
+        return deliveryZones.servedAreasOf(store.getId()).stream().map(ZoneResponse::of).toList();
+    }
+
     private static OfferResponse toOffer(StoreOffer offer) {
-        return new OfferResponse(
-                offer.getId(),
-                offer.getStoreId(),
-                offer.getKind(),
-                offer.getTitle(),
-                offer.getSubtitle(),
-                offer.getValue(),
-                offer.getMinSubtotal(),
-                offer.getEndsAt());
+        return StoreCards.offer(offer);
     }
 
     /**

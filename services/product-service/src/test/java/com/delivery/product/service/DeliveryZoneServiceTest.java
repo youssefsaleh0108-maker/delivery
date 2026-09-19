@@ -1,12 +1,18 @@
 package com.delivery.product.service;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -197,6 +203,68 @@ class DeliveryZoneServiceTest {
             service.rename(hamra.getId(), "Hamra", "Beirut", 5, null, false);
 
             assertThat(hamra.getSortOrder()).isEqualTo(5);
+        }
+    }
+
+    /**
+     * The list the shop page's "Delivery area" map draws, and tells a customer "inside" or
+     * "outside" from. Checkout is decided by {@link DeliveryZoneService#termsFor}; the moment the two
+     * are different sets, the page promises an address that placement refuses.
+     */
+    @Nested
+    @DisplayName("the areas a shop delivers to, as its shop page shows them")
+    class ServedAreas {
+
+        private final DeliveryZone hamra = new DeliveryZone("Hamra", "Beirut", 10);
+        private final DeliveryZone verdun = new DeliveryZone("Verdun", "Beirut", 20);
+        private final DeliveryZone jounieh = new DeliveryZone("Jounieh", "Keserwan", 30);
+
+        /**
+         * Backs every coverage read — the list, the "prices by area" test and the per-area lookup —
+         * from one set of rows, as the table does, so termsFor and servedAreasOf read the same data.
+         */
+        private void covers(DeliveryZone... served) {
+            List<StoreDeliveryZone> rows = Arrays.stream(served)
+                    .map(z -> new StoreDeliveryZone(store.getId(), z.getId(),
+                            new BigDecimal("2.00"), null, 0))
+                    .toList();
+            when(storeZones.findByStoreId(store.getId())).thenReturn(rows);
+            when(storeZones.existsByStoreId(store.getId())).thenReturn(!rows.isEmpty());
+            when(storeZones.findByStoreIdAndZoneId(eq(store.getId()), any()))
+                    .thenAnswer(ask -> rows.stream()
+                            .filter(row -> row.getZoneId().equals(ask.getArgument(1)))
+                            .findFirst());
+            when(zones.findByIdInOrderBySortOrderAscNameAsc(any())).thenAnswer(ask -> {
+                Collection<UUID> ids = ask.getArgument(0);
+                return Stream.of(hamra, verdun, jounieh).filter(z -> ids.contains(z.getId())).toList();
+            });
+        }
+
+        @Test
+        void are_exactly_the_areas_placement_serves_retired_ones_included() {
+            // Retired after the shop priced it: out of the picker, but a saved address that names
+            // it still orders there, so the map must still count it.
+            verdun.retire();
+            covers(hamra, verdun);
+
+            List<DeliveryZone> shown = service.servedAreasOf(store.getId());
+
+            assertThat(shown).extracting(DeliveryZone::getName).containsExactly("Hamra", "Verdun");
+            for (DeliveryZone area : List.of(hamra, verdun, jounieh)) {
+                assertThat(service.termsFor(store, area.getId()).served())
+                        .as("checkout serves %s exactly when the map lists it", area.getName())
+                        .isEqualTo(shown.contains(area));
+            }
+        }
+
+        @Test
+        void none_means_the_areas_do_not_limit_the_shop_not_that_it_goes_nowhere() {
+            covers();
+
+            assertThat(service.servedAreasOf(store.getId())).isEmpty();
+            // Every area is served, at the flat fee — what an empty list has to be read as.
+            assertThat(service.termsFor(store, jounieh.getId()).served()).isTrue();
+            verify(zones, never()).findByIdInOrderBySortOrderAscNameAsc(any());
         }
     }
 }

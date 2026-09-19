@@ -467,6 +467,7 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
           onSignOut: widget.onSignOut,
           onOpenBasket: _openBasket,
           onOpenGiftHub: _giftHubEntry,
+          connectivity: _online,
           neighbourhoodChatApi: widget.neighbourhoodChatApi,
           chatSocket: widget.chatSocket,
           // Built here because this is where the chat client and its socket live; Home hands it to
