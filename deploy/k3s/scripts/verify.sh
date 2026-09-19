@@ -172,6 +172,46 @@ grep -q 'Draining a dead-letter queue' README.md \
   && ok "the drain procedure is documented" \
   || fail "README.md documents no drain procedure"
 
+echo "== credentials stay out of the repository =="
+# 2026-09: the repository was public and carried working dev/qa credentials. These keep them out.
+realm=base/assets/keycloak/realm-delivery-platform.json
+# "value" also names protocol-mapper config values; only credentials and client secrets matter.
+cred_literals=$(awk '/"type": "password"/ { getline; if ($0 !~ /"value": "\$\{[A-Z][A-Z0-9_]*\}"/) n++ } END { print n + 0 }' "$realm")
+secret_literals=$(grep -E '"secret": "' "$realm" | grep -c -v -E '"secret": "\$\{[A-Z][A-Z0-9_]*\}"' || true)
+[ "$cred_literals" = 0 ] && [ "$secret_literals" = 0 ] \
+  && ok "the realm file's client secrets and passwords are all \${...} placeholders" \
+  || fail "the realm file carries $secret_literals literal client secret(s) and $cred_literals literal password(s)"
+# A placeholder Keycloak cannot resolve is imported as its own text, so every one must come from a
+# Secret on the keycloak container.
+for name in $(grep -o '"\${[A-Z][A-Z0-9_]*}"' "$realm" | tr -d '"${}' | sort -u); do
+  grep -A1 -- "- name: $name\$" base/identity.yaml | grep -q secretKeyRef \
+    && ok "placeholder $name is fed from a Secret" \
+    || fail "placeholder $name has no secretKeyRef on the keycloak container: it would import as literal text"
+done
+for secret in $( { grep -h -o 'secretKeyRef: { name: [a-z0-9-]*' base/*.yaml | awk '{print $4}'
+                   grep -h -A1 'secretKeyRef:$' base/*.yaml | grep -o 'name: [a-z0-9-]*' | awk '{print $2}'
+                   grep -h -o 'secret: [a-z0-9-]*' overlays/ingress.template.yaml | awk '{print $2}'; } | sort -u); do
+  [ "$secret" = anthropic-api ] && continue   # optional, created by hand (README.md)
+  grep -q -E "(mint|create secret generic) $secret( |\\\\|\$)" scripts/gen-secrets.sh \
+    && ok "Secret $secret is minted by gen-secrets.sh" \
+    || fail "Secret $secret is referenced but gen-secrets.sh never creates it"
+done
+grep -q -E '^\s+WHATSAPP_(APP_SECRET|VERIFY_TOKEN):' base/configmap-common.yaml \
+  && fail "platform-common carries a WhatsApp secret again" \
+  || ok "platform-common carries no WhatsApp secret"
+grep -r -l -E '\$(2[aby]|apr1)\$' base cluster overlays scripts >/dev/null 2>&1 \
+  && fail "a password hash is in the repository: $(grep -r -l -E '\$(2[aby]|apr1)\$' base cluster overlays scripts | tr '\n' ' ')" \
+  || ok "no password hash in base, cluster, overlays or scripts"
+grep -q 'keycloak\.client-secret=' base/assets/vault/bootstrap.sh \
+  && fail "vault/bootstrap.sh seeds a Keycloak client secret" \
+  || ok "the Vault seed carries no Keycloak client secret"
+grep -q -E 'tok (customer|rider|merchant|backoffice|carrier) [^)]' scripts/e2e-smoke.sh || grep -q -E 'password=[^$"]' scripts/e2e-smoke.sh \
+  && fail "scripts/e2e-smoke.sh carries a password" \
+  || ok "scripts/e2e-smoke.sh reads the demo logins from their Secret"
+for t in scripts/test/gen-secrets.test.sh scripts/test/e2e-smoke.test.sh; do
+  sh "$t" > "$tmp/test.out" 2>&1 && ok "$t" || { fail "$t:"; grep FAIL "$tmp/test.out"; }
+done
+
 echo
 if [ "$fails" -eq 0 ]; then
   echo "all checks passed"

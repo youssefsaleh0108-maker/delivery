@@ -6,6 +6,11 @@
 --
 -- Passwords here are LOCAL DEV ONLY. In staging and production these roles are created by
 -- Terraform and their passwords live in Vault, resolved through the Config Server (Section 6).
+--
+-- Not so in dev and qa: there, the services in use still log in with these role-derived passwords,
+-- which the repository published. Replacing them is the production secrets refactor's work (see
+-- deploy/k3s/README.md). What can be closed without it is closed below: the roles nothing logs in
+-- as cannot log in at all.
 
 \connect delivery
 
@@ -57,12 +62,22 @@ BEGIN
 END
 $$;
 
+-- No deployed service logs in as these three: identity_service and file_service own schemas that
+-- nothing connects to, and corebanking_simulator is dev-only and never deployed here. A login that
+-- works with a password printed above opens a door for nobody, so there is none. Give a role LOGIN
+-- and a password from a Secret on the day a service needs it.
+ALTER ROLE identity_service NOLOGIN PASSWORD NULL;
+ALTER ROLE file_service NOLOGIN PASSWORD NULL;
+ALTER ROLE corebanking_simulator NOLOGIN PASSWORD NULL;
+
 -- Read-only role for the Backoffice reconciliation views and for ad-hoc operator queries.
 -- Deliberately has no write grant anywhere.
+-- It cannot log in until an operator gives it a password of their own (ALTER ROLE ... LOGIN
+-- PASSWORD ...): the one this file used to set was published with the repository.
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'delivery_readonly') THEN
-        CREATE ROLE delivery_readonly LOGIN PASSWORD 'readonly_dev_pw';
+        CREATE ROLE delivery_readonly NOLOGIN;
     END IF;
 END
 $$;

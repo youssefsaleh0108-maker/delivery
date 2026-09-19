@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:mobile_app/main.dart' as app;
 
+import 'support/demo_logins.dart';
+
 // The rider's earnings screen, driven through the real app against the live dev backend.
 //
 // WHAT IS BEING GUARDED. `RiderBalance.available` is signed on purpose — a rider who is holding
@@ -23,7 +25,7 @@ import 'package:mobile_app/main.dart' as app;
 // it. This file feeds it the real ledger of a real account that is genuinely in the negative, so
 // the wiring itself is the thing under test.
 //
-// WHY IT IS NOT VACUOUS. The dev rider (rider/300003) is carrying cash: GET /api/rider/earnings
+// WHY IT IS NOT VACUOUS. The dev demo rider is carrying cash: GET /api/rider/earnings
 // answers `available: -110.39` with `cashFloatHeld: 110.39` for this account. Pre-fix, the balance
 // line rendered that raw figure and this account displayed "-110.39" to its owner. Every assertion
 // below is written so that reading fails it. That is also why the vacuity guards matter more than
@@ -232,7 +234,7 @@ void main() {
     // Six digits deliberately: the field carries FilteringTextInputFormatter.digitsOnly and a
     // six-character limit, and _submitCredentials refuses anything of a different length before it
     // makes a network call at all.
-    await tester.enterText(passcodeField, '300003');
+    await tester.enterText(passcodeField, DemoLogins.passwordOf('rider'));
     await tester.pump();
 
     // ensureVisible because the form lives in a CustomScrollView (sign_in_screen.dart:324) and the

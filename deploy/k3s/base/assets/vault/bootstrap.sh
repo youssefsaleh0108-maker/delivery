@@ -71,18 +71,18 @@ vault kv put secret/connector-settings spring.datasource.password="connector_set
 vault kv put secret/transfer-service   spring.datasource.password="transfer_service_dev_pw"
 
 # The notification layer. Both services own tables in the `notification` schema and share its
-# database role; the Keycloak client secret lets Notifications Manager read user contact details
-# through a service account scoped to view-users and nothing else.
+# database role. The Keycloak client secrets of notifications-manager and accounting-service are
+# NOT seeded here any more: they were literals in this file, published with the repository. Each
+# service now reads its own from the keycloak-clients Secret (services.yaml), the Secret the realm
+# import filled Keycloak from, so one value has one home and rotating it needs no Vault reseed.
 vault kv put secret/notifications-manager \
-  spring.datasource.password="notification_service_dev_pw" \
-  delivery.notifications.keycloak.client-secret="notifications-manager-dev-secret"
+  spring.datasource.password="notification_service_dev_pw"
 vault kv put secret/app-notification \
   spring.datasource.password="notification_service_dev_pw"
 
 # Phase 4. accounting-service holds business rules and a database; it never sees a bank credential.
 vault kv put secret/accounting-service \
-  spring.datasource.password="accounting_service_dev_pw" \
-  delivery.accounting.keycloak.client-secret="accounting-service-dev-secret"
+  spring.datasource.password="accounting_service_dev_pw"
 # Dev only - the simulator is never deployed to staging or production.
 vault kv put secret/corebanking-simulator \
   spring.datasource.password="corebanking_simulator_dev_pw"

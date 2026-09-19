@@ -10,6 +10,7 @@ import 'package:mobile_app/src/customer_shell.dart';
 import 'package:mobile_app/src/sign_in_screen.dart';
 
 import 'support/backend.dart';
+import 'support/demo_logins.dart';
 import 'support/journey.dart';
 
 /// The Butler errand page and the Google button, on a real phone against the dev backend.
@@ -128,7 +129,7 @@ void main() {
     // ============================================================ the customer reads and pays
 
     await app.main();
-    await signIn(tester, 'customer', '100001', expectedShell: CustomerShell);
+    await signIn(tester, 'customer', DemoLogins.passwordOf('customer'), expectedShell: CustomerShell);
 
     await tester.tap(find.descendant(
         of: find.byType(CustomerNavBar), matching: find.text(en.navButler)));

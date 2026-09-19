@@ -255,7 +255,7 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": true,
-      "secret": "notifications-manager-dev-secret",
+      "secret": "${NOTIFICATIONS_CLIENT_SECRET}",
       "protocol": "openid-connect"
     },
     {
@@ -269,7 +269,7 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": true,
-      "secret": "onboarding-service-dev-secret",
+      "secret": "${ONBOARDING_CLIENT_SECRET}",
       "protocol": "openid-connect"
     },
     {
@@ -283,7 +283,7 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": true,
-      "secret": "accounting-service-dev-secret",
+      "secret": "${ACCOUNTING_CLIENT_SECRET}",
       "protocol": "openid-connect"
     }
   ],
@@ -369,7 +369,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "100001",
+          "value": "${DEMO_CUSTOMER_PASSWORD}",
           "temporary": false
         }
       ],
@@ -402,7 +402,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "300003",
+          "value": "${DEMO_RIDER_PASSWORD}",
           "temporary": false
         }
       ],
@@ -435,7 +435,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "200002",
+          "value": "${DEMO_MERCHANT_PASSWORD}",
           "temporary": false
         }
       ],
@@ -468,7 +468,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "400004",
+          "value": "${DEMO_BACKOFFICE_PASSWORD}",
           "temporary": false
         }
       ],
@@ -487,7 +487,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "500005",
+          "value": "${DEMO_CARRIER_PASSWORD}",
           "temporary": false
         }
       ],

@@ -9,6 +9,7 @@ import 'package:mobile_app/src/my_orders_screen.dart';
 import 'package:mobile_app/src/order_details_screen.dart';
 
 import 'support/backend.dart';
+import 'support/demo_logins.dart';
 import 'support/journey.dart';
 
 /// **The customer watches their order move, without touching the phone.**
@@ -59,7 +60,7 @@ void main() {
     await Backend.putRiderBackInHouse(backofficeToken, Backend.subjectOf(riderToken));
 
     await app.main();
-    await signIn(tester, 'customer', '100001', expectedShell: CustomerShell);
+    await signIn(tester, 'customer', DemoLogins.passwordOf('customer'), expectedShell: CustomerShell);
 
     // Placed AFTER the customer is already looking at the app, which is the only way to prove the
     // list learned about it rather than merely having been built with it.

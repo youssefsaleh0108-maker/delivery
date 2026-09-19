@@ -29,7 +29,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/youssefsaleh0108-maker/delivery.git
+    repoURL: git@github.com:youssefsaleh0108-maker/delivery.git
     targetRevision: develop
     path: deploy/k3s/overlays/dev
   destination:
@@ -52,7 +52,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/youssefsaleh0108-maker/delivery.git
+    repoURL: git@github.com:youssefsaleh0108-maker/delivery.git
     targetRevision: qa
     path: deploy/k3s/overlays/qa
   destination:
