@@ -70,8 +70,10 @@ data:
   RIDER_CHANGE_LIMIT_LBP: "100000"
   SIMULATE_WALLETS: "true"
   WHATSAPP_SIMULATOR_ENABLED: "true"
-  WHATSAPP_APP_SECRET: local-webhook-secret
-  WHATSAPP_VERIFY_TOKEN: delivery-local-verify
+  # WHATSAPP_APP_SECRET and WHATSAPP_VERIFY_TOKEN are NOT here any more. They were literals in
+  # this file, so they were in the repository and in every pod on the platform, while only
+  # whatsapp-service reads them. They now come from the whatsapp-webhook Secret, minted per
+  # environment by gen-secrets.sh and referenced by whatsapp-service alone (services.yaml).
   WHATSAPP_OUTBOUND_URL: http://whatsapp-service:8116/simulator/outbound
   AUTO_APPROVE_RIDER: "false"
   AUTO_APPROVE_MERCHANT: "false"

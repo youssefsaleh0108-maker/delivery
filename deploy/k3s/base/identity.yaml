@@ -1,6 +1,8 @@
 # Keycloak, importing the realm on first boot against a fresh database — the realm file carries
 # the clients AND the demo logins (customer/rider/merchant/backoffice/carrier), so a new
-# environment is usable the moment this is Ready.
+# environment is usable the moment this is Ready. Their secrets and passwords are NOT in that
+# file: it holds `${VAR}` placeholders, filled from the keycloak-clients and demo-logins Secrets
+# below (see the comment on ONBOARDING_CLIENT_SECRET).
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -45,6 +47,37 @@ spec:
               value: "true"
             - name: KC_HEALTH_ENABLED
               value: "true"
+            # The values behind the realm file's placeholders. Keycloak substitutes `${NAME}` from
+            # THIS container's environment while it imports a realm at startup — and only then:
+            # ExportImportManager.runImportAtStartup switches keycloak.migration.replace-placeholders
+            # on, and a realm that already exists is skipped whole. So these matter once, when an
+            # environment is new; in a running environment they change nothing, and a secret is
+            # rotated through the admin API instead (scripts/rotate-secrets.sh).
+            #
+            # They used to be literals in the realm file, published with the repository: a client
+            # secret that holds BACKOFFICE, and every demo login's password.
+            #
+            # NOT optional, on purpose. An unresolved placeholder is not an error to Keycloak — it
+            # keeps the text — so a missing variable would import the literal string
+            # `${ONBOARDING_CLIENT_SECRET}` as the secret, a credential anyone who reads this file
+            # can use. Refusing to start without the Secret is the only safe failure. gen-secrets.sh
+            # mints both Secrets for a new environment.
+            - name: ONBOARDING_CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: keycloak-clients, key: ONBOARDING_CLIENT_SECRET } }
+            - name: ACCOUNTING_CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: keycloak-clients, key: ACCOUNTING_CLIENT_SECRET } }
+            - name: NOTIFICATIONS_CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: keycloak-clients, key: NOTIFICATIONS_CLIENT_SECRET } }
+            - name: DEMO_CUSTOMER_PASSWORD
+              valueFrom: { secretKeyRef: { name: demo-logins, key: customer } }
+            - name: DEMO_RIDER_PASSWORD
+              valueFrom: { secretKeyRef: { name: demo-logins, key: rider } }
+            - name: DEMO_MERCHANT_PASSWORD
+              valueFrom: { secretKeyRef: { name: demo-logins, key: merchant } }
+            - name: DEMO_BACKOFFICE_PASSWORD
+              valueFrom: { secretKeyRef: { name: demo-logins, key: backoffice } }
+            - name: DEMO_CARRIER_PASSWORD
+              valueFrom: { secretKeyRef: { name: demo-logins, key: carrier } }
           ports:
             - containerPort: 8080
             - containerPort: 9000
