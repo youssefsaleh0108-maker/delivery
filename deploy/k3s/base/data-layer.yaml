@@ -257,7 +257,10 @@ spec:
     spec:
       containers:
         - name: minio
-          image: minio/minio:latest
+          # Docker Hub stopped serving minio/*, and with :latest every restart tried to re-pull and
+          # would have failed, taking storage down. This is the exact build that was running, from
+          # quay.io, pinned by digest. Upgrade deliberately, by changing the digest.
+          image: quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
           args: ["server", "/data", "--console-address", ":9001"]
           env:
             - name: MINIO_ROOT_USER
@@ -302,11 +305,12 @@ spec:
 # always safe, but nothing runs it again on its own: a finished Job is immutable, Argo CD applies it
 # once and never re-runs it, and prune is off. So the name carries a suffix. Bump it whenever
 # assets/minio/bootstrap.sh changes, and each environment runs the script once more on its next
-# sync. -2 added the order-attachments bucket for service orders.
+# sync. Bump it too when the image changes, since that is also a Job spec change. -2 added the
+# order-attachments bucket for service orders; -3 moved the image to quay.io.
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: minio-init-2
+  name: minio-init-3
 spec:
   backoffLimit: 10
   template:
@@ -316,7 +320,9 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: mc
-          image: minio/mc:latest
+          # Docker Hub stopped serving minio/* (pulls fail with "repository does not exist").
+          # quay.io serves the same build, pinned by digest so the Job can never pull something else.
+          image: quay.io/minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
           command: ["/bin/sh", "/bootstrap/bootstrap.sh"]
           env:
             - name: MINIO_ROOT_USER
