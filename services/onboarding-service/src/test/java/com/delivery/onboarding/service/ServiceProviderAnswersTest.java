@@ -401,7 +401,8 @@ class ServiceProviderAnswersTest {
                     new AutoApprovalPolicy(false, false, false,
                             mock(AutoApprovalDecisionRepository.class),
                             mock(AutoApprovalAuditRepository.class)),
-                    mock(org.springframework.transaction.PlatformTransactionManager.class));
+                    mock(org.springframework.transaction.PlatformTransactionManager.class),
+                    mock(com.delivery.onboarding.domain.PartnerEditEntryRepository.class));
         }
 
         /** The open form's services application, with the email proof "email-proof". */

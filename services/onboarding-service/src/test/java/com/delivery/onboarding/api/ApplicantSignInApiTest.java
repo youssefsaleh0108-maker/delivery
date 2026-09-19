@@ -16,6 +16,7 @@ import com.delivery.onboarding.service.PartnerManagementService;
 import com.delivery.onboarding.service.PayoutDetailsService;
 import com.delivery.onboarding.service.VerificationService;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -71,6 +72,39 @@ class ApplicantSignInApiTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("account-exists"))
                 .andExpect(jsonPath("$.message").value("An account already uses this email address."));
+    }
+
+    @Test
+    @DisplayName("asking again once the sign-in is recorded is a 422 coded sign-in-exists, not bare English")
+    void the_sign_in_is_already_there() throws Exception {
+        doThrow(new AccountApplicationService.AccountRuleException(
+                AccountApplicationService.AccountRuleException.SIGN_IN_EXISTS,
+                "That application already has a sign-in."))
+                .when(onboarding).createApplicantAccount("ref-sam", "482910");
+
+        mvc.perform(post("/api/onboarding/applications/ref-sam/account")
+                        .contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("sign-in-exists"));
+    }
+
+    @Test
+    @DisplayName("a decided application, or one whose email backoffice changed, is refused by name too")
+    void the_other_refusals_are_coded() throws Exception {
+        // Literals, not the constants: these strings are what the app matches on.
+        assertThat(AccountApplicationService.AccountRuleException.SIGN_IN_EXISTS).isEqualTo("sign-in-exists");
+        assertThat(AccountApplicationService.AccountRuleException.APPLICATION_DECIDED)
+                .isEqualTo("application-decided");
+        assertThat(AccountApplicationService.AccountRuleException.EMAIL_CHANGED).isEqualTo("email-changed");
+        for (String code : new String[] {"application-decided", "email-changed"}) {
+            doThrow(new AccountApplicationService.AccountRuleException(code, "Refused."))
+                    .when(onboarding).createApplicantAccount("ref-sam", "482910");
+
+            mvc.perform(post("/api/onboarding/applications/ref-sam/account")
+                            .contentType(MediaType.APPLICATION_JSON).content(BODY))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.code").value(code));
+        }
     }
 
     @Test

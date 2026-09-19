@@ -177,8 +177,7 @@ public class ApplicationIntake {
             return application;
         }
         if (application.getApplicantUserRef() != null) {
-            throw new OnboardingService.ApplicationRuleException(
-                    "That application already has a sign-in");
+            throw OnboardingService.signInExists();
         }
         application.applicantAccountCreated(userRef);
         try {
@@ -187,10 +186,8 @@ public class ApplicationIntake {
             // One application per account: applicant_user_ref is unique. The caller checked before it
             // took an existing account up, so this is another application getting there first — and
             // to the applicant it means what that check means: the address has an account already.
-            throw new AccountApplicationService.AccountRuleException(
-                    AccountApplicationService.AccountRuleException.ACCOUNT_EXISTS,
-                    "An account already uses this email address. Sign in with it, or apply with a "
-                            + "different email.");
+            // The caller takes back what its take-up granted (OnboardingService.createApplicantAccount).
+            throw OnboardingService.accountExists();
         }
         return application;
     }

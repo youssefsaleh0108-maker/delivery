@@ -22,6 +22,9 @@ import com.delivery.onboarding.domain.OnboardingApplicationRepository;
  * <p>Idempotent by inspection: an account already recorded on the application is not created twice.
  * Camunda retries a failed job three times by default, and the second attempt after a timeout that
  * actually succeeded would otherwise fail on a duplicate username and strand the application.
+ *
+ * <p>It does not take APPLICANT away from an applicant's account: {@link ReleaseApplicant} does,
+ * once the partner record exists.
  */
 @Component("provisionAccount")
 public class ProvisionAccount implements JavaDelegate {
@@ -70,13 +73,23 @@ public class ProvisionAccount implements JavaDelegate {
         String applicantRef = application.getApplicantUserRef();
         if (applicantRef != null) {
             // They already hold the role they applied for — it was granted at sign-up so they could
-            // explore. Approval is the removal of APPLICANT, which is what the publish and claim
-            // endpoints refuse on. Granting the role again is harmless and kept for the case where
-            // an older applicant account predates that change.
+            // explore. Granting it again is harmless and kept for the case where an older applicant
+            // account predates that change.
+            //
+            // APPLICANT stays, for now. Taking it away is what lets the publish and claim endpoints
+            // through, so it is the process's last step that can fail (ReleaseApplicant), after the
+            // shop or the fleet exists. Here, it came before the rider was attached to their company:
+            // an attach that failed rolled the approval back and left an undecided account able to
+            // claim deliveries, for as long as nothing put APPLICANT back.
             keycloak.grantRealmRole(applicantRef, role);
-            keycloak.revokeRealmRole(applicantRef, "APPLICANT");
+            if (!ReleaseApplicant.comesLater(execution)) {
+                // An instance started before the release step existed runs its own, older definition
+                // to the end, and that one has no such step: take APPLICANT here, as it always did,
+                // or its partner would be approved and never able to act.
+                keycloak.revokeRealmRole(applicantRef, "APPLICANT");
+            }
             execution.setVariable("userRef", applicantRef);
-            log.info("Application {} approved; {} can now act, not just explore",
+            log.info("Application {} approved; {} keeps its role and is let act once set up",
                     applicationId, applicantRef);
             return;
         }

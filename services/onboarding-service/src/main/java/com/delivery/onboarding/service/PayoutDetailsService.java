@@ -86,7 +86,7 @@ public class PayoutDetailsService {
         // Neither the number nor the holder's name. The application reference is enough to find the
         // row, and whoever can find the row is already entitled to read it.
         log.info("Payout details recorded for application {} ({} per {})",
-                application.getReference(), outcome.state(), verifier.name());
+                application.getId(), outcome.state(), verifier.name());
         return details;
     }
 

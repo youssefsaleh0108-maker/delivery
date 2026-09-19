@@ -113,6 +113,16 @@ invent is the onboarding client secret, which must match what the realm import c
   `order-attachments` and `merchant-kyc` (private, presigned). `delivery-proof` and `receipts` stay
   unrouted because no service signs a URL into either yet; `scripts/verify.sh` checks both halves.
 - **The demo logins** come from the realm import: customer/rider/merchant/backoffice/carrier.
+- **The realm import runs only against a fresh database**, so a change to the realm file reaches an
+  environment that already has one only by hand. The user profile now declares
+  `onboardingApplicationId`, admin-only to view and to edit: onboarding-service stamps it on every
+  account it makes for an applicant's passcode, and finishes an interrupted sign-up only on an
+  account stamped for that application. Keycloak silently drops an undeclared attribute, so until
+  dev and qa declare it an interrupted sign-up is refused with `account-exists` (safe, but it cannot
+  be finished). In each environment's admin console: Realm settings → User profile → Create
+  attribute, name `onboardingApplicationId`, display name `Onboarding application`, not required,
+  and only admins may view or edit it. (Do not run `infra/keycloak/apply-realm-updates.sh` here: it
+  re-asserts the compose stack's dev client secrets.)
 - **order-manager's image** is the one Docker Hub pull (its own repo/pipeline); everything else
   pulls public GHCR packages.
 - **The portal** serves whatever is under `/opt/delivery/sites/<env>/portal` on the node — sync a

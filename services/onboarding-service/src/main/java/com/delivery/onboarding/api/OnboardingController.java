@@ -481,8 +481,11 @@ public class OnboardingController {
      *
      * <p>201 once the sign-in exists — also when an automatic approval behind it failed, which leaves
      * the application with a reviewer, not the applicant without a sign-in. 422 {@code account-exists}
-     * when the address belongs to another account; 503 {@code sign-in-unavailable} when the platform
-     * could not make one just now, where the same call again is safe and is what finishes it.
+     * when the address belongs to another account; {@code sign-in-exists} when this application's
+     * sign-in is already recorded, so the app signs them in; {@code application-decided} and
+     * {@code email-changed} when the application may not have one made at all. 503
+     * {@code sign-in-unavailable} when the platform could not make one just now, where the same call
+     * again is safe and is what finishes it.
      */
     @PostMapping("/applications/{reference}/account")
     public ResponseEntity<Void> createApplicantAccount(

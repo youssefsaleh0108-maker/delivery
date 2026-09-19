@@ -180,7 +180,7 @@ public class ApplicantDocumentService {
         documents.save(document);
 
         // The kind and the application, never the object key or anything from the file itself.
-        log.info("Document {} uploaded for application {}", kind, application.getReference());
+        log.info("Document {} uploaded for application {}", kind, application.getId());
         return document;
     }
 
