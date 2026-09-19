@@ -28,6 +28,7 @@ import com.delivery.notifications.domain.NotificationTemplateRepository;
 import com.delivery.notifications.link.NotificationLink;
 import com.delivery.notifications.link.NotificationLinkTarget;
 import com.delivery.platform.notifications.NotificationCommand;
+import com.delivery.platform.notifications.OneTimeCodes;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -43,15 +44,34 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * poison message or one slow channel back up every other channel behind it — head-of-line blocking
  * across SMS, email and push at once. One queue per channel, consumed by its own worker deployable,
  * means a stuck SMS route cannot delay an email.
+ *
+ * <p><strong>A one-time code is sent, never kept.</strong> The log row holds the text with the code
+ * masked, and only the command on the bus carries it, marked so the workers mask it too before they
+ * keep anything (see {@link OneTimeCodes}). The log used to hold every code in full, and back office
+ * reads the log: anybody with that role could ask for a code to any address, read it here, and set
+ * that account's passcode. {@link #CODE_PURPOSES} is the list of what carries one.
  */
 @Service
 public class NotificationDispatchService {
 
     private static final Logger log = LoggerFactory.getLogger(NotificationDispatchService.class);
 
+    /**
+     * Every purpose, or event type, whose message carries a one-time code: the address proof and the
+     * passcode reset Onboarding sends. Matched without regard to case or surrounding space, so a
+     * caller cannot get a code into the log by spelling its purpose differently.
+     *
+     * <p>A new message that carries a code must be added here, or its code is logged in full. No
+     * template row carries one today: every placeholder in V10 to V19 is an order, a shop or an
+     * amount.
+     */
+    static final Set<String> CODE_PURPOSES =
+            Set.of("onboarding.verification", "onboarding.password-reset");
+
     private final NotificationTemplateRepository templates;
     private final NotificationLogRepository logs;
     private final NotificationPreferenceService preferences;
+    private final TestCodeSink testCodes;
     private final RabbitTemplate rabbit;
     private final ObjectMapper objectMapper;
     private final String exchange;
@@ -74,6 +94,7 @@ public class NotificationDispatchService {
             NotificationTemplateRepository templates,
             NotificationLogRepository logs,
             NotificationPreferenceService preferences,
+            TestCodeSink testCodes,
             RabbitTemplate rabbit,
             ObjectMapper objectMapper,
             @Value("${delivery.outbox.exchange:delivery.events}") String exchange,
@@ -81,6 +102,7 @@ public class NotificationDispatchService {
         this.templates = templates;
         this.logs = logs;
         this.preferences = preferences;
+        this.testCodes = testCodes;
         this.rabbit = rabbit;
         this.objectMapper = objectMapper;
         this.exchange = exchange;
@@ -176,9 +198,11 @@ public class NotificationDispatchService {
                 continue;
             }
 
+            String subject = template.renderSubject(values);
+            String body = template.renderBody(values);
             NotificationLog entry = new NotificationLog(
                     orderId, recipientId, channel, recipient, eventType,
-                    template.renderSubject(values), template.renderBody(values), correlationId);
+                    forTheLog(eventType, subject), forTheLog(eventType, body), correlationId);
             entry.pointAt(linkFor(template, orderId, values).orElse(null));
             entry.dedupeOn(dedupeKey);
             logs.save(entry);
@@ -190,10 +214,21 @@ public class NotificationDispatchService {
             // the coupling the schema-per-service boundary exists to prevent. What "never leaves
             // the platform" buys IN_APP is that its recipient is a user id rather than a phone
             // number or a device token, not a shortcut past the bus.
-            publishAfterCommit(entry);
+            publishAfterCommit(entry, subject, body);
         }
 
         return created;
+    }
+
+    /** Whether messages of this purpose, or event type, carry a one-time code. */
+    static boolean carriesCode(String eventType) {
+        return eventType != null
+                && CODE_PURPOSES.contains(eventType.trim().toLowerCase(java.util.Locale.ROOT));
+    }
+
+    /** The text as the log row may keep it: with any one-time code masked. */
+    private static String forTheLog(String eventType, String text) {
+        return carriesCode(eventType) ? OneTimeCodes.mask(text) : text;
     }
 
     /**
@@ -278,14 +313,17 @@ public class NotificationDispatchService {
      * <p>Ordering matters: if the command went out first and the transaction then rolled back, a
      * connector could send a real SMS for a notification the platform has no record of — which is
      * unauditable and, for a paid provider, unaccounted spend.
+     *
+     * @param subject the text to deliver, which for a one-time code is not what the row holds
+     * @param body    likewise
      */
-    private void publishAfterCommit(NotificationLog entry) {
+    private void publishAfterCommit(NotificationLog entry, String subject, String body) {
         org.springframework.transaction.support.TransactionSynchronizationManager
                 .registerSynchronization(
                         new org.springframework.transaction.support.TransactionSynchronization() {
                             @Override
                             public void afterCommit() {
-                                send(entry);
+                                send(entry, subject, body);
                             }
                         });
     }
@@ -305,7 +343,9 @@ public class NotificationDispatchService {
      *
      * <p>The log row is still written first, on the same reasoning as everywhere else — the row is
      * what makes "the code never arrived" answerable, and its id is the idempotency key that stops a
-     * redelivered command sending a second copy.
+     * redelivered command sending a second copy. For a code it answers that question without the
+     * code: recipient, purpose, status and provider stay, and the code is masked in the subject and
+     * the body it keeps (see {@link #CODE_PURPOSES}).
      *
      * @param purpose what this is for, e.g. {@code onboarding.verification} — the event type on the
      *                row, so this traffic can be told apart from order mail when reading the log
@@ -358,10 +398,15 @@ public class NotificationDispatchService {
                            NotificationLink link) {
         NotificationLog entry = new NotificationLog(
                 null, recipientId == null || recipientId.isBlank() ? ANONYMOUS_RECIPIENT : recipientId,
-                channel, recipient, purpose, subject, body, correlationId);
+                channel, recipient, purpose,
+                forTheLog(purpose, subject), forTheLog(purpose, body), correlationId);
         entry.pointAt(link);
         logs.saveAndFlush(entry);
-        send(entry);
+        if (carriesCode(purpose)) {
+            // Keeps nothing unless the sink is on and the address is on the reserved test domain.
+            testCodes.capture(channel, recipient, purpose, subject, body);
+        }
+        send(entry, subject, body);
         // The address is deliberately absent from this line. A one-time code is sent to prove an
         // address, which means the address is the thing worth not scattering through log files.
         log.info("Direct {} queued for {} as {}", channel, purpose, entry.getId());
@@ -371,7 +416,14 @@ public class NotificationDispatchService {
     /** Marks a log row as addressed to somebody with no account, rather than inventing a user id. */
     public static final String ANONYMOUS_RECIPIENT = "anonymous";
 
-    private void send(NotificationLog entry) {
+    /**
+     * Hands one message to its channel's worker.
+     *
+     * @param subject the text to deliver: the log row's own, except for a one-time code, which the
+     *                row holds masked
+     * @param body    likewise
+     */
+    private void send(NotificationLog entry, String subject, String body) {
         try {
             // Context the channel needs but the rendered text does not carry: the push worker
             // builds its deep link from orderId, and App Notification files the message under its
@@ -408,12 +460,19 @@ public class NotificationDispatchService {
             // Note there is no hostname in any of it, and that is the point — see NotificationLink.
             entry.link().ifPresent(link -> link.writeTo(metadata));
 
+            // The mark that tells every worker downstream to mask the code before it keeps a copy
+            // of this command — in the dead-letter queue, or in a log line. The code itself is only
+            // ever in the subject and body, which have to carry it: that is the message.
+            if (carriesCode(entry.getEventType())) {
+                metadata.put(OneTimeCodes.FLAG, "true");
+            }
+
             NotificationCommand command = new NotificationCommand(
                     entry.getId().toString(),
                     entry.getChannel(),
                     entry.getRecipient(),
-                    entry.getSubject(),
-                    entry.getBody(),
+                    subject,
+                    body,
                     metadata,
                     entry.getCorrelationId(),
                     Instant.now());

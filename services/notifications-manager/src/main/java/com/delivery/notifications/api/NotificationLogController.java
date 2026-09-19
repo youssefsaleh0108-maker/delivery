@@ -21,6 +21,10 @@ import com.delivery.platform.security.CurrentUser;
  * failure reason and which provider it went through — that is the whole point of keeping the log.
  * A customer can see only their own, and only that it was sent: exposing "SMTP relay rejected
  * 550 mailbox full" to an end user leaks infrastructure detail and helps nobody.
+ *
+ * <p>Neither view can show a one-time code, because no row holds one: the dispatch service masks it
+ * before the row is written. {@code /recipients/anonymous} used to list every verification and
+ * passcode-reset code sent, which let back office take any account it could name.
  */
 @RestController
 @RequestMapping("/api/notification-log")
