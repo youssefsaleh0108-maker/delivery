@@ -21314,6 +21314,90 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'To finish setting up your sign-in, confirm your email once more. It keeps anyone else from choosing your passcode.'**
   String get wizAccountConfirmAgain;
+
+  /// No description provided for @isrchSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search shops, cuisines and items'**
+  String get isrchSearchHint;
+
+  /// No description provided for @isrchNearTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Items in shops near you'**
+  String get isrchNearTitle;
+
+  /// No description provided for @isrchAnywhereTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Items in shops'**
+  String get isrchAnywhereTitle;
+
+  /// No description provided for @isrchSeeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'See all items'**
+  String get isrchSeeAll;
+
+  /// No description provided for @isrchFieldHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search items in shops'**
+  String get isrchFieldHint;
+
+  /// No description provided for @isrchEmptyNear.
+  ///
+  /// In en, this message translates to:
+  /// **'No open shop near you has “{query}” right now'**
+  String isrchEmptyNear(String query);
+
+  /// No description provided for @isrchEmptyAnywhere.
+  ///
+  /// In en, this message translates to:
+  /// **'No open shop has “{query}” right now'**
+  String isrchEmptyAnywhere(String query);
+
+  /// No description provided for @isrchEmptyTruncated.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Only the best match was checked.} other{Only the {count} best matches were checked.}}'**
+  String isrchEmptyTruncated(int count);
+
+  /// No description provided for @isrchNotByDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Your address has no map pin, so shops aren\'t sorted by distance.'**
+  String get isrchNotByDistance;
+
+  /// No description provided for @isrchMoreInStore.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 more in this shop} other{{count} more in this shop}}'**
+  String isrchMoreInStore(int count);
+
+  /// No description provided for @isrchCouldNotSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t search items just now.'**
+  String get isrchCouldNotSearch;
+
+  /// No description provided for @isrchTypeMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Type at least 2 letters to search items.'**
+  String get isrchTypeMore;
+
+  /// No description provided for @isrchSearching.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching items'**
+  String get isrchSearching;
+
+  /// No description provided for @isrchUseFewerWords.
+  ///
+  /// In en, this message translates to:
+  /// **'Use up to 5 words to search items.'**
+  String get isrchUseFewerWords;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

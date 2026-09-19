@@ -704,44 +704,10 @@ public class StoreController {
 
     // ---------------------------------------------------------------- mapping
 
+    /** A shop's card, as every list draws it ({@link StoreCards}). */
     private StoreCardResponse toCard(StoreView v, Set<UUID> starred,
                                      Map<UUID, List<StoreOffer>> offersByStore) {
-        Store store = v.store();
-        List<StoreOffer> storeOffers = offersByStore.getOrDefault(store.getId(), List.of());
-        // Both sizes come out of one lookup per slot, so the storefront grid costs exactly the
-        // metadata queries it did before.
-        ImageUrl logo = images.resolveImage(store.getLogoRef());
-        ImageUrl cover = images.resolveImage(store.getCoverRef());
-        return new StoreCardResponse(
-                store.getId(),
-                store.getSlug(),
-                store.getName(),
-                store.getVertical(),
-                store.getTagline(),
-                store.getTags(),
-                store.getRating(),
-                store.getRatingCount(),
-                store.getDeliveryFee(),
-                store.getMinOrder(),
-                store.getEtaMinMinutes(),
-                store.getEtaMaxMinutes(),
-                v.availability(),
-                ImageUrl.fullOf(logo),
-                ImageUrl.fullOf(cover),
-                ImageUrl.thumbOf(logo),
-                ImageUrl.thumbOf(cover),
-                starred.contains(store.getId()),
-                storeOffers.isEmpty() ? null : toOffer(storeOffers.get(0)),
-                store.getNeighborhood(),
-                store.isVerifiedLocal(),
-                store.getPowerStatus(),
-                store.getPowerNote(),
-                store.getPowerUpdatedAt(),
-                v.powerCurrent(),
-                store.getLatitude(),
-                store.getLongitude(),
-                store.getDeliveryRadiusMetres(),
-                store.getServiceCategory());
+        return StoreCards.of(v, starred, offersByStore, images);
     }
 
     private StoreResponse toResponse(StoreView v, Set<UUID> starred) {
@@ -787,15 +753,7 @@ public class StoreController {
     }
 
     private static OfferResponse toOffer(StoreOffer offer) {
-        return new OfferResponse(
-                offer.getId(),
-                offer.getStoreId(),
-                offer.getKind(),
-                offer.getTitle(),
-                offer.getSubtitle(),
-                offer.getValue(),
-                offer.getMinSubtotal(),
-                offer.getEndsAt());
+        return StoreCards.offer(offer);
     }
 
     /**

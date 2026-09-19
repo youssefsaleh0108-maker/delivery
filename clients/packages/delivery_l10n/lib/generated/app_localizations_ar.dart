@@ -12712,4 +12712,76 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get wizAccountConfirmAgain =>
       'لإكمال إعداد تسجيل الدخول، أكّد بريدك الإلكتروني مرة أخرى. هكذا لا يستطيع أحد غيرك اختيار رمز دخولك.';
+
+  @override
+  String get isrchSearchHint => 'ابحث عن متاجر وأطباق وأصناف';
+
+  @override
+  String get isrchNearTitle => 'أصناف في متاجر قريبة منك';
+
+  @override
+  String get isrchAnywhereTitle => 'أصناف في المتاجر';
+
+  @override
+  String get isrchSeeAll => 'عرض كل الأصناف';
+
+  @override
+  String get isrchFieldHint => 'ابحث عن صنف في المتاجر';
+
+  @override
+  String isrchEmptyNear(String query) {
+    return 'لا يتوفر «$query» الآن في أي متجر مفتوح قريب منك';
+  }
+
+  @override
+  String isrchEmptyAnywhere(String query) {
+    return 'لا يتوفر «$query» الآن في أي متجر مفتوح';
+  }
+
+  @override
+  String isrchEmptyTruncated(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'لم نفحص إلا أفضل $count نتيجة.',
+      many: 'لم نفحص إلا أفضل $count نتيجةً.',
+      few: 'لم نفحص إلا أفضل $count نتائج.',
+      two: 'لم نفحص إلا أفضل نتيجتين.',
+      one: 'لم نفحص إلا أفضل نتيجة.',
+      zero: 'لم نفحص أي نتيجة.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get isrchNotByDistance =>
+      'عنوانك غير محدد على الخريطة، لذا لم تُرتَّب المتاجر حسب المسافة.';
+
+  @override
+  String isrchMoreInStore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count صنف آخر في هذا المتجر',
+      many: '$count صنفًا آخر في هذا المتجر',
+      few: '$count أصناف أخرى في هذا المتجر',
+      two: 'صنفان آخران في هذا المتجر',
+      one: 'صنف آخر في هذا المتجر',
+      zero: 'لا مزيد في هذا المتجر',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get isrchCouldNotSearch => 'تعذّر البحث عن الأصناف الآن.';
+
+  @override
+  String get isrchTypeMore => 'اكتب حرفين على الأقل للبحث عن الأصناف.';
+
+  @override
+  String get isrchSearching => 'جارٍ البحث عن الأصناف';
+
+  @override
+  String get isrchUseFewerWords =>
+      'استخدم خمس كلمات على الأكثر للبحث عن الأصناف.';
 }

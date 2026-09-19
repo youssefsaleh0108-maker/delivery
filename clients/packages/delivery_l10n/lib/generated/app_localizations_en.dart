@@ -12566,4 +12566,67 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get wizAccountConfirmAgain =>
       'To finish setting up your sign-in, confirm your email once more. It keeps anyone else from choosing your passcode.';
+
+  @override
+  String get isrchSearchHint => 'Search shops, cuisines and items';
+
+  @override
+  String get isrchNearTitle => 'Items in shops near you';
+
+  @override
+  String get isrchAnywhereTitle => 'Items in shops';
+
+  @override
+  String get isrchSeeAll => 'See all items';
+
+  @override
+  String get isrchFieldHint => 'Search items in shops';
+
+  @override
+  String isrchEmptyNear(String query) {
+    return 'No open shop near you has “$query” right now';
+  }
+
+  @override
+  String isrchEmptyAnywhere(String query) {
+    return 'No open shop has “$query” right now';
+  }
+
+  @override
+  String isrchEmptyTruncated(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Only the $count best matches were checked.',
+      one: 'Only the best match was checked.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get isrchNotByDistance =>
+      'Your address has no map pin, so shops aren\'t sorted by distance.';
+
+  @override
+  String isrchMoreInStore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count more in this shop',
+      one: '1 more in this shop',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get isrchCouldNotSearch => 'We couldn\'t search items just now.';
+
+  @override
+  String get isrchTypeMore => 'Type at least 2 letters to search items.';
+
+  @override
+  String get isrchSearching => 'Searching items';
+
+  @override
+  String get isrchUseFewerWords => 'Use up to 5 words to search items.';
 }
