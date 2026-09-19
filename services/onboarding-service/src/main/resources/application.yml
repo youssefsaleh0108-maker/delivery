@@ -148,9 +148,11 @@ delivery:
       - /api/onboarding/applications/by-reference/**
       # Choosing a passcode at the end of an application. Open for the same reason: the account it
       # creates is the one the caller would otherwise need in order to call this at all. The
-      # reference in the path is what stands in for a token, and the address it belongs to was
-      # already proved with a code. /applications/mine is deliberately NOT here — it is keyed on
-      # the caller.
+      # reference in the path only names the application — back office and delivery companies see
+      # it, and access logs keep this path. What stands in for a token is in the body: the
+      # account-setup ticket the submission answered with, or a fresh code answered on the
+      # application's address. /applications/mine is deliberately NOT here — it is keyed on the
+      # caller.
       - /api/onboarding/applications/*/account
       # Proving an address or a number belongs to you, which by definition happens before there is
       # an account to authenticate with. These two send real messages to addresses strangers type,

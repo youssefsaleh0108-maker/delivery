@@ -433,10 +433,10 @@ class ServiceProviderAnswersTest {
             intake = mock(ApplicationIntake.class);
             verifications = mock(VerificationService.class);
             when(intake.record(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
-                    .thenAnswer(call -> new OnboardingApplication(call.getArgument(0),
-                            call.getArgument(1), call.getArgument(2), call.getArgument(3),
-                            Instant.now(), null, null, null,
-                            call.<Checked>getArgument(8).details(), null));
+                    .thenAnswer(call -> new ApplicationIntake.Recorded(new OnboardingApplication(
+                            call.getArgument(0), call.getArgument(1), call.getArgument(2),
+                            call.getArgument(3), Instant.now(), null, null, null,
+                            call.<Checked>getArgument(8).details(), null), "account-ticket"));
             RuntimeService runtime = mock(RuntimeService.class);
             ProcessInstance started = mock(ProcessInstance.class);
             when(started.getId()).thenReturn("process-1");
@@ -457,7 +457,7 @@ class ServiceProviderAnswersTest {
                                                        String phoneProof) {
             return onboarding.submit(Kind.MERCHANT, "Al Fakhry Press", "Sam Salem",
                     "sam@example.test", "email-proof", phone, phoneProof, null,
-                    services(category, area(HAMRA, "Hamra")), null);
+                    services(category, area(HAMRA, "Hamra")), null).application();
         }
 
         private void emailProved() {

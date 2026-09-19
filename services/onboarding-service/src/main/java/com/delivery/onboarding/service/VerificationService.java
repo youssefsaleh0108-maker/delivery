@@ -398,6 +398,33 @@ public class VerificationService {
                 .isPresent();
     }
 
+    /**
+     * Whether a sign-up proof for this address was earned recently, without spending it.
+     *
+     * <p>For the passcode step, which accepts a code answered on the application's address in place
+     * of an account-setup ticket that expired. A confirmed proof otherwise lives until it is spent —
+     * right for a form somebody takes ten minutes over, wrong for something that sets a passcode: the
+     * proof has to say somebody holds the inbox now, not that somebody once did.
+     *
+     * @param within how long ago it may have been confirmed
+     */
+    @Transactional(readOnly = true)
+    public boolean isFreshlyVerified(String token, Channel channel, String destination,
+                                     Duration within) {
+        if (token == null || token.isBlank()) {
+            return false;
+        }
+        Instant since = Instant.now().minus(within);
+        return verifications.findByToken(token)
+                .filter(ContactVerification::isUsable)
+                .filter(v -> v.getChannel() == channel)
+                .filter(v -> v.getPurpose() == Purpose.SIGNUP)
+                .filter(v -> v.getConfirmedAt().isAfter(since))
+                .filter(v -> normaliseQuietly(channel, destination)
+                        .map(v.getDestination()::equals).orElse(false))
+                .isPresent();
+    }
+
     // ---------------------------------------------------------------- shaping
 
     /**

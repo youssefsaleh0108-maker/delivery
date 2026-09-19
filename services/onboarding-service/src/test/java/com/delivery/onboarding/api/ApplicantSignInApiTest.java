@@ -33,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class ApplicantSignInApiTest {
 
-    private static final String BODY = "{\"password\":\"482910\"}";
+    private static final String BODY = "{\"password\":\"482910\",\"accountTicket\":\"ticket-sam\"}";
 
     private OnboardingService onboarding;
     private MockMvc mvc;
@@ -50,13 +50,58 @@ class ApplicantSignInApiTest {
     }
 
     @Test
-    @DisplayName("201 once the sign-in exists")
+    @DisplayName("201 once the sign-in exists, with the ticket taken from the body")
     void made() throws Exception {
         mvc.perform(post("/api/onboarding/applications/ref-sam/account")
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isCreated());
 
-        verify(onboarding).createApplicantAccount("ref-sam", "482910");
+        verify(onboarding).createApplicantAccount("ref-sam", "482910", "ticket-sam", null);
+    }
+
+    @Test
+    @DisplayName("an email proof in the body reaches the service in the ticket's place")
+    void an_email_proof_instead() throws Exception {
+        mvc.perform(post("/api/onboarding/applications/ref-sam/account")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"482910\",\"emailVerificationToken\":\"proof-sam\"}"))
+                .andExpect(status().isCreated());
+
+        verify(onboarding).createApplicantAccount("ref-sam", "482910", null, "proof-sam");
+    }
+
+    @Test
+    @DisplayName("the reference alone is a 422 coded sign-in-proof-missing, whose words tell an old app's user to update")
+    void the_reference_alone() throws Exception {
+        assertThat(AccountApplicationService.AccountRuleException.SIGN_IN_PROOF_MISSING)
+                .isEqualTo("sign-in-proof-missing");
+        doThrow(new AccountApplicationService.AccountRuleException("sign-in-proof-missing",
+                "This version of the app can no longer finish setting up a sign-in. Please update "
+                        + "the app and try again."))
+                .when(onboarding).createApplicantAccount("ref-sam", "482910", null, null);
+
+        // Exactly what an installed copy of the app sends: the passcode and nothing else.
+        mvc.perform(post("/api/onboarding/applications/ref-sam/account")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"password\":\"482910\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("sign-in-proof-missing"))
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.containsString("update the app")));
+    }
+
+    @Test
+    @DisplayName("a ticket that is wrong, spent or late is a 422 coded sign-in-proof-rejected")
+    void a_rejected_ticket() throws Exception {
+        assertThat(AccountApplicationService.AccountRuleException.SIGN_IN_PROOF_REJECTED)
+                .isEqualTo("sign-in-proof-rejected");
+        doThrow(new AccountApplicationService.AccountRuleException("sign-in-proof-rejected",
+                "That confirmation has expired or was already used."))
+                .when(onboarding).createApplicantAccount("ref-sam", "482910", "ticket-sam", null);
+
+        mvc.perform(post("/api/onboarding/applications/ref-sam/account")
+                        .contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("sign-in-proof-rejected"));
     }
 
     @Test
@@ -65,7 +110,7 @@ class ApplicantSignInApiTest {
         doThrow(new AccountApplicationService.AccountRuleException(
                 AccountApplicationService.AccountRuleException.ACCOUNT_EXISTS,
                 "An account already uses this email address."))
-                .when(onboarding).createApplicantAccount("ref-sam", "482910");
+                .when(onboarding).createApplicantAccount("ref-sam", "482910", "ticket-sam", null);
 
         mvc.perform(post("/api/onboarding/applications/ref-sam/account")
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
@@ -80,7 +125,7 @@ class ApplicantSignInApiTest {
         doThrow(new AccountApplicationService.AccountRuleException(
                 AccountApplicationService.AccountRuleException.SIGN_IN_EXISTS,
                 "That application already has a sign-in."))
-                .when(onboarding).createApplicantAccount("ref-sam", "482910");
+                .when(onboarding).createApplicantAccount("ref-sam", "482910", "ticket-sam", null);
 
         mvc.perform(post("/api/onboarding/applications/ref-sam/account")
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
@@ -98,7 +143,7 @@ class ApplicantSignInApiTest {
         assertThat(AccountApplicationService.AccountRuleException.EMAIL_CHANGED).isEqualTo("email-changed");
         for (String code : new String[] {"application-decided", "email-changed"}) {
             doThrow(new AccountApplicationService.AccountRuleException(code, "Refused."))
-                    .when(onboarding).createApplicantAccount("ref-sam", "482910");
+                    .when(onboarding).createApplicantAccount("ref-sam", "482910", "ticket-sam", null);
 
             mvc.perform(post("/api/onboarding/applications/ref-sam/account")
                             .contentType(MediaType.APPLICATION_JSON).content(BODY))
@@ -113,7 +158,7 @@ class ApplicantSignInApiTest {
         doThrow(new OnboardingService.SignInUnavailableException(
                 "Your sign-in could not be set up just now. Please try again in a minute.",
                 new IllegalStateException("Keycloak refused a service-account token")))
-                .when(onboarding).createApplicantAccount("ref-sam", "482910");
+                .when(onboarding).createApplicantAccount("ref-sam", "482910", "ticket-sam", null);
 
         mvc.perform(post("/api/onboarding/applications/ref-sam/account")
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
@@ -121,5 +166,29 @@ class ApplicantSignInApiTest {
                 .andExpect(jsonPath("$.code").value("sign-in-unavailable"))
                 .andExpect(jsonPath("$.message").value(
                         "Your sign-in could not be set up just now. Please try again in a minute."));
+    }
+
+    @Test
+    @DisplayName("a rejection that lost to the applicant's sign-in on the row's version is a 409, not a bare 500")
+    void a_version_conflict() throws Exception {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken(
+                        org.springframework.security.oauth2.jwt.Jwt.withTokenValue("token")
+                                .header("alg", "none").subject("reviewer-1").build(),
+                        java.util.List.of()));
+        try {
+            doThrow(new org.springframework.orm.ObjectOptimisticLockingFailureException(
+                    "OnboardingApplication", id))
+                    .when(onboarding).reject(id, "reviewer-1", "Not taking riders there");
+
+            mvc.perform(post("/api/onboarding/applications/{id}/reject", id)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"reason\":\"Not taking riders there\"}"))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("application-changed"));
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
     }
 }

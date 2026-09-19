@@ -1,5 +1,6 @@
 package com.delivery.onboarding.service;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -10,6 +11,7 @@ import org.camunda.bpm.engine.TaskService;
 import org.camunda.bpm.engine.task.Task;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -152,6 +154,26 @@ public class OnboardingService {
         }
     }
 
+    /**
+     * What the applicant showed at the passcode step to prove the application is theirs.
+     *
+     * <p>The account-setup ticket the submission answered with, or — once that is lost or expired — a
+     * code answered on the application's address in the last half hour. Either is spent with the
+     * sign-in it sets up ({@link ApplicationIntake#attachApplicantAccount}).
+     *
+     * @param emailToken the email proof when that is what was shown; null for the ticket
+     */
+    public record SignInProof(String emailToken) {
+
+        static final SignInProof TICKET = new SignInProof(null);
+
+        /** Never the token: a record's generated toString would put it in any log that printed one. */
+        @Override
+        public String toString() {
+            return emailToken == null ? "SignInProof[ticket]" : "SignInProof[email code]";
+        }
+    }
+
     // ---------------------------------------------------------------- applying
 
     /**
@@ -176,13 +198,16 @@ public class OnboardingService {
      * company has to be hiring, and its region is what the application records in place of any area
      * the app sent (see {@link CompanyRiderAnswers}). The proofs are looked at first for the same
      * reason, so a made-up application costs Order Manager nothing either.
+     *
+     * @return the application and its account-setup ticket, which the submitter alone is answered
+     *         with — the passcode step asks for it ({@link #createApplicantAccount})
      */
-    public OnboardingApplication submit(OnboardingApplication.Kind kind, String businessName,
-                                        String contactName, String contactEmail,
-                                        String emailVerificationToken, String contactPhone,
-                                        String phoneVerificationToken, String notes,
-                                        Map<String, Object> details,
-                                        UUID targetProviderId) {
+    public ApplicationIntake.Recorded submit(OnboardingApplication.Kind kind, String businessName,
+                                             String contactName, String contactEmail,
+                                             String emailVerificationToken, String contactPhone,
+                                             String phoneVerificationToken, String notes,
+                                             Map<String, Object> details,
+                                             UUID targetProviderId) {
 
         if (ServiceProviderAnswers.isServices(details)
                 || CompanyRiderAnswers.namesACompany(kind, targetProviderId)) {
@@ -192,9 +217,9 @@ public class OnboardingService {
         // nowhere else: not into a log line, not into a process variable.
         ServiceProviderAnswers.Checked checked = services.checked(kind, details, targetProviderId);
 
-        OnboardingApplication application;
+        ApplicationIntake.Recorded recorded;
         try {
-            application = intake.record(
+            recorded = intake.record(
                     kind, businessName, contactName, contactEmail, emailVerificationToken,
                     contactPhone, phoneVerificationToken, notes, checked, targetProviderId);
         } catch (IllegalArgumentException e) {
@@ -202,15 +227,17 @@ public class OnboardingService {
             // on; an unhandled 500 is not.
             throw new ApplicationRuleException(e.getMessage());
         }
+        OnboardingApplication application = recorded.application();
 
         startReview(application);
 
-        // By id, never by reference, here and on every line below: the reference is what finishes
-        // a sign-in nobody has made yet (createApplicantAccount), so a log reader holding one could
-        // set their own passcode on somebody else's application.
+        // By id, never by reference, here and on every line below. The reference no longer opens
+        // anything that acts — the passcode step asks for the ticket — but it still ties a line to
+        // a person for anybody holding a support email, which a log has no reason to. The ticket
+        // itself never reaches a log at all.
         log.info("Application {} submitted: {} as {}",
                 application.getId(), application.getBusinessName(), kind);
-        return application;
+        return recorded;
     }
 
     /**
@@ -496,13 +523,25 @@ public class OnboardingService {
      * <p>Creates the Keycloak account, records it against the application, and leaves the decision
      * untouched — the account holds APPLICANT beside the role applied for until somebody approves.
      *
-     * <p>Keyed on the reference rather than on a token, for the same reason the status lookup is:
-     * there is no caller identity yet. The reference is 160 bits, was handed to one person, and the
-     * address on the application was already proved with a code, so this cannot mint an account on
-     * an address the applicant does not control. That last part is checked rather than assumed,
-     * because backoffice can correct a contact email without any code ({@link #onTheProvedAddress}):
-     * an application whose address changed since it was proved gets no sign-in at all, and neither
-     * does one somebody already decided.
+     * <p><strong>The reference names the application; it does not prove it is yours.</strong> There
+     * is no caller identity yet, and the reference used to stand in for one — "160 bits, handed to one
+     * person". It was never only theirs: back office reads it on every application, a delivery
+     * company on every rider applying to it (the company's listing and its portal print it), and it
+     * rides in this very path, which access logs keep. So a company could set its own passcode on an
+     * applicant's unfinished sign-in, or on the leftover account a failed attempt left stamped for the
+     * application, and then approve the rider it had just signed in as.
+     *
+     * <p>So this takes a secret as well ({@link #requireProof}), and judges it before anything about
+     * the application is answered and before Keycloak is asked anything: the account-setup ticket the
+     * submission answered with, or a code answered on the application's address in the last half
+     * hour. Neither is in a URL, and neither is logged. An app too old to send one is refused in words
+     * that tell its user to update ({@code sign-in-proof-missing}); a ticket that is wrong, spent or
+     * late, or a proof that is stale, is {@code sign-in-proof-rejected}, and the app asks for a code.
+     *
+     * <p>The address on the application was proved with a code at submission, and that is checked
+     * rather than assumed, because backoffice can correct a contact email without any code
+     * ({@link #onTheProvedAddress}): an application whose address changed since it was proved gets no
+     * sign-in at all, and neither does one somebody already decided.
      *
      * <p><strong>Deliberately NOT transactional</strong>, for the reason {@link #submit} is not. The
      * sign-in is recorded by {@link ApplicationIntake#attachApplicantAccount}, which commits on its
@@ -518,15 +557,22 @@ public class OnboardingService {
      * {@code sign-in-exists}, so the app sends the applicant to sign in. Anything on the platform's
      * side — Keycloak unreachable or refusing this service's token, the record not saving — is logged
      * here with its cause and answers {@code sign-in-unavailable}, and trying again is safe: an
-     * account a failed attempt created is taken up by the next one ({@link #resumableAccount}).
+     * account a failed attempt created is taken up by the next one ({@link #resumableAccount}), and
+     * the ticket or proof is spent only by the attempt that records the sign-in.
+     *
+     * @param accountTicket the ticket the submission answered with, or null
+     * @param emailProof    a proof from {@code POST /verifications/confirm} on the application's
+     *                      address, or null — what an applicant whose ticket is gone sends instead
      */
-    public void createApplicantAccount(String reference, String password) {
+    public void createApplicantAccount(String reference, String password, String accountTicket,
+                                       String emailProof) {
         OnboardingApplication application = null;
         OnboardingApplication recorded;
         try {
             application = applications.findByReference(reference)
                     .orElseThrow(() -> new ApplicationRuleException("No application with that reference"));
-            recorded = recordSignIn(application, password);
+            SignInProof proof = requireProof(application, accountTicket, emailProof);
+            recorded = recordSignIn(application, password, proof);
         } catch (ApplicationRuleException e) {
             throw e;
         } catch (RuntimeException e) {
@@ -556,6 +602,39 @@ public class OnboardingService {
     }
 
     /**
+     * The applicant's proof that this application is theirs: the first thing judged, before anything
+     * about the application is answered and before Keycloak is asked anything.
+     *
+     * <p>A valid ticket is enough, and so is a fresh proof for the application's address when the
+     * ticket is not; a caller holding neither has shown nothing but the reference, which is not a
+     * secret. One answer about the application itself does come from here, to a ticket's holder only:
+     * a ticket that is this application's and was spent by the sign-in the application now records is
+     * the retry of an attempt whose answer was lost, or the second of two taps, and it is told
+     * {@code sign-in-exists} — the same answer it gets when it arrives a moment earlier, before the
+     * first attempt recorded anything.
+     */
+    private SignInProof requireProof(OnboardingApplication application, String accountTicket,
+                                     String emailProof) {
+        OnboardingApplication.TicketCheck ticket =
+                application.checkAccountTicket(accountTicket, Instant.now());
+        if (ticket == OnboardingApplication.TicketCheck.VALID) {
+            return SignInProof.TICKET;
+        }
+        if (emailProof != null && !emailProof.isBlank()
+                && verifications.isFreshlyVerified(emailProof, Channel.EMAIL,
+                        application.getContactEmail(), OnboardingApplication.ACCOUNT_TICKET_LIFETIME)) {
+            return new SignInProof(emailProof);
+        }
+        if (ticket == OnboardingApplication.TicketCheck.SPENT
+                && application.getApplicantUserRef() != null) {
+            throw signInExists();
+        }
+        boolean showedNothing = (accountTicket == null || accountTicket.isBlank())
+                && (emailProof == null || emailProof.isBlank());
+        throw showedNothing ? proofMissing() : proofRejected();
+    }
+
+    /**
      * Makes the applicant's account — or takes up the one an earlier attempt left — and records it
      * against their application. Returns the application as committed.
      *
@@ -571,14 +650,13 @@ public class OnboardingService {
      *       on the address may be taken up — so an address typed in by backoffice cannot carry it.
      * </ol>
      */
-    private OnboardingApplication recordSignIn(OnboardingApplication application, String password) {
+    private OnboardingApplication recordSignIn(OnboardingApplication application, String password,
+                                               SignInProof proof) {
         if (application.getApplicantUserRef() != null) {
             throw signInExists();
         }
         if (application.isDecided()) {
-            throw new AccountRuleException(AccountRuleException.APPLICATION_DECIDED,
-                    "This application has already been decided, so a sign-in can no longer be set up "
-                            + "for it here.");
+            throw applicationDecided();
         }
         if (!onTheProvedAddress(application)) {
             throw new AccountRuleException(AccountRuleException.EMAIL_CHANGED,
@@ -600,10 +678,11 @@ public class OnboardingService {
                     password,
                     application.getId());
         } catch (KeycloakAdminClient.AccountExistsException e) {
-            return takeUpAndRecord(application, password);
+            return takeUpAndRecord(application, password, proof);
         }
 
-        return intake.attachApplicantAccount(application.getId(), userRef);
+        // Made just now, with the live role: if the record does not take it, the role goes.
+        return record(application, userRef, proof, true);
     }
 
     /**
@@ -628,20 +707,53 @@ public class OnboardingService {
      * records it — or refuses with {@code account-exists}, touching nothing.
      *
      * <p>Should the record then refuse the account after all — another application recorded it in
-     * the meantime, or this one got a different sign-in — the live role the take-up granted is taken
-     * back before the refusal is passed on (see {@link #withdrawTakenUpRole}).
+     * the meantime, this one got a different sign-in, or a reviewer decided it — the live role the
+     * take-up granted is taken back before the refusal is passed on (see {@link #record}).
      */
-    private OnboardingApplication takeUpAndRecord(OnboardingApplication application, String password) {
+    private OnboardingApplication takeUpAndRecord(OnboardingApplication application, String password,
+                                                  SignInProof proof) {
         String userRef = resumableAccount(application).orElseThrow(OnboardingService::accountExists);
         boolean grantedLiveRole = takeUp(userRef, application, password);
+        return record(application, userRef, proof, grantedLiveRole);
+    }
+
+    /**
+     * Records the account against the application ({@link ApplicationIntake#attachApplicantAccount})
+     * — or, when that does not happen, takes back the live role this attempt granted before the
+     * failure is passed on.
+     *
+     * <p>An account holds its live role on the strength of the record naming it, so an account the
+     * record did not take is left with APPLICANT alone, which grants nothing. The case that made this
+     * matter is a reviewer's rejection landing while the passcode was being set: the account was made
+     * with the live role, the attach found the application decided — or lost to the rejection's
+     * commit on the row's version — and the rejected applicant was left holding the role. A failure
+     * on the platform's side takes it back too; the retry that finishes the sign-in grants it again.
+     *
+     * <p>A conflict on the version is read again before it is answered. Two taps racing each other
+     * both bring the same account, and the one that lost the write finds the account recorded by the
+     * other: that is success, and the role stays. A decision is said as {@code application-decided};
+     * anything else is worth another try, and answers {@code sign-in-unavailable}.
+     *
+     * @param grantedLiveRole whether this attempt gave the account the live role it did not hold
+     */
+    private OnboardingApplication record(OnboardingApplication application, String userRef,
+                                         SignInProof proof, boolean grantedLiveRole) {
+        RuntimeException failure;
         try {
-            return intake.attachApplicantAccount(application.getId(), userRef);
-        } catch (ApplicationRuleException refused) {
-            if (grantedLiveRole) {
-                withdrawTakenUpRole(userRef, application);
+            return intake.attachApplicantAccount(application.getId(), userRef, proof);
+        } catch (OptimisticLockingFailureException conflict) {
+            Optional<OnboardingApplication> now = applications.findById(application.getId());
+            if (now.isPresent() && userRef.equals(now.get().getApplicantUserRef())) {
+                return now.get();
             }
-            throw refused;
+            failure = now.isPresent() && now.get().isDecided() ? applicationDecided() : conflict;
+        } catch (RuntimeException notRecorded) {
+            failure = notRecorded;
         }
+        if (grantedLiveRole) {
+            withdrawGrantedRole(userRef, application);
+        }
+        throw failure;
     }
 
     /** The refusal for an address that already has an account which is not this sign-up's own. */
@@ -656,6 +768,32 @@ public class OnboardingService {
         return new AccountRuleException(AccountRuleException.SIGN_IN_EXISTS,
                 "That application already has a sign-in. Sign in with its email address and the "
                         + "passcode you chose.");
+    }
+
+    /** The refusal for an application somebody decided: a sign-in is no longer made for it. */
+    static AccountRuleException applicationDecided() {
+        return new AccountRuleException(AccountRuleException.APPLICATION_DECIDED,
+                "This application has already been decided, so a sign-in can no longer be set up "
+                        + "for it here.");
+    }
+
+    /**
+     * The refusal for a passcode step that showed only the reference.
+     *
+     * <p>In practice an app from before the ticket, which shows this sentence as it comes — so the
+     * sentence is the instruction that helps its user.
+     */
+    static AccountRuleException proofMissing() {
+        return new AccountRuleException(AccountRuleException.SIGN_IN_PROOF_MISSING,
+                "This version of the app can no longer finish setting up a sign-in. Please update "
+                        + "the app and try again.");
+    }
+
+    /** The refusal for a ticket that is wrong, spent or late, or an email proof that is stale. */
+    static AccountRuleException proofRejected() {
+        return new AccountRuleException(AccountRuleException.SIGN_IN_PROOF_REJECTED,
+                "That confirmation has expired or was already used. Confirm your email address "
+                        + "again with a new code to finish setting up your sign-in.");
     }
 
     /**
@@ -680,6 +818,13 @@ public class OnboardingService {
      * </ul>
      * The address itself was checked before Keycloak was asked anything: it is still the one the
      * applicant proved ({@link #onTheProvedAddress}).
+     *
+     * <p>Except that the application recording it may be <em>this</em> one. That is a second tap, or a
+     * retry, arriving after the first recorded the account it made — after this attempt read the
+     * application and saw no sign-in. The sign-in is made, and made for this applicant: it is
+     * {@code sign-in-exists}, which the app answers by signing in. It used to be read as somebody
+     * else's account and refused with {@code account-exists}, which tells the applicant the address
+     * is taken — by the sign-in they had just made.
      */
     private Optional<String> resumableAccount(OnboardingApplication application) {
         Optional<String> found = keycloak.findUserIdByEmail(application.getContactEmail());
@@ -688,13 +833,18 @@ public class OnboardingService {
         }
         String userRef = found.get();
 
+        Optional<OnboardingApplication> recordedBy = applications.findByApplicantUserRef(userRef);
+        if (recordedBy.isPresent() && recordedBy.get().getId().equals(application.getId())) {
+            throw signInExists();
+        }
+
         String refusal = null;
         if (!keycloak.applicationStampOf(userRef)
                 .map(application.getId().toString()::equals).orElse(false)) {
             refusal = "it is not stamped for this application";
         } else if (keycloak.isLinkedToIdentityProvider(userRef)) {
             refusal = "it is linked to an identity provider";
-        } else if (applications.findByApplicantUserRef(userRef).isPresent()
+        } else if (recordedBy.isPresent()
                 || applications.findFirstByProvisionedUserRefOrderByCreatedAtDesc(userRef).isPresent()) {
             refusal = "an application already records it";
         }
@@ -712,7 +862,7 @@ public class OnboardingService {
      * one they are about to sign in with, whatever the first attempt was given.
      *
      * @return whether it granted the live role, which the account did not hold before — what
-     *         {@link #withdrawTakenUpRole} takes back if the record then refuses the account
+     *         {@link #withdrawGrantedRole} takes back if the record then does not take the account
      */
     private boolean takeUp(String userRef, OnboardingApplication application, String password) {
         String liveRole = application.getKind().liveRole();
@@ -726,23 +876,26 @@ public class OnboardingService {
     }
 
     /**
-     * Takes back the live role a take-up granted, once the record refused the account it was for.
+     * Takes back the live role this attempt granted — by making the account, or by taking it up —
+     * once the record did not take the account it was for.
      *
-     * <p>The record refuses when another application got to the account first, or this one got a
-     * different sign-in; either way this application's role has no business on it. APPLICANT stays,
-     * on purpose: it grants nothing, and the application that did record the account may be relying
-     * on it — taking it off could leave that application's own live role with nothing holding it
-     * back. Nobody is waiting on this, so a failure is logged, loudly, for somebody to finish by hand.
+     * <p>The record refuses when another application got to the account first, this one got a
+     * different sign-in, or somebody decided the application meanwhile; it fails when the platform
+     * does. Either way this application's role has no business on an account nothing records.
+     * APPLICANT stays, on purpose: it grants nothing, and an application that did record the account
+     * may be relying on it — taking it off could leave that application's own live role with nothing
+     * holding it back. Nobody is waiting on this, so a failure is logged, loudly, for somebody to
+     * finish by hand.
      */
-    private void withdrawTakenUpRole(String userRef, OnboardingApplication application) {
+    private void withdrawGrantedRole(String userRef, OnboardingApplication application) {
         String liveRole = application.getKind().liveRole();
         try {
             keycloak.revokeRealmRole(userRef, liveRole);
-            log.warn("Application {} could not record account {} after taking it up; took back the "
-                    + "{} it granted", application.getId(), userRef, liveRole);
+            log.warn("Application {} could not record account {}; took back the {} this attempt "
+                    + "granted", application.getId(), userRef, liveRole);
         } catch (RuntimeException e) {
-            log.error("Application {} could not record account {} after taking it up, and the {} it "
-                    + "granted could not be taken back: remove it from that account by hand",
+            log.error("Application {} could not record account {}, and the {} this attempt granted "
+                    + "could not be taken back: remove it from that account by hand",
                     application.getId(), userRef, liveRole, e);
         }
     }

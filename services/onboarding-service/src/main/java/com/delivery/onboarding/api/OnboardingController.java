@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -56,7 +58,7 @@ import jakarta.validation.constraints.Size;
 @RequestMapping("/api/onboarding")
 public class OnboardingController {
 
-    /** Only ever used to record a storage failure whose message is not safe to return. */
+    /** Only ever used to record a failure whose detail is not safe, or not useful, to return. */
     private static final org.slf4j.Logger LOG =
             org.slf4j.LoggerFactory.getLogger(OnboardingController.class);
 
@@ -120,10 +122,25 @@ public class OnboardingController {
     }
 
     /**
-     * @param password the six-digit passcode the app's keypad collects, same floor as sign-up
+     * @param password               the six-digit passcode the app's keypad collects, same floor as
+     *                               sign-up
+     * @param accountTicket          the account-setup ticket the submission answered with. In the
+     *                               body, never the path: a path is what access logs keep
+     * @param emailVerificationToken instead of the ticket once it is lost or expired: a proof from
+     *                               {@code POST /verifications/confirm} on the application's address,
+     *                               confirmed in the last half hour
      */
     public record ApplicantAccountRequest(
-            @NotBlank @Size(min = 6, max = 128) String password) {
+            @NotBlank @Size(min = 6, max = 128) String password,
+            @Size(max = 64) String accountTicket,
+            @Size(max = 64) String emailVerificationToken) {
+
+        /** Never the secrets: a record's generated toString would print all three. */
+        @Override
+        public String toString() {
+            return "ApplicantAccountRequest[ticket=" + (accountTicket != null)
+                    + ", emailProof=" + (emailVerificationToken != null) + "]";
+        }
     }
 
     public record VerificationRequest(
@@ -179,6 +196,37 @@ public class OnboardingController {
                     a.getRejectionReason(),
                     com.delivery.onboarding.service.ServiceProviderAnswers.summaryOf(
                             a.getDetails()));
+        }
+    }
+
+    /**
+     * The answer to a submission: the receipt, and the account-setup ticket beside it.
+     *
+     * <p>The only place the ticket ever appears. It is what the passcode step asks for — the
+     * reference is no secret: back office sees it, a rider's delivery company sees it, and it rides in
+     * URL paths — so it goes to the client that submitted, in this body, once, and is never shown
+     * again: not by the receipt lookup, not in any listing, not in a log. The record keeps its hash.
+     *
+     * <p>Flat, with the receipt's own fields, so a client that reads {@code reference} off the answer
+     * reads it exactly as before.
+     */
+    public record SubmissionReceipt(String reference, String status, String businessName,
+                                    String kind, Instant submittedAt, String rejectionReason,
+                                    com.delivery.onboarding.service.ServiceProviderAnswers.Summary
+                                            service,
+                                    String accountTicket) {
+
+        static SubmissionReceipt of(com.delivery.onboarding.service.ApplicationIntake.Recorded r) {
+            ApplicationReceipt receipt = ApplicationReceipt.of(r.application());
+            return new SubmissionReceipt(receipt.reference(), receipt.status(),
+                    receipt.businessName(), receipt.kind(), receipt.submittedAt(),
+                    receipt.rejectionReason(), receipt.service(), r.accountTicket());
+        }
+
+        /** Never the ticket: a record's generated toString would put it in any log that printed one. */
+        @Override
+        public String toString() {
+            return "SubmissionReceipt[reference=" + reference + "]";
         }
     }
 
@@ -387,16 +435,20 @@ public class OnboardingController {
      *
      * <p>No authentication, by necessity. A prospective partner has no account — creating one is
      * what they are asking for.
+     *
+     * <p>Answered with the account-setup ticket as well as the receipt ({@link SubmissionReceipt}),
+     * and marked {@code no-store} because of it: nothing between here and the submitter keeps a copy.
      */
     @PostMapping("/applications")
-    public ResponseEntity<ApplicationReceipt> apply(@Valid @RequestBody ApplicationRequest request) {
-        OnboardingApplication application = onboarding.submit(
+    public ResponseEntity<SubmissionReceipt> apply(@Valid @RequestBody ApplicationRequest request) {
+        com.delivery.onboarding.service.ApplicationIntake.Recorded recorded = onboarding.submit(
                 request.kind(), request.businessName(), request.contactName(),
                 request.contactEmail(), request.emailVerificationToken(),
                 request.contactPhone(), request.phoneVerificationToken(), request.notes(),
                 request.details(), request.targetProviderId());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApplicationReceipt.of(application));
+                .cacheControl(CacheControl.noStore())
+                .body(SubmissionReceipt.of(recorded));
     }
 
     /**
@@ -473,25 +525,32 @@ public class OnboardingController {
      * Choosing a passcode at the end of an application, so the applicant can get in and watch it.
      *
      * <p>Open, like the application itself, because the account being created is the one they would
-     * otherwise have to authenticate with. What stands in for a token is the reference: 160 bits,
-     * handed to one person, and tied to an address that was already proved with a code.
+     * otherwise have to authenticate with. The reference in the path only names the application — it
+     * is no secret: back office and the rider's delivery company both see it, and this path is in
+     * every access log. What stands in for a token is in the body: the account-setup ticket the
+     * submission answered with, or, once that is lost or expired, a code answered on the
+     * application's address in the last half hour. See
+     * {@link OnboardingService#createApplicantAccount}.
      *
      * <p>The account created carries APPLICANT beside the role applied for. It cannot sell, carry or
      * dispatch anything until a decision goes its way.
      *
      * <p>201 once the sign-in exists — also when an automatic approval behind it failed, which leaves
-     * the application with a reviewer, not the applicant without a sign-in. 422 {@code account-exists}
-     * when the address belongs to another account; {@code sign-in-exists} when this application's
-     * sign-in is already recorded, so the app signs them in; {@code application-decided} and
-     * {@code email-changed} when the application may not have one made at all. 503
-     * {@code sign-in-unavailable} when the platform could not make one just now, where the same call
-     * again is safe and is what finishes it.
+     * the application with a reviewer, not the applicant without a sign-in. 422
+     * {@code sign-in-proof-missing} when the body carries neither secret (an app from before them,
+     * told to update), {@code sign-in-proof-rejected} when the one it carries is wrong, spent or late;
+     * {@code account-exists} when the address belongs to another account; {@code sign-in-exists} when
+     * this application's sign-in is already recorded, so the app signs them in;
+     * {@code application-decided} and {@code email-changed} when the application may not have one
+     * made at all. 503 {@code sign-in-unavailable} when the platform could not make one just now,
+     * where the same call again is safe and is what finishes it.
      */
     @PostMapping("/applications/{reference}/account")
     public ResponseEntity<Void> createApplicantAccount(
             @PathVariable String reference,
             @Valid @RequestBody ApplicantAccountRequest request) {
-        onboarding.createApplicantAccount(reference, request.password());
+        onboarding.createApplicantAccount(reference, request.password(), request.accountTicket(),
+                request.emailVerificationToken());
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
@@ -935,6 +994,21 @@ public class OnboardingController {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
                 "message", e.getMessage(),
                 "code", OnboardingService.SignInUnavailableException.CODE));
+    }
+
+    /**
+     * 409: somebody else wrote this application between this request reading it and writing it — an
+     * applicant's sign-in being recorded while a reviewer decided, say. The application carries a
+     * version now, so the later write fails and changes nothing, where it used to overwrite the
+     * earlier one whole. Nothing is half done: opening the application again shows where it stands.
+     */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<Map<String, String>> changedMeanwhile(OptimisticLockingFailureException e) {
+        LOG.info("An application changed while a request was writing it", e);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                "message", "This application changed while you were working on it. Open it again "
+                        + "to see where it stands.",
+                "code", "application-changed"));
     }
 
     /**

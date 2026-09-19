@@ -163,6 +163,18 @@ public class AccountApplicationService {
          */
         public static final String EMAIL_CHANGED = "email-changed";
 
+        /**
+         * The open form's last step, showing nothing but the reference — which is not a secret. In
+         * practice an app from before the account-setup ticket, whose user is told to update it.
+         */
+        public static final String SIGN_IN_PROOF_MISSING = "sign-in-proof-missing";
+
+        /**
+         * The open form's last step, showing an account-setup ticket that is wrong, spent or late, or
+         * an email proof that is stale or spent. The app asks for a code on the address and sends that.
+         */
+        public static final String SIGN_IN_PROOF_REJECTED = "sign-in-proof-rejected";
+
         public static final String NAME_MISSING = "name-missing";
 
         public static final String SHOP_NAME_MISSING = "shop-name-missing";
