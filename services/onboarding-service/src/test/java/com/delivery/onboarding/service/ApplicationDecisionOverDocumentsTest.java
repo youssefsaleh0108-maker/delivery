@@ -56,7 +56,9 @@ class ApplicationDecisionOverDocumentsTest {
                 // settings store, which is both halves of "manual" — see AutoApprovalPolicy.
                 new AutoApprovalPolicy(false, false, false,
                         mock(AutoApprovalDecisionRepository.class),
-                        mock(AutoApprovalAuditRepository.class)));
+                        mock(AutoApprovalAuditRepository.class)),
+                mock(org.springframework.transaction.PlatformTransactionManager.class),
+                mock(com.delivery.onboarding.domain.PartnerEditEntryRepository.class));
 
         application = new OnboardingApplication(Kind.RIDER, "Sam Salem", "Sam Salem",
                 "sam@example.test", Instant.now(), null, null, null, null, null);

@@ -137,6 +137,32 @@ public class AccountApplicationService {
         /** The token's address is missing, or its identity provider did not vouch for it. */
         public static final String EMAIL_UNVERIFIED = "email-unverified";
 
+        /**
+         * The open form's last step: the application's address already belongs to another account —
+         * a customer's, a partner's, anybody's but an earlier attempt at this same sign-up — so no
+         * sign-in can be made for it ({@code OnboardingService.createApplicantAccount}).
+         */
+        public static final String ACCOUNT_EXISTS = "account-exists";
+
+        /**
+         * The open form's last step, asked again: the application already has its sign-in — the
+         * answer to an earlier try was lost, or it said 503 after the sign-in had in fact been
+         * recorded. Nothing is wrong; the applicant signs in with the passcode they chose.
+         */
+        public static final String SIGN_IN_EXISTS = "sign-in-exists";
+
+        /**
+         * The open form's last step, for an application somebody already decided: no sign-in is
+         * made for it any more, whichever way it went.
+         */
+        public static final String APPLICATION_DECIDED = "application-decided";
+
+        /**
+         * The open form's last step, for an application whose contact email backoffice changed after
+         * the applicant proved it: a sign-in is made only on the address a code was answered on.
+         */
+        public static final String EMAIL_CHANGED = "email-changed";
+
         public static final String NAME_MISSING = "name-missing";
 
         public static final String SHOP_NAME_MISSING = "shop-name-missing";
@@ -258,7 +284,7 @@ public class AccountApplicationService {
         onboarding.startReview(application);
         grantApplicantAccess(caller.userRef(), kind);
         log.info("Account {} applied as {} (application {})",
-                caller.userRef(), kind, application.getReference());
+                caller.userRef(), kind, application.getId());
 
         return new Result(autoApproveIfAutomatic(application), true);
     }
@@ -394,11 +420,11 @@ public class AccountApplicationService {
             OnboardingApplication approved = onboarding.approve(
                     application.getId(), AutoApprovalPolicy.AUTOMATIC_REVIEWER, true);
             log.info("Application {} auto-approved for a signed-in account ({} is automatic)",
-                    approved.getReference(), application.getKind());
+                    approved.getId(), application.getKind());
             return approved;
         } catch (RuntimeException e) {
             log.error("Auto-approval failed for {}; it stays in the review queue",
-                    application.getReference(), e);
+                    application.getId(), e);
             return application;
         }
     }

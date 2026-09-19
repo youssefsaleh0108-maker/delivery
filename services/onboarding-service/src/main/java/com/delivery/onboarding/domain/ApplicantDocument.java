@@ -16,7 +16,7 @@ import jakarta.persistence.Table;
  * <p>The bytes are not here and never pass through this service. They go straight from the
  * applicant's device to the {@code merchant-kyc} bucket with a presigned PUT, and this row is the
  * pointer plus the verdict. See {@code ApplicantDocumentService} for the three-step flow and for
- * why that bucket must stay unrouted.
+ * why that bucket stays private, with every read of it presigned.
  *
  * <p>A document's state is deliberately independent of its application's. They are decided by the
  * same person but they are not the same decision: a licence can be refused for a photograph nobody

@@ -12680,4 +12680,24 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get riderRegionAreaBekaa => 'البقاع';
+
+  @override
+  String get wizAccountExists =>
+      'لهذا البريد الإلكتروني حساب بالفعل. سجّل الدخول بذلك الحساب، أو قدّم طلبك ببريد إلكتروني آخر.';
+
+  @override
+  String get wizAccountSignInUnavailable =>
+      'تعذّر إعداد تسجيل الدخول الآن. يُرجى المحاولة مجدداً بعد دقيقة.';
+
+  @override
+  String get wizAccountSignInExists =>
+      'تسجيل دخولك جاهز بالفعل. سجّل الدخول ببريدك الإلكتروني ورمز الدخول الذي اخترته.';
+
+  @override
+  String get wizAccountApplicationDecided =>
+      'تم البتّ في هذا الطلب بالفعل، لذا لا يمكن إعداد تسجيل دخول له من هنا. يُرجى التواصل مع الدعم.';
+
+  @override
+  String get wizAccountEmailChanged =>
+      'تم تغيير البريد الإلكتروني في هذا الطلب بعد التحقق منه، لذا لا يمكن إعداد تسجيل دخول له. يُرجى التواصل مع الدعم.';
 }

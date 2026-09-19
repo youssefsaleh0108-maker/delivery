@@ -476,8 +476,16 @@ public class OnboardingController {
      * otherwise have to authenticate with. What stands in for a token is the reference: 160 bits,
      * handed to one person, and tied to an address that was already proved with a code.
      *
-     * <p>The account created carries APPLICANT and nothing else. It cannot sell, carry or dispatch
-     * anything until a decision goes its way.
+     * <p>The account created carries APPLICANT beside the role applied for. It cannot sell, carry or
+     * dispatch anything until a decision goes its way.
+     *
+     * <p>201 once the sign-in exists — also when an automatic approval behind it failed, which leaves
+     * the application with a reviewer, not the applicant without a sign-in. 422 {@code account-exists}
+     * when the address belongs to another account; {@code sign-in-exists} when this application's
+     * sign-in is already recorded, so the app signs them in; {@code application-decided} and
+     * {@code email-changed} when the application may not have one made at all. 503
+     * {@code sign-in-unavailable} when the platform could not make one just now, where the same call
+     * again is safe and is what finishes it.
      */
     @PostMapping("/applications/{reference}/account")
     public ResponseEntity<Void> createApplicantAccount(
@@ -911,6 +919,22 @@ public class OnboardingController {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
                 "message", e.getMessage(),
                 "code", com.delivery.onboarding.client.PlatformClient.CompaniesUnavailableException.CODE));
+    }
+
+    /**
+     * 503: an applicant's sign-in could not be made for a reason on the platform's side — Keycloak
+     * unreachable or refusing this service's own token, a failure half way, the record not saving.
+     * Nothing the applicant typed is wrong, and the same call in a minute is the remedy: it takes up
+     * any account the failed attempt left. Coded, so the app says it in the reader's language instead
+     * of meeting a bare 500 it has no words for. The service logs the cause, and the correlation id on
+     * that line ties it to this answer.
+     */
+    @ExceptionHandler(OnboardingService.SignInUnavailableException.class)
+    public ResponseEntity<Map<String, String>> signInUnavailable(
+            OnboardingService.SignInUnavailableException e) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                "message", e.getMessage(),
+                "code", OnboardingService.SignInUnavailableException.CODE));
     }
 
     /**
