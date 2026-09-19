@@ -232,9 +232,25 @@ public class RiderEarningsController {
         return body == null ? null : body.note();
     }
 
+    /**
+     * Runs one decision on a cash-out.
+     *
+     * <p><strong>409 for the decision that lost (RECON-07).</strong> Two operators acting on one
+     * request at once: the one committed second fails its version check, and one arriving after the
+     * other finds the request already decided. Either way the request is in a state that refuses it
+     * and the caller reloads to see what happened, which is a conflict and not a bad request.
+     */
     private ResponseEntity<?> decide(java.util.function.Supplier<RiderCashOut> action) {
         try {
             return ResponseEntity.ok(cashOutPayload(action.get()));
+        } catch (com.delivery.accounting.domain.AlreadyDecidedException e) {
+            return ResponseEntity.status(409).body(Map.of(
+                    "error", e.getMessage(), "code", "ALREADY_DECIDED"));
+        } catch (org.springframework.dao.OptimisticLockingFailureException e) {
+            return ResponseEntity.status(409).body(Map.of(
+                    "error", "Somebody else decided this cash-out at the same moment. Reload to "
+                            + "see what was recorded.",
+                    "code", "ALREADY_DECIDED"));
         } catch (IllegalArgumentException | IllegalStateException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

@@ -12,6 +12,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 /**
  * A request to turn points into money.
@@ -92,6 +93,18 @@ public class PointsRedemption {
     @Column(name = "decision_note")
     private String decisionNote;
 
+    /**
+     * Which decision this row has seen (RECON-07, V53).
+     *
+     * <p>An operator refusing a request while its owner cancelled it released the held points
+     * twice, and one approved as its owner cancelled it still read APPROVED and could be paid out
+     * for points already back in the balance. With a version the decision committed second is
+     * refused at commit, and the API answers it 409. A wrapper type so a new request reads as new.
+     */
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
     protected PointsRedemption() {
     }
 
@@ -152,7 +165,7 @@ public class PointsRedemption {
 
     private void requireStatus(Status required, String action) {
         if (this.status != required) {
-            throw new IllegalStateException(
+            throw new AlreadyDecidedException(
                     "Cannot " + action + " a redemption that is " + this.status);
         }
     }

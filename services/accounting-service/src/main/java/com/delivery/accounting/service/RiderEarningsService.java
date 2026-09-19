@@ -496,12 +496,20 @@ public class RiderEarningsService {
      *
      * <p>A refusal is not an exception: it leaves the request open and the money still held, which
      * is the correct state for something an operator will retry.
+     *
+     * <p><strong>One decision wins (RECON-07).</strong> A pay and a refusal made at the same moment
+     * both used to succeed — the money paid out and released back to the balance. The request's
+     * version now refuses whichever commits second, and the provider is handed the request's id as
+     * its idempotency key, so a payment re-driven after that refusal is still one payment.
+     *
+     * @throws com.delivery.accounting.domain.AlreadyDecidedException the request is no longer open
      */
     @Transactional
     public RiderCashOut payCashOut(UUID id, String by, String operatorReference) {
         RiderCashOut request = load(id);
         if (!request.isOpen()) {
-            throw new IllegalStateException("Cannot pay a cash-out that is " + request.getStatus());
+            throw new com.delivery.accounting.domain.AlreadyDecidedException(
+                    "Cannot pay a cash-out that is " + request.getStatus());
         }
 
         RiderPayoutProvider provider = payoutProviders.current();
