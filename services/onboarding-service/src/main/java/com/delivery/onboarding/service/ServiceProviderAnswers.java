@@ -53,7 +53,10 @@ import com.delivery.onboarding.domain.OnboardingApplication.Kind;
  * rider naming a delivery company is judged against Order Manager — the company must be hiring, and
  * its region is recorded in place of an area the rider chose. That rule is
  * {@link CompanyRiderAnswers}'s; it is reached from {@link #checked} because {@link Checked} is the
- * only form the intake records, so a front door cannot skip it.
+ * only form the intake records, so a front door cannot skip it. For the same reason a delivery
+ * company's own application has its coverage kept here to the regions the company form offers
+ * ({@link HiringCompanies#withRegisteredCoverage}): riders are shown that coverage as the company's
+ * region.
  */
 @Component
 public class ServiceProviderAnswers {
@@ -169,8 +172,9 @@ public class ServiceProviderAnswers {
 
         /**
          * A services application's details in canonical form; a rider's naming a delivery company
-         * with the company's region in place of any place the app sent; any other application's
-         * exactly as sent.
+         * with the company's region in place of any place the app sent; a delivery company's with
+         * its coverage kept to the regions its form offers; any other application's exactly as sent
+         * — less any {@code companyRegions}, which only {@link CompanyRiderAnswers} writes.
          */
         public Map<String, Object> details() {
             return details;
@@ -223,8 +227,11 @@ public class ServiceProviderAnswers {
      * Product Service come first, and the zones are only read once the category is known to be open.
      *
      * <p>For a rider naming a delivery company, the company's region in place of any place the app
-     * sent, and a refusal when the company is not hiring — see {@link CompanyRiderAnswers}. Any other
-     * application's details are recorded as sent.
+     * sent, and a refusal when the company is not hiring — see {@link CompanyRiderAnswers}. For a
+     * delivery company, its coverage kept to the regions its form offers — see
+     * {@link HiringCompanies#withRegisteredCoverage}. Any other application's details are recorded as
+     * sent. None keeps a {@code companyRegions} it sent, a services application included: that key
+     * is the region a company rider was shown, and only {@link CompanyRiderAnswers} writes it.
      *
      * <p>Never answered from memory, unlike {@link #options()}: this is the judgement, and it has to
      * be the one Product Service, or Order Manager, would give now. It waits on them, so call it with
@@ -239,7 +246,8 @@ public class ServiceProviderAnswers {
      */
     public Checked checked(Kind kind, Map<String, Object> details, UUID targetProviderId) {
         if (!isServices(details)) {
-            return new Checked(companyRiders.checked(kind, targetProviderId, details));
+            return new Checked(companyRiders.checked(kind, targetProviderId,
+                    HiringCompanies.withRegisteredCoverage(kind, details)));
         }
         if (kind != Kind.MERCHANT) {
             throw new ServiceAnswerException(ServiceAnswerException.NOT_A_SHOP,
@@ -268,6 +276,9 @@ public class ServiceProviderAnswers {
                         "That area is no longer on YouDrop's list. Choose your area again"));
 
         Map<String, Object> canonical = new LinkedHashMap<>(details);
+        // Copied as sent otherwise, so a region a client claimed for itself would survive here when
+        // CompanyRiderAnswers drops it from every other application.
+        canonical.remove(CompanyRiderAnswers.COMPANY_REGIONS);
         canonical.put(BUSINESS_TYPE, SERVICES);
         canonical.put(SERVICE_CATEGORY, category);
         canonical.put(AREA, Map.of(ZONE_ID, area.zoneId().toString(), LABEL, area.name()));

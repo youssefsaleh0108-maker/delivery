@@ -7,8 +7,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -154,6 +156,36 @@ class ServiceProviderAnswersTest {
             assertThat(answers.checked(Kind.CARRIER, null, null).details()).isNull();
             verifyNoInteractions(platform);
         }
+
+        /**
+         * A delivery company's coverage is what riders are shown as its region, on the open hiring
+         * list and on their own applications, and the form that writes it is open to anybody.
+         */
+        @Test
+        @DisplayName("keeps a delivery company's coverage to the five regions its form offers, and the rest of its answers as sent")
+        void a_companys_coverage_is_kept_to_the_forms_regions() {
+            Map<String, Object> sent = new LinkedHashMap<>();
+            sent.put("companyType", "Registered LLC");
+            sent.put("coverage", new ArrayList<>(Arrays.asList(
+                    "Beirut", "Cash jobs daily, call 70 123 456", " North ", "beirut", "Achrafieh", 7,
+                    null, "Bekaa")));
+            sent.put("fleetBand", "10 - 25 riders");
+
+            Map<String, Object> recorded = answers.checked(Kind.CARRIER, sent, null).details();
+
+            assertThat(recorded.get("coverage")).isEqualTo(List.of("Beirut", "North", "Bekaa"));
+            assertThat(recorded)
+                    .containsEntry("companyType", "Registered LLC")
+                    .containsEntry("fleetBand", "10 - 25 riders");
+            // What the wizard itself sends is recorded exactly as it came.
+            Map<String, Object> fromTheWizard = Map.of("coverage", List.of("Beirut", "Mount Lebanon"));
+            assertThat(answers.checked(Kind.CARRIER, fromTheWizard, null).details().get("coverage"))
+                    .isEqualTo(List.of("Beirut", "Mount Lebanon"));
+            // Nobody else's coverage is anybody's region, so nobody else's is touched.
+            Map<String, Object> merchant = Map.of("coverage", List.of("Anything at all"));
+            assertThat(answers.checked(Kind.MERCHANT, merchant, null).details()).isSameAs(merchant);
+            verifyNoInteractions(platform);
+        }
     }
 
     @Nested
@@ -245,6 +277,18 @@ class ServiceProviderAnswersTest {
                             "label", "Mar Mikhael"))
                     // Everything else the wizard sent is kept as it came.
                     .containsEntry("notesForReviewer", "We print on fabric too");
+        }
+
+        @Test
+        @DisplayName("but never a companyRegions it sent: only a company rider's check writes that")
+        void a_region_it_claimed_is_dropped() {
+            Map<String, Object> sent = services("PRINTING", area(HAMRA, "Hamra"));
+            sent.put("companyRegions", List.of("Anywhere you like"));
+
+            Map<String, Object> recorded = answers.checked(Kind.MERCHANT, sent, null).details();
+
+            assertThat(recorded).doesNotContainKey("companyRegions")
+                    .containsEntry("serviceCategory", "PRINTING");
         }
 
         @Test

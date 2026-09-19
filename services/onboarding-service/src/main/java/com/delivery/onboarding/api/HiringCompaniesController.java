@@ -39,8 +39,9 @@ public class HiringCompaniesController {
      * be: a rider chooses a company before they have an account, because applying is how they get one.
      * It names no person — company names and place names, both of which the companies advertise.
      * Being open to anybody is also why it is served from memory for half a minute at a time
-     * ({@link HiringCompanies#FORM_FRESH_FOR}): each read is a call to Order Manager. The application
-     * itself is judged against who is hiring at the moment it is sent.
+     * ({@link HiringCompanies#FORM_FRESH_FOR}), and from the last good read while Order Manager cannot
+     * answer: each read is a call to Order Manager, and no anonymous request waits behind another's.
+     * The application itself is judged against who is hiring at the moment it is sent.
      */
     @GetMapping("/hiring-companies")
     public List<HiringCompanies.Company> hiringCompanies() {
