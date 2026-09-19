@@ -3,6 +3,7 @@ package com.delivery.tracking.api;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.AfterEach;
@@ -56,30 +57,33 @@ class PingRoutesAccessTest {
     private static final UUID ORDER = UUID.fromString("0f0e0d0c-0000-4000-8000-000000000001");
     private static final String BODY = """
             {"lat":33.8938,"lng":35.5018,"accuracyM":6.5,"recordedAt":"2026-09-19T10:00:00Z"}""";
-    /** What every app build before the fix time existed sends — it must keep working. */
+    /** What every app build before the fix time existed sends: refused now, for want of it. */
     private static final String OLD_APP_BODY = """
             {"lat":33.8938,"lng":35.5018,"accuracyM":8}""";
 
     private TrackingService tracking;
     private PresenceService presence;
+    private SimpMessagingTemplate live;
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
         tracking = mock(TrackingService.class);
         presence = mock(PresenceService.class);
+        live = mock(SimpMessagingTemplate.class);
         mvc = MockMvcBuilders.standaloneSetup(
-                        new TrackingController(tracking, mock(EtaService.class),
-                                mock(SimpMessagingTemplate.class)),
+                        new TrackingController(tracking, mock(EtaService.class), live),
                         new RiderPresenceController(presence, mock(DutySessionService.class)))
                 .setControllerAdvice(new PingProblems())
                 .build();
 
         when(tracking.ping(any(UUID.class), anyString(), any(Fix.class))).thenAnswer(call -> {
             Fix fix = call.getArgument(2);
-            return new TrackingService.Position(call.getArgument(0), call.getArgument(1),
-                    fix.lat(), fix.lng(), fix.accuracyM(), Instant.now());
+            return Optional.of(new TrackingService.Position(call.getArgument(0),
+                    call.getArgument(1), fix.lat(), fix.lng(), fix.accuracyM(), Instant.now()));
         });
+        when(presence.recordOffOrderFix(anyString(), any(Fix.class)))
+                .thenReturn(Optional.of(Instant.now()));
     }
 
     @AfterEach
@@ -193,16 +197,54 @@ class PingRoutesAccessTest {
                     Instant.parse("2026-09-19T10:00:00Z"))));
         }
 
-        /** The fix time is additive: an app that predates it is not refused for leaving it out. */
+        /**
+         * The fix time is required. A body without it is well formed, so the route does not stamp
+         * it or refuse it as malformed: it hands the missing time on, and the policy's refusal
+         * comes back as a 422 naming the reason. (The policy itself is FixPolicyTest.)
+         */
         @Test
-        void a_report_from_an_older_app_with_no_fix_time_is_still_accepted() throws Exception {
+        void a_report_with_no_fix_time_is_passed_on_untouched_and_refused_with_its_reason()
+                throws Exception {
+            signedInAs(RIDER, "DELIVERY");
+            when(tracking.ping(eq(ORDER), eq(RIDER), any(Fix.class))).thenThrow(
+                    new FixPolicy.FixRejectedException(FixPolicy.Reason.FIX_TIME_MISSING));
+            when(presence.recordOffOrderFix(eq(RIDER), any(Fix.class))).thenThrow(
+                    new FixPolicy.FixRejectedException(FixPolicy.Reason.FIX_TIME_MISSING));
+
+            orderPing(OLD_APP_BODY)
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.reason").value("FIX_TIME_MISSING"));
+            ownPing(OLD_APP_BODY)
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.reason").value("FIX_TIME_MISSING"));
+
+            verify(tracking).ping(ORDER, RIDER, new Fix(33.8938, 35.5018, 8f, null));
+            verify(presence).recordOffOrderFix(RIDER, new Fix(33.8938, 35.5018, 8f, null));
+            verifyNoInteractions(live);
+        }
+
+        /**
+         * Nothing new to record — a duplicate, or a report under the rate floor — still answers
+         * 202, so the app does not count it as a failure, and nothing is pushed to the watchers.
+         */
+        @Test
+        void a_report_that_adds_nothing_is_accepted_and_not_pushed() throws Exception {
+            signedInAs(RIDER, "DELIVERY");
+            when(tracking.ping(eq(ORDER), eq(RIDER), any(Fix.class))).thenReturn(Optional.empty());
+
+            orderPing(BODY).andExpect(status().isAccepted());
+
+            verifyNoInteractions(live);
+        }
+
+        @Test
+        void a_recorded_report_is_pushed_to_the_orders_live_topic() throws Exception {
             signedInAs(RIDER, "DELIVERY");
 
-            orderPing(OLD_APP_BODY).andExpect(status().isAccepted());
-            ownPing(OLD_APP_BODY).andExpect(status().isAccepted());
+            orderPing(BODY).andExpect(status().isAccepted());
 
-            verify(tracking).ping(ORDER, RIDER, Fix.untimed(33.8938, 35.5018, 8f));
-            verify(presence).recordOffOrderFix(RIDER, Fix.untimed(33.8938, 35.5018, 8f));
+            verify(live).convertAndSend(eq("/topic/orders/" + ORDER + "/position"),
+                    any(Object.class));
         }
 
         @Test

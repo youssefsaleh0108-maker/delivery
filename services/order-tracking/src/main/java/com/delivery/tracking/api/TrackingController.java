@@ -56,19 +56,22 @@ public class TrackingController {
      * it empty keeps the payload off the mobile data plan.
      *
      * <p>Refusals are mapped in {@link PingProblems}: 422 with a {@code reason} for a fix that is
-     * not believable, 401/403 for a caller who is not a signed-in rider.
+     * not believable, 401/403 for a caller who is not a signed-in rider. A fix that adds nothing
+     * new — not newer than the rider's last one, or too soon after it — is also answered 202, and
+     * is neither recorded nor pushed: the handset did nothing wrong and has nothing to change.
      */
     @PostMapping("/orders/{orderId}/ping")
     @PreAuthorize("hasRole('DELIVERY')")
     public ResponseEntity<Void> ping(@PathVariable UUID orderId,
                                      @Valid @RequestBody PingRequest request) {
-        Position recorded = tracking.ping(orderId, PingProblems.rider(), request.fix());
-        // The live push. Fire-and-forget by design: the position is already durable, and a
-        // subscriber that misses this frame gets it on its next history fetch. Authorisation
-        // happened at SUBSCRIBE (WebSocketConfiguration), so everyone on the topic may see it.
-        live.convertAndSend("/topic/orders/" + orderId + "/position",
-                new PositionResponse(recorded.orderId(), recorded.riderId(), recorded.lat(),
-                        recorded.lng(), recorded.accuracyM(), recorded.recordedAt()));
+        tracking.ping(orderId, PingProblems.rider(), request.fix()).ifPresent(recorded ->
+                // The live push. Fire-and-forget by design: the position is already durable, and a
+                // subscriber that misses this frame gets it on its next history fetch.
+                // Authorisation happened at SUBSCRIBE (WebSocketConfiguration), so everyone on the
+                // topic may see it.
+                live.convertAndSend("/topic/orders/" + orderId + "/position",
+                        new PositionResponse(recorded.orderId(), recorded.riderId(), recorded.lat(),
+                                recorded.lng(), recorded.accuracyM(), recorded.recordedAt())));
         return ResponseEntity.accepted().build();
     }
 
@@ -139,8 +142,11 @@ public class TrackingController {
     /**
      * @param accuracyM  the handset's radius of uncertainty in metres; optional, as it always was,
      *                   but never negative
-     * @param recordedAt when the phone took the fix, by its own clock (ISO-8601). Optional and
-     *                   additive: app builds that predate it are stamped on arrival, as before
+     * @param recordedAt when the phone took the fix, by its own clock (ISO-8601). Required: a body
+     *                   without it is well formed, so it is not a 400, and is refused with a 422 and
+     *                   {@code reason: FIX_TIME_MISSING} (see {@link com.delivery.tracking.service.FixPolicy}).
+     *                   App builds that predate the field swallow ping errors, so refusing their
+     *                   simulated London positions changes nothing a rider sees
      */
     public record PingRequest(
             @NotNull @DecimalMin("-90") @DecimalMax("90") Double lat,

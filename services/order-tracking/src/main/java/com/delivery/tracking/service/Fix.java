@@ -13,13 +13,8 @@ import java.time.Instant;
  * @param accuracyM the handset's own radius of uncertainty, in metres. Null when it did not say —
  *                  older app builds, and handsets that do not report one
  * @param takenAt   when the phone took the fix, by the phone's clock. Null from app builds that
- *                  predate the field; those reports are stamped with the moment they arrived, which
- *                  is what every report was stamped with before the field existed
+ *                  predate the field; {@link FixPolicy} refuses those, since a report that does not
+ *                  say when it was taken cannot be judged for age at all
  */
 public record Fix(double lat, double lng, Float accuracyM, Instant takenAt) {
-
-    /** A report with no fix time, as every app build before the field sent it. */
-    public static Fix untimed(double lat, double lng, Float accuracyM) {
-        return new Fix(lat, lng, accuracyM, null);
-    }
 }

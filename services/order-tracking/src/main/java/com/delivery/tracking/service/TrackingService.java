@@ -71,11 +71,14 @@ public class TrackingService {
      * rider could have got to ({@link FixPolicy}). That is judged after both checks above, so a
      * refusal's reason is only ever given to the rider already known to be on the order, and before
      * anything is written, so a refused fix never reaches the trail, the cache or the live topic.
+     * A fix that is believable but adds nothing new — not newer than the rider's last one, or too
+     * soon after it — is not written either, and comes back empty rather than refused.
      *
+     * @return the position as recorded, or empty when there was nothing new to record
      * @throws FixPolicy.FixRejectedException when the fix is not believable
      */
     @Transactional
-    public Position ping(UUID orderId, String riderId, Fix fix) {
+    public Optional<Position> ping(UUID orderId, String riderId, Fix fix) {
         OrderParticipants order = participants.findById(orderId)
                 .orElseThrow(() -> new TrackingNotFoundException(orderId));
 
@@ -96,20 +99,18 @@ public class TrackingService {
         // backwards for a dispatcher watching a fleet. It is also where the fix is judged, against
         // the last one accepted for this rider on any order, so it goes first: a refusal here
         // throws before the trail below is written.
-        Instant at = presence.recordFix(riderId, fix);
+        Optional<Instant> recordedAt = presence.recordFix(riderId, fix);
+        if (recordedAt.isEmpty()) {
+            return Optional.empty();
+        }
+        Instant at = recordedAt.get();
 
         events.save(new TrackingEvent(orderId, riderId, fix.lat(), fix.lng(), fix.accuracyM(), at));
 
         Position position = new Position(orderId, riderId, fix.lat(), fix.lng(), fix.accuracyM(),
                 at);
         cache(position);
-        return position;
-    }
-
-    /** A ping with no fix time, as every app build before the field sent one. */
-    @Transactional
-    public Position ping(UUID orderId, String riderId, double lat, double lng, Float accuracyM) {
-        return ping(orderId, riderId, Fix.untimed(lat, lng, accuracyM));
+        return Optional.of(position);
     }
 
     /**

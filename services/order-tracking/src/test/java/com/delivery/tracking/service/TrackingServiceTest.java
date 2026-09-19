@@ -73,12 +73,17 @@ class TrackingServiceTest {
         when(events.findLatestForOrder(any(UUID.class), any(Pageable.class))).thenReturn(List.of());
         when(events.findByOrderIdOrderByRecordedAtAsc(any(UUID.class))).thenReturn(List.of());
         // Presence is where a fix is judged and given its time; standing in for it, every fix is
-        // believed and recorded at the phone's time, or on arrival when it carries none.
+        // believed and recorded at the phone's time.
         when(presence.recordFix(anyString(), any(Fix.class))).thenAnswer(call -> {
             Fix fix = call.getArgument(1);
-            return fix.takenAt() != null ? fix.takenAt() : Instant.now();
+            return Optional.of(fix.takenAt());
         });
         orderAssignedTo(RIDER);
+    }
+
+    /** A fix the phone took just now. */
+    private static Fix fix(double lat, double lng, Float accuracyM) {
+        return new Fix(lat, lng, accuracyM, Instant.now());
     }
 
     private void orderAssignedTo(String riderId) {
@@ -101,7 +106,7 @@ class TrackingServiceTest {
 
         @Test
         void is_recorded_and_returned() {
-            TrackingService.Position position = tracking.ping(ORDER, RIDER, 33.89, 35.50, 5.0f);
+            TrackingService.Position position = tracking.ping(ORDER, RIDER, fix(33.89, 35.50, 5.0f)).orElseThrow();
 
             assertThat(position.lat()).isEqualTo(33.89);
             assertThat(position.lng()).isEqualTo(35.50);
@@ -111,7 +116,7 @@ class TrackingServiceTest {
 
         @Test
         void refreshes_the_hot_read_cache() {
-            tracking.ping(ORDER, RIDER, 33.89, 35.50, 5.0f);
+            tracking.ping(ORDER, RIDER, fix(33.89, 35.50, 5.0f));
 
             verify(values).set(eq(CACHE_KEY), anyString(), eq(Duration.ofSeconds(60)));
         }
@@ -122,7 +127,7 @@ class TrackingServiceTest {
          */
         @Test
         void from_a_rider_who_is_not_assigned_is_refused() {
-            assertThatThrownBy(() -> tracking.ping(ORDER, "other-rider", 33.89, 35.50, null))
+            assertThatThrownBy(() -> tracking.ping(ORDER, "other-rider", fix(33.89, 35.50, null)))
                     .isInstanceOf(TrackingService.TrackingNotFoundException.class);
 
             verify(events, never()).save(any(TrackingEvent.class));
@@ -131,7 +136,7 @@ class TrackingServiceTest {
         /** The customer is not the rider, however legitimate their interest in the order. */
         @Test
         void from_the_customer_is_refused_too() {
-            assertThatThrownBy(() -> tracking.ping(ORDER, CUSTOMER, 33.89, 35.50, null))
+            assertThatThrownBy(() -> tracking.ping(ORDER, CUSTOMER, fix(33.89, 35.50, null)))
                     .isInstanceOf(TrackingService.TrackingNotFoundException.class);
         }
 
@@ -140,7 +145,7 @@ class TrackingServiceTest {
         void on_an_unassigned_order_is_refused() {
             orderAssignedTo(null);
 
-            assertThatThrownBy(() -> tracking.ping(ORDER, RIDER, 33.89, 35.50, null))
+            assertThatThrownBy(() -> tracking.ping(ORDER, RIDER, fix(33.89, 35.50, null)))
                     .isInstanceOf(TrackingService.TrackingNotFoundException.class);
         }
 
@@ -148,7 +153,7 @@ class TrackingServiceTest {
         void on_an_unknown_order_is_refused() {
             when(participants.findById(ORDER)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> tracking.ping(ORDER, RIDER, 33.89, 35.50, null))
+            assertThatThrownBy(() -> tracking.ping(ORDER, RIDER, fix(33.89, 35.50, null)))
                     .isInstanceOf(TrackingService.TrackingNotFoundException.class);
         }
 
@@ -161,7 +166,7 @@ class TrackingServiceTest {
             doThrow(new IllegalStateException("redis down"))
                     .when(values).set(anyString(), anyString(), any(Duration.class));
 
-            TrackingService.Position position = tracking.ping(ORDER, RIDER, 33.89, 35.50, null);
+            TrackingService.Position position = tracking.ping(ORDER, RIDER, fix(33.89, 35.50, null)).orElseThrow();
 
             assertThat(position).isNotNull();
             verify(events).save(any(TrackingEvent.class));
@@ -170,7 +175,7 @@ class TrackingServiceTest {
         /** Accuracy is optional — not every handset reports it. */
         @Test
         void without_a_reported_accuracy_is_accepted() {
-            assertThat(tracking.ping(ORDER, RIDER, 33.89, 35.50, null).accuracyM()).isNull();
+            assertThat(tracking.ping(ORDER, RIDER, fix(33.89, 35.50, null)).orElseThrow().accuracyM()).isNull();
         }
 
         /**
@@ -179,9 +184,9 @@ class TrackingServiceTest {
          */
         @Test
         void also_counts_as_evidence_that_the_rider_is_still_present() {
-            tracking.ping(ORDER, RIDER, 33.89, 35.50, 5.0f);
+            tracking.ping(ORDER, RIDER, fix(33.89, 35.50, 5.0f));
 
-            verify(presence).recordFix(RIDER, Fix.untimed(33.89, 35.50, 5.0f));
+            verify(presence).recordFix(eq(RIDER), any(Fix.class));
         }
 
         /**
@@ -194,7 +199,7 @@ class TrackingServiceTest {
         void on_a_delivered_order_is_refused() {
             orderInStatus("DELIVERED");
 
-            assertThatThrownBy(() -> tracking.ping(ORDER, RIDER, 33.89, 35.50, 5.0f))
+            assertThatThrownBy(() -> tracking.ping(ORDER, RIDER, fix(33.89, 35.50, 5.0f)))
                     .isInstanceOf(TrackingService.TrackingClosedException.class);
 
             verify(events, never()).save(any(TrackingEvent.class));
@@ -205,7 +210,7 @@ class TrackingServiceTest {
         void on_a_cancelled_order_is_refused() {
             orderInStatus("CANCELLED");
 
-            assertThatThrownBy(() -> tracking.ping(ORDER, RIDER, 33.89, 35.50, 5.0f))
+            assertThatThrownBy(() -> tracking.ping(ORDER, RIDER, fix(33.89, 35.50, 5.0f)))
                     .isInstanceOf(TrackingService.TrackingClosedException.class);
 
             verify(events, never()).save(any(TrackingEvent.class));
@@ -216,7 +221,7 @@ class TrackingServiceTest {
         void on_a_finished_order_does_not_refresh_the_hot_read_cache() {
             orderInStatus("DELIVERED");
 
-            assertThatThrownBy(() -> tracking.ping(ORDER, RIDER, 33.89, 35.50, 5.0f))
+            assertThatThrownBy(() -> tracking.ping(ORDER, RIDER, fix(33.89, 35.50, 5.0f)))
                     .isInstanceOf(TrackingService.TrackingClosedException.class);
 
             verify(values, never()).set(anyString(), anyString(), any(Duration.class));
@@ -230,7 +235,7 @@ class TrackingServiceTest {
         void before_collection_is_still_accepted() {
             orderInStatus("READY");
 
-            assertThat(tracking.ping(ORDER, RIDER, 33.89, 35.50, 5.0f)).isNotNull();
+            assertThat(tracking.ping(ORDER, RIDER, fix(33.89, 35.50, 5.0f))).isPresent();
 
             verify(events).save(any(TrackingEvent.class));
         }
@@ -243,14 +248,14 @@ class TrackingServiceTest {
         void on_a_delivered_order_from_a_stranger_is_still_a_not_found() {
             orderInStatus("DELIVERED");
 
-            assertThatThrownBy(() -> tracking.ping(ORDER, "other-rider", 33.89, 35.50, null))
+            assertThatThrownBy(() -> tracking.ping(ORDER, "other-rider", fix(33.89, 35.50, null)))
                     .isInstanceOf(TrackingService.TrackingNotFoundException.class);
         }
 
         /** A refused ping is not evidence of anything, least of all that the rider is on duty. */
         @Test
         void from_a_stranger_does_not_touch_presence() {
-            assertThatThrownBy(() -> tracking.ping(ORDER, "other-rider", 33.89, 35.50, null))
+            assertThatThrownBy(() -> tracking.ping(ORDER, "other-rider", fix(33.89, 35.50, null)))
                     .isInstanceOf(TrackingService.TrackingNotFoundException.class);
 
             verify(presence, never()).recordFix(anyString(), any(Fix.class));
@@ -275,6 +280,21 @@ class TrackingServiceTest {
         }
 
         /**
+         * A believable fix that adds nothing — a duplicate, or one under the rate floor — is not
+         * refused, and reaches nothing either: no trail point, no cache entry, and nothing for the
+         * controller to push.
+         */
+        @Test
+        void that_adds_nothing_new_writes_nothing_and_returns_nothing_to_push() {
+            when(presence.recordFix(anyString(), any(Fix.class))).thenReturn(Optional.empty());
+
+            assertThat(tracking.ping(ORDER, RIDER, fix(33.89, 35.50, 5.0f))).isEmpty();
+
+            verify(events, never()).save(any(TrackingEvent.class));
+            verify(values, never()).set(anyString(), anyString(), any(Duration.class));
+        }
+
+        /**
          * The trail is about where the rider was when. A fix that sat in a mobile network's queue
          * for twenty seconds is recorded at the moment the phone took it, not when it landed —
          * otherwise the ETA would measure from a position it believes is fresher than it is.
@@ -285,7 +305,7 @@ class TrackingServiceTest {
             ArgumentCaptor<TrackingEvent> saved = ArgumentCaptor.forClass(TrackingEvent.class);
 
             TrackingService.Position position =
-                    tracking.ping(ORDER, RIDER, new Fix(33.89, 35.50, 6.0f, takenAt));
+                    tracking.ping(ORDER, RIDER, new Fix(33.89, 35.50, 6.0f, takenAt)).orElseThrow();
 
             verify(events).save(saved.capture());
             assertThat(saved.getValue().getRecordedAt()).isEqualTo(takenAt);

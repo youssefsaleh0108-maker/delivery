@@ -190,20 +190,16 @@ public class PresenceService {
      *
      * <p>The fix is judged by {@link FixPolicy} against the last one accepted for this rider before
      * anything is written, so a refused fix leaves no trace in either store — and in particular
-     * does not become the anchor the next fix is compared with.
+     * does not become the anchor the next fix is compared with. A fix that adds nothing new (not
+     * newer than the last one, or too soon after it) is not written either, and is not refused.
      *
-     * @return the instant the fix is recorded at: the phone's fix time, never later than now
+     * @return the instant the fix is recorded at — the phone's fix time, never later than now — or
+     *         empty when it was not new enough to record
      * @throws FixPolicy.FixRejectedException when the fix is not believable
      */
     @Transactional
-    public Instant recordFix(String riderId, Fix fix) {
+    public Optional<Instant> recordFix(String riderId, Fix fix) {
         return record(riderId, fix, readCache(riderId));
-    }
-
-    /** A fix with no fix time, as reports were before the field existed. */
-    @Transactional
-    public void recordFix(String riderId, double lat, double lng, Float accuracyM) {
-        recordFix(riderId, Fix.untimed(lat, lng, accuracyM));
     }
 
     /**
@@ -218,10 +214,11 @@ public class PresenceService {
      * <p>The order-scoped ping does not come through here; it has its own and narrower rule, that
      * the caller is the rider assigned to that order ({@link TrackingService#ping}).
      *
+     * @return as {@link #recordFix}: when the fix is recorded at, or empty when it was not new
      * @throws OffDutyException when the rider is neither on duty nor carrying anything
      */
     @Transactional
-    public Instant recordOffOrderFix(String riderId, Fix fix) {
+    public Optional<Instant> recordOffOrderFix(String riderId, Fix fix) {
         PresenceSnapshot cached = readCache(riderId);
         boolean onDuty = cached != null
                 ? cached.dutyState() == DutyState.ON_DUTY
@@ -234,7 +231,7 @@ public class PresenceService {
         return record(riderId, fix, cached);
     }
 
-    private Instant record(String riderId, Fix fix, PresenceSnapshot cached) {
+    private Optional<Instant> record(String riderId, Fix fix, PresenceSnapshot cached) {
         Instant now = Instant.now();
 
         if (cached == null) {
@@ -242,25 +239,33 @@ public class PresenceService {
             // Redis being down entirely). Settle it against the record and write through.
             RiderPresence row = presence.findById(riderId)
                     .orElseGet(() -> RiderPresence.firstSeen(riderId, now));
-            Instant at = fixPolicy.admit(fix, FixPolicy.Previous.of(row.getLastLat(),
-                    row.getLastLng(), row.getLastAccuracyM(), row.getLastSeenAt()), now);
-            row.sighted(fix.lat(), fix.lng(), fix.accuracyM(), at);
+            FixPolicy.Admission admission = fixPolicy.admit(fix, FixPolicy.Previous.of(
+                    row.getLastLat(), row.getLastLng(), row.getLastAccuracyM(),
+                    row.getLastSeenAt()), now);
+            if (!admission.recorded()) {
+                return Optional.empty();
+            }
+            row.sighted(fix.lat(), fix.lng(), fix.accuracyM(), admission.at());
             presence.save(row);
             cache(PresenceSnapshot.of(row));
-            return at;
+            return Optional.of(admission.at());
         }
 
         // Warm: judged against the cached snapshot, which carries the exact last fix — the durable
         // row lags it by up to the persist interval, so comparing with the row would measure a
         // jump from somewhere the rider was half a minute ago.
-        Instant at = fixPolicy.admit(fix, FixPolicy.Previous.of(cached.lat(), cached.lng(),
-                cached.accuracyM(), cached.lastSeenAt()), now);
+        FixPolicy.Admission admission = fixPolicy.admit(fix, FixPolicy.Previous.of(cached.lat(),
+                cached.lng(), cached.accuracyM(), cached.lastSeenAt()), now);
+        if (!admission.recorded()) {
+            return Optional.empty();
+        }
+        Instant at = admission.at();
         // A cached snapshot exists, so the durable row does too. Move it only if the throttle is
         // due — see RiderPresenceRepository#touchIfDue for what this trades away and why.
         presence.touchIfDue(riderId, fix.lat(), fix.lng(), fix.accuracyM(), at,
                 at.minus(persistInterval));
         cache(cached.withFix(fix.lat(), fix.lng(), fix.accuracyM(), at));
-        return at;
+        return Optional.of(at);
     }
 
     /**

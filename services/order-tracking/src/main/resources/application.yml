@@ -169,6 +169,21 @@ delivery:
       # How long the last accepted fix anchors that speed check. Past it, the next fix starts
       # fresh — so one bad anchor refuses a rider for at most this long.
       jump-window: 5m
+      # A fix less than this after the rider's last accepted one is answered 202 and neither
+      # recorded nor pushed; so is one dated at or before it. The app sends at most every 10 s.
+      min-interval: 5s
+      # Where a fix may come from: Lebanon (33.05–34.69 N, 35.10–36.63 E) with about 15 km of
+      # margin. Outside it a fix is refused as OUTSIDE_SERVICE_AREA — the old simulator's London,
+      # an emulator's Mountain View, a spoofing app's default. On unless the environment turns it
+      # off, which only dev does (deploy/k3s/overlays/dev), because dev's riders are emulators.
+      # Off or on, a rider's last fix outside the box is never what the next one is judged
+      # against, so the first real fix after an app upgrade is not refused as a jump.
+      service-area:
+        enabled: ${TRACKING_SERVICE_AREA_ENABLED:true}
+        min-lat: 32.91
+        max-lat: 34.83
+        min-lng: 34.93
+        max-lng: 36.80
 
     presence:
       # How long after the last fix a rider still counts as present. Past this they read as STALE,
