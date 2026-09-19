@@ -300,6 +300,9 @@ step_demo_logins() {
     rm -f "$WORK/demo/body"
     [ "$code" = 204 ] || die "Keycloak answered $code to the new password for $u (its password is unchanged)"
     secret_set_key demo-logins "$u" "$WORK/demo/new"
+    # A new password does not end a session: whoever signed in with the published one would keep
+    # refreshing their tokens. End them all.
+    check "$u: every session signed out" 204 "$(kc -o /dev/null -w '%{http_code}' -X POST "$ADMIN/users/$uid/logout")"
     # A login locked by past failures would make the proof below lie.
     kc -o /dev/null -X DELETE "$ADMIN/attack-detection/brute-force/users/$uid"
     if [ -s "$WORK/demo/old" ]; then check "$u: the old password is refused" 401 "$(pw_code "$client" "$u" "$WORK/demo/old")"
@@ -431,6 +434,7 @@ PY
     kc_fresh
     kc "$ADMIN/users/$id" | jq -c '.enabled = false' > "$WORK/user.json"
     check "a test account disabled" 204 "$(kc -o /dev/null -w '%{http_code}' -X PUT -H 'Content-Type: application/json' --data-binary @"$WORK/user.json" "$ADMIN/users/$id")"
+    check "...and its sessions signed out" 204 "$(kc -o /dev/null -w '%{http_code}' -X POST "$ADMIN/users/$id/logout")"
   done < "$WORK/test-ids"
 }
 
