@@ -21296,6 +21296,24 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'The email on this application was changed after it was verified, so a sign-in can\'t be set up for it. Please contact support.'**
   String get wizAccountEmailChanged;
+
+  /// No description provided for @wizAccountProofMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'This version of the app can\'t finish setting up your sign-in. Please update the app and try again.'**
+  String get wizAccountProofMissing;
+
+  /// No description provided for @wizAccountProofRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Your confirmation has expired. Confirm your email with a new code to finish setting up your sign-in.'**
+  String get wizAccountProofRejected;
+
+  /// No description provided for @wizAccountConfirmAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'To finish setting up your sign-in, confirm your email once more. It keeps anyone else from choosing your passcode.'**
+  String get wizAccountConfirmAgain;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

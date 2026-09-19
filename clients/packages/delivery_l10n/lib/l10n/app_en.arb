@@ -6106,5 +6106,8 @@
   "wizAccountSignInUnavailable": "Sign-in can't be set up right now. Please try again in a minute.",
   "wizAccountSignInExists": "Your sign-in is already set up. Sign in with your email and the passcode you chose.",
   "wizAccountApplicationDecided": "This application has already been decided, so a sign-in can't be set up for it here. Please contact support.",
-  "wizAccountEmailChanged": "The email on this application was changed after it was verified, so a sign-in can't be set up for it. Please contact support."
+  "wizAccountEmailChanged": "The email on this application was changed after it was verified, so a sign-in can't be set up for it. Please contact support.",
+  "wizAccountProofMissing": "This version of the app can't finish setting up your sign-in. Please update the app and try again.",
+  "wizAccountProofRejected": "Your confirmation has expired. Confirm your email with a new code to finish setting up your sign-in.",
+  "wizAccountConfirmAgain": "To finish setting up your sign-in, confirm your email once more. It keeps anyone else from choosing your passcode."
 }

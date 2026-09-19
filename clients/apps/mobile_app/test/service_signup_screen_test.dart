@@ -461,8 +461,11 @@ void main() {
     expect(application['contactEmail'], 'sam@example.test');
     expect(application['emailVerificationToken'], 'proof-EMAIL');
     expect((application['details'] as Map<String, dynamic>)['businessType'], 'SERVICES');
+    // The passcode, with the ticket the submission answered with: the reference names the
+    // application, and proves nothing.
     expect(server.bodies['POST /api/onboarding/applications/ref-open/account'], <String, dynamic>{
       'password': '246810',
+      'accountTicket': 'ticket-open',
     });
 
     // Signed in with the passcode just chosen, so the documents can travel — as on the other path.
@@ -572,6 +575,73 @@ void main() {
     expect(find.text(_en.svcDocsTitle), findsOneWidget);
     expect(find.textContaining(_en.couldNotCreateSignIn), findsNothing);
     expect(find.textContaining('already has a sign-in'), findsNothing);
+  });
+
+  testWidgets(
+      'a ticket the server no longer takes is replaced by a new code on the address, and its proof',
+      (WidgetTester tester) async {
+    // The ticket's half hour ran out before the passcode reached the server. The reference cannot
+    // stand in — delivery companies and back office see references — so the address is proved again.
+    _phone(tester);
+    final _Server server = _Server(_Keycloak())
+      ..refuseOnce = true
+      ..accountRefusal = (
+        status: 422,
+        body: <String, Object?>{
+          'code': 'sign-in-proof-rejected',
+          'message': 'That confirmation has expired or was already used.',
+        },
+      );
+    final Dio dio = Dio(BaseOptions(baseUrl: 'https://api.test'))..httpClientAdapter = server;
+    final _PasswordGrant auth = _PasswordGrant(server.keycloak);
+
+    await tester.pumpWidget(_app(ServiceProviderSignupScreen(
+      api: OnboardingApi(dio),
+      documentsApi: _Documents(),
+      authService: auth,
+      pickDocument: _pickScan,
+      onFinished: (AuthSession _) {},
+      onClose: () {},
+    )));
+    await tester.pumpAndSettle();
+
+    await fillPrintShop(tester);
+    await tester.enterText(_field(_en.authOwnerFullName), 'Sam Salem');
+    await tester.enterText(_field(_en.authContactEmail), 'Sam@Example.test');
+    await tester.enterText(_field(_en.password), '246810');
+    await tester.pump();
+    await tapApply(tester);
+    Future<void> answer(String digits) async {
+      final int before = server.confirmed;
+      await tester.enterText(
+          find.descendant(of: find.byType(OneTimeCodeField), matching: find.byType(TextField)),
+          digits);
+      await _pump(tester);
+      if (server.confirmed == before) {
+        await tester.tap(find.widgetWithText(AuthPrimaryButton, _en.verify));
+        await _pump(tester);
+      }
+    }
+
+    await answer('123456');
+
+    // Refused with the ticket; a second code went to the application's address, and the code screen
+    // says why it is asking again.
+    expect(server.accountBodies.single['accountTicket'], 'ticket-open');
+    expect(server.codesSent, <String>['sam@example.test', 'sam@example.test']);
+    expect(find.text(_en.wizAccountConfirmAgain), findsOneWidget);
+    expect(auth.grants, isEmpty);
+
+    await answer('654321');
+
+    expect(server.accountBodies.last, <String, dynamic>{
+      'password': '246810',
+      'emailVerificationToken': 'proof-EMAIL-2',
+    });
+    // The application went once; the sign-in is made and signed in, and the documents follow.
+    expect(server.calls.where((String c) => c == 'POST /api/onboarding/applications'), hasLength(1));
+    expect(auth.grants, <String>['sam@example.test 246810']);
+    expect(find.text(_en.svcDocsTitle), findsOneWidget);
   });
 }
 
@@ -683,6 +753,18 @@ class _Server implements HttpClientAdapter {
   /// Answers the open form's passcode with this instead of making the sign-in.
   ({int status, Map<String, Object?> body})? accountRefusal;
 
+  /// Whether [accountRefusal] answers the next passcode only, and then the sign-in is made.
+  bool refuseOnce = false;
+
+  /// Every body the passcode step was sent, in order.
+  final List<Map<String, dynamic>> accountBodies = <Map<String, dynamic>>[];
+
+  /// Where each code was sent, in order.
+  final List<String> codesSent = <String>[];
+
+  /// How many codes were confirmed: each proof names its number, so an old one tells from a new one.
+  int confirmed = 0;
+
   /// Grants MERCHANT without APPLICANT, as auto-approval does.
   bool automatic = false;
 
@@ -716,18 +798,28 @@ class _Server implements HttpClientAdapter {
         if (!automatic) keycloak.roles.add('APPLICANT');
         return _json(201, _receipt(automatic ? 'APPROVED' : 'SUBMITTED', 'ref-1'));
       case 'POST /api/onboarding/verifications':
+        codesSent.add(((data! as Map<String, dynamic>)['destination'] as String).toLowerCase());
         return _json(202, <String, Object?>{'expiresAt': '2026-09-14T10:10:00Z'});
       case 'POST /api/onboarding/verifications/confirm':
         final Map<String, dynamic> code = data! as Map<String, dynamic>;
+        confirmed++;
         return _json(200, <String, Object?>{
-          'token': 'proof-${code['channel']}',
+          // The first proof keeps its plain name; a later one says which it is.
+          'token': confirmed == 1 ? 'proof-${code['channel']}' : 'proof-${code['channel']}-$confirmed',
           'destination': (code['destination'] as String).toLowerCase(),
         });
       case 'POST /api/onboarding/applications':
-        return _json(201, _receipt('SUBMITTED', 'ref-open'));
+        return _json(201, <String, Object?>{
+          ..._receipt('SUBMITTED', 'ref-open'),
+          'accountTicket': 'ticket-open',
+        });
       case 'POST /api/onboarding/applications/ref-open/account':
+        accountBodies.add(Map<String, dynamic>.of(data! as Map<String, dynamic>));
         final ({int status, Map<String, Object?> body})? refusedAccount = accountRefusal;
-        if (refusedAccount != null) return _json(refusedAccount.status, refusedAccount.body);
+        if (refusedAccount != null) {
+          if (refuseOnce) accountRefusal = null;
+          return _json(refusedAccount.status, refusedAccount.body);
+        }
         return _json(201, <String, Object?>{});
     }
     return _json(404, <String, Object?>{'message': 'not expected in this test: $route'});

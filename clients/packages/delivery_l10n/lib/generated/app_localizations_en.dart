@@ -12554,4 +12554,16 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get wizAccountEmailChanged =>
       'The email on this application was changed after it was verified, so a sign-in can\'t be set up for it. Please contact support.';
+
+  @override
+  String get wizAccountProofMissing =>
+      'This version of the app can\'t finish setting up your sign-in. Please update the app and try again.';
+
+  @override
+  String get wizAccountProofRejected =>
+      'Your confirmation has expired. Confirm your email with a new code to finish setting up your sign-in.';
+
+  @override
+  String get wizAccountConfirmAgain =>
+      'To finish setting up your sign-in, confirm your email once more. It keeps anyone else from choosing your passcode.';
 }

@@ -12700,4 +12700,16 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get wizAccountEmailChanged =>
       'تم تغيير البريد الإلكتروني في هذا الطلب بعد التحقق منه، لذا لا يمكن إعداد تسجيل دخول له. يُرجى التواصل مع الدعم.';
+
+  @override
+  String get wizAccountProofMissing =>
+      'لا يستطيع هذا الإصدار من التطبيق إكمال إعداد تسجيل دخولك. يُرجى تحديث التطبيق والمحاولة مجدداً.';
+
+  @override
+  String get wizAccountProofRejected =>
+      'انتهت صلاحية التأكيد. أكّد بريدك الإلكتروني برمز جديد لإكمال إعداد تسجيل الدخول.';
+
+  @override
+  String get wizAccountConfirmAgain =>
+      'لإكمال إعداد تسجيل الدخول، أكّد بريدك الإلكتروني مرة أخرى. هكذا لا يستطيع أحد غيرك اختيار رمز دخولك.';
 }

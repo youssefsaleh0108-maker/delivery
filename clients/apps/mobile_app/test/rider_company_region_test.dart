@@ -692,6 +692,7 @@ class _Server implements HttpClientAdapter {
           'status': 'SUBMITTED',
           'kind': 'RIDER',
           'businessName': body['businessName'],
+          'accountTicket': 'ticket-open',
         });
       }
       keycloak.roles

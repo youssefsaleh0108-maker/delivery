@@ -20,6 +20,11 @@ import 'package:dio/dio.dart';
 /// its email changed by support after it was verified (`email-changed`). Until the server named them
 /// they were a bare 500 or the server's English, and a rider read "That did not go through" with
 /// nothing to act on.
+///
+/// And the step's own secret, which the reference no longer stands in for: none sent
+/// (`sign-in-proof-missing` — an app older than the ticket, whose user is told to update), or one the
+/// server would not take (`sign-in-proof-rejected`) — see [isSignInProofRefused], which the forms act
+/// on before anything is shown.
 String applicationServerMessage(DeliveryStrings t, Object error) {
   switch (_codeOf(error)) {
     case 'account-exists':
@@ -32,6 +37,10 @@ String applicationServerMessage(DeliveryStrings t, Object error) {
       return t.wizAccountApplicationDecided;
     case 'email-changed':
       return t.wizAccountEmailChanged;
+    case 'sign-in-proof-missing':
+      return t.wizAccountProofMissing;
+    case 'sign-in-proof-rejected':
+      return t.wizAccountProofRejected;
   }
   if (error is DioException) {
     final Object? body = error.response?.data;
@@ -48,6 +57,18 @@ String applicationServerMessage(DeliveryStrings t, Object error) {
 /// the sign-in made and go straight on to signing in with the passcode just chosen — the one the
 /// sign-in was made with.
 bool isSignInExists(Object error) => _codeOf(error) == 'sign-in-exists';
+
+/// Whether the passcode step refused the secret that proves the application is the applicant's:
+/// the account-setup ticket from the submission was wrong, spent or past its half hour, or no secret
+/// was sent at all.
+///
+/// The reference in the path proves nothing — a rider's delivery company sees it too — so the open
+/// forms answer this by proving the address again: a new code to the application's email, and its
+/// proof sent in the ticket's place. Only that code does; any other refusal is shown as it is.
+bool isSignInProofRefused(Object error) => switch (_codeOf(error)) {
+      'sign-in-proof-rejected' || 'sign-in-proof-missing' => true,
+      _ => false,
+    };
 
 /// A refused application, in the reader's language wherever the server named the refusal.
 ///

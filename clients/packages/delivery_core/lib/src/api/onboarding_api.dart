@@ -72,6 +72,23 @@ class OnboardingApi {
     });
   }
 
+  /// What the open form's submission answers with: the application's reference, and the
+  /// account-setup ticket that alone lets the submitter choose its passcode.
+  ///
+  /// The reference is a display id — support quotes it, and back office and the rider's delivery
+  /// company see it too — so it proves nothing. The ticket does: the server answers it once, to this
+  /// call, keeps only its hash, and takes it for thirty minutes and one sign-in. Hold it in memory and
+  /// hand it straight to [createApplicantAccount]; never log it, store it or put it in a URL. Null only
+  /// from a server older than the ticket — the passcode step then asks for an email code instead.
+  static ({String reference, String? accountTicket}) _submission(Response<dynamic> response) {
+    final Map<String, dynamic> body = response.data as Map<String, dynamic>;
+    final Object? ticket = body['accountTicket'];
+    return (
+      reference: body['reference'] as String,
+      accountTicket: ticket is String && ticket.isNotEmpty ? ticket : null,
+    );
+  }
+
   /// Applies to ride, either for one delivery company or for YouDrop itself.
   ///
   /// [companyId] null means the second of those: no company is named, so the application is the
@@ -80,7 +97,9 @@ class OnboardingApi {
   /// [details] is the signup wizard's free-form answers — vehicle, work region, date of birth —
   /// the arbitrary object the server stores beside the fixed columns and a reviewer reads. See
   /// [OnboardingApplication.details] for why it exists and why it is flattened on the way back.
-  Future<String> applyAsRider({
+  ///
+  /// Answers with the reference and the account-setup ticket — see [_submission].
+  Future<({String reference, String? accountTicket})> applyAsRider({
     required String name,
     required String email,
     required String emailVerificationToken,
@@ -104,22 +123,16 @@ class OnboardingApi {
       'notes': notes,
       'details': details,
     });
-    return (response.data as Map<String, dynamic>)['reference'] as String;
+    return _submission(response);
   }
 
-  /// Applies to sell on YouDrop.
-  ///
-  /// No company is named and none may be: a shop is asking the platform for terms, and a merchant
-  /// carrying a delivery company would turn up in that company's applicant list.
-  ///
-  /// [details] carries the wizard's free-form answers — business type and the like. See
-  /// [OnboardingApplication.details].
   /// Applies to run a delivery company on YouDrop.
   ///
   /// Same wire as the other kinds; everything the carrier wizard collects beyond the contact
   /// block — CR number, company type, fleet counts, operating hours, capabilities, coverage —
-  /// rides in [details], which the application record stores for the reviewer.
-  Future<String> applyAsCarrier({
+  /// rides in [details], which the application record stores for the reviewer. Answers with the
+  /// reference and the account-setup ticket — see [_submission].
+  Future<({String reference, String? accountTicket})> applyAsCarrier({
     required String companyName,
     required String contactName,
     required String email,
@@ -141,10 +154,18 @@ class OnboardingApi {
       'notes': notes,
       'details': details,
     });
-    return (response.data as Map<String, dynamic>)['reference'] as String;
+    return _submission(response);
   }
 
-  Future<String> applyAsMerchant({
+  /// Applies to sell on YouDrop.
+  ///
+  /// No company is named and none may be: a shop is asking the platform for terms, and a merchant
+  /// carrying a delivery company would turn up in that company's applicant list.
+  ///
+  /// [details] carries the wizard's free-form answers — business type and the like. See
+  /// [OnboardingApplication.details]. Answers with the reference and the account-setup ticket —
+  /// see [_submission].
+  Future<({String reference, String? accountTicket})> applyAsMerchant({
     required String businessName,
     required String contactName,
     required String email,
@@ -166,20 +187,33 @@ class OnboardingApi {
       'notes': notes,
       'details': details,
     });
-    return (response.data as Map<String, dynamic>)['reference'] as String;
+    return _submission(response);
   }
 
   /// Chooses a passcode at the end of an application, so the applicant can sign in and watch it.
   ///
   /// Open, like the application itself: the account being created is the one they would otherwise
-  /// need in order to call this. The reference is what stands in for a token.
+  /// need in order to call this. The [reference] only names the application — back office and the
+  /// rider's delivery company see it too — so the call proves it is the applicant's with a secret in
+  /// the body, never the URL: the [accountTicket] the submission answered with, or, once that is lost
+  /// or expired, an [emailVerificationToken] from [confirmCode] on the application's address.
+  ///
+  /// Refused with the code `sign-in-proof-rejected` when the one sent is wrong, spent or late — the
+  /// caller then asks for a fresh email code and sends its proof — and `sign-in-proof-missing` when
+  /// neither is sent.
   Future<void> createApplicantAccount({
     required String reference,
     required String password,
+    String? accountTicket,
+    String? emailVerificationToken,
   }) async {
     await _dio.post<dynamic>(
-      '/api/onboarding/applications/$reference/account',
-      data: <String, dynamic>{'password': password},
+      '/api/onboarding/applications/${Uri.encodeComponent(reference)}/account',
+      data: <String, dynamic>{
+        'password': password,
+        if (accountTicket != null) 'accountTicket': accountTicket,
+        if (emailVerificationToken != null) 'emailVerificationToken': emailVerificationToken,
+      },
     );
   }
 

@@ -258,6 +258,25 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   bool _applicationClosed = false;
   String? _reference;
 
+  /// The account-setup ticket the submission answered with: what lets this applicant — and not
+  /// whoever else can read the [_reference] — choose the passcode.
+  ///
+  /// The reference is a display id: back office sees it, a rider's delivery company sees it and its
+  /// portal prints it. So `POST /applications/{reference}/account` asks for this as well, in the body.
+  /// Held in memory only, for the half hour the server honours it, and dropped once the sign-in is
+  /// made. Null when it was never given (a server older than tickets) or has been refused — the
+  /// passcode step then proves the address again instead ([_reproveEmail]).
+  String? _accountTicket;
+
+  /// A fresh proof of the application's address, from a code answered after the ticket was refused
+  /// or never came: what the passcode step sends in the ticket's place.
+  String? _signInProof;
+
+  /// True while the email round is proving the address again for the sign-in — after the
+  /// application is in — rather than for the application itself. The code screen then says why it is
+  /// asking twice, its answer goes to [_finishAccount], and back returns to the finishing screen.
+  bool _reprovingEmail = false;
+
   /// True once the account exists. Creating it is not retryable — the server refuses a second
   /// sign-in for one application — so a later failure must retry the sign-in alone.
   bool _accountCreated = false;
@@ -438,7 +457,15 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         setState(() {
           _error = null;
           _emailCode.clear();
-          _phase = _Phase.wizard;
+          if (_reprovingEmail) {
+            // The application is in: back is back to where its sign-in waits, whose Try again asks
+            // for a code once more — never to a wizard whose answers were already sent.
+            _reprovingEmail = false;
+            _phase = _Phase.finishing;
+            _error = DeliveryStrings.of(context).wizAccountProofRejected;
+          } else {
+            _phase = _Phase.wizard;
+          }
         });
       case _Phase.verifyPhone:
         setState(() {
@@ -537,13 +564,21 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
       _error = null;
     });
     try {
-      final ({String token, String destination}) result = await widget.api
-          .confirmCode('EMAIL', _email.text.trim(), _emailCode.text.trim());
-      // The server's spelling, not what was typed. The application has to carry exactly what was
-      // verified or it is refused for a reason nobody can see on screen.
-      _verifiedEmail = result.destination;
-      _emailToken = result.token;
-      _emailProvedAs = _email.text.trim();
+      if (_reprovingEmail) {
+        // The application's own address, as the server spelled it: the proof has to name the
+        // address on the application, or the passcode step refuses it.
+        _signInProof = (await widget.api
+                .confirmCode('EMAIL', _verifiedEmail!, _emailCode.text.trim()))
+            .token;
+      } else {
+        final ({String token, String destination}) result = await widget.api
+            .confirmCode('EMAIL', _email.text.trim(), _emailCode.text.trim());
+        // The server's spelling, not what was typed. The application has to carry exactly what was
+        // verified or it is refused for a reason nobody can see on screen.
+        _verifiedEmail = result.destination;
+        _emailToken = result.token;
+        _emailProvedAs = _email.text.trim();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -554,8 +589,41 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
       return;
     }
     if (!mounted) return;
+    if (_reprovingEmail) {
+      setState(() {
+        _busy = false;
+        _reprovingEmail = false;
+        _phase = _Phase.finishing;
+      });
+      await _finishAccount();
+      return;
+    }
     setState(() => _busy = false);
     await _phoneRound();
+  }
+
+  /// Proves the application's address again, for the passcode step alone: a new code to it, and the
+  /// code screen.
+  ///
+  /// For when the account-setup ticket cannot carry the step — refused as spent or past its half hour
+  /// (an applicant who left the retry for later), or never given. The reference cannot stand in: it
+  /// is no secret. A fresh code on the address can, and only the applicant can answer one.
+  Future<void> _reproveEmail() async {
+    _accountTicket = null;
+    _signInProof = null;
+    _emailCode.clear();
+    try {
+      await _sendCode('EMAIL', _verifiedEmail!);
+    } catch (_) {
+      // Already on screen, in the server's words — a code asked for too soon, say. Try again on the
+      // finishing screen asks once more.
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _reprovingEmail = true;
+      _phase = _Phase.verifyEmail;
+    });
   }
 
   Future<void> _confirmPhone() async {
@@ -657,40 +725,44 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
       return;
     }
     try {
-      _reference ??= _isRider
-          ? await widget.api.applyAsRider(
-              name: _name.text.trim(),
-              email: _verifiedEmail!,
-              emailVerificationToken: _emailToken!,
-              // Null when they chose us. The server reads that as an application to YouDrop's own
-              // fleet and routes it to the backoffice rather than to a company.
-              companyId: _company?.id,
-              phone: _verifiedPhone,
-              phoneVerificationToken: _phoneToken,
-              notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
-              details: _details,
-            )
-          : _isCarrier
-              ? await widget.api.applyAsCarrier(
-                  companyName: _business.text.trim(),
-                  contactName: _name.text.trim(),
-                  email: _verifiedEmail!,
-                  emailVerificationToken: _emailToken!,
-                  phone: _verifiedPhone,
-                  phoneVerificationToken: _phoneToken,
-                  notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
-                  details: _details,
-                )
-              : await widget.api.applyAsMerchant(
-                  businessName: _business.text.trim(),
-                  contactName: _name.text.trim(),
-                  email: _verifiedEmail!,
-                  emailVerificationToken: _emailToken!,
-                  phone: _verifiedPhone,
-                  phoneVerificationToken: _phoneToken,
-                  notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
-                  details: _details,
-                );
+      if (_reference == null) {
+        final ({String reference, String? accountTicket}) submitted = _isRider
+            ? await widget.api.applyAsRider(
+                name: _name.text.trim(),
+                email: _verifiedEmail!,
+                emailVerificationToken: _emailToken!,
+                // Null when they chose us. The server reads that as an application to YouDrop's own
+                // fleet and routes it to the backoffice rather than to a company.
+                companyId: _company?.id,
+                phone: _verifiedPhone,
+                phoneVerificationToken: _phoneToken,
+                notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+                details: _details,
+              )
+            : _isCarrier
+                ? await widget.api.applyAsCarrier(
+                    companyName: _business.text.trim(),
+                    contactName: _name.text.trim(),
+                    email: _verifiedEmail!,
+                    emailVerificationToken: _emailToken!,
+                    phone: _verifiedPhone,
+                    phoneVerificationToken: _phoneToken,
+                    notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+                    details: _details,
+                  )
+                : await widget.api.applyAsMerchant(
+                    businessName: _business.text.trim(),
+                    contactName: _name.text.trim(),
+                    email: _verifiedEmail!,
+                    emailVerificationToken: _emailToken!,
+                    phone: _verifiedPhone,
+                    phoneVerificationToken: _phoneToken,
+                    notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+                    details: _details,
+                  );
+        _reference = submitted.reference;
+        _accountTicket = submitted.accountTicket;
+      }
     } catch (e) {
       if (!mounted) return;
       if (_companyRefused(e)) return;
@@ -750,6 +822,11 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   /// fails, because the application already has a sign-in — so a failure after that point must
   /// retry only the sign-in. Without that distinction a single hiccup left somebody tapping a
   /// button against a call that could never succeed again.
+  ///
+  /// Creating it shows the account-setup ticket from the submission, straight from memory — or,
+  /// when the server would not take the ticket (spent, or older than its half hour) or never gave
+  /// one, a proof of the address answered just now ([_reproveEmail]). The reference alone would be
+  /// refused: anybody holding it could otherwise choose this applicant's passcode.
   Future<void> _finishAccount() async {
     final DeliveryStrings t = DeliveryStrings.of(context);
     setState(() {
@@ -767,17 +844,33 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         _session ??= await widget.authService.refresh();
       } else {
         if (!_accountCreated) {
+          if (_accountTicket == null && _signInProof == null) {
+            // Nothing that proves the application is theirs: prove the address first.
+            await _reproveEmail();
+            return;
+          }
           try {
             await widget.api.createApplicantAccount(
               reference: _reference!,
               password: _passcode.text,
+              accountTicket: _signInProof == null ? _accountTicket : null,
+              emailVerificationToken: _signInProof,
             );
           } catch (e) {
+            if (isSignInProofRefused(e)) {
+              // The ticket's half hour ran out while this screen waited, or the proof went stale:
+              // a new code to the address, and its proof in their place.
+              await _reproveEmail();
+              return;
+            }
             // Already made: an earlier try went through and its answer was lost. Straight on to
             // signing in with the passcode it was made with — see [isSignInExists].
             if (!isSignInExists(e)) rethrow;
           }
           _accountCreated = true;
+          // Spent with the sign-in they set up; nothing left worth holding.
+          _accountTicket = null;
+          _signInProof = null;
         }
         _session ??= await widget.authService
             .signInWithPassword(_verifiedEmail!, _passcode.text);
@@ -2279,6 +2372,11 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
           height: 18 / 14,
         ),
       ),
+      // Asked a second time, after the application went in — say why, or it reads like a fault.
+      if (_reprovingEmail) ...<Widget>[
+        const SizedBox(height: DeliverySpacing.md),
+        SoftNote(text: t.wizAccountConfirmAgain, icon: Icons.lock_outline),
+      ],
       const SizedBox(height: DeliverySpacing.lg),
       OneTimeCodeField(
         controller: email ? _emailCode : _phoneCode,
@@ -2293,8 +2391,11 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
           action: t.sendAnother,
           onTap: _busy
               ? null
-              : () => _sendCode(email ? 'EMAIL' : 'PHONE',
-                      email ? _email.text.trim() : _phone.text.trim())
+              : () => _sendCode(
+                      email ? 'EMAIL' : 'PHONE',
+                      email
+                          ? (_reprovingEmail ? _verifiedEmail! : _email.text.trim())
+                          : _phone.text.trim())
                   .catchError((Object _) {}),
         ),
       ),
