@@ -1,6 +1,8 @@
 /// Client-side mirrors of the Product Service storefront DTOs.
 library;
 
+import 'zone_models.dart';
+
 /// What a store sells. Drives the vertical switcher at the top of the home screen.
 enum StoreVertical {
   restaurant('RESTAURANT', 'Restaurants'),
@@ -438,6 +440,7 @@ class Store {
     this.powerUpdatedAt,
     this.powerCurrent = false,
     this.deliveryRadiusMetres,
+    this.deliveryZones,
     this.serviceCategory,
   });
 
@@ -511,6 +514,16 @@ class Store {
 
   /// The merchant's delivery circle in metres, or null for zones-only.
   final int? deliveryRadiusMetres;
+
+  /// The areas this shop delivers to — the other half of where it goes, beside the circle — in the
+  /// picker's order, exactly the areas order placement serves.
+  ///
+  /// Empty: the areas do not limit this shop, it serves every area (never "delivers nowhere").
+  /// Null: the server did not say, as one built before the store read carried areas does not, and
+  /// then nothing may be drawn or concluded from areas at all — an empty list would claim a fact
+  /// nobody sent. Includes areas retired from the picker ([DeliveryZone.active] false) that the
+  /// shop still serves, because a saved address naming one still orders there.
+  final List<DeliveryZone>? deliveryZones;
 
   /// Whether there is a pin to draw or to measure "near me" from.
   bool get hasPin => latitude != null && longitude != null;
@@ -598,6 +611,7 @@ class Store {
         powerUpdatedAt: powerUpdatedAt,
         powerCurrent: powerCurrent,
         deliveryRadiusMetres: deliveryRadiusMetres,
+        deliveryZones: deliveryZones,
         serviceCategory: serviceCategory,
       );
 
@@ -638,8 +652,17 @@ class Store {
             : DateTime.parse(json['powerUpdatedAt'] as String),
         powerCurrent: json['powerCurrent'] as bool? ?? false,
         deliveryRadiusMetres: (json['deliveryRadiusMetres'] as num?)?.toInt(),
+        deliveryZones: _deliveryZonesFrom(json['deliveryZones']),
         serviceCategory: ServiceCategory.maybeFromWire(json['serviceCategory'] as String?),
       );
+
+  /// Null when the key is absent or not a list — an older server, which says nothing about areas.
+  static List<DeliveryZone>? _deliveryZonesFrom(Object? json) => json is List<dynamic>
+      ? json
+          .whereType<Map<String, dynamic>>()
+          .map(DeliveryZone.fromJson)
+          .toList(growable: false)
+      : null;
 }
 
 /// One window in which a store is open.
