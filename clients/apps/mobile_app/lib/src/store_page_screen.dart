@@ -5,10 +5,9 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
+import 'basket_add.dart';
 import 'cart.dart';
 import 'product_detail_screen.dart';
-import 'product_options_sheet.dart';
-import 'shop_limit_dialog.dart';
 import 'store_power_chip.dart';
 import 'store_state_mapping.dart';
 
@@ -52,6 +51,7 @@ class StorePageScreen extends StatefulWidget {
     this.onFavoriteChanged,
     this.layout = StorePageLayout.standard,
     this.shopChatAction,
+    this.initialSearch,
   });
 
   /// Which design to draw. The neighbourhood browse and its map open shops as
@@ -115,6 +115,12 @@ class StorePageScreen extends StatefulWidget {
   /// error rather than a bar that goes nowhere — which is what the pop was, quietly, for everyone.
   final VoidCallback onOpenBasket;
 
+  /// Opens the shop with its shelf already searched for these words, the search field open and
+  /// showing them. How the item search's "N more in this shop" lands on the rest of what it found
+  /// here: the shelf search matches as the item search does (product-service
+  /// `ProductRepository.findActiveInStoreMatching`). Null or blank opens the shelf unsearched.
+  final String? initialSearch;
+
   @override
   State<StorePageScreen> createState() => _StorePageScreenState();
 }
@@ -158,6 +164,13 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
   @override
   void initState() {
     super.initState();
+    // Before the first read, so the first page is already the searched shelf.
+    final String? initial = widget.initialSearch?.trim();
+    if (initial != null && initial.isNotEmpty) {
+      _search = initial;
+      _searchController.text = initial;
+      _searchOpen = true;
+    }
     _products.addListener(_rebuild);
     _load();
   }
@@ -285,85 +298,17 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
     if (_searchOpen) _tabs.animateTo(0);
   }
 
-  /// Cached per product so re-tapping Add does not re-fetch a menu that cannot have changed
-  /// while this screen is open.
-  final Map<String, List<OptionGroup>> _optionGroups = <String, List<OptionGroup>>{};
+  /// Add, and a tap on a row, as every list that draws products does them ([BasketAdd]): the shop
+  /// limit, then the product's questions, then the basket.
+  late final BasketAdd _basket = BasketAdd(
+      storeApi: widget.storeApi, cart: widget.cart, onOpenBasket: widget.onOpenBasket);
 
   /// Adds a product, asking its questions first if it has any.
-  ///
-  /// The options are fetched on demand rather than with the shelf: most products have none, and
-  /// loading every product's option tree to render a list would undo the paging.
-  Future<void> _add(Product product) async {
-    if (widget.cart.exceedsShopLimit(product, from: _card)) {
-      await _explainShopLimit();
-      return;
-    }
-
-    List<OptionGroup> groups = _optionGroups[product.id] ?? const <OptionGroup>[];
-    if (!_optionGroups.containsKey(product.id)) {
-      try {
-        groups = await widget.storeApi.productOptions(product.id);
-        _optionGroups[product.id] = groups;
-      } catch (_) {
-        // A menu that will not load must not block a product that probably has no options; the
-        // server revalidates at checkout either way.
-        _optionGroups[product.id] = const <OptionGroup>[];
-        groups = const <OptionGroup>[];
-      }
-    }
-
-    if (groups.isEmpty) {
-      widget.cart.add(product, from: _card);
-      return;
-    }
-    if (!mounted) return;
-    await _openDetail(product, groups);
-  }
-
-  /// The full product screen the redesign promotes the options sheet into.
-  Future<void> _openDetail(Product product, List<OptionGroup> groups) async {
-    final ConfiguredProduct? configured = await showProductDetail(
-      context,
-      api: widget.storeApi,
-      product: product,
-      groups: groups,
-    );
-    if (configured != null) {
-      widget.cart.addConfigured(configured, from: _card);
-    }
-  }
+  Future<void> _add(Product product) => _basket.add(context, product, from: _card);
 
   /// Opening a row rather than its add button: the detail screen is the frame's own destination
   /// for a product, options or not.
-  Future<void> _openProduct(Product product) async {
-    if (widget.cart.exceedsShopLimit(product, from: _card)) {
-      await _explainShopLimit();
-      return;
-    }
-    List<OptionGroup> groups = _optionGroups[product.id] ?? const <OptionGroup>[];
-    if (!_optionGroups.containsKey(product.id)) {
-      try {
-        groups = await widget.storeApi.productOptions(product.id);
-        _optionGroups[product.id] = groups;
-      } catch (_) {
-        _optionGroups[product.id] = const <OptionGroup>[];
-        groups = const <OptionGroup>[];
-      }
-    }
-    if (!mounted) return;
-    await _openDetail(product, groups);
-  }
-
-  /// The one limit a basket still has, explained at the moment of the tap rather than as a 422 at
-  /// checkout: items from at most [Cart.maxShops] shops at once.
-  ///
-  /// It used to be one shop, and adding from a second offered to throw the first shop's basket
-  /// away. Nothing is thrown away now: the customer is shown the way to the basket, where they
-  /// choose which shop to check out or remove.
-  Future<void> _explainShopLimit() async {
-    final bool openBasket = await explainShopLimit(context);
-    if (openBasket && mounted) widget.onOpenBasket();
-  }
+  Future<void> _openProduct(Product product) => _basket.open(context, product, from: _card);
 
   Future<void> _toggleFavorite() async {
     final Store? store = _store;
