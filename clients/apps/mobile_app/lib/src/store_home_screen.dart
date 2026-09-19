@@ -89,7 +89,8 @@ class StoreHomeScreen extends StatefulWidget {
   /// Opens the gift hub (Figma 112:1684) over the shell. Null draws no entry.
   final VoidCallback? onOpenGiftHub;
 
-  /// The neighbourhood room behind the chat entry under the browse entry. Null leaves it undrawn.
+  /// The neighbourhood room behind the chat tile beside the browse. Null leaves it undrawn, and the
+  /// browse then takes the whole row.
   final NeighbourhoodChatApi? neighbourhoodChatApi;
 
   /// App Notification's socket, for the room's live messages.
@@ -444,12 +445,12 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                 else if (_error != null)
                   SliverFillRemaining(hasScrollBody: false, child: _errorState())
                 else ...<Widget>[
-                  SliverToBoxAdapter(child: _neighbourhoodEntry(t)),
-                  if (widget.neighbourhoodChatApi != null)
-                    SliverToBoxAdapter(child: _neighbourhoodChatEntry(t)),
                   // Banners sit above the offers rail: designed artwork the business chose to lead
                   // with, ahead of the mechanical list of discounts.
                   if (_banners.isNotEmpty) SliverToBoxAdapter(child: _bannerRail()),
+                  // The neighbourhood's two doors, side by side under the banner — where the owner
+                  // asked for them. With no banner to sit under, they take its place.
+                  SliverToBoxAdapter(child: _neighbourhoodRow(t)),
                   if (_railFavorites.isNotEmpty)
                     SliverToBoxAdapter(child: _featuredSection()),
                   SliverToBoxAdapter(
@@ -954,84 +955,142 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
     ));
   }
 
+  /// The neighbourhood's two doors, the browse and the chat room, side by side in one row under
+  /// the banner rail. The owner asked for them "beside each other under the banner"; they used to
+  /// be two full-width cards stacked above it.
+  ///
+  /// Two equal columns with the house two-up gap. The shop grid further down uses the same gap, so
+  /// on a phone the tiles line up with its columns. [IntrinsicHeight] gives both tiles the height
+  /// of whichever has more to say, and each whole tile is its own tap target. A stretched Row alone
+  /// would not do it: inside the scroll view its height is unbounded. With no chat room, the
+  /// browse does not sit beside an empty half. It takes the whole row, as the full-width card it
+  /// was drawn as.
+  Widget _neighbourhoodRow(DeliveryStrings t) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          _gutter, DeliverySpacing.sm, _gutter, DeliverySpacing.sm),
+      child: widget.neighbourhoodChatApi == null
+          ? _neighbourhoodEntry(t, compact: false)
+          : IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Expanded(child: _neighbourhoodEntry(t, compact: true)),
+                  const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+                  Expanded(child: _neighbourhoodChatEntry(t)),
+                ],
+              ),
+            ),
+    );
+  }
+
   /// The door to the neighbourhood browse (Figma 112:1941).
   ///
-  /// That screen existed long before anything opened it — the surface checklist carried it as
-  /// UNREACHABLE — so it gets a place on Home, just under the category tiles, where somebody asking
-  /// "what is near me" already is. The frames draw no entry card of their own; this is the home
-  /// feed's own card language, and it names the screen it opens.
-  Widget _neighbourhoodEntry(DeliveryStrings t) => _homeEntryCard(
+  /// That screen existed long before anything opened it (the surface checklist carried it as
+  /// UNREACHABLE), so it has a place on Home where somebody asking "what is near me" already is.
+  /// The frames draw no entry card of their own; this is the home feed's own card language, and it
+  /// names the screen it opens. Half of the neighbourhood row when the chat room is beside it, the
+  /// whole row when it is not.
+  Widget _neighbourhoodEntry(DeliveryStrings t, {required bool compact}) => _homeEntryCard(
         icon: Icons.storefront_rounded,
         title: t.dekkaneBrowseTitle,
         subtitle: t.dekkaneEntrySub,
         onTap: _openNeighbourhood,
+        compact: compact,
       );
 
-  /// The door to the neighbourhood's chat room (Figma 121:102), right under the browse because it
-  /// is the same neighbourhood: the shops near the address, then the people. The frame marks Home
-  /// as the tab it belongs to and draws no entry of its own, so it takes the feed's card language.
+  /// The door to the neighbourhood's chat room (Figma 121:102). It sits beside the browse because
+  /// both are the same neighbourhood: the shops near the address, and the people. The frame marks
+  /// Home as the tab it belongs to and draws no entry of its own, so it takes the feed's card
+  /// language. Only ever drawn as a half tile: when there is no room there is no tile at all.
   Widget _neighbourhoodChatEntry(DeliveryStrings t) => _homeEntryCard(
         icon: Icons.forum_rounded,
         title: t.chatRoomEntryTitle,
         subtitle: t.chatRoomEntrySub,
         onTap: _openNeighbourhoodChat,
+        compact: true,
       );
 
+  /// The home feed's entry card: the glyph on a brand-soft disc, a bold title over a muted line, a
+  /// chevron, and the whole card one tap target.
+  ///
+  /// The card comes in two shapes. At full width, the disc, the words and the chevron share one
+  /// line. [compact] is the half-width tile the neighbourhood row pairs up. On a 320dp phone that
+  /// tile is 130dp wide, which leaves the words 106dp even before a 40dp disc takes its share. So
+  /// in the tile the disc and the chevron take the top line, and the words get the tile's whole
+  /// width underneath.
+  ///
+  /// The tile's sizes were measured with the app's own Rubik, not guessed. At 14sp,
+  /// "Neighbourhood" is 108dp wide and would break mid-word at 320dp; at 13sp it fits. The
+  /// browse's subtitle needs four lines at 320dp, so capping it at the full card's two would cut
+  /// it short on the phones this has to fit. The caps are only a backstop against copy nobody
+  /// measured. The tile's height is never fixed, so larger text makes the row taller and never
+  /// clips it.
   Widget _homeEntryCard({
     required IconData icon,
     required String title,
     required String subtitle,
     required VoidCallback onTap,
+    bool compact = false,
   }) {
-    return Padding(
-      padding: const EdgeInsetsDirectional.fromSTEB(
-          _gutter, DeliverySpacing.sm, _gutter, DeliverySpacing.sm),
-      child: YdCard(
-        onTap: onTap,
-        padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - 4),
-        child: Row(
-          children: <Widget>[
-            Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(
-                  color: DeliveryColors.brandSoft, shape: BoxShape.circle),
-              child: Icon(icon, size: 20, color: DeliveryColors.brand),
-            ),
-            const SizedBox(width: DeliverySpacing.md - 4),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: DeliveryColors.ink,
-                      height: 1.25,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, color: DeliveryColors.muted, height: 1.3),
-                  ),
-                ],
-              ),
-            ),
-            // Always chevron_right: the icon is declared with matchTextDirection, so Icon already
-            // mirrors it in Arabic, and choosing chevron_left there would flip it a second time.
-            const Icon(Icons.chevron_right, size: 20, color: DeliveryColors.faint),
-          ],
+    final Widget disc = Container(
+      width: 40,
+      height: 40,
+      alignment: Alignment.center,
+      decoration: const BoxDecoration(color: DeliveryColors.brandSoft, shape: BoxShape.circle),
+      child: Icon(icon, size: 20, color: DeliveryColors.brand),
+    );
+    // Always chevron_right: the icon is declared with matchTextDirection, so Icon already mirrors
+    // it in Arabic, and choosing chevron_left there would flip it a second time.
+    const Widget chevron = Icon(Icons.chevron_right, size: 20, color: DeliveryColors.faint);
+    final Widget words = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Text(
+          title,
+          // Two lines, in both shapes: a long title wraps rather than losing its end, which at
+          // full width with large text is what a single line used to do.
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: compact ? 13 : 15,
+            fontWeight: FontWeight.w700,
+            color: DeliveryColors.ink,
+            height: 1.25,
+          ),
         ),
-      ),
+        const SizedBox(height: 2),
+        Text(
+          subtitle,
+          maxLines: compact ? 4 : 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 12, color: DeliveryColors.muted, height: 1.3),
+        ),
+      ],
+    );
+
+    return YdCard(
+      onTap: onTap,
+      padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - DeliverySpacing.xs),
+      child: compact
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Row(children: <Widget>[disc, const Spacer(), chevron]),
+                const SizedBox(height: DeliverySpacing.sm),
+                words,
+              ],
+            )
+          : Row(
+              children: <Widget>[
+                disc,
+                const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+                Expanded(child: words),
+                chevron,
+              ],
+            ),
     );
   }
 
@@ -1172,9 +1231,13 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   /// The banner carousel: full-bleed artwork the Backoffice curates, advancing on its own
   /// every four seconds at the operator's request. Swiping by hand still works and the timer
   /// picks up from wherever the customer left it.
+  ///
+  /// The gap above it used to come from the neighbourhood cards stacked on top of it. Now that
+  /// those sit underneath, the rail carries that gap itself, so it does not butt against the
+  /// category cards or the gift card.
   Widget _bannerRail() {
     return Padding(
-      padding: const EdgeInsetsDirectional.only(bottom: DeliverySpacing.sm),
+      padding: const EdgeInsetsDirectional.symmetric(vertical: DeliverySpacing.sm),
       child: Column(
         children: <Widget>[
           SizedBox(
