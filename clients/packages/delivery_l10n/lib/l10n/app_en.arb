@@ -3876,7 +3876,7 @@
   "carrCashBoOverdueNote": "Some cash has been out longer than the platform's limit. Nothing is wrong with the ledger: this is money the bank has not seen yet.",
   "carrCashBoLoadFailed": "What delivery companies hold could not be loaded just now. The rest of this page is unaffected.",
   "carrCashBoMethodLabel": "How it was paid (optional)",
-  "dekkaneBrowseTitle": "Your Neighborhood",
+  "dekkaneBrowseTitle": "Your neighbourhood",
   "dekkaneBrowseSubRegion": "Local {region} dekkanes",
   "@dekkaneBrowseSubRegion": {
     "placeholders": {

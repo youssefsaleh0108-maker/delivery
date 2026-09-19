@@ -7876,7 +7876,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get carrCashBoMethodLabel => 'How it was paid (optional)';
 
   @override
-  String get dekkaneBrowseTitle => 'Your Neighborhood';
+  String get dekkaneBrowseTitle => 'Your neighbourhood';
 
   @override
   String dekkaneBrowseSubRegion(String region) {
