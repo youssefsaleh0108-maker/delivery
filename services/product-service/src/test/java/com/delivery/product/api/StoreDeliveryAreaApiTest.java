@@ -41,9 +41,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * map: the circle it already carried (the pin and {@code deliveryRadiusMetres}) and, beside it, the
  * areas it delivers to — the same list order placement serves ({@code servedAreasOf}).
  *
- * <p>What is pinned is the wire shape the app reads: each area's id, name and region, its centre
- * only as the back office placed it, and an empty list — never a missing or null one — for a shop
- * whose areas do not limit it.
+ * <p>What is pinned is the wire shape the app reads — the area picker's own shape, so the app parses
+ * it with the model it has: each area's id, name, region, rank and whether it is still in the picker,
+ * its centre only as the back office placed it, and an empty list — never a missing or null one —
+ * for a shop whose areas do not limit it.
  */
 @DisplayName("a shop's delivery area on its store read")
 class StoreDeliveryAreaApiTest {
@@ -92,6 +93,8 @@ class StoreDeliveryAreaApiTest {
         DeliveryZone hamra = new DeliveryZone("Hamra", "Beirut", 10);
         hamra.placeAt(GeoPoint.of(33.896000d, 35.480000d));
         DeliveryZone verdun = new DeliveryZone("Verdun", "Beirut", 20);
+        // Out of the picker, still served: a saved address that names it still orders there.
+        verdun.retire();
         when(zones.servedAreasOf(grocer.getId())).thenReturn(List.of(hamra, verdun));
 
         mvc.perform(get("/api/stores/{id}", grocer.getId()))
@@ -103,10 +106,13 @@ class StoreDeliveryAreaApiTest {
                 .andExpect(jsonPath("$.deliveryZones[0].id").value(hamra.getId().toString()))
                 .andExpect(jsonPath("$.deliveryZones[0].name").value("Hamra"))
                 .andExpect(jsonPath("$.deliveryZones[0].region").value("Beirut"))
+                .andExpect(jsonPath("$.deliveryZones[0].sortOrder").value(10))
+                .andExpect(jsonPath("$.deliveryZones[0].active").value(true))
                 .andExpect(jsonPath("$.deliveryZones[0].centerLat").value(33.896))
                 .andExpect(jsonPath("$.deliveryZones[0].centerLng").value(35.48))
                 // Not placed yet: listed by name, with no invented position.
                 .andExpect(jsonPath("$.deliveryZones[1].name").value("Verdun"))
+                .andExpect(jsonPath("$.deliveryZones[1].active").value(false))
                 .andExpect(jsonPath("$.deliveryZones[1].centerLat").doesNotExist())
                 .andExpect(jsonPath("$.deliveryZones[1].centerLng").doesNotExist());
     }

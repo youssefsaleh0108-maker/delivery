@@ -122,15 +122,17 @@ public final class StoreDtos {
     }
 
     /**
-     * One area a shop delivers to.
+     * One area a shop delivers to, in the shape the area picker already reads
+     * ({@code GET /api/delivery-zones}), so a client parses it with the model it has.
      *
      * <p>An area is a name the customer picks for their address ("Hamra"), and whether a shop goes
      * there is decided by that pick alone, never by distance. The centre is roughly the middle of
      * the neighbourhood, entered by the back office (V30) — a place to put the name on a map, NOT a
-     * boundary — and null until the area has been placed. Both or neither.
+     * boundary — and null until the area has been placed. Both or neither. {@code active} is false
+     * for an area retired from the picker that the shop still serves.
      */
-    public record ServedZoneResponse(UUID id, String name, String region,
-                                     BigDecimal centerLat, BigDecimal centerLng) {
+    public record ServedZoneResponse(UUID id, String name, String region, int sortOrder,
+                                     boolean active, BigDecimal centerLat, BigDecimal centerLng) {
     }
 
     /** The card shape: everything a storefront grid needs and nothing it does not. */

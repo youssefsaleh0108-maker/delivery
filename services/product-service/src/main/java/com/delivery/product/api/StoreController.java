@@ -801,7 +801,8 @@ public class StoreController {
     private List<ServedZoneResponse> servedZonesOf(Store store) {
         return deliveryZones.servedAreasOf(store.getId()).stream()
                 .map(zone -> new ServedZoneResponse(zone.getId(), zone.getName(), zone.getRegion(),
-                        zone.getCenterLat(), zone.getCenterLng()))
+                        zone.getSortOrder(), zone.isActive(), zone.getCenterLat(),
+                        zone.getCenterLng()))
                 .toList();
     }
 
