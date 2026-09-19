@@ -23,6 +23,8 @@
 #   lock-unused-db-roles  NOLOGIN for the database roles no service logs in as
 #   test-accounts [--disable]  count (and, with --disable, disable) accounts the repository's test
 #                         scripts created with passcodes printed in those scripts
+#   user-profile-stamp    declare the admin-only onboardingApplicationId attribute in the live
+#                         realm's user profile (the rider sign-up needs it; idempotent)
 #   verify                prove all of it: pods Ready, API 401/200, every consumer holds its Secret's
 #                         value, current values accepted, the repository's values refused
 #
@@ -41,9 +43,9 @@ STEP="${2:?usage: rotate-secrets.sh <namespace> <step> [args]}"
 shift 2
 ENV_NAME="${NS#delivery-}"
 REALM=delivery-platform
-IAM="https://iam-$ENV_NAME.youdrop.shop"
-API="https://api-$ENV_NAME.youdrop.shop"
-MON="https://monitoring-$ENV_NAME.youdrop.shop"
+IAM="${IAM:-https://iam-$ENV_NAME.youdrop.shop}"     # overridable for the offline tests only
+API="${API:-https://api-$ENV_NAME.youdrop.shop}"
+MON="${MON:-https://monitoring-$ENV_NAME.youdrop.shop}"
 TOKEN_URL="$IAM/realms/$REALM/protocol/openid-connect/token"
 ADMIN="$IAM/admin/realms/$REALM"
 OLD_TAR="${OLD_TAR:-/dev/shm/rotation-old.tar}"
@@ -128,6 +130,28 @@ demo_client() { [ "$1" = backoffice ] && echo delivery-portal || echo mobile-app
 # Key NAMES of a Vault path, read through the reseed sidecar (which holds the token); never values.
 vault_keys() { k exec deploy/vault -c vault-reseed -- vault kv get -format=json "secret/$1" 2>/dev/null | jq -r '.data.data | keys | join(",")'; }
 psqlq() { k exec postgres-0 -- psql -U delivery -d delivery -At -c "$1"; }
+# db_login <role> <password-file>: psql as <role> over TCP to the pod's own address, where pg_hba
+# demands the password (the socket and 127.0.0.1 are trust, and would prove nothing). The password
+# goes in on stdin. Prints psql's answer: "1", or its error.
+db_login() {
+  k exec -i postgres-0 -- sh -c 'IFS= read -r PGPASSWORD; export PGPASSWORD; psql -h "$(hostname -i | cut -d" " -f1)" -U "$1" -d delivery -At -c "select 1" 2>&1' sh "$1" < "$2"
+}
+# config_sources <app>: config-server's HTTP code and the NAMES of its property sources for <app>,
+# e.g. "200 application-default,vault:accounting-service,vault:application". The body holds values
+# and stays in the private directory.
+config_sources() {
+  local ip code
+  ip=$(k get svc config-server -o jsonpath='{.spec.clusterIP}')
+  if [ ! -s "$WORK/cfg-curl" ]; then
+    secret_key_to platform-secrets CONFIG_SERVER_USER "$WORK/cfg-u"
+    secret_key_to platform-secrets CONFIG_SERVER_PASSWORD "$WORK/cfg-p"
+    { printf 'user = "'; cat "$WORK/cfg-u"; printf ':'; cat "$WORK/cfg-p"; printf '"\n'; } > "$WORK/cfg-curl"
+    rm -f "$WORK/cfg-u" "$WORK/cfg-p"
+  fi
+  code=$(curl -s -o "$WORK/cfg-body" -w '%{http_code}' -K "$WORK/cfg-curl" "http://$ip:8888/$1/default")
+  printf '%s %s' "$code" "$(jq -r '[.propertySources[]?.name] | join(",")' "$WORK/cfg-body" 2>/dev/null)"
+  rm -f "$WORK/cfg-body"
+}
 
 # -------------------------------------------------------------------------------------- Keycloak
 KC_AT=0
@@ -257,8 +281,7 @@ step_check_old() {   # a preflight: is every exposed value the refusal proofs ne
   old_value opsline - "$WORK/x"; check "ops-auth-users holds the repository's hash" 1 "$(k get secret ops-auth-users -o jsonpath='{.data.users}' | base64 -d | grep -c -F -f "$WORK/x")"
   for r in $UNUSED_ROLES; do
     old_value dbrole "$r" "$WORK/x"
-    code=$(k exec -i postgres-0 -- sh -c "IFS= read -r PGPASSWORD; export PGPASSWORD; psql -h postgres -U $r -d delivery -At -c 'select 1' 2>&1" < "$WORK/x")
-    check "$r logs in with the repository's password" 1 "$code"
+    check "$r logs in with the repository's password" 1 "$(db_login "$r" "$WORK/x")"
   done
   rm -f "$WORK/x"
 }
@@ -361,8 +384,14 @@ step_vault_reseed() {
   k rollout restart deploy/vault >/dev/null || die "could not restart vault"
   # Ready means seeded: the sidecar's readiness gates on the seed's completion marker.
   k rollout status deploy/vault --timeout=300s >/dev/null || die "vault did not come back"
+  # The Config Server logged in to the Vault that just went away. It renews or logs in again only on
+  # its token's schedule (up to an hour), and until then a service that starts could not fetch its
+  # configuration. A restart logs it in to this Vault now.
+  restart config-server
   for p in accounting-service notifications-manager; do
     check "Vault's secret/$p no longer carries a client secret" absent "$(vault_keys "$p" | grep -q client-secret && echo present || echo absent)"
+    r=$(config_sources "$p")
+    check "config-server serves $p its Vault source again" yes "$(case "$r" in "200 "*"vault:$p"*) echo yes ;; *) echo "no: $r" ;; esac)"
   done
 }
 
@@ -408,11 +437,56 @@ step_lock_unused_db_roles() {
   for r in $UNUSED_ROLES; do
     check "$r cannot log in" f "$(psqlq "select rolcanlogin from pg_roles where rolname = '$r'")"
     if old_value dbrole "$r" "$WORK/db-old"; then
-      # Over TCP (the socket is trust), with the repository's password on stdin.
-      out=$(k exec -i postgres-0 -- sh -c "IFS= read -r PGPASSWORD; export PGPASSWORD; psql -h postgres -U $r -d delivery -c 'select 1' 2>&1" < "$WORK/db-old")
+      out=$(db_login "$r" "$WORK/db-old")
       check "$r with the repository's password" refused "$(printf '%s' "$out" | grep -q 'not permitted to log in' && echo refused || echo not-refused)"
     fi
   done
+}
+
+step_user_profile_stamp() {
+  # The rider sign-up stamps the account it creates with its application's id, in an attribute only
+  # an administrator (the onboarding service account) may see or write. Keycloak's declarative user
+  # profile DISCARDS any attribute it does not declare, silently, and a realm-file change never
+  # reaches an existing realm, so the declaration goes in here, through the admin API, exactly as the
+  # realm file has it: view and edit admin only, no user permission, not required, single-valued.
+  # Idempotent: present and right is left alone; present and wrong is corrected.
+  local state before after code
+  kc_login
+  kc "$ADMIN/users/profile" > "$WORK/up.json"
+  jq -e '.attributes | type == "array"' "$WORK/up.json" >/dev/null 2>&1 || die "could not read the realm's user profile"
+  before=$(jq -r '[.attributes[].name] | sort | join(",")' "$WORK/up.json")
+  state=$(python3 - "$WORK/up.json" "$WORK/up-new.json" <<'PY'
+import json, sys
+cfg = json.load(open(sys.argv[1]))
+want = {"name": "onboardingApplicationId", "displayName": "Onboarding application",
+        "permissions": {"view": ["admin"], "edit": ["admin"]}, "multivalued": False}
+attrs = cfg["attributes"]
+cur = next((a for a in attrs if a.get("name") == want["name"]), None)
+def right(a):
+    p = a.get("permissions") or {}
+    return p.get("view") == ["admin"] and p.get("edit") == ["admin"] and not a.get("required") and not a.get("multivalued")
+if cur is None:
+    attrs.append(want); state = "added"
+elif right(cur):
+    state = "present"
+else:
+    attrs[attrs.index(cur)] = want; state = "corrected"
+json.dump(cfg, open(sys.argv[2], "w"))
+print(state)
+PY
+)
+  if [ "$state" != present ]; then
+    code=$(kc -o /dev/null -w '%{http_code}' -X PUT -H 'Content-Type: application/json' --data-binary @"$WORK/up-new.json" "$ADMIN/users/profile")
+    check "the user profile accepted onboardingApplicationId ($state)" 200 "$code"
+  else
+    ok "onboardingApplicationId was already declared this way; nothing written"
+  fi
+  kc "$ADMIN/users/profile" > "$WORK/up.json"
+  check "onboardingApplicationId: view admin only" '["admin"]' "$(jq -c '.attributes[] | select(.name == "onboardingApplicationId") | .permissions.view' "$WORK/up.json")"
+  check "onboardingApplicationId: edit admin only" '["admin"]' "$(jq -c '.attributes[] | select(.name == "onboardingApplicationId") | .permissions.edit' "$WORK/up.json")"
+  check "onboardingApplicationId: not required, single-valued" 'null false' "$(jq -r '.attributes[] | select(.name == "onboardingApplicationId") | "\(.required) \(.multivalued // false)"' "$WORK/up.json")"
+  after=$(jq -r '[.attributes[].name] | sort | join(",")' "$WORK/up.json")
+  check "every attribute declared before is still declared" yes "$(python3 -c 'import sys; b=set(sys.argv[1].split(",")); a=set(sys.argv[2].split(",")); print("yes" if b <= a else "no: lost " + ",".join(sorted(b - a)))' "$before" "$after")"
 }
 
 step_test_accounts() {
@@ -517,6 +591,7 @@ case "$STEP" in
   drop-stale-keys) step_drop_stale_keys ;;
   lock-unused-db-roles) step_lock_unused_db_roles ;;
   test-accounts) step_test_accounts "$@" ;;
+  user-profile-stamp) step_user_profile_stamp ;;
   verify) step_verify ;;
   *) die "unknown step '$STEP' (see the header of this script)" ;;
 esac
