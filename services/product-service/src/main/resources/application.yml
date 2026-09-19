@@ -147,10 +147,22 @@ delivery:
     # (and whose own delivery circle reaches the pin) are searched; the radius is the server's, never a
     # request's. max-candidates caps the matching products one search reads, best matches first, so a
     # two-letter search in a large catalogue cannot pull it all into memory; an answer that reached the
-    # cap says so (truncated), and the app words an empty one as "among the best matches".
+    # cap says so (truncated), and the app words an empty one as "among the best matches". Each shop
+    # takes at most three of those rows, nearest shops first, and shops closed now take none.
+    #
+    # What one search may cost: every statement of it runs under statement-timeout (SET LOCAL
+    # statement_timeout), and one the database cancels is a 503 SEARCH_TIMED_OUT. At 150,000 products
+    # an ordinary search takes 2-30 ms and the widest the rules allow (three terms of five common
+    # words) about 0.15 s, so 2s is room for a busy database, not a budget. One signed-in account may
+    # run per-account-burst searches at once, then per-account-per-minute (429 SEARCH_RATE_LIMITED
+    # past that): Home searches 350 ms after the customer pauses typing, and the results page as they
+    # scroll, which stays well inside it.
     item-search:
       radius-metres: 5000
       max-candidates: 300
+      statement-timeout: 2s
+      per-account-burst: 15
+      per-account-per-minute: 60
 
     # Merchant Blitz: shelf photos in, a draft catalogue out (CatalogScanService).
     scan:

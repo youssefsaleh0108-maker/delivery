@@ -27,6 +27,7 @@ import com.delivery.product.service.ItemSearchService;
 import com.delivery.product.service.ItemSearchService.ItemQuery;
 import com.delivery.product.service.ItemSearchService.ItemSearchResult;
 import com.delivery.product.service.ItemSearchService.ShopMatch;
+import com.delivery.product.service.ItemSearchThrottle;
 import com.delivery.product.service.ProductImageService;
 import com.delivery.product.service.StoreService;
 
@@ -41,7 +42,8 @@ import com.delivery.product.service.StoreService;
  * <p>Any signed-in caller, like the storefront and "near me", and for their reason: a point is where
  * somebody is standing, so no signed-out caller gets a proximity oracle, while a customer, a merchant
  * checking their own listing and back office all read the same public cards and shelves. Nothing here
- * is scoped to the caller except the star on each card, which is the caller's own.
+ * is scoped to the caller except the star on each card, which is the caller's own, and the limit on how
+ * often one account may search ({@link ItemSearchThrottle}), which is counted per account.
  */
 @RestController
 @RequestMapping("/api/products/search")
@@ -54,13 +56,16 @@ public class ItemSearchController {
     private final StoreService storeService;
     private final CatalogService catalog;
     private final ProductImageService images;
+    private final ItemSearchThrottle throttle;
 
     public ItemSearchController(ItemSearchService itemSearch, StoreService storeService,
-                                CatalogService catalog, ProductImageService images) {
+                                CatalogService catalog, ProductImageService images,
+                                ItemSearchThrottle throttle) {
         this.itemSearch = itemSearch;
         this.storeService = storeService;
         this.catalog = catalog;
         this.images = images;
+        this.throttle = throttle;
     }
 
     /**
@@ -70,6 +75,14 @@ public class ItemSearchController {
      * {@code code}: {@code SEARCH_TOO_SHORT} (nothing to search, or a term under 2 characters),
      * {@code SEARCH_TOO_LONG}, {@code SEARCH_TOO_MANY_TERMS}, {@code SEARCH_BAD_BARCODE}; and 400
      * "Invalid location" for half a point, one out of range, or (0, 0), as every coordinate here is.
+     * Once folded, a term with no word of two characters or more is {@code SEARCH_TOO_SHORT} and one
+     * with more than five is {@code SEARCH_TOO_MANY_WORDS}. 429 {@code SEARCH_RATE_LIMITED} when the
+     * account has searched too often, and 503 {@code SEARCH_TIMED_OUT} when the database gave up; both
+     * with Retry-After.
+     *
+     * <p>The request is checked before the account is counted, so a search refused as malformed costs
+     * the customer nothing; the account is counted before anything is read, so a refused one costs the
+     * database nothing.
      */
     @PostMapping("/items")
     @PreAuthorize("isAuthenticated()")
@@ -77,6 +90,7 @@ public class ItemSearchController {
         ItemQuery query = ItemQuery.of(request.q(), request.terms(), request.barcode());
         // Built before anything is read, so half a point or (0, 0) is refused rather than searched.
         GeoPoint centre = GeoPoint.ofNullable(request.latitude(), request.longitude());
+        throttle.acquire(CurrentUser.requireId());
         ItemSearchResult result = itemSearch.search(query, centre,
                 request.page() == null ? 0 : request.page(),
                 request.size() == null ? DEFAULT_PAGE_SIZE : request.size());

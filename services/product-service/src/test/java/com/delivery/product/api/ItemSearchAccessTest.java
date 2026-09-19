@@ -18,8 +18,10 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.authorization.method.AuthorizationManagerBeforeMethodInterceptor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -40,7 +42,10 @@ import com.delivery.product.service.ItemSearchService;
 import com.delivery.product.service.ItemSearchService.ItemQuery;
 import com.delivery.product.service.ItemSearchService.ItemSearchResult;
 import com.delivery.product.service.ItemSearchService.SearchRefusedException;
+import com.delivery.product.service.ItemSearchService.SearchTimedOutException;
 import com.delivery.product.service.ItemSearchService.ShopMatch;
+import com.delivery.product.service.ItemSearchThrottle;
+import com.delivery.product.service.ItemSearchThrottle.SearchThrottledException;
 import com.delivery.product.service.ProductImageService;
 import com.delivery.product.service.StoreService;
 import com.delivery.product.service.StoreService.StoreView;
@@ -54,6 +59,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -63,7 +69,8 @@ import static org.mockito.Mockito.when;
  * <p>The controller is wrapped in Spring Security's real {@code @PreAuthorize} interceptor, as in
  * {@code DeliveryZoneAroundAccessTest}, so the rule is exercised rather than read off the annotation.
  * Any signed-in caller may search, whatever their role, and a caller who is not signed in is refused
- * before anything is read: a point is where somebody is standing.
+ * before anything is read: a point is where somebody is standing. One account may search a person's
+ * share, and past it is refused before anything is read too.
  */
 @DisplayName("searching items, over the API")
 class ItemSearchAccessTest {
@@ -72,6 +79,9 @@ class ItemSearchAccessTest {
     private StoreService storeService;
     private CatalogService catalog;
     private ItemSearchController controller;
+
+    /** Three searches at once, then one a minute: a limit a test reaches in a few calls. */
+    private static final int BURST = 3;
 
     private Store shop;
     private Product pepsi;
@@ -96,7 +106,7 @@ class ItemSearchAccessTest {
         answering(true, 345.4d);
 
         ProxyFactory secured = new ProxyFactory(new ItemSearchController(itemSearch, storeService,
-                catalog, mock(ProductImageService.class)));
+                catalog, mock(ProductImageService.class), new ItemSearchThrottle(BURST, 1)));
         secured.setProxyTargetClass(true);
         secured.addAdvisor(AuthorizationManagerBeforeMethodInterceptor.preAuthorize());
         controller = (ItemSearchController) secured.getProxy();
@@ -223,5 +233,64 @@ class ItemSearchAccessTest {
                         e -> assertThat(new ApiExceptionHandler().onSearchRefused(e).getProperties())
                                 .containsEntry("code", "SEARCH_BAD_BARCODE"));
         verify(itemSearch, never()).search(any(), any(), anyInt(), anyInt());
+    }
+
+    // ------------------------------------------------------------------------------------ how often
+
+    @Test
+    @DisplayName("an account past its share of searches is refused with 429, a code and the wait, unsearched")
+    void an_account_that_searches_too_often_is_refused_with_the_wait() {
+        signedInAs("busy-customer", "CUSTOMER");
+        for (int i = 0; i < BURST; i++) {
+            controller.items(pepsiNearHamra());
+        }
+
+        assertThatThrownBy(() -> controller.items(pepsiNearHamra()))
+                .isInstanceOfSatisfying(SearchThrottledException.class, e -> {
+                    ResponseEntity<ProblemDetail> answer = new ApiExceptionHandler().onSearchThrottled(e);
+                    assertThat(answer.getStatusCode().value()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
+                    assertThat(answer.getBody().getProperties())
+                            .containsEntry("code", "SEARCH_RATE_LIMITED")
+                            .containsEntry("retryAfterSeconds", 60L);
+                    assertThat(answer.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isEqualTo("60");
+                });
+        verify(itemSearch, times(BURST)).search(any(), any(), anyInt(), anyInt());
+
+        // Counted per account: somebody else searching is not held up.
+        signedInAs("another-customer", "CUSTOMER");
+        assertThat(controller.items(pepsiNearHamra()).content()).hasSize(1);
+    }
+
+    /** A request refused as malformed never reached the database, so it costs the customer nothing. */
+    @Test
+    @DisplayName("a malformed search does not count against the account")
+    void a_malformed_search_does_not_count() {
+        signedInAs("clumsy-customer", "CUSTOMER");
+        for (int i = 0; i < BURST + 2; i++) {
+            assertThatThrownBy(() -> controller.items(new ItemSearchRequest("p", null, null, null, null,
+                    0, 10))).isInstanceOf(SearchRefusedException.class);
+        }
+
+        for (int i = 0; i < BURST; i++) {
+            assertThat(controller.items(pepsiNearHamra()).content()).hasSize(1);
+        }
+    }
+
+    @Test
+    @DisplayName("a search the database gave up on is a 503 with a code and a Retry-After, never the query")
+    void a_search_the_database_gave_up_on_is_a_503() {
+        signedInAs("customer-sub", "CUSTOMER");
+        when(itemSearch.search(any(), any(), anyInt(), anyInt()))
+                .thenThrow(new SearchTimedOutException(new RuntimeException("57014")));
+
+        assertThatThrownBy(() -> controller.items(pepsiNearHamra()))
+                .isInstanceOfSatisfying(SearchTimedOutException.class, e -> {
+                    ResponseEntity<ProblemDetail> answer = new ApiExceptionHandler().onSearchTimedOut(e);
+                    assertThat(answer.getStatusCode().value())
+                            .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE.value());
+                    assertThat(answer.getBody().getProperties()).containsEntry("code", "SEARCH_TIMED_OUT");
+                    assertThat(answer.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isEqualTo("5");
+                    assertThat(answer.getBody().getDetail()).doesNotContain("pepsi");
+                });
     }
 }

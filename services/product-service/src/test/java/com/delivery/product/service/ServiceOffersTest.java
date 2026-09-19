@@ -714,7 +714,7 @@ class ServiceOffersTest {
                     .isInstanceOf(StoreNotFoundException.class);
             verify(products, never()).findActiveInStore(any(), any(), anyString(), any(Pageable.class));
             verify(products, never()).findActiveInStoreMatching(any(), anyBoolean(), any(), anyString(),
-                    anyString(), any(Pageable.class));
+                    anyString(), anyString(), any(Pageable.class));
             verify(products, never()).findActiveInStoreByIds(any(), any(), any(Pageable.class));
         }
 

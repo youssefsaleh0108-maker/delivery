@@ -1,7 +1,9 @@
 package com.delivery.product.service;
 
 import java.math.BigDecimal;
+import java.sql.SQLException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -34,7 +36,8 @@ import com.delivery.product.service.StoreService.StoreView;
  * "Who near me sells Pepsi?": products across every live goods shop, grouped by the shop that sells them.
  *
  * <p>The work is split as "near me" splits it ({@code StoreRepository#findActiveIdsNear}). The database
- * matches the words, narrows by status, stock, vertical and distance, ranks, and caps
+ * matches the words, narrows by status, stock, vertical, distance and opening hours, ranks, keeps each
+ * shop's best {@value #ITEMS_PER_SHOP} matches and counts the rest, and caps
  * ({@link ItemSearchRepository#findCandidateRows}). This class then judges every candidate again on the
  * rows as read, and decides:
  * <ul>
@@ -53,14 +56,24 @@ import com.delivery.product.service.StoreService.StoreView;
  * <p>What is left is grouped by shop, because the customer chooses a shop to order from, not a product
  * in the abstract. A shop's items are its best matches first; the shops are ordered by their best match
  * (tier, then score), then by distance, or by rating when there is no point, then by id so the order is
- * the same on every refresh. Each group keeps its top {@value #ITEMS_PER_SHOP} items and says how many
- * matched in all, and the groups are paged here, in memory: there are at most
+ * the same on every refresh: the order the query kept its rows in, so what a cut leaves out is what
+ * this would have listed last. Each group keeps its top {@value #ITEMS_PER_SHOP} items and says how
+ * many matched in all, and the groups are paged here, in memory: there are at most
  * {@code max-candidates} of them.
  *
  * <p>The radius is the server's ({@code delivery.catalog.item-search.radius-metres}), never the
  * request's, like the Services tab's popular row: a client that could widen it could page every shop on
  * the platform by distance from any point. Without a point every live goods shop is searched, with no
  * distance, and the answer says {@code nearby: false}.
+ *
+ * <p><strong>What one search may cost.</strong> The query reads what the words select through the
+ * trigram index, so the words are held to what the index can narrow by: a term folds to at most
+ * {@value #MAX_WORDS} words of two characters or more, and has at least one ({@link SearchWords}; a
+ * one-character word is matched only inside the phrase). The words are counted as the database folds
+ * them, after one round trip that reads no table. Every statement runs under
+ * {@code delivery.catalog.item-search.statement-timeout}; one that runs past it is cancelled by the
+ * database and the search answers 503 {@code SEARCH_TIMED_OUT}. The controller limits how often one
+ * account searches ({@link ItemSearchThrottle}).
  */
 @Service
 public class ItemSearchService {
@@ -73,6 +86,13 @@ public class ItemSearchService {
 
     /** The query's term slots. Text search uses one; a photo's name, Arabic name and brand use three. */
     static final int MAX_TERMS = 3;
+
+    /**
+     * The most words a term may fold to, counting those of two characters or more. Five covers a
+     * product as people name it ("nido full cream milk 2kg"), and each word is a check on every row the
+     * index lets through.
+     */
+    static final int MAX_WORDS = 5;
 
     /** The largest page of shops one request may ask for. */
     static final int MAX_PAGE_SIZE = 20;
@@ -87,10 +107,23 @@ public class ItemSearchService {
     /** The most candidates the setting may ask one search to read. */
     static final int MAX_CANDIDATE_CEILING = 1_000;
 
+    /** The bounds a statement timeout is held to, applied to the setting. */
+    static final Duration MIN_STATEMENT_TIMEOUT = Duration.ofMillis(100);
+    static final Duration MAX_STATEMENT_TIMEOUT = Duration.ofSeconds(15);
+
+    /** How long a client is told to wait after a search the database gave up on. */
+    static final long TIMED_OUT_RETRY_AFTER_SECONDS = 5;
+
     /** EAN-8, UPC-A, EAN-13 and GTIN-14 all fit, and so does anything a merchant keyed in between. */
     private static final Pattern BARCODE = Pattern.compile("[0-9]{8,14}");
 
-    /** A term or the whole query is shorter than {@value #MIN_TERM_LENGTH} characters, or empty. */
+    /** PostgreSQL's query_canceled: a statement timeout, or a cancel. */
+    private static final String QUERY_CANCELED = "57014";
+
+    /**
+     * A term or the whole query is shorter than {@value #MIN_TERM_LENGTH} characters, or empty, or folds
+     * to no word of two characters or more ("a.").
+     */
     public static final String SEARCH_TOO_SHORT = "SEARCH_TOO_SHORT";
 
     /** A term is longer than {@value #MAX_TERM_LENGTH} characters. */
@@ -99,8 +132,14 @@ public class ItemSearchService {
     /** More than {@value #MAX_TERMS} terms, counting {@code q}. */
     public static final String SEARCH_TOO_MANY_TERMS = "SEARCH_TOO_MANY_TERMS";
 
+    /** A term folds to more than {@value #MAX_WORDS} words of two characters or more. */
+    public static final String SEARCH_TOO_MANY_WORDS = "SEARCH_TOO_MANY_WORDS";
+
     /** A barcode that is not 8 to 14 digits. */
     public static final String SEARCH_BAD_BARCODE = "SEARCH_BAD_BARCODE";
+
+    /** The database gave up on the search at the statement timeout; 503. */
+    public static final String SEARCH_TIMED_OUT = "SEARCH_TIMED_OUT";
 
     private final ItemSearchRepository search;
     private final ProductRepository products;
@@ -109,29 +148,37 @@ public class ItemSearchService {
     private final Clock clock;
     private final int radiusMetres;
     private final int maxCandidates;
+    private final Duration statementTimeout;
 
     public ItemSearchService(ItemSearchRepository search, ProductRepository products,
                              StoreRepository stores, StoreService storeService, Clock clock,
                              @Value("${delivery.catalog.item-search.radius-metres:5000}")
                              int radiusMetres,
                              @Value("${delivery.catalog.item-search.max-candidates:300}")
-                             int maxCandidates) {
+                             int maxCandidates,
+                             @Value("${delivery.catalog.item-search.statement-timeout:2s}")
+                             Duration statementTimeout) {
         this.search = search;
         this.products = products;
         this.stores = stores;
         this.storeService = storeService;
         this.clock = clock;
         // Clamped rather than trusted, so a configuration mistake can neither empty the search for
-        // ever nor make "near you" nationwide, nor pull the whole catalogue into memory.
+        // ever nor make "near you" nationwide, nor pull the whole catalogue into memory, nor let one
+        // search hold a connection for minutes.
         this.radiusMetres = Math.min(Math.max(radiusMetres, MIN_RADIUS_METRES), MAX_RADIUS_METRES);
         this.maxCandidates = Math.min(Math.max(maxCandidates, 1), MAX_CANDIDATE_CEILING);
+        Duration timeout = statementTimeout == null ? MAX_STATEMENT_TIMEOUT : statementTimeout;
+        this.statementTimeout = timeout.compareTo(MIN_STATEMENT_TIMEOUT) < 0 ? MIN_STATEMENT_TIMEOUT
+                : timeout.compareTo(MAX_STATEMENT_TIMEOUT) > 0 ? MAX_STATEMENT_TIMEOUT : timeout;
     }
 
     // ---------------------------------------------------------------- the question
 
     /**
      * What to look for: up to {@value #MAX_TERMS} terms, a barcode, or both. Built only by {@link #of},
-     * which refuses what cannot be searched, so a query that exists is one the database may be asked.
+     * which refuses what cannot be searched as typed; the words are checked again once folded, by
+     * {@link ItemSearchService#search}.
      *
      * @param terms   the terms, trimmed; {@code q} first when there is one
      * @param barcode the barcode's digits, or null
@@ -190,7 +237,7 @@ public class ItemSearchService {
             return trimmed;
         }
 
-        /** The slot the query binds: the term, or {@code ''} when unused. Never null; see the query. */
+        /** The slot the fold is asked for: the term, or {@code ''} when unused. Never null. */
         String slot(int index) {
             return index < terms.size() ? terms.get(index) : "";
         }
@@ -211,6 +258,27 @@ public class ItemSearchService {
         }
     }
 
+    /**
+     * The database cancelled the search at the statement timeout. Mapped to 503 with
+     * {@link #SEARCH_TIMED_OUT} and a Retry-After, rather than a partial answer: a cancelled statement
+     * returns no rows at all, and running a narrower one in its place would spend more of the time
+     * just found to be short.
+     */
+    public static class SearchTimedOutException extends RuntimeException {
+
+        public SearchTimedOutException(Throwable cause) {
+            super("The search took too long. Try again in a moment.", cause);
+        }
+
+        public String getCode() {
+            return SEARCH_TIMED_OUT;
+        }
+
+        public long getRetryAfterSeconds() {
+            return TIMED_OUT_RETRY_AFTER_SECONDS;
+        }
+    }
+
     // ---------------------------------------------------------------- the answer
 
     /**
@@ -227,9 +295,10 @@ public class ItemSearchService {
     /**
      * A page of shops, and what the page can honestly claim.
      *
-     * @param truncated      true when more products matched than one search reads. The page then covers
-     *                       the best {@code candidateLimit} matches only, so "no shop sells it" over a
-     *                       truncated answer means "none among those".
+     * @param truncated      true when more matched than one search reads. The page then covers the
+     *                       best {@code candidateLimit} matches only (at most {@value #ITEMS_PER_SHOP} of
+     *                       each shop, the nearest shops first), so "no shop sells it" over a truncated
+     *                       answer means "none among those".
      * @param candidateLimit how many matching products one search reads
      * @param nearby         whether the search was around a point. Without one no distance is known.
      */
@@ -243,26 +312,46 @@ public class ItemSearchService {
      * @param centre where the customer is, or null to search every live goods shop
      * @param page   zero-based; a negative page is the first
      * @param size   clamped to between one and {@value #MAX_PAGE_SIZE}
+     * @throws SearchRefusedException  when a term folds to no word to match, or to too many
+     * @throws SearchTimedOutException when the database gave up at the statement timeout
      */
     @Transactional(readOnly = true)
     public ItemSearchResult search(ItemQuery query, GeoPoint centre, int page, int size) {
+        try {
+            // Before anything else in the transaction, so every statement of it is bounded.
+            search.limitStatementTime(Long.toString(statementTimeout.toMillis()));
+            return searchWithinTimeout(query, centre, page, size);
+        } catch (RuntimeException e) {
+            if (cancelledByTheDatabase(e)) {
+                throw new SearchTimedOutException(e);
+            }
+            throw e;
+        }
+    }
+
+    private ItemSearchResult searchWithinTimeout(ItemQuery query, GeoPoint centre, int page, int size) {
         PageRequest pageable = PageRequest.of(Math.max(page, 0),
                 Math.min(Math.max(size, 1), MAX_PAGE_SIZE));
         Instant now = clock.instant();
         boolean near = centre != null;
+        List<SearchWords> slots = wordsOf(query);
 
         List<Candidate> found = search.findCandidates(
-                query.slot(0), query.slot(1), query.slot(2),
+                slots.get(0).phrase(), slots.get(0).wordsForQuery(),
+                slots.get(1).phrase(), slots.get(1).wordsForQuery(),
+                slots.get(2).phrase(), slots.get(2).wordsForQuery(),
                 query.barcode() == null ? "" : query.barcode(),
                 near,
                 near ? centre.latitude().doubleValue() : 0d,
                 near ? centre.longitude().doubleValue() : 0d,
                 radiusMetres * StoreService.RADIUS_SLACK,
                 StoreService.RADIUS_SLACK,
+                now,
+                ITEMS_PER_SHOP,
                 maxCandidates + 1);
         // One row more than the ceiling was asked for, so reaching it is seen rather than guessed at:
         // exactly maxCandidates rows could be every match there was. Best first, so the row left over
-        // is the weakest match.
+        // is the weakest match of the farthest shop.
         boolean truncated = found.size() > maxCandidates;
         List<Candidate> candidates = truncated ? found.subList(0, maxCandidates) : found;
         if (candidates.isEmpty()) {
@@ -279,17 +368,25 @@ public class ItemSearchService {
         // Each shop is judged once, however many of its products matched.
         Map<UUID, Optional<Shop>> shops = new LinkedHashMap<>();
         for (Candidate candidate : candidates) {
-            Product product = productsById.get(candidate.productId());
-            if (product == null
-                    || product.getStatus() != Product.Status.ACTIVE
-                    || !product.isInStock()) {
+            Optional<Shop> judged = shops.computeIfAbsent(candidate.storeId(),
+                    id -> judge(storesById.get(id), centre, now));
+            if (judged.isEmpty()) {
                 continue;
             }
-            // The row as read decides whose product this is, not the candidate's copy of it.
-            UUID storeId = product.getStoreId();
-            Optional<Shop> shop = shops.computeIfAbsent(storeId,
-                    id -> judge(storesById.get(id), centre, now));
-            shop.ifPresent(s -> s.hits.add(new Hit(candidate, product)));
+            Shop shop = judged.get();
+            // The database's count, the same on every row of the shop.
+            shop.matched = Math.max(shop.matched, candidate.matchedInStore());
+            Product product = productsById.get(candidate.productId());
+            // The row as read decides, not the candidate's copy of it: a product paused, sold out or
+            // moved since the query is not this shop's match, and is not counted either.
+            if (product == null
+                    || product.getStatus() != Product.Status.ACTIVE
+                    || !product.isInStock()
+                    || !candidate.storeId().equals(product.getStoreId())) {
+                shop.dropped++;
+                continue;
+            }
+            shop.hits.add(new Hit(candidate, product));
         }
 
         List<Shop> listed = new ArrayList<>();
@@ -302,9 +399,55 @@ public class ItemSearchService {
         List<ShopMatch> matches = listed.stream()
                 .map(s -> new ShopMatch(s.view, s.distanceMetres,
                         s.hits.stream().limit(ITEMS_PER_SHOP).map(Hit::product).toList(),
-                        s.hits.size()))
+                        Math.max(s.matched - s.dropped, s.hits.size())))
                 .toList();
         return new ItemSearchResult(pageOf(matches, pageable), truncated, maxCandidates, near);
+    }
+
+    /**
+     * The query's three slots, each folded by the database and checked: a term with no word of two
+     * characters or more cannot be searched, nor one with more than {@value #MAX_WORDS}. An unused slot
+     * is {@link SearchWords#NONE}; a barcode alone asks the database nothing here.
+     */
+    private List<SearchWords> wordsOf(ItemQuery query) {
+        if (query.terms().isEmpty()) {
+            return List.of(SearchWords.NONE, SearchWords.NONE, SearchWords.NONE);
+        }
+        List<String> folded = products.foldForSearch(query.slot(0), query.slot(1), query.slot(2));
+        List<SearchWords> slots = new ArrayList<>();
+        for (int i = 0; i < MAX_TERMS; i++) {
+            if (i >= query.terms().size()) {
+                slots.add(SearchWords.NONE);
+                continue;
+            }
+            SearchWords words = SearchWords.of(folded.get(i));
+            if (words.isEmpty()) {
+                throw new SearchRefusedException(SEARCH_TOO_SHORT, "Type at least one word of "
+                        + SearchWords.MIN_WORD_LENGTH + " letters or digits to search.");
+            }
+            if (words.words().size() > MAX_WORDS) {
+                throw new SearchRefusedException(SEARCH_TOO_MANY_WORDS,
+                        "A search can have at most " + MAX_WORDS + " words.");
+            }
+            slots.add(words);
+        }
+        return slots;
+    }
+
+    /** Whether {@code e} is the database cancelling a statement, at the timeout or on request. */
+    static boolean cancelledByTheDatabase(Throwable e) {
+        // However the layers above JDBC wrapped it (Spring's and JPA's timeout exceptions, or a
+        // generic one around the driver's), the driver's own error says 57014. Bounded, in case a
+        // chain of causes loops.
+        Throwable cause = e;
+        for (int depth = 0; cause != null && depth < 32; depth++, cause = cause.getCause()) {
+            if (cause instanceof org.springframework.dao.QueryTimeoutException
+                    || cause instanceof jakarta.persistence.QueryTimeoutException
+                    || cause instanceof SQLException sql && QUERY_CANCELED.equals(sql.getSQLState())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -342,11 +485,16 @@ public class ItemSearchService {
         return Optional.of(new Shop(view, metres));
     }
 
-    /** A shop being listed: its view, its distance when there is a point, and its matches. */
+    /**
+     * A shop being listed: its view, its distance when there is a point, its matches, and the
+     * database's count of them, less those found not live on reading.
+     */
     private static final class Shop {
         private final StoreView view;
         private final Double distanceMetres;
         private final List<Hit> hits = new ArrayList<>();
+        private int matched;
+        private int dropped;
 
         private Shop(StoreView view, Double distanceMetres) {
             this.view = view;

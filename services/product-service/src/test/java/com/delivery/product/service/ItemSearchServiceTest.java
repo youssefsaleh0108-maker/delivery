@@ -1,6 +1,7 @@
 package com.delivery.product.service;
 
 import java.math.BigDecimal;
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Duration;
@@ -12,6 +13,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -19,7 +21,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.mockito.invocation.InvocationOnMock;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.mock.env.MockEnvironment;
 
 import com.delivery.product.domain.CategoryRepository;
@@ -36,6 +41,7 @@ import com.delivery.product.domain.StoreRepository;
 import com.delivery.product.service.ItemSearchService.ItemQuery;
 import com.delivery.product.service.ItemSearchService.ItemSearchResult;
 import com.delivery.product.service.ItemSearchService.SearchRefusedException;
+import com.delivery.product.service.ItemSearchService.SearchTimedOutException;
 import com.delivery.product.service.ItemSearchService.ShopMatch;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,15 +52,20 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
  * "Who near me sells Pepsi?" as the service decides it.
  *
- * <p>The database matches the words and narrows; this service judges every candidate again and decides
- * what a customer is shown, and in what order ({@link ItemSearchService}). These tests hold the second
- * half to account. The words themselves, the folding and the tiers are SQL, and
+ * <p>The database matches the words, narrows, caps each shop and counts; this service checks the words
+ * it is asked for, bounds the database's time, judges every candidate again and decides what a customer
+ * is shown, and in what order ({@link ItemSearchService}). These tests hold the service to account. The
+ * words themselves, the folding, the tiers, the caps and the order the cut keeps are SQL, and
  * {@code ItemSearchDatabaseTest} checks them against a real PostgreSQL.
  *
  * <p>The coordinates are real places in Beirut, as in {@code NearbyStoreSearchTest}, so a failure is a
@@ -71,6 +82,7 @@ class ItemSearchServiceTest {
 
     private static final int RADIUS = 5_000;
     private static final int CAP = 300;
+    private static final Duration TIMEOUT = Duration.ofSeconds(2);
 
     private final Map<UUID, Store> shops = new LinkedHashMap<>();
     private final Map<UUID, Product> products = new LinkedHashMap<>();
@@ -91,6 +103,7 @@ class ItemSearchServiceTest {
         shops.clear();
         products.clear();
         graded.clear();
+        asked = null;
         search = mock(ItemSearchRepository.class);
         storeRepository = mock(StoreRepository.class);
         productRepository = mock(ProductRepository.class);
@@ -100,9 +113,13 @@ class ItemSearchServiceTest {
                 mock(OnboardingApplicationClient.class),
                 Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofHours(4));
 
-        when(search.findCandidates(anyString(), anyString(), anyString(), anyString(), anyBoolean(),
-                anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyInt()))
+        when(search.findCandidates(anyString(), anyString(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), anyBoolean(), anyDouble(), anyDouble(), anyDouble(), anyDouble(),
+                any(), anyInt(), anyInt()))
                 .thenAnswer(this::candidateQuery);
+        when(productRepository.foldForSearch(anyString(), anyString(), anyString()))
+                .thenAnswer(call -> List.of(fold(call.getArgument(0)), fold(call.getArgument(1)),
+                        fold(call.getArgument(2))));
         when(productRepository.findAllById(any())).thenAnswer(call -> {
             List<Product> found = new ArrayList<>();
             for (UUID id : call.<Iterable<UUID>>getArgument(0)) {
@@ -124,44 +141,80 @@ class ItemSearchServiceTest {
     }
 
     /**
+     * The stand-in for {@code search_fold}: enough of it for these tests' Latin and Arabic words. The
+     * real one is V37's, and {@code ItemSearchDatabaseTest} checks it.
+     */
+    private static String fold(String term) {
+        return term.toLowerCase(Locale.ROOT)
+                .replaceAll("['’]", "")
+                .replaceAll("[^a-z0-9\\u0621-\\u064A]+", " ")
+                .strip();
+    }
+
+    /**
      * The stand-in for the SQL: faithful where the service relies on it, blind where it must not.
      *
-     * <p>Faithful: a product matches when its name contains a term, ignoring case, or its barcode is the
-     * barcode; the answer is best first (tier, score, product id) and stops at the LIMIT. A test can grade
-     * a product with its own tier and score.
+     * <p>Faithful: a product matches when its folded name contains a folded phrase, or its barcode is
+     * the barcode; each shop keeps its best {@code perStore} matches (tier, score, product id) and says
+     * how many it had; the rows are ordered as the query orders them (tier, score, the nearer shop on
+     * the sphere, the better rating, the ids) and stop at the LIMIT. A test can grade a product with its
+     * own tier and score.
      *
-     * <p>Blind: it hands back products of drafts, suspended shops, service shops and shops far away,
-     * paused, draft and out-of-stock products, whatever the point. The service's own checks on those are
-     * what these tests hold to account; a stand-in that had done them already would test nothing.
+     * <p>Blind: it hands back products of drafts, suspended shops, service shops, closed shops and shops
+     * far away, paused, draft and out-of-stock products, whatever the point. The service's own checks on
+     * those are what these tests hold to account; a stand-in that had done them already would test
+     * nothing.
      */
     private List<Candidate> candidateQuery(InvocationOnMock call) {
         asked = call.getArguments();
-        List<String> terms = new ArrayList<>();
-        for (int i = 0; i < 3; i++) {
-            String term = call.getArgument(i);
-            if (!term.isEmpty()) {
-                terms.add(term.toLowerCase());
+        List<String> phrases = new ArrayList<>();
+        for (int slot : new int[] {0, 2, 4}) {
+            String phrase = call.getArgument(slot);
+            if (!phrase.isEmpty()) {
+                phrases.add(phrase);
             }
         }
-        String barcode = call.getArgument(3);
-        int maxRows = call.getArgument(9);
-        List<Candidate> found = new ArrayList<>();
+        String barcode = call.getArgument(6);
+        boolean near = call.getArgument(7);
+        GeoPoint point = near ? GeoPoint.of(call.<Double>getArgument(8), call.<Double>getArgument(9)) : null;
+        int perStore = call.getArgument(13);
+        int maxRows = call.getArgument(14);
+
+        Map<UUID, List<Candidate>> byShop = new LinkedHashMap<>();
         for (Product product : products.values()) {
-            Candidate grade = graded.get(product.getId());
-            if (grade != null) {
-                found.add(grade);
-            } else if (!barcode.isEmpty() && barcode.equals(product.getBarcode())) {
-                found.add(new Candidate(product.getId(), product.getStoreId(), 0, 0d));
-            } else if (terms.stream().anyMatch(t -> product.getName().toLowerCase().contains(t))) {
-                found.add(new Candidate(product.getId(), product.getStoreId(), 1, 1d));
+            Candidate match = graded.get(product.getId());
+            if (match == null && !barcode.isEmpty() && barcode.equals(product.getBarcode())) {
+                match = new Candidate(product.getId(), product.getStoreId(), 0, 0d, 0);
+            } else if (match == null && phrases.stream().anyMatch(p -> fold(product.getName()).contains(p))) {
+                match = new Candidate(product.getId(), product.getStoreId(), 1, 1d, 0);
+            }
+            if (match != null) {
+                byShop.computeIfAbsent(match.storeId(), id -> new ArrayList<>()).add(match);
             }
         }
-        return found.stream()
-                .sorted(Comparator.comparingInt(Candidate::tier)
-                        .thenComparing(Candidate::score, Comparator.reverseOrder())
-                        .thenComparing(Candidate::productId))
-                .limit(maxRows)
-                .toList();
+        Comparator<Candidate> bestFirst = Comparator.comparingInt(Candidate::tier)
+                .thenComparing(Candidate::score, Comparator.reverseOrder())
+                .thenComparing(Candidate::productId);
+        List<Candidate> rows = new ArrayList<>();
+        byShop.forEach((storeId, matches) -> matches.stream().sorted(bestFirst).limit(perStore)
+                .map(c -> new Candidate(c.productId(), c.storeId(), c.tier(), c.score(), matches.size()))
+                .forEach(rows::add));
+        rows.sort(Comparator.comparingInt(Candidate::tier)
+                .thenComparing(Candidate::score, Comparator.reverseOrder())
+                .thenComparingDouble(c -> distanceTo(point, c.storeId()))
+                .thenComparing(c -> shops.containsKey(c.storeId()) ? shops.get(c.storeId()).getRating() : null,
+                        Comparator.nullsLast(Comparator.<BigDecimal>reverseOrder()))
+                .thenComparing(Candidate::storeId)
+                .thenComparing(Candidate::productId));
+        return rows.stream().limit(maxRows).toList();
+    }
+
+    private double distanceTo(GeoPoint point, UUID storeId) {
+        if (point == null) {
+            return 0d;
+        }
+        Store shop = shops.get(storeId);
+        return shop == null || shop.location() == null ? Double.MAX_VALUE : point.distanceMetresTo(shop.location());
     }
 
     // ------------------------------------------------------------------------------------ fixtures
@@ -172,7 +225,7 @@ class ItemSearchServiceTest {
 
     private ItemSearchService service(int maxCandidates) {
         return new ItemSearchService(search, productRepository, storeRepository, storeService,
-                Clock.fixed(NOW, ZoneOffset.UTC), RADIUS, maxCandidates);
+                Clock.fixed(NOW, ZoneOffset.UTC), RADIUS, maxCandidates, TIMEOUT);
     }
 
     /** A listed grocery, pinned, open all week. */
@@ -221,7 +274,7 @@ class ItemSearchServiceTest {
     /** {@link #sells}, with the tier and score the database would have given it. */
     private Product sells(Store shop, String name, int tier, double score) {
         Product product = sells(shop, name);
-        graded.put(product.getId(), new Candidate(product.getId(), shop.getId(), tier, score));
+        graded.put(product.getId(), new Candidate(product.getId(), shop.getId(), tier, score, 0));
         return product;
     }
 
@@ -239,6 +292,12 @@ class ItemSearchServiceTest {
 
     private static List<String> itemNames(ShopMatch match) {
         return match.items().stream().map(Product::getName).toList();
+    }
+
+    private static void refused(String code, Runnable search) {
+        assertThatThrownBy(search::run)
+                .isInstanceOfSatisfying(SearchRefusedException.class,
+                        e -> assertThat(e.getCode()).isEqualTo(code));
     }
 
     // ------------------------------------------------------------------------------------ the tests
@@ -282,17 +341,25 @@ class ItemSearchServiceTest {
             assertThat(shopNames(searchEverywhere("pepsi"))).containsExactly("Achrafieh Grocer");
         }
 
+        /**
+         * The query leaves these out, but a product can be paused or sell out between the query and the
+         * read. What the read says decides, and the shop's count loses what it dropped.
+         */
         @Test
-        void a_paused_draft_or_out_of_stock_product_never_appears() {
+        void a_paused_draft_or_out_of_stock_product_never_appears_nor_counts() {
             Store shop = corner("Corner Grocer");
             sells(shop, "Pepsi 1L").pause();
-            Product draft = new Product(shop.getMerchantId(), shop.getId(), "Pepsi 2L", null,
-                    new BigDecimal("2.00"), null);
-            products.put(draft.getId(), draft);
             sells(shop, "Pepsi Max").applyStockProjection(false);
             sells(shop, "Pepsi Zero");
+            Store other = downtown("Only A Draft");
+            Product draft = new Product(other.getMerchantId(), other.getId(), "Pepsi 2L", null,
+                    new BigDecimal("2.00"), null);
+            products.put(draft.getId(), draft);
 
-            ShopMatch match = searchNear("pepsi").page().getContent().get(0);
+            ItemSearchResult result = searchNear("pepsi");
+
+            assertThat(shopNames(result)).containsExactly("Corner Grocer");
+            ShopMatch match = result.page().getContent().get(0);
             assertThat(itemNames(match)).containsExactly("Pepsi Zero");
             assertThat(match.matchedInStore()).isEqualTo(1);
         }
@@ -366,7 +433,10 @@ class ItemSearchServiceTest {
     @DisplayName("grouping and order")
     class GroupingAndOrder {
 
-        /** The shop is what a customer orders from, so its matches travel together: the best three. */
+        /**
+         * The shop is what a customer orders from, so its matches travel together: the best three, and
+         * the database's count of all of them, however many rows it kept.
+         */
         @Test
         void a_shops_matches_are_one_group_with_its_best_three_and_a_count_of_all() {
             Store shop = corner("Corner Grocer");
@@ -407,7 +477,7 @@ class ItemSearchServiceTest {
         void shops_are_ordered_by_best_tier_then_best_score_then_distance() {
             sells(corner("Near But Fuzzy"), "Pepsy", 3, 0.67d);
             sells(achrafieh("Far But Exact"), "Pepsi 1L", 1, 1.0d);
-            sells(downtown("Middle Weaker Score"), "Pepsi Max", 1, 0.8d);
+            sells(downtown("Middle Weaker Score"), "Pepsi Max", 1, 0.9d);
             sells(shopAt("Exact And Nearer", 33.896000d, 35.490000d), "Pepsi Can", 1, 1.0d);
 
             ItemSearchResult result = searchNear("pepsi");
@@ -505,9 +575,8 @@ class ItemSearchServiceTest {
          */
         @Test
         void an_answer_that_reached_the_ceiling_says_it_was_truncated() {
-            Store shop = corner("Corner Grocer");
             for (int i = 0; i < 4; i++) {
-                sells(shop, "Pepsi " + i);
+                sells(shopAt("Shop " + i, 33.8980d + i * 0.001d, 35.4830d), "Pepsi 1L");
             }
 
             ItemSearchResult capped = service(3).search(ItemQuery.of("pepsi", null, null), HAMRA, 0, 20);
@@ -515,9 +584,30 @@ class ItemSearchServiceTest {
 
             assertThat(capped.truncated()).isTrue();
             assertThat(capped.candidateLimit()).isEqualTo(3);
-            assertThat(capped.page().getContent().get(0).matchedInStore()).isEqualTo(3);
+            assertThat(shopNames(capped)).containsExactly("Shop 0", "Shop 1", "Shop 2");
             assertThat(whole.truncated()).isFalse();
-            assertThat(whole.page().getContent().get(0).matchedInStore()).isEqualTo(4);
+            assertThat(whole.page().getContent()).hasSize(4);
+        }
+
+        /**
+         * One shop with more matches than it may show takes three rows, not all of them, and still says
+         * how many it has: the ceiling is not spent on one shop.
+         */
+        @Test
+        void a_shop_with_many_matches_takes_three_rows_and_keeps_its_count() {
+            Store big = corner("Forty Kinds Of Pepsi");
+            for (int i = 0; i < 40; i++) {
+                sells(big, "Pepsi " + i);
+            }
+            sells(downtown("Downtown Grocer"), "Pepsi 1L");
+
+            ItemSearchResult result = service(4).search(ItemQuery.of("pepsi", null, null), HAMRA, 0, 20);
+
+            assertThat(result.truncated()).isFalse();
+            assertThat(shopNames(result)).containsExactly("Forty Kinds Of Pepsi", "Downtown Grocer");
+            assertThat(result.page().getContent().get(0).items()).hasSize(3);
+            assertThat(result.page().getContent().get(0).matchedInStore()).isEqualTo(40);
+            assertThat((int) asked[13]).isEqualTo(ItemSearchService.ITEMS_PER_SHOP);
         }
 
         /** Truncated means the best matches were kept: the weakest one is the one left out. */
@@ -553,62 +643,152 @@ class ItemSearchServiceTest {
 
         /**
          * The circle carries the same slack "near me" gives its own, so the spheroid cannot drop a shop
-         * the sphere keeps; the sphere decides afterwards. One row more than the ceiling.
+         * the sphere keeps; the sphere decides afterwards. One row more than the ceiling, three rows a
+         * shop, and the service's own clock for "open now".
          */
         @Test
-        void near_a_point_it_asks_for_the_widened_circle_and_one_row_past_the_ceiling() {
+        void near_a_point_it_asks_for_the_widened_circle_three_a_shop_and_one_row_past_the_ceiling() {
             searchNear("pepsi");
 
-            assertThat(asked[4]).isEqualTo(true);
-            assertThat((double) asked[5]).isEqualTo(33.8977d);
-            assertThat((double) asked[6]).isEqualTo(35.4829d);
-            assertThat((double) asked[7]).isEqualTo(RADIUS * StoreService.RADIUS_SLACK);
-            assertThat((double) asked[8]).isEqualTo(StoreService.RADIUS_SLACK);
-            assertThat(asked[9]).isEqualTo(CAP + 1);
+            assertThat(asked[7]).isEqualTo(true);
+            assertThat((double) asked[8]).isEqualTo(33.8977d);
+            assertThat((double) asked[9]).isEqualTo(35.4829d);
+            assertThat((double) asked[10]).isEqualTo(RADIUS * StoreService.RADIUS_SLACK);
+            assertThat((double) asked[11]).isEqualTo(StoreService.RADIUS_SLACK);
+            assertThat(asked[12]).isEqualTo(NOW);
+            assertThat(asked[13]).isEqualTo(ItemSearchService.ITEMS_PER_SHOP);
+            assertThat(asked[14]).isEqualTo(CAP + 1);
         }
 
         @Test
         void without_a_point_it_asks_for_no_circle_and_binds_no_null() {
             searchEverywhere("pepsi");
 
-            assertThat(asked[4]).isEqualTo(false);
-            assertThat((double) asked[5]).isZero();
-            assertThat((double) asked[6]).isZero();
+            assertThat(asked[7]).isEqualTo(false);
+            assertThat((double) asked[8]).isZero();
+            assertThat((double) asked[9]).isZero();
         }
 
-        /** q is the first slot, then the terms; an unused slot and an absent barcode are '' and never null. */
+        /**
+         * q is the first slot, then the terms, each as the database folds it and its words longest first;
+         * an unused slot and an absent barcode are '' and never null.
+         */
         @Test
-        void q_and_the_terms_fill_the_slots_in_order() {
-            service().search(ItemQuery.of("  pepsi  ", List.of("بيبسي"), null), HAMRA, 0, 10);
-            assertThat(List.of(asked[0], asked[1], asked[2], asked[3]))
-                    .containsExactly("pepsi", "بيبسي", "", "");
+        void q_and_the_terms_fill_the_slots_in_order_folded_with_their_words_longest_first() {
+            service().search(ItemQuery.of("  Nido Full CREAM milk  ", List.of("بيبسي"), null), HAMRA, 0, 10);
 
+            assertThat(List.of(asked[0], asked[1], asked[2], asked[3], asked[4], asked[5], asked[6]))
+                    .containsExactly("nido full cream milk", "cream nido full milk", "بيبسي", "بيبسي",
+                            "", "", "");
+        }
+
+        /** A barcode alone has no words, so nothing is folded. */
+        @Test
+        void a_barcode_alone_fills_no_slot_and_folds_nothing() {
             service().search(ItemQuery.of(null, null, "5449000000996"), HAMRA, 0, 10);
-            assertThat(List.of(asked[0], asked[1], asked[2], asked[3]))
-                    .containsExactly("", "", "", "5449000000996");
+
+            assertThat(List.of(asked[0], asked[1], asked[2], asked[3], asked[4], asked[5], asked[6]))
+                    .containsExactly("", "", "", "", "", "", "5449000000996");
+            verify(productRepository, never()).foldForSearch(anyString(), anyString(), anyString());
+        }
+
+        /**
+         * A one-letter word ("1" and "l" of "1.5 l") is in the phrase but not among the words: most
+         * names contain one, and no index can narrow by it.
+         */
+        @Test
+        void a_one_letter_word_is_kept_in_the_phrase_and_left_out_of_the_words() {
+            service().search(ItemQuery.of("Coca-Cola Zero 1.5 L", null, null), HAMRA, 0, 10);
+
+            assertThat(asked[0]).isEqualTo("coca cola zero 1 5 l");
+            assertThat(asked[1]).isEqualTo("coca cola zero");
         }
 
         /** The radius is the server's setting, held to "near me"'s bounds. */
         @Test
         void a_radius_setting_out_of_bounds_is_clamped() {
             new ItemSearchService(search, productRepository, storeRepository, storeService,
-                    Clock.fixed(NOW, ZoneOffset.UTC), 900_000, CAP)
+                    Clock.fixed(NOW, ZoneOffset.UTC), 900_000, CAP, TIMEOUT)
                     .search(ItemQuery.of("pepsi", null, null), HAMRA, 0, 10);
 
-            assertThat((double) asked[7])
+            assertThat((double) asked[10])
                     .isEqualTo(ItemSearchService.MAX_RADIUS_METRES * StoreService.RADIUS_SLACK);
+        }
+    }
+
+    @Nested
+    @DisplayName("what one search may cost the database")
+    class Cost {
+
+        /** The timeout is set before anything else is asked, so it bounds every statement of the search. */
+        @Test
+        void every_statement_runs_under_the_statement_timeout_set_first() {
+            searchNear("pepsi");
+
+            InOrder order = inOrder(search, productRepository);
+            order.verify(search).limitStatementTime("2000");
+            order.verify(productRepository).foldForSearch("pepsi", "", "");
+            order.verify(search).findCandidates(anyString(), anyString(), anyString(), anyString(),
+                    anyString(), anyString(), anyString(), anyBoolean(), anyDouble(), anyDouble(),
+                    anyDouble(), anyDouble(), any(), anyInt(), anyInt());
+        }
+
+        /** A setting of a millisecond would fail every search, and one of minutes would hold a connection. */
+        @Test
+        void a_timeout_setting_out_of_bounds_is_clamped() {
+            new ItemSearchService(search, productRepository, storeRepository, storeService,
+                    Clock.fixed(NOW, ZoneOffset.UTC), RADIUS, CAP, Duration.ofMillis(1))
+                    .search(ItemQuery.of("pepsi", null, null), HAMRA, 0, 10);
+            new ItemSearchService(search, productRepository, storeRepository, storeService,
+                    Clock.fixed(NOW, ZoneOffset.UTC), RADIUS, CAP, Duration.ofMinutes(5))
+                    .search(ItemQuery.of("pepsi", null, null), HAMRA, 0, 10);
+
+            verify(search).limitStatementTime("100");
+            verify(search).limitStatementTime("15000");
+        }
+
+        /**
+         * The database cancels a statement that runs past the timeout with SQLSTATE 57014, however the
+         * layers above the driver wrap it. The search answers that as SEARCH_TIMED_OUT, a 503.
+         */
+        @Test
+        void a_statement_the_database_cancelled_is_a_timed_out_search() {
+            SQLException cancelled = new SQLException("canceling statement due to statement timeout", "57014");
+            List<RuntimeException> wrappings = List.of(
+                    new QueryTimeoutException("timed out", cancelled),
+                    new jakarta.persistence.QueryTimeoutException("timed out"),
+                    new RuntimeException(new jakarta.persistence.PersistenceException(cancelled)));
+            for (RuntimeException wrapped : wrappings) {
+                doThrow(wrapped).when(search).findCandidates(anyString(), anyString(), anyString(),
+                        anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyDouble(),
+                        anyDouble(), anyDouble(), anyDouble(), any(), anyInt(), anyInt());
+
+                assertThatThrownBy(() -> searchNear("pepsi"))
+                        .as(wrapped.toString())
+                        .isInstanceOfSatisfying(SearchTimedOutException.class, e -> {
+                            assertThat(e.getCode()).isEqualTo(ItemSearchService.SEARCH_TIMED_OUT);
+                            assertThat(e.getRetryAfterSeconds()).isPositive();
+                            assertThat(e.getCause()).isSameAs(wrapped);
+                        });
+            }
+        }
+
+        /** Any other failure is not a timeout, and is not dressed up as one. */
+        @Test
+        void any_other_failure_passes_through_as_it_was() {
+            RuntimeException down = new DataAccessResourceFailureException("connection lost",
+                    new SQLException("terminating connection", "08006"));
+            doThrow(down).when(search).findCandidates(anyString(), anyString(), anyString(), anyString(),
+                    anyString(), anyString(), anyString(), anyBoolean(), anyDouble(), anyDouble(), anyDouble(),
+                    anyDouble(), any(), anyInt(), anyInt());
+
+            assertThatThrownBy(() -> searchNear("pepsi")).isSameAs(down);
         }
     }
 
     @Nested
     @DisplayName("what cannot be searched")
     class Refusals {
-
-        private void refused(String code, Runnable search) {
-            assertThatThrownBy(search::run)
-                    .isInstanceOfSatisfying(SearchRefusedException.class,
-                            e -> assertThat(e.getCode()).isEqualTo(code));
-        }
 
         @Test
         void nothing_or_one_character_is_too_short() {
@@ -618,6 +798,35 @@ class ItemSearchServiceTest {
             refused(ItemSearchService.SEARCH_TOO_SHORT, () -> ItemQuery.of(" p ", null, null));
             refused(ItemSearchService.SEARCH_TOO_SHORT, () -> ItemQuery.of("pepsi", List.of(""), null));
             assertThat(ItemQuery.of("pe", null, null).terms()).containsExactly("pe");
+        }
+
+        /**
+         * Counted as the database folds it: "a." is one letter, and "a b c d e" is five words of one, which
+         * nothing can narrow by. Nothing is searched for either.
+         */
+        @Test
+        void a_term_that_folds_to_no_word_of_two_characters_is_too_short() {
+            refused(ItemSearchService.SEARCH_TOO_SHORT, () -> searchNear("a."));
+            refused(ItemSearchService.SEARCH_TOO_SHORT, () -> searchNear("1 l"));
+            refused(ItemSearchService.SEARCH_TOO_SHORT,
+                    () -> searchNear("a b c d e f g h i j k l m n o p q r s t u v w x y z"));
+            refused(ItemSearchService.SEARCH_TOO_SHORT,
+                    () -> service().search(ItemQuery.of("pepsi", List.of("!!"), null), HAMRA, 0, 10));
+            assertThat(asked).isNull();
+        }
+
+        /** Five words, counting only those of two characters or more; a sixth is refused, unsearched. */
+        @Test
+        void more_than_five_words_is_too_many() {
+            refused(ItemSearchService.SEARCH_TOO_MANY_WORDS, () -> searchNear("ab cd ef gh ij kl"));
+            refused(ItemSearchService.SEARCH_TOO_MANY_WORDS,
+                    () -> searchNear("pepsi cola diet zero max light"));
+            assertThat(asked).isNull();
+
+            searchNear("ab cd ef gh ij");
+            assertThat(asked[1]).isEqualTo("ab cd ef gh ij");
+            searchNear("coca cola zero diet can 1 5 l");
+            assertThat(asked[1]).isEqualTo("coca cola zero diet can");
         }
 
         /** A reader counts an emoji as one character, and so does the limit. */

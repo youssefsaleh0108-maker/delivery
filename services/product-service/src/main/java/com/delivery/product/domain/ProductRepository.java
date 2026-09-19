@@ -141,62 +141,107 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
      * only matched {@code LOWER(name) LIKE}, a shop found for "احمد" through its "أحمد" product, or for
      * "nescafe" through "Nescafé", would open onto nothing. So a product is on this page when its lowered
      * name contains the term, as before, or when it reaches one of the item search's tiers on
-     * {@code search_name} (V37): the folded term is in the folded name, every folded word of it is, or it
-     * sounds like part of it. Best match first, in the item search's order, then by name.
+     * {@code search_name} (V37), by the item search's own rules: the folded phrase is in the folded name,
+     * every word of it is (a word of two characters as a whole word), or its longest word, from four
+     * characters, sounds like a word of the name (strict word similarity). Best match first, in the item
+     * search's order, then by name.
      *
      * <p>Native, because {@code search_name} is unmapped and the tiers need pg_trgm; so it is used only
      * for a search, and the page's order is this query's own: the caller passes an unsorted page. Out of
-     * stock is not filtered here, as the shelf never has.
+     * stock is not filtered here, as the shelf never has. One shop's shelf, so no index is needed for the
+     * words: what bounds the cost is the shop's size and the term's, which the caller caps.
      *
-     * @param inAisle    whether {@code categoryId} narrows the shelf; when false it is ignored, and is
-     *                   never null, since a null bound into native SQL has no type
+     * @param inAisle     whether {@code categoryId} narrows the shelf; when false it is ignored, and is
+     *                    never null, since a null bound into native SQL has no type
+     * @param phrase      the term folded ({@link #foldForSearch}), or {@code ''} when it folds to nothing
+     * @param words       its words of two characters or more, longest first, or {@code ''}
      * @param namePattern {@link com.delivery.product.service.SearchPatterns#like} of the term
      */
     @Query(value = """
             SELECT p.*
               FROM products p
-             CROSS JOIN (SELECT NULLIF(search_fold(CAST(:term AS text)), '') AS f) t
+             CROSS JOIN (SELECT r.p, r.w,
+                                CASE WHEN char_length(split_part(r.p, ' ', 1)) >= 3 THEN '' ELSE ' ' END || r.p
+                                  || CASE WHEN char_length(substring(r.p FROM '[^ ]+$')) >= 3 THEN '' ELSE ' ' END AS n,
+                                CASE WHEN char_length(split_part(r.w, ' ', 1)) >= 4 THEN split_part(r.w, ' ', 1) END AS z
+                           FROM (SELECT NULLIF(CAST(:phrase AS text), '') AS p,
+                                        NULLIF(CAST(:words AS text), '') AS w) r) t
              WHERE p.status = 'ACTIVE'
                AND p.store_id = CAST(:storeId AS uuid)
                AND (NOT CAST(:inAisle AS boolean) OR p.category_id = CAST(:categoryId AS uuid))
                AND (LOWER(p.name) LIKE CAST(:namePattern AS text) ESCAPE '\\'
-                    OR strpos(p.search_name, t.f) > 0
-                    OR (t.f IS NOT NULL AND NOT EXISTS (
-                            SELECT 1 FROM unnest(string_to_array(t.f, ' ')) AS w(word)
-                             WHERE strpos(p.search_name, w.word) = 0))
-                    OR t.f OPERATOR(public.<%) p.search_name)
+                    OR strpos(p.search_name, t.n) > 0
+                    OR (t.w IS NOT NULL AND NOT EXISTS (
+                            SELECT 1 FROM unnest(string_to_array(t.w, ' ')) AS x(word)
+                             WHERE strpos(p.search_name, CASE WHEN char_length(x.word) >= 3 THEN x.word
+                                                              ELSE ' ' || x.word || ' ' END) = 0))
+                    OR t.z OPERATOR(public.<<%) p.search_name)
              ORDER BY CASE
                         WHEN LOWER(p.name) LIKE CAST(:namePattern AS text) ESCAPE '\\'
-                          OR strpos(p.search_name, t.f) > 0 THEN 1
-                        WHEN t.f IS NOT NULL AND NOT EXISTS (
-                               SELECT 1 FROM unnest(string_to_array(t.f, ' ')) AS w(word)
-                                WHERE strpos(p.search_name, w.word) = 0) THEN 2
+                          OR strpos(p.search_name, t.n) > 0 THEN 1
+                        WHEN t.w IS NOT NULL AND NOT EXISTS (
+                               SELECT 1 FROM unnest(string_to_array(t.w, ' ')) AS x(word)
+                                WHERE strpos(p.search_name, CASE WHEN char_length(x.word) >= 3 THEN x.word
+                                                                 ELSE ' ' || x.word || ' ' END) = 0) THEN 2
                         ELSE 3
                       END,
-                      COALESCE(public.word_similarity(t.f, p.search_name), 0) DESC,
+                      CASE WHEN strpos(p.search_name, ' ' || t.p || ' ') > 0 THEN 1.0
+                           WHEN strpos(p.search_name, ' ' || t.p) > 0 THEN 0.9
+                           ELSE COALESCE(public.strict_word_similarity(COALESCE(t.z, t.p), p.search_name), 0)
+                      END DESC,
                       p.name, p.id
             """,
             countQuery = """
             SELECT count(*)
               FROM products p
-             CROSS JOIN (SELECT NULLIF(search_fold(CAST(:term AS text)), '') AS f) t
+             CROSS JOIN (SELECT r.p, r.w,
+                                CASE WHEN char_length(split_part(r.p, ' ', 1)) >= 3 THEN '' ELSE ' ' END || r.p
+                                  || CASE WHEN char_length(substring(r.p FROM '[^ ]+$')) >= 3 THEN '' ELSE ' ' END AS n,
+                                CASE WHEN char_length(split_part(r.w, ' ', 1)) >= 4 THEN split_part(r.w, ' ', 1) END AS z
+                           FROM (SELECT NULLIF(CAST(:phrase AS text), '') AS p,
+                                        NULLIF(CAST(:words AS text), '') AS w) r) t
              WHERE p.status = 'ACTIVE'
                AND p.store_id = CAST(:storeId AS uuid)
                AND (NOT CAST(:inAisle AS boolean) OR p.category_id = CAST(:categoryId AS uuid))
                AND (LOWER(p.name) LIKE CAST(:namePattern AS text) ESCAPE '\\'
-                    OR strpos(p.search_name, t.f) > 0
-                    OR (t.f IS NOT NULL AND NOT EXISTS (
-                            SELECT 1 FROM unnest(string_to_array(t.f, ' ')) AS w(word)
-                             WHERE strpos(p.search_name, w.word) = 0))
-                    OR t.f OPERATOR(public.<%) p.search_name)
+                    OR strpos(p.search_name, t.n) > 0
+                    OR (t.w IS NOT NULL AND NOT EXISTS (
+                            SELECT 1 FROM unnest(string_to_array(t.w, ' ')) AS x(word)
+                             WHERE strpos(p.search_name, CASE WHEN char_length(x.word) >= 3 THEN x.word
+                                                              ELSE ' ' || x.word || ' ' END) = 0))
+                    OR t.z OPERATOR(public.<<%) p.search_name)
             """,
             nativeQuery = true)
     Page<Product> findActiveInStoreMatching(@Param("storeId") UUID storeId,
                                             @Param("inAisle") boolean inAisle,
                                             @Param("categoryId") UUID categoryId,
-                                            @Param("term") String term,
+                                            @Param("phrase") String phrase,
+                                            @Param("words") String words,
                                             @Param("namePattern") String namePattern,
                                             Pageable pageable);
+
+    /**
+     * Up to three terms spelled as search spells them ({@code search_fold}, V37): lower case, one letter
+     * for each Arabic letter family, Western digits, no accents, vowel marks or apostrophes, and single
+     * spaces between words; {@code ''} for a term that folds to nothing. The item search and the shelf
+     * search count and pick their words from this, so the words they judge are the words the database
+     * compares, with no second copy of the rule to drift from the first.
+     *
+     * <p>No table is read. A term is never null ({@code ''} for an unused slot), for the reason
+     * {@link #findActiveInStoreMatching} gives.
+     */
+    @Query(value = """
+            SELECT COALESCE(search_fold(CAST(:t1 AS text)), ''),
+                   COALESCE(search_fold(CAST(:t2 AS text)), ''),
+                   COALESCE(search_fold(CAST(:t3 AS text)), '')
+            """, nativeQuery = true)
+    java.util.List<Object[]> foldRowsForSearch(@Param("t1") String t1, @Param("t2") String t2, @Param("t3") String t3);
+
+    /** {@link #foldRowsForSearch}, as the three folded terms in order. */
+    default java.util.List<String> foldForSearch(String t1, String t2, String t3) {
+        Object[] row = foldRowsForSearch(t1, t2, t3).get(0);
+        return java.util.List.of((String) row[0], (String) row[1], (String) row[2]);
+    }
 
     /**
      * The aisles a store actually stocks, with a count each.

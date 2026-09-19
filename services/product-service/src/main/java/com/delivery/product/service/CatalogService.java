@@ -124,11 +124,35 @@ public class CatalogService {
             return products.findActiveInStore(storeId, categoryId, SearchPatterns.like(search), pageable);
         }
         // A search matches as the customer item search does, so a shop it found for "احمد" or
-        // "nescafe" opens onto the same products (ProductRepository#findActiveInStoreMatching). That
-        // query orders by how well each product matches, so the page is passed on unsorted.
+        // "nescafe" opens onto the same products (ProductRepository#findActiveInStoreMatching), with
+        // the same words: folded by the database, those of two characters or more. That query orders
+        // by how well each product matches, so the page is passed on unsorted.
+        String term = shelfTerm(search);
+        SearchWords words = SearchWords.of(products.foldForSearch(term, "", "").get(0));
         return products.findActiveInStoreMatching(storeId, categoryId != null,
-                categoryId == null ? storeId : categoryId, search.trim(), SearchPatterns.like(search),
-                PageRequest.of(pageable.getPageNumber(), pageable.getPageSize()));
+                categoryId == null ? storeId : categoryId, words.phrase(), words.wordsForQuery(),
+                SearchPatterns.like(term), PageRequest.of(pageable.getPageNumber(), pageable.getPageSize()));
+    }
+
+    /** The longest shelf search, in characters: the item search's own limit. */
+    static final int MAX_SHELF_SEARCH_LENGTH = 100;
+
+    /**
+     * A shelf search as it is run: trimmed, and cut to its first {@value #MAX_SHELF_SEARCH_LENGTH}
+     * characters.
+     *
+     * <p>Every product of the shop is checked against every word of the term, so the term's length is
+     * the one cost a caller controls: 4 KB of one-letter words took 0.28 s for a 500-product shop.
+     * Cut rather than refused, as the shelf has always answered whatever its box held, and nobody types
+     * a hundred characters looking for a product; the item search, which refuses longer, never sends
+     * one here through "more in this shop". A character is a code point, so an emoji is never split.
+     */
+    static String shelfTerm(String search) {
+        String trimmed = search.trim();
+        if (trimmed.codePointCount(0, trimmed.length()) <= MAX_SHELF_SEARCH_LENGTH) {
+            return trimmed;
+        }
+        return trimmed.substring(0, trimmed.offsetByCodePoints(0, MAX_SHELF_SEARCH_LENGTH)).trim();
     }
 
     /**

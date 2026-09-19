@@ -7,8 +7,10 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -231,6 +233,41 @@ public class ApiExceptionHandler {
         ProblemDetail detail = problem(HttpStatus.BAD_REQUEST, "Search refused", e.getMessage());
         detail.setProperty("code", e.getCode());
         return detail;
+    }
+
+    /**
+     * One account searched items more often than a person does ({@code ItemSearchThrottle}).
+     *
+     * <p>429 with {@code SEARCH_RATE_LIMITED}, and the wait both as Retry-After, which HTTP clients
+     * understand, and in the body, which the app reads.
+     */
+    @ExceptionHandler(com.delivery.product.service.ItemSearchThrottle.SearchThrottledException.class)
+    public ResponseEntity<ProblemDetail> onSearchThrottled(
+            com.delivery.product.service.ItemSearchThrottle.SearchThrottledException e) {
+        ProblemDetail detail = problem(HttpStatus.TOO_MANY_REQUESTS, "Too many searches", e.getMessage());
+        detail.setProperty("code", e.getCode());
+        detail.setProperty("retryAfterSeconds", e.getRetryAfterSeconds());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(e.getRetryAfterSeconds()))
+                .body(detail);
+    }
+
+    /**
+     * The database gave up on an item search at its statement timeout ({@code ItemSearchService}).
+     *
+     * <p>503 with {@code SEARCH_TIMED_OUT} and a Retry-After: nothing is wrong with the request, the
+     * database is busier than a search may wait for, and the same search a little later may well
+     * succeed. The detail never repeats the query.
+     */
+    @ExceptionHandler(com.delivery.product.service.ItemSearchService.SearchTimedOutException.class)
+    public ResponseEntity<ProblemDetail> onSearchTimedOut(
+            com.delivery.product.service.ItemSearchService.SearchTimedOutException e) {
+        ProblemDetail detail = problem(HttpStatus.SERVICE_UNAVAILABLE, "Search timed out", e.getMessage());
+        detail.setProperty("code", e.getCode());
+        detail.setProperty("retryAfterSeconds", e.getRetryAfterSeconds());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(e.getRetryAfterSeconds()))
+                .body(detail);
     }
 
     /**
