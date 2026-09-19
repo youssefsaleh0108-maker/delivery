@@ -374,20 +374,24 @@ public class PresenceService {
     /**
      * Where a rider is, for someone who is not that rider.
      *
-     * <p>Four callers may ask, and the list is deliberately short, because a rider's live position
-     * is personal data about a worker rather than a property of an order:
+     * <p>Three callers may ask, and the list is deliberately short, because a rider's position is
+     * personal data about a worker rather than a property of an order:
      *
      * <ul>
      *   <li>the rider themselves;</li>
-     *   <li>backoffice, which is what the support role is for;</li>
-     *   <li>the fleet that employs them — their own dispatcher, and nobody else's;</li>
-     *   <li>a customer with a live order in that rider's hands, and only while it is live.</li>
+     *   <li>backoffice, which is what the support role is for — the last known position, with the
+     *       time it was taken ({@code lastSeenAt}), on duty or not;</li>
+     *   <li>the fleet that employs them — their own dispatcher, and nobody else's — and the
+     *       position only while the rider is declared on duty. Off duty, the fleet still sees the
+     *       duty state and when the phone last reported, but not where: a last fix outlives the
+     *       shift, and is often near home.</li>
      * </ul>
      *
-     * <p>The merchant is <em>not</em> on that list, although they can see the same rider through
-     * {@code GET /api/tracking/orders/{id}}. The difference is the scope: the order-scoped read is
-     * bounded by one delivery, while this one follows a person, and a shop has no business
-     * following a courier once the bag has left the counter.
+     * <p>Customers and shops are <em>not</em> on that list. They see a rider through their order
+     * ({@code GET /api/tracking/orders/{id}}), where one rule decides what each may see and when
+     * (TrackingService#sightingFor): a person-scoped read beside it would be a second door with a
+     * different rule — it used to show a customer the rider for as long as any order of theirs was
+     * in the rider's hands, wherever the rider was going.
      *
      * <p>A caller who is none of these gets the same {@code not found} as a caller asking about a
      * rider id that does not exist. 403 would confirm the rider is real, which is enough to let
@@ -395,16 +399,16 @@ public class PresenceService {
      */
     @Transactional(readOnly = true)
     public RiderPresenceView locationOf(String riderId, String callerId, boolean isBackoffice) {
-        if (!mayRead(riderId, callerId, isBackoffice)) {
+        boolean unrestricted = callerId.equals(riderId) || isBackoffice;
+        if (!unrestricted && !employsRider(callerId, riderId)) {
             throw new PresenceNotFoundException(riderId);
         }
-        return ownPresence(riderId).orElseThrow(() -> new PresenceNotFoundException(riderId));
+        RiderPresenceView view = ownPresence(riderId)
+                .orElseThrow(() -> new PresenceNotFoundException(riderId));
+        return unrestricted ? view : view.asSeenByFleet();
     }
 
-    private boolean mayRead(String riderId, String callerId, boolean isBackoffice) {
-        if (callerId.equals(riderId) || isBackoffice) {
-            return true;
-        }
+    private boolean employsRider(String callerId, String riderId) {
         // Resolved rather than merely looked up: a dispatcher asking where their own rider is has
         // no row here until somebody asks Order Manager for one. The RIDER's fleet is only ever
         // read — we hold no token for them, and an order event is how a rider's row appears.
@@ -414,11 +418,8 @@ public class PresenceService {
         // the rider is on that fleet NOW, so a company that let the rider go stops seeing where
         // they are, and an Order Manager that cannot be reached refuses rather than trusting the
         // linkage. Asked last, so a customer or a stranger never costs a cross-service call.
-        if (callerCarrier.isPresent() && callerCarrier.equals(carrierOf(riderId))
-                && fleetGuard.isOnCallersFleet(callerId, riderId)) {
-            return true;
-        }
-        return participants.customerHasLiveOrderWith(callerId, riderId);
+        return callerCarrier.isPresent() && callerCarrier.equals(carrierOf(riderId))
+                && fleetGuard.isOnCallersFleet(callerId, riderId);
     }
 
     /**
@@ -433,6 +434,10 @@ public class PresenceService {
      * sorted query over the whole fleet, which is what a relational index is for; doing it in Redis
      * would mean a key scan, and a key scan on the hot instance is how a cache becomes an outage.
      * The cost is that {@code last_seen_at} here lags the true value by up to the persist interval.
+     *
+     * <p>Positions as {@link #locationOf} gives them: the back office sees every rider's last known
+     * position with its time; a carrier sees a rider's position only while the rider is declared on
+     * duty — {@code onDutyOnly=false} lists the off-duty riders too, without where they are.
      */
     @Transactional(readOnly = true)
     public List<RiderPresenceView> roster(String callerId, boolean isBackoffice,
@@ -467,6 +472,7 @@ public class PresenceService {
 
         return rows.stream()
                 .map(row -> RiderPresenceView.of(row, now, presenceWindow))
+                .map(view -> isBackoffice ? view : view.asSeenByFleet())
                 // Re-sorted here rather than trusting the SQL order: Postgres sorts NULLs first on
                 // a DESC ordering, so a rider who declared duty and never pinged would otherwise
                 // head the roster — the least present rider at the top of the presence list.
@@ -558,8 +564,13 @@ public class PresenceService {
     /**
      * A rider's presence as anyone reading it sees it.
      *
-     * @param dutyState what the rider declared
-     * @param state     what that means now, having checked when we last heard from them
+     * <p>A position never travels without its time: {@code lat}, {@code lng} and
+     * {@code accuracyM} are present only together with {@code lastSeenAt}, which is when that
+     * fix was taken. A last known position read without its age reads as "here now".
+     *
+     * @param dutyState  what the rider declared
+     * @param state      what that means now, having checked when we last heard from them
+     * @param lastSeenAt when the last fix was taken — the time of {@code lat}/{@code lng}
      */
     public record RiderPresenceView(
             String riderId,
@@ -572,10 +583,31 @@ public class PresenceService {
             Double lng,
             Float accuracyM) {
 
+        public RiderPresenceView {
+            if (lastSeenAt == null) {
+                lat = null;
+                lng = null;
+                accuracyM = null;
+            }
+        }
+
         static RiderPresenceView of(RiderPresence row, Instant now, Duration presenceWindow) {
             return new RiderPresenceView(row.getRiderId(), row.getCarrierId(), row.getDutyState(),
                     row.effectiveState(now, presenceWindow), row.getDutyChangedAt(),
                     row.getLastSeenAt(), row.getLastLat(), row.getLastLng(), row.getLastAccuracyM());
+        }
+
+        /**
+         * As the rider's fleet sees it: everything, but the position only while the rider is
+         * declared on duty. A rider's last fix outlives their shift — it is often near home — and
+         * nobody but the back office keeps sight of it once they have gone off duty.
+         */
+        public RiderPresenceView asSeenByFleet() {
+            if (dutyState == DutyState.ON_DUTY) {
+                return this;
+            }
+            return new RiderPresenceView(riderId, carrierId, dutyState, state, dutyChangedAt,
+                    lastSeenAt, null, null, null);
         }
     }
 

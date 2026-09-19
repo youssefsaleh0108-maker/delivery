@@ -49,6 +49,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import com.delivery.tracking.domain.CarrierMembership;
 import com.delivery.tracking.domain.CarrierMembershipRepository;
 import com.delivery.tracking.domain.DutySessionRepository;
 import com.delivery.tracking.domain.OrderParticipants;
@@ -91,6 +92,8 @@ class RiderVisibilityAccessTest {
     private static final String SHOP_1 = "merchant-1";
     private static final String SHOP_2 = "merchant-2";
     private static final String BACKOFFICE = "backoffice-sub";
+    private static final String DISPATCHER = "dispatcher-sub";
+    private static final UUID FLEET = UUID.fromString("f1ee7000-0000-4000-8000-000000000001");
 
     // Downtown Beirut: two shops, two customers' doors, and the rider's home.
     private static final double BASE_LAT = 33.8938;
@@ -209,10 +212,24 @@ class RiderVisibilityAccessTest {
         when(fleetGuard.isOnCallersFleet(anyString(), anyString())).thenReturn(true);
         when(fleetGuard.retainCallersFleet(anyString(), any(), any()))
                 .thenAnswer(call -> List.copyOf((java.util.Collection<?>) call.getArgument(1)));
+        // The rider works for FLEET, whose dispatcher reads the roster.
         CarrierMembershipRepository memberships = mock(CarrierMembershipRepository.class);
         when(memberships.findById(anyString())).thenReturn(Optional.empty());
+        when(memberships.findById(RIDER)).thenReturn(Optional.of(new CarrierMembership(RIDER,
+                FLEET, CarrierMembership.Kind.RIDER, CarrierMembership.Source.ORDER_EVENT)));
         CarrierScopeResolver carrierScope = mock(CarrierScopeResolver.class);
         when(carrierScope.scopeFor(anyString())).thenReturn(Optional.empty());
+        when(carrierScope.scopeFor(DISPATCHER)).thenReturn(Optional.of(FLEET));
+        when(carrierScope.requireScopeFor(DISPATCHER)).thenReturn(FLEET);
+        when(presenceRepo.findByCarrierIdOrderByLastSeenAtDesc(any())).thenAnswer(call ->
+                presenceRows.values().stream()
+                        .filter(row -> call.getArgument(0).equals(row.getCarrierId()))
+                        .toList());
+        when(presenceRepo.findAllByOrderByLastSeenAtDesc())
+                .thenAnswer(call -> List.copyOf(presenceRows.values()));
+        RiderPresence riderRow = RiderPresence.firstSeen(RIDER, clock);
+        riderRow.attachCarrier(FLEET, clock);
+        presenceRows.putIfAbsent(RIDER, riderRow);
 
         // The shipped limits, except that a rider may cover any distance and a fix may be minutes
         // old: the scenarios below move the rider across Beirut in seconds, and the speed and age
@@ -695,6 +712,90 @@ class RiderVisibilityAccessTest {
                 read("stranger-sub", "/api/tracking/orders/" + order + path)
                         .andExpect(status().isNotFound());
             }
+        }
+    }
+
+    @Nested
+    @DisplayName("the rider's delivery company, and the rider as a person")
+    class Company {
+
+        private void riderDeclares(String state) throws Exception {
+            signedInAs(RIDER, "DELIVERY");
+            mvc.perform(post("/api/tracking/riders/me/duty")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"state\":\"" + state + "\"}"))
+                    .andExpect(status().isOk());
+        }
+
+        private void riderReportsBetweenJobs(GeoPoint where) throws Exception {
+            signedInAs(RIDER, "DELIVERY");
+            mvc.perform(post("/api/tracking/riders/me/ping")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(String.format(Locale.ROOT,
+                                    "{\"lat\":%.7f,\"lng\":%.7f,\"accuracyM\":6,"
+                                            + "\"recordedAt\":\"%s\"}",
+                                    where.lat(), where.lng(), nextFixTime())))
+                    .andExpect(status().isAccepted());
+        }
+
+        private ResultActions roster(String who, String role) throws Exception {
+            signedInAs(who, role);
+            return mvc.perform(get("/api/tracking/riders/roster").param("onDutyOnly", "false"));
+        }
+
+        private ResultActions location(String who, String... roles) throws Exception {
+            signedInAs(who, roles);
+            return mvc.perform(get("/api/tracking/riders/" + RIDER + "/location"));
+        }
+
+        /**
+         * On duty, the company sees where its rider is. Off duty it still sees the rider on its
+         * roster, off duty, and when the phone last reported — never where: the last fix outlives
+         * the shift and is often near home. The back office keeps that position, with its time.
+         */
+        @Test
+        void the_company_sees_the_rider_only_while_on_duty_and_the_back_office_always()
+                throws Exception {
+            riderDeclares("ON_DUTY");
+            riderReportsBetweenJobs(NEAR_SHOP_1);
+
+            roster(DISPATCHER, "CARRIER")
+                    .andExpect(jsonPath("$", hasSize(1)))
+                    .andExpect(jsonPath("$[0].lat", closeTo(NEAR_SHOP_1.lat(), 1e-6)));
+            location(DISPATCHER, "CARRIER")
+                    .andExpect(jsonPath("$.lat", closeTo(NEAR_SHOP_1.lat(), 1e-6)));
+
+            riderDeclares("OFF_DUTY");
+
+            roster(DISPATCHER, "CARRIER")
+                    .andExpect(jsonPath("$", hasSize(1)))
+                    .andExpect(jsonPath("$[0].dutyState").value("OFF_DUTY"))
+                    .andExpect(jsonPath("$[0].lat").value(nullValue()))
+                    .andExpect(jsonPath("$[0].lng").value(nullValue()))
+                    .andExpect(jsonPath("$[0].lastSeenAt", notNullValue()));
+            location(DISPATCHER, "CARRIER")
+                    .andExpect(jsonPath("$.lat").value(nullValue()))
+                    .andExpect(jsonPath("$.lastSeenAt", notNullValue()));
+
+            roster(BACKOFFICE, "BACKOFFICE")
+                    .andExpect(jsonPath("$[0].lat", closeTo(NEAR_SHOP_1.lat(), 1e-6)))
+                    .andExpect(jsonPath("$[0].lastSeenAt", notNullValue()));
+            location(BACKOFFICE, "BACKOFFICE")
+                    .andExpect(jsonPath("$.lat", closeTo(NEAR_SHOP_1.lat(), 1e-6)))
+                    .andExpect(jsonPath("$.lastSeenAt", notNullValue()));
+        }
+
+        /**
+         * A customer follows the rider through their order, under its rule — never as a person,
+         * even with an order in the rider's hands.
+         */
+        @Test
+        void a_customer_cannot_follow_the_rider_as_a_person() throws Exception {
+            UUID order = order(CUSTOMER_A, SHOP_1, SHOP_1_PIN, DOOR_A, "PICKED_UP");
+            riderReports(order, ON_THE_WAY_TO_A);
+            seenAt(position(CUSTOMER_A, order), ON_THE_WAY_TO_A);
+
+            location(CUSTOMER_A, "CUSTOMER").andExpect(status().isNotFound());
         }
     }
 

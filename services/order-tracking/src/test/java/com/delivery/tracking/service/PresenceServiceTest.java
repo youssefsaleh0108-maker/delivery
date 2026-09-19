@@ -666,7 +666,6 @@ class PresenceServiceTest {
         @Test
         void a_stranger_is_refused_and_told_nothing() {
             rider(DutyState.ON_DUTY, Duration.ofSeconds(5));
-            when(participants.customerHasLiveOrderWith(anyString(), anyString())).thenReturn(false);
 
             assertThatThrownBy(() -> presence.locationOf(RIDER, "stranger-sub", false))
                     .isInstanceOf(PresenceService.PresenceNotFoundException.class);
@@ -687,6 +686,21 @@ class PresenceServiceTest {
                     .isEqualTo(RIDER);
         }
 
+        /**
+         * Support keeps the last known position after the shift — with the time it was taken, so
+         * it is never read as where the rider is now.
+         */
+        @Test
+        void backoffice_keeps_an_off_duty_riders_last_position_with_its_time() {
+            RiderPresence row = rider(DutyState.OFF_DUTY, Duration.ofHours(3));
+
+            RiderPresenceView view = presence.locationOf(RIDER, "backoffice-sub", true);
+
+            assertThat(view.lat()).isEqualTo(33.89);
+            assertThat(view.lng()).isEqualTo(35.50);
+            assertThat(view.lastSeenAt()).isEqualTo(row.getLastSeenAt()).isNotNull();
+        }
+
         /** A dispatcher watching their own fleet is the whole point of the roster screen. */
         @Test
         void the_fleet_that_employs_the_rider_may_read_it() {
@@ -694,7 +708,50 @@ class PresenceServiceTest {
             employs(RIDER, CARRIER, CarrierMembership.Kind.RIDER);
             employs(DISPATCHER, CARRIER, CarrierMembership.Kind.STAFF);
 
-            assertThat(presence.locationOf(RIDER, DISPATCHER, false).riderId()).isEqualTo(RIDER);
+            RiderPresenceView view = presence.locationOf(RIDER, DISPATCHER, false);
+
+            assertThat(view.riderId()).isEqualTo(RIDER);
+            assertThat(view.lat()).isEqualTo(33.89);
+        }
+
+        /**
+         * Off duty, the fleet still sees that and when the phone last reported — not where. The
+         * last fix outlives the shift, and is often near home.
+         */
+        @Test
+        void the_fleet_does_not_see_where_a_rider_is_once_they_are_off_duty() {
+            rider(DutyState.OFF_DUTY, Duration.ofMinutes(20));
+            employs(RIDER, CARRIER, CarrierMembership.Kind.RIDER);
+            employs(DISPATCHER, CARRIER, CarrierMembership.Kind.STAFF);
+
+            RiderPresenceView view = presence.locationOf(RIDER, DISPATCHER, false);
+
+            assertThat(view.dutyState()).isEqualTo(DutyState.OFF_DUTY);
+            assertThat(view.lastSeenAt()).isNotNull();
+            assertThat(view.lat()).isNull();
+            assertThat(view.lng()).isNull();
+            assertThat(view.accuracyM()).isNull();
+        }
+
+        /** Declared on duty and gone quiet: the dispatcher needs to find them, so the fleet sees. */
+        @Test
+        void the_fleet_still_sees_a_rider_on_duty_whose_signal_went_stale() {
+            rider(DutyState.ON_DUTY, Duration.ofMinutes(20));
+            employs(RIDER, CARRIER, CarrierMembership.Kind.RIDER);
+            employs(DISPATCHER, CARRIER, CarrierMembership.Kind.STAFF);
+
+            RiderPresenceView view = presence.locationOf(RIDER, DISPATCHER, false);
+
+            assertThat(view.state()).isEqualTo(PresenceState.STALE);
+            assertThat(view.lat()).isEqualTo(33.89);
+        }
+
+        /** The rider's own read is not the fleet's: off duty or not, it is theirs. */
+        @Test
+        void the_rider_still_sees_their_own_position_off_duty() {
+            rider(DutyState.OFF_DUTY, Duration.ofMinutes(20));
+
+            assertThat(presence.locationOf(RIDER, RIDER, false).lat()).isEqualTo(33.89);
         }
 
         /** A competitor's dispatcher is a stranger, whatever role they hold. */
@@ -703,7 +760,6 @@ class PresenceServiceTest {
             rider(DutyState.ON_DUTY, Duration.ofSeconds(5));
             employs(RIDER, CARRIER, CarrierMembership.Kind.RIDER);
             employs(DISPATCHER, OTHER_CARRIER, CarrierMembership.Kind.STAFF);
-            when(participants.customerHasLiveOrderWith(anyString(), anyString())).thenReturn(false);
 
             assertThatThrownBy(() -> presence.locationOf(RIDER, DISPATCHER, false))
                     .isInstanceOf(PresenceService.PresenceNotFoundException.class);
@@ -717,35 +773,28 @@ class PresenceServiceTest {
         @Test
         void two_riders_who_belong_to_no_fleet_are_still_strangers_to_each_other() {
             rider(DutyState.ON_DUTY, Duration.ofSeconds(5));
-            when(participants.customerHasLiveOrderWith(anyString(), anyString())).thenReturn(false);
 
             assertThatThrownBy(() -> presence.locationOf(RIDER, "another-rider-sub", false))
                     .isInstanceOf(PresenceService.PresenceNotFoundException.class);
         }
 
-        /** The customer waiting on this rider, while they are waiting and not afterwards. */
+        /**
+         * Not even with a live order in the rider's hands: a customer sees the rider through that
+         * order, under its rule (who is on which leg, how near the shop, whose door). Following
+         * the person here would show them the rider on somebody else's delivery.
+         */
         @Test
-        void a_customer_with_a_live_order_in_that_riders_hands_may_read_it() {
+        void a_customer_is_refused_even_with_a_live_order_in_that_riders_hands() {
             rider(DutyState.ON_DUTY, Duration.ofSeconds(5));
-            when(participants.customerHasLiveOrderWith(CUSTOMER, RIDER)).thenReturn(true);
-
-            assertThat(presence.locationOf(RIDER, CUSTOMER, false).riderId()).isEqualTo(RIDER);
-        }
-
-        /** Once the delivery is over the customer's window closes with it. */
-        @Test
-        void a_customer_whose_order_has_finished_may_not() {
-            rider(DutyState.ON_DUTY, Duration.ofSeconds(5));
-            when(participants.customerHasLiveOrderWith(CUSTOMER, RIDER)).thenReturn(false);
 
             assertThatThrownBy(() -> presence.locationOf(RIDER, CUSTOMER, false))
                     .isInstanceOf(PresenceService.PresenceNotFoundException.class);
+            verify(participants, never()).findById(any());
         }
 
         /** Nothing about a rider id is echoed back into a body something might render. */
         @Test
         void the_refusal_does_not_reflect_the_requested_id_back_to_the_caller() {
-            when(participants.customerHasLiveOrderWith(anyString(), anyString())).thenReturn(false);
 
             assertThatThrownBy(() ->
                     presence.locationOf("<script>alert(1)</script>", "stranger-sub", false))
@@ -792,6 +841,49 @@ class PresenceServiceTest {
         void a_carrier_who_belongs_to_no_company_is_told_so_rather_than_shown_an_empty_list() {
             assertThatThrownBy(() -> presence.roster(DISPATCHER, false, null, true))
                     .isInstanceOf(PresenceService.NoCarrierException.class);
+        }
+
+        /**
+         * The whole fleet, off-duty riders included ({@code onDutyOnly=false}): the company sees
+         * where its on-duty riders are, and of the others only that they are off duty and when
+         * their phone last reported.
+         */
+        @Test
+        void a_carrier_sees_positions_only_of_riders_on_duty() {
+            employs(DISPATCHER, CARRIER, CarrierMembership.Kind.STAFF);
+            Instant now = Instant.now();
+            RiderPresence working = RiderPresence.firstSeen("rider-working", now.minusSeconds(3600));
+            working.declare(DutyState.ON_DUTY, now.minusSeconds(3600));
+            working.sighted(33.89, 35.50, 5f, now.minusSeconds(10));
+            RiderPresence gone = RiderPresence.firstSeen("rider-home", now.minusSeconds(3600));
+            gone.declare(DutyState.OFF_DUTY, now.minusSeconds(600));
+            gone.sighted(33.95, 35.60, 5f, now.minusSeconds(700));
+            when(presenceRepo.findByCarrierIdOrderByLastSeenAtDesc(CARRIER))
+                    .thenReturn(List.of(working, gone));
+
+            List<RiderPresenceView> roster = presence.roster(DISPATCHER, false, null, false);
+
+            assertThat(roster).extracting(RiderPresenceView::riderId)
+                    .containsExactly("rider-working", "rider-home");
+            assertThat(roster.get(0).lat()).isEqualTo(33.89);
+            assertThat(roster.get(1).lat()).isNull();
+            assertThat(roster.get(1).lng()).isNull();
+            assertThat(roster.get(1).lastSeenAt()).isNotNull();
+        }
+
+        /** Support's roster keeps every last known position, each with the time it was taken. */
+        @Test
+        void backoffice_sees_every_last_position_with_its_time() {
+            Instant now = Instant.now();
+            RiderPresence gone = RiderPresence.firstSeen("rider-home", now.minusSeconds(3600));
+            gone.declare(DutyState.OFF_DUTY, now.minusSeconds(600));
+            gone.sighted(33.95, 35.60, 5f, now.minusSeconds(700));
+            when(presenceRepo.findAllByOrderByLastSeenAtDesc()).thenReturn(List.of(gone));
+
+            RiderPresenceView view = presence.roster("backoffice-sub", true, null, false).get(0);
+
+            assertThat(view.lat()).isEqualTo(33.95);
+            assertThat(view.lastSeenAt()).isEqualTo(now.minusSeconds(700));
         }
 
         /**

@@ -152,7 +152,6 @@ class CarrierReadsAfterReleaseTest {
     @DisplayName("a released rider's live position is refused exactly as an unknown rider's is")
     void the_position_of_a_released_rider_is_not_found() {
         orderManagerSaysTheFleetIs(KEPT);
-        when(participants.customerHasLiveOrderWith(anyString(), anyString())).thenReturn(false);
 
         assertThat(presence.locationOf(KEPT, DISPATCHER, false).lat()).isNotNull();
 

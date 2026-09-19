@@ -117,12 +117,14 @@ public class RiderPresenceController {
      * Where one rider is.
      *
      * <p>Open to any authenticated caller at the routing layer and then narrowed sharply in
-     * {@link PresenceService#locationOf} — self, backoffice, the employing fleet, or a customer
-     * with a live order in that rider's hands. A caller outside that set gets 404, identical to the
-     * answer for a rider who does not exist, so the endpoint cannot be used to enumerate the fleet.
+     * {@link PresenceService#locationOf} — self; backoffice, with the last known position and its
+     * time; or the employing fleet, with the position only while the rider is on duty. A caller
+     * outside that set gets 404, identical to the answer for a rider who does not exist, so the
+     * endpoint cannot be used to enumerate the fleet. Customers and shops see a rider through their
+     * order instead, under the order's own rule.
      *
-     * <p>A role check here instead would be wrong: the four groups who may ask hold four different
-     * roles, and three of them may only ask about particular riders.
+     * <p>A role check here instead would be wrong: the groups who may ask hold different roles, and
+     * a fleet may only ask about its own riders.
      */
     @GetMapping("/{riderId}/location")
     public RiderPresenceView location(@PathVariable String riderId) {
@@ -140,6 +142,9 @@ public class RiderPresenceController {
      * <p>{@code onDutyOnly} filters on the declared state, not the effective one, and that is on
      * purpose: a rider who declared duty and then went quiet is precisely who a dispatcher needs to
      * see, and filtering them out would hide the problem. They come back marked {@code STALE}.
+     *
+     * <p>A carrier sees each rider's position only while that rider is declared on duty; the back
+     * office sees every rider's last known position, with {@code lastSeenAt} as its time.
      */
     @GetMapping("/roster")
     @PreAuthorize("hasAnyRole('BACKOFFICE','CARRIER')")
