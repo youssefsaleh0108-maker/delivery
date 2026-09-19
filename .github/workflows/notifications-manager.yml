@@ -28,7 +28,58 @@ on:
       - 'pom.xml'
 
 jobs:
+  # V20 against a real PostgreSQL: the log's old codes masked, the test code sink's CHECK refusing
+  # any address off the reserved domain, and every entity validated as at boot. `ci` waits for it.
+  database-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          # Throwaway, and reachable only from this job.
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 24
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+
+      - name: One-time codes against PostgreSQL
+        env:
+          NOTIFICATIONS_TEST_DB_URL: jdbc:postgresql://localhost:5432/postgres
+        run: >-
+          mvn -B -U -pl services/notifications-manager -am test
+          -Dtest=OneTimeCodesDatabaseTest
+          -Dsurefire.failIfNoSpecifiedTests=false
+
+      - name: Fail if the database tests did not run
+        run: |
+          report=services/notifications-manager/target/surefire-reports/TEST-com.delivery.notifications.domain.OneTimeCodesDatabaseTest.xml
+          if [ ! -f "$report" ]; then
+            echo "::error::No report at $report, so the database tests did not run."
+            exit 1
+          fi
+          if ! grep -q 'tests="[1-9]' "$report" || grep -q 'skipped="[1-9]' "$report"; then
+            echo "::error::The database tests were skipped. Is NOTIFICATIONS_TEST_DB_URL set?"
+            exit 1
+          fi
+
   ci:
+    needs: database-tests
     uses: ./.github/workflows/reusable-service-ci.yml
     with:
       service-name: notifications-manager
