@@ -4,47 +4,61 @@ kind: Kustomization
 namespace: delivery-dev
 
 resources:
-  - namespace.yaml
-  - ../../base
-  - ingress.yaml
+- namespace.yaml
+- ../../base
+- ingress.yaml
 
+  # DEV SENDS REAL MAIL through the operator's relay — these override platform-common's
+  # mailpit sink (envFrom: the later source wins). qa deliberately keeps the sink: a test
+  # environment that can mail whatever address somebody typed is the failure mode.
+  # SMTP_PASSWORD is the Gmail app password, living only in platform-secrets on the box.
+  # SMS_TEST_INBOX must be a mailbox the operator owns once the relay is real — every
+  # simulated SMS becomes an actual email to it.
+  # Notifications Manager's test code sink. The delivery log masks every one-time code, so the
+  # smoke tests read theirs from notification.test_code_sink, which keeps codes ONLY for
+  # @youdrop.test addresses (a reserved domain nobody can own). A test environment's switch:
+  # never copy it into a production overlay.
+  # Riders are approved as soon as their email is verified (the owner's decision, 2026-09-19).
+  # A value set from the portal's auto-approval screen wins over this one; dev has none for riders.
 configMapGenerator:
-  - name: platform-env
-    literals:
-      - KEYCLOAK_PUBLIC_URL=https://iam-dev.youdrop.shop
-      - KEYCLOAK_ISSUER_URI=https://iam-dev.youdrop.shop/realms/delivery-platform
-      - MINIO_PUBLIC_ENDPOINT=https://api-dev.youdrop.shop
-      - CORS_ALLOWED_ORIGINS=https://portal-dev.youdrop.shop,https://app-dev.youdrop.shop,http://localhost:*,http://127.0.0.1:*
-      # DEV SENDS REAL MAIL through the operator's relay — these override platform-common's
-      # mailpit sink (envFrom: the later source wins). qa deliberately keeps the sink: a test
-      # environment that can mail whatever address somebody typed is the failure mode.
-      # SMTP_PASSWORD is the Gmail app password, living only in platform-secrets on the box.
-      # SMS_TEST_INBOX must be a mailbox the operator owns once the relay is real — every
-      # simulated SMS becomes an actual email to it.
-      - SMTP_HOST=smtp.gmail.com
-      - SMTP_PORT=587
-      - SMTP_USER=youssef.saleh0108@gmail.com
-      - SMTP_AUTH=true
-      - SMTP_STARTTLS=true
-      - EMAIL_FROM=youssef.saleh0108@gmail.com
-      - SMS_TEST_INBOX=youssef.saleh0108@gmail.com
-      # Notifications Manager's test code sink. The delivery log masks every one-time code, so the
-      # smoke tests read theirs from notification.test_code_sink, which keeps codes ONLY for
-      # @youdrop.test addresses (a reserved domain nobody can own). A test environment's switch:
-      # never copy it into a production overlay.
-      - TEST_CODE_SINK_ENABLED=true
+- literals:
+  - KEYCLOAK_PUBLIC_URL=https://iam-dev.youdrop.shop
+  - KEYCLOAK_ISSUER_URI=https://iam-dev.youdrop.shop/realms/delivery-platform
+  - MINIO_PUBLIC_ENDPOINT=https://api-dev.youdrop.shop
+  - CORS_ALLOWED_ORIGINS=https://portal-dev.youdrop.shop,https://app-dev.youdrop.shop,http://localhost:*,http://127.0.0.1:*
+  - SMTP_HOST=smtp.office365.com
+  - SMTP_PORT=587
+  - SMTP_USER=noreply@youdrop.shop
+  - SMTP_AUTH=true
+  - SMTP_STARTTLS=true
+  - EMAIL_FROM=noreply@youdrop.shop
+  - SMS_TEST_INBOX=youssef.saleh0108@gmail.com
+  - TEST_CODE_SINK_ENABLED=true
+  - AUTO_APPROVE_RIDER=true
+  name: platform-env
 
 generatorOptions:
   disableNameSuffixHash: true
 
+# order-manager lives in its own repository, and dev runs its moving `:develop` tag, so a new
+# order-manager build changes nothing Argo CD can see. Changing this value rolls the pods, and
+# imagePullPolicy: Always makes them pull the new build. Set it to the order-manager commit that
+# should be running.
 patches:
-  - target:
-      kind: Deployment
-      name: portal
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/volumes/1/hostPath/path
-        value: /opt/delivery/sites/dev/portal
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/volumes/1/hostPath/path
+      value: /opt/delivery/sites/dev/portal
+  target:
+    kind: Deployment
+    name: portal
+- patch: |-
+    - op: add
+      path: /spec/template/metadata/annotations/youdrop.shop~1order-manager-build
+      value: "429ce9e"
+  target:
+    kind: Deployment
+    name: order-manager
 
 # Which build each service runs. CI rewrites these lines after every image build on this
 # environment's branch (see reusable-service-ci.yml, update-environment-manifest) and Argo CD
@@ -52,29 +66,42 @@ patches:
 images:
 - name: docker.io/youssefsaleh0108/delivery-order-manager
   newTag: develop
-- name: ghcr.io/youssefsaleh0108-maker/product-service
-  newTag: main
-- name: ghcr.io/youssefsaleh0108-maker/order-tracking
-  newTag: main
-- name: ghcr.io/youssefsaleh0108-maker/transfer-service
-  newTag: main
-- name: ghcr.io/youssefsaleh0108-maker/connector-settings
-  newTag: main
-- name: ghcr.io/youssefsaleh0108-maker/notifications-manager
-  newTag: main
-- name: ghcr.io/youssefsaleh0108-maker/app-notification
-  newTag: main
-- name: ghcr.io/youssefsaleh0108-maker/email-connector
-  newTag: main
-- name: ghcr.io/youssefsaleh0108-maker/push-connector
-  newTag: main
-- name: ghcr.io/youssefsaleh0108-maker/sms-connector
-  newTag: main
 - name: ghcr.io/youssefsaleh0108-maker/accounting-service
-  newTag: main
-- name: ghcr.io/youssefsaleh0108-maker/whatsapp-service
-  newTag: main
-- name: ghcr.io/youssefsaleh0108-maker/onboarding-service
-  newTag: main
+  newName: ghcr.io/youssefsaleh0108-maker/accounting-service
+  newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
+- name: ghcr.io/youssefsaleh0108-maker/app-notification
+  newName: ghcr.io/youssefsaleh0108-maker/app-notification
+  newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
 - name: ghcr.io/youssefsaleh0108-maker/config-server
-  newTag: main
+  newName: ghcr.io/youssefsaleh0108-maker/config-server
+  newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
+- name: ghcr.io/youssefsaleh0108-maker/connector-settings
+  newName: ghcr.io/youssefsaleh0108-maker/connector-settings
+  newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
+- name: ghcr.io/youssefsaleh0108-maker/email-connector
+  newName: ghcr.io/youssefsaleh0108-maker/email-connector
+  newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
+- name: ghcr.io/youssefsaleh0108-maker/notifications-manager
+  newName: ghcr.io/youssefsaleh0108-maker/notifications-manager
+  newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
+- name: ghcr.io/youssefsaleh0108-maker/onboarding-service
+  newName: ghcr.io/youssefsaleh0108-maker/onboarding-service
+  newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
+- name: ghcr.io/youssefsaleh0108-maker/order-tracking
+  newName: ghcr.io/youssefsaleh0108-maker/order-tracking
+  newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
+- name: ghcr.io/youssefsaleh0108-maker/product-service
+  newName: ghcr.io/youssefsaleh0108-maker/product-service
+  newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
+- name: ghcr.io/youssefsaleh0108-maker/push-connector
+  newName: ghcr.io/youssefsaleh0108-maker/push-connector
+  newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
+- name: ghcr.io/youssefsaleh0108-maker/sms-connector
+  newName: ghcr.io/youssefsaleh0108-maker/sms-connector
+  newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
+- name: ghcr.io/youssefsaleh0108-maker/transfer-service
+  newName: ghcr.io/youssefsaleh0108-maker/transfer-service
+  newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
+- name: ghcr.io/youssefsaleh0108-maker/whatsapp-service
+  newName: ghcr.io/youssefsaleh0108-maker/whatsapp-service
+  newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
