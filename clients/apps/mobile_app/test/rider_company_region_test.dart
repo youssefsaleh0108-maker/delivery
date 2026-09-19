@@ -84,7 +84,7 @@ Finder _mapOrItsPlaceholder() =>
     find.byWidgetPredicate((Widget w) => w is FlutterMap || w is AuthMapPlaceholder);
 
 int _hiringReads(_Server server) =>
-    server.calls.where((String c) => c == 'GET /api/delivery-providers/hiring').length;
+    server.calls.where((String c) => c == 'GET /api/onboarding/hiring-companies').length;
 
 /// The rider wizard for a signed-in Google account, walked to its last step: who they ride for.
 Future<DeliveryStrings> _openAtTheLastStep(WidgetTester tester, _Server server,
@@ -384,8 +384,9 @@ class _Keycloak implements OidcClient {
   Future<void> signOut(AuthConfig config, String? refreshToken) async {}
 }
 
-/// Order Manager's public list of who is hiring, and onboarding-service's signed-in application
-/// endpoint. Anything else the screen calls is recorded and refused, so a stray call shows up.
+/// onboarding-service's open list of who is hiring — each company with its region already resolved,
+/// zones or else registered regions — and its signed-in application endpoint. Anything else the
+/// screen calls is recorded and refused, so a stray call shows up.
 class _Server implements HttpClientAdapter {
   final _Keycloak keycloak = _Keycloak();
   final List<String> calls = <String>[];
@@ -411,7 +412,7 @@ class _Server implements HttpClientAdapter {
     final String route = '${options.method} ${options.path}';
     calls.add(route);
 
-    if (route == 'GET /api/delivery-providers/hiring') return _json(200, hiring);
+    if (route == 'GET /api/onboarding/hiring-companies') return _json(200, hiring);
 
     if (route == 'POST /api/onboarding/applications/mine') {
       final Map<String, dynamic> body = options.data as Map<String, dynamic>;

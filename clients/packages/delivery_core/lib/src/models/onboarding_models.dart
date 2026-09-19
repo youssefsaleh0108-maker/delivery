@@ -62,12 +62,13 @@ class HiringCompany {
   final String id;
   final String name;
 
-  /// Where the company delivers: the names of its active coverage zones.
+  /// Where the company delivers: the names of its active coverage zones, or — for a company that has
+  /// drawn none — the regions it registered with (owner, 2026-09).
   ///
   /// A rider who joins the company works there rather than choosing an area, so the rider wizard
-  /// shows this read-only. Empty when the company has drawn no zone yet — and when the server is
-  /// older than the field, which says nothing either way: there is no region to show, and the
-  /// wizard shows a dash rather than inventing one.
+  /// shows this read-only, and the server records the same region on the application. Empty when
+  /// the company has neither — and when the server is older than the field, which says nothing
+  /// either way: there is no region to show, and the wizard shows a dash rather than inventing one.
   final List<String> regions;
 
   factory HiringCompany.fromJson(Map<String, dynamic> json) => HiringCompany(
@@ -196,12 +197,28 @@ class OnboardingApplication {
   /// Anything that is not a JSON object reads as no details at all, including the null the receipt
   /// shape sends. Values are stringified rather than filtered, so an answer of `false` or `0`
   /// survives instead of vanishing.
+  ///
+  /// A list reads as its entries joined with commas — "Beirut, Mount Lebanon", which is what a
+  /// reviewer and a company's roster show, rather than Dart's "[Beirut, Mount Lebanon]" — and an
+  /// empty list is no answer, left out like a null rather than shown as a blank.
   static Map<String, String> _details(dynamic value) {
     if (value is! Map) return const <String, String>{};
-    return <String, String>{
-      for (final MapEntry<dynamic, dynamic> e in value.entries)
-        if (e.value != null) e.key.toString(): e.value.toString(),
-    };
+    final Map<String, String> details = <String, String>{};
+    for (final MapEntry<dynamic, dynamic> e in value.entries) {
+      final String? text = _detailText(e.value);
+      if (text != null) details[e.key.toString()] = text;
+    }
+    return details;
+  }
+
+  static String? _detailText(dynamic value) {
+    if (value == null) return null;
+    if (value is! List) return value.toString();
+    final List<String> entries = <String>[
+      for (final dynamic entry in value)
+        if (entry != null && entry.toString().trim().isNotEmpty) entry.toString().trim(),
+    ];
+    return entries.isEmpty ? null : entries.join(', ');
   }
 
   static DateTime? _time(dynamic value) =>

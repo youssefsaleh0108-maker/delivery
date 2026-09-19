@@ -14,10 +14,17 @@ class OnboardingApi {
 
   // ------------------------------------------------------------------ applying
 
-  /// The delivery companies somebody could apply to ride for. No token: they have no account yet.
+  /// The delivery companies somebody could apply to ride for, each with the region a rider joining it
+  /// works in. No token: they have no account yet.
+  ///
+  /// Read from onboarding-service rather than from Order Manager's own list, because a company with
+  /// no zones shows the regions it registered with (owner, 2026-09) and only onboarding-service holds
+  /// those — and it records that same region on the application, so a rider is recorded with what
+  /// they were shown. Installed copies of the app still read Order Manager's list, which keeps
+  /// working: it carries the same companies, with zones only.
   Future<List<HiringCompany>> hiringCompanies() async {
     final Response<dynamic> response =
-        await _dio.get<dynamic>('/api/delivery-providers/hiring');
+        await _dio.get<dynamic>('/api/onboarding/hiring-companies');
     return (response.data as List<dynamic>)
         .map((dynamic c) => HiringCompany.fromJson(c as Map<String, dynamic>))
         .toList();

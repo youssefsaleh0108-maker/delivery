@@ -1685,10 +1685,11 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   /// The region of the company a rider chose, read-only (owner, 2026-09: the rider does not select a
   /// region; the app displays the registered delivery company's).
   ///
-  /// The names are the company's active coverage zones, from the same public list the company was
-  /// picked from, and the server records that same region on the application. There is nothing here
-  /// for the rider to choose, so nothing here is drawn as a field. A dash when the company has drawn
-  /// no zone yet: the platform has no region to show for it, and saying so beats inventing one.
+  /// The names come from the same list the company was picked from, onboarding-service's: the
+  /// company's active zones, or — for a company that has drawn none — the regions it registered with
+  /// (owner, 2026-09). The server records that same region on the application. There is nothing here
+  /// for the rider to choose, so nothing here is drawn as a field. A dash when the company has
+  /// neither: the platform has no region to show for it, and saying so beats inventing one.
   List<Widget> _companyRegion(DeliveryStrings t, HiringCompany company) => <Widget>[
         AuthFieldLabel(label: t.riderRegionLabel, uppercase: true),
         const SizedBox(height: DeliverySpacing.sm),

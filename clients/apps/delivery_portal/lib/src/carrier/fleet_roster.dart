@@ -161,8 +161,8 @@ class CarrierFleet {
   /// subject instead. The platform has no badge numbers, and none is invented here.
   String referenceOf(String rider) => applications[rider]?.reference ?? shortRiderRef(rider);
 
-  /// Where the rider said they work, from their own application. Null when they did not say —
-  /// never guessed at from anything else.
+  /// Where the rider works, from their own application: the region of the company they applied to,
+  /// or where they said they work. Null when neither is there — never guessed at from anything else.
   String? regionOf(String rider) {
     final Map<String, String> details = applications[rider]?.details ?? const <String, String>{};
     for (final String key in regionKeys) {
@@ -172,11 +172,16 @@ class CarrierFleet {
     return null;
   }
 
-  /// The application keys a rider's region has been written under. `preferredArea` is the one the
-  /// rider wizard writes today (mobile_app `partner_application_screen.dart`) and was missing from
-  /// the old table's list, which left every rider who applied from the app without a region; the
-  /// rest are older shapes of the same answer.
+  /// The application keys a rider's region has been written under, first match wins.
+  ///
+  /// `companyRegions` comes first: a rider who applies to a company does not choose an area, and the
+  /// server records the company's region instead — its zones, or the regions it registered with —
+  /// which reads as "Achrafieh, Hamra". `preferredArea` is what the rider wizard writes for a rider
+  /// riding for YouDrop, and what every rider wrote before; it was missing from the old table's list,
+  /// which left every rider who applied from the app without a region. The rest are older shapes of
+  /// the same answer.
   static const List<String> regionKeys = <String>[
+    'companyRegions',
     'preferredArea',
     'workRegion',
     'region',

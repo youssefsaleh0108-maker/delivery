@@ -43,6 +43,30 @@ void main() {
     expect(find.text('—'), findsNWidgets(2));
   });
 
+  testWidgets("a company rider's region is the company's, read as names rather than a list",
+      (WidgetTester tester) async {
+    await pumpDirectory(
+        tester,
+        FleetStub(applications: <Map<String, dynamic>>[
+          applicationJson(
+            id: 'app-1',
+            name: 'Nadia Haddad',
+            riderRef: nadia,
+            // What the server records for a rider who applied to this company: its region, as a
+            // list. An area an older app typed as well does not win over it.
+            details: const <String, Object?>{
+              'companyRegions': <String>['Achrafieh', 'Hamra'],
+              'preferredArea': 'Verdun',
+              'vehicleType': 'MOTORCYCLE',
+            },
+          ),
+        ]));
+
+    expect(find.text('Achrafieh, Hamra'), findsOneWidget);
+    expect(find.text('[Achrafieh, Hamra]'), findsNothing);
+    expect(find.text('Verdun'), findsNothing);
+  });
+
   testWidgets('every rating and every standing comes from a fleet-wide read, never one per rider',
       (WidgetTester tester) async {
     // Six plus two per rider used to go out at once — more than eighty for forty riders — into the
