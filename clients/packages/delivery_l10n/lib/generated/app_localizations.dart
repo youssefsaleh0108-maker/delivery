@@ -21218,6 +21218,24 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Sign-in can\'t be set up right now. Please try again in a minute.'**
   String get wizAccountSignInUnavailable;
+
+  /// No description provided for @wizAccountSignInExists.
+  ///
+  /// In en, this message translates to:
+  /// **'Your sign-in is already set up. Sign in with your email and the passcode you chose.'**
+  String get wizAccountSignInExists;
+
+  /// No description provided for @wizAccountApplicationDecided.
+  ///
+  /// In en, this message translates to:
+  /// **'This application has already been decided, so a sign-in can\'t be set up for it here. Please contact support.'**
+  String get wizAccountApplicationDecided;
+
+  /// No description provided for @wizAccountEmailChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The email on this application was changed after it was verified, so a sign-in can\'t be set up for it. Please contact support.'**
+  String get wizAccountEmailChanged;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

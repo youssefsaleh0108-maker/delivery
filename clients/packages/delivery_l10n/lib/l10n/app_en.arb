@@ -6092,5 +6092,8 @@
   "svcChatUnavailable": "Chat is unavailable right now.",
   "svcChatOrderNotFound": "Couldn't open this order's chat. Reloading the order.",
   "wizAccountExists": "This email address already has an account. Sign in with that account, or apply with a different email.",
-  "wizAccountSignInUnavailable": "Sign-in can't be set up right now. Please try again in a minute."
+  "wizAccountSignInUnavailable": "Sign-in can't be set up right now. Please try again in a minute.",
+  "wizAccountSignInExists": "Your sign-in is already set up. Sign in with your email and the passcode you chose.",
+  "wizAccountApplicationDecided": "This application has already been decided, so a sign-in can't be set up for it here. Please contact support.",
+  "wizAccountEmailChanged": "The email on this application was changed after it was verified, so a sign-in can't be set up for it. Please contact support."
 }

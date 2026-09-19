@@ -711,10 +711,16 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         _session ??= await widget.authService.refresh();
       } else {
         if (!_accountCreated) {
-          await widget.api.createApplicantAccount(
-            reference: _reference!,
-            password: _passcode.text,
-          );
+          try {
+            await widget.api.createApplicantAccount(
+              reference: _reference!,
+              password: _passcode.text,
+            );
+          } catch (e) {
+            // Already made: an earlier try went through and its answer was lost. Straight on to
+            // signing in with the passcode it was made with — see [isSignInExists].
+            if (!isSignInExists(e)) rethrow;
+          }
           _accountCreated = true;
         }
         _session ??= await widget.authService

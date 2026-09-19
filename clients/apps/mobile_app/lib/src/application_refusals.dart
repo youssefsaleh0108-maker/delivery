@@ -11,18 +11,27 @@ import 'package:dio/dio.dart';
 /// The server's own words where it has any — they are written to be acted on — and otherwise the
 /// generic "that did not go through", for a failure that never reached a sentence.
 ///
-/// Two refusals are said in the reader's language even here, because they come from the step that
-/// shows the server's words — choosing the passcode, where a failure reads "We could not set up your
-/// sign-in" and then this (the partner wizard's `_messageFrom`, and the services signup): an address
-/// that already has an account (`account-exists`), and the platform failing to make one just now
-/// (`sign-in-unavailable`), which a retry in a minute finishes. Until the server named them both were
-/// a bare 500, and a rider read "That did not go through" with nothing to act on.
+/// The passcode step's refusals are said in the reader's language even here, because that step shows
+/// the server's words — a failure reads "We could not set up your sign-in" and then this (the partner
+/// wizard's `_messageFrom`, and the services signup): an address that already has an account
+/// (`account-exists`), the platform failing to make one just now (`sign-in-unavailable`), which a
+/// retry in a minute finishes, the sign-in already made (`sign-in-exists`, see [isSignInExists]), and
+/// an application that may not have one made at all — decided already (`application-decided`), or
+/// its email changed by support after it was verified (`email-changed`). Until the server named them
+/// they were a bare 500 or the server's English, and a rider read "That did not go through" with
+/// nothing to act on.
 String applicationServerMessage(DeliveryStrings t, Object error) {
   switch (_codeOf(error)) {
     case 'account-exists':
       return t.wizAccountExists;
     case 'sign-in-unavailable':
       return t.wizAccountSignInUnavailable;
+    case 'sign-in-exists':
+      return t.wizAccountSignInExists;
+    case 'application-decided':
+      return t.wizAccountApplicationDecided;
+    case 'email-changed':
+      return t.wizAccountEmailChanged;
   }
   if (error is DioException) {
     final Object? body = error.response?.data;
@@ -30,6 +39,15 @@ String applicationServerMessage(DeliveryStrings t, Object error) {
   }
   return t.thatDidNotGoThrough;
 }
+
+/// Whether the passcode step was refused because the application's sign-in already exists: an
+/// earlier try went through and its answer never arrived — a lost 201, or a 503 whose sign-in had in
+/// fact been recorded.
+///
+/// Nothing is wrong, and making the sign-in again can never succeed, so the open forms treat this as
+/// the sign-in made and go straight on to signing in with the passcode just chosen — the one the
+/// sign-in was made with.
+bool isSignInExists(Object error) => _codeOf(error) == 'sign-in-exists';
 
 /// A refused application, in the reader's language wherever the server named the refusal.
 ///

@@ -60,8 +60,44 @@ void main() {
     );
   });
 
+  test('a sign-in already made is named, and recognised as the one to sign in with', () {
+    final DioException made = answered(422, <String, Object?>{
+      'code': 'sign-in-exists',
+      'message': 'That application already has a sign-in.',
+    });
+
+    expect(isSignInExists(made), isTrue);
+    expect(applicationServerMessage(en, made), en.wizAccountSignInExists);
+    expect(applicationServerMessage(ar, made), ar.wizAccountSignInExists);
+    expect(applicationRefusal(ar, made), ar.wizAccountSignInExists);
+    // Only that code: an address with somebody else's account must never be signed in to.
+    expect(
+        isSignInExists(answered(422, <String, Object?>{'code': 'account-exists', 'message': 'x'})),
+        isFalse);
+    expect(isSignInExists(StateError('offline')), isFalse);
+  });
+
+  test('an application that may not have a sign-in made says why, in either language', () {
+    final DioException decided = answered(422, <String, Object?>{
+      'code': 'application-decided',
+      'message': 'This application has already been decided.',
+    });
+    final DioException changed = answered(422, <String, Object?>{
+      'code': 'email-changed',
+      'message': 'The email address on this application was changed after it was verified.',
+    });
+
+    expect(applicationServerMessage(en, decided), en.wizAccountApplicationDecided);
+    expect(applicationServerMessage(ar, decided), ar.wizAccountApplicationDecided);
+    expect(applicationServerMessage(en, changed), en.wizAccountEmailChanged);
+    expect(applicationServerMessage(ar, changed), ar.wizAccountEmailChanged);
+  });
+
   test('the Arabic is Arabic, not the English copied', () {
     expect(ar.wizAccountExists, isNot(en.wizAccountExists));
     expect(ar.wizAccountSignInUnavailable, isNot(en.wizAccountSignInUnavailable));
+    expect(ar.wizAccountSignInExists, isNot(en.wizAccountSignInExists));
+    expect(ar.wizAccountApplicationDecided, isNot(en.wizAccountApplicationDecided));
+    expect(ar.wizAccountEmailChanged, isNot(en.wizAccountEmailChanged));
   });
 }

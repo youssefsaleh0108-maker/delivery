@@ -12508,4 +12508,16 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get wizAccountSignInUnavailable =>
       'Sign-in can\'t be set up right now. Please try again in a minute.';
+
+  @override
+  String get wizAccountSignInExists =>
+      'Your sign-in is already set up. Sign in with your email and the passcode you chose.';
+
+  @override
+  String get wizAccountApplicationDecided =>
+      'This application has already been decided, so a sign-in can\'t be set up for it here. Please contact support.';
+
+  @override
+  String get wizAccountEmailChanged =>
+      'The email on this application was changed after it was verified, so a sign-in can\'t be set up for it. Please contact support.';
 }
