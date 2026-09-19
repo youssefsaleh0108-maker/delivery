@@ -224,6 +224,11 @@ public class RiderEarningsService {
      * <p>The result can therefore be NEGATIVE, and is returned that way rather than clamped. A
      * rider who owes the platform money should see that they do; a zero would look like having
      * earned nothing, which is a different and more alarming statement.
+     *
+     * <p><strong>Only cash owed to the platform (RECON-12).</strong> Cash from a delivery company's
+     * jobs is owed to the company, which nets it in its own pay run or takes it at its hub; netting
+     * it here too took the same notes twice. And never the shop's till the same account may hold: a
+     * shop settles its till with the platform on its own terms (V52).
      */
     @Transactional(readOnly = true)
     public BigDecimal availableFor(String riderRef) {
@@ -231,10 +236,8 @@ public class RiderEarningsService {
         if (!offsetCashFloat) {
             return balance;
         }
-        // As a rider, and never as the shop the same account may also be: a shop's till is settled
-        // with the platform on its own terms and is no part of what a rider may cash out (V52).
-        return scale(balance.subtract(floatEntries.outstandingTotalFor(riderRef,
-                com.delivery.accounting.domain.CashFloatEntry.HolderKind.RIDER)));
+        BigDecimal owed = floatEntries.riderOwesPlatform(riderRef);
+        return scale(balance.subtract(owed == null ? BigDecimal.ZERO : owed));
     }
 
     // -------------------------------------------------------------------------------- statement

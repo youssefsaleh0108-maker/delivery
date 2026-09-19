@@ -269,6 +269,8 @@ public class RiderEarningsController {
         // they are holding more of the platform's money than it owes them, and it is shown that way
         // rather than clamped: a zero would read as having earned nothing.
         payload.put("available", available);
+        // What was netted off: cash the rider owes the PLATFORM. Cash from a delivery company's
+        // jobs is the company's to collect and is not in it (RECON-12).
         payload.put("cashFloatHeld", balance.subtract(available));
         payload.put("minimumCashOut", earnings.minimumCashOut());
         // So the app can promise the right thing. Nothing pays automatically today, and a screen

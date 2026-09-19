@@ -144,10 +144,9 @@ class RiderCashOutTest {
         when(ledger.balanceOf(RIDER)).thenReturn(new BigDecimal(balance));
     }
 
+    /** Cash the rider holds that they owe the platform — what a cash-out is netted against. */
     private void isCarrying(String cash) {
-        when(floatEntries.outstandingTotalFor(RIDER,
-                com.delivery.accounting.domain.CashFloatEntry.HolderKind.RIDER))
-                .thenReturn(new BigDecimal(cash));
+        when(floatEntries.riderOwesPlatform(RIDER)).thenReturn(new BigDecimal(cash));
     }
 
     @Nested

@@ -451,8 +451,9 @@ class MerchantCashTest {
                             new com.delivery.accounting.payout.ManualPayoutProvider()), "MANUAL"),
                     new BigDecimal("5.00"), new BigDecimal("100.00"), true, "UTC", "USD");
             when(riderLedger.balanceOf(SHOP)).thenReturn(new BigDecimal("20.00"));
-            when(floats.outstandingTotalFor(SHOP, HolderKind.RIDER))
-                    .thenReturn(new BigDecimal("13.25"));
+            // What the account owes the platform as a rider: its bag. The query reads RIDER rows
+            // only, and MerchantCashConstraintTest proves against Postgres that the till is not in it.
+            when(floats.riderOwesPlatform(SHOP)).thenReturn(new BigDecimal("13.25"));
             lenient().when(floats.outstandingTotalFor(SHOP, HolderKind.MERCHANT))
                     .thenReturn(new BigDecimal("40.00"));
 

@@ -133,6 +133,27 @@ public interface CashFloatRepository extends JpaRepository<CashFloatEntry, UUID>
                                    @Param("holderKind") CashFloatEntry.HolderKind holderKind);
 
     /**
+     * What a rider owes the PLATFORM right now: their outstanding cash, less any they hold for a
+     * delivery company (RECON-12).
+     *
+     * <p>Cash from a company's jobs is owed to the company, which nets it in its own pay run
+     * ({@code PayslipCalculator}) or takes it at its hub, and then answers to the platform for it.
+     * Netting it against what the platform owes the rider as well took the same notes twice: a
+     * rider owed 20.00 for own-fleet work and holding 30.00 for their company was told they could
+     * take out -10.00. Never a shop's till either, which a shop that also delivers settles on its
+     * own terms.
+     */
+    @Query("""
+            SELECT COALESCE(SUM(f.amount), 0) FROM CashFloatEntry f
+            WHERE f.holderRef = :rider
+              AND f.holderKind = com.delivery.accounting.domain.CashFloatEntry$HolderKind.RIDER
+              AND f.carrierRef IS NULL
+              AND f.entryKind = com.delivery.accounting.domain.CashFloatEntry$Kind.COLLECTED
+              AND f.clearedBy IS NULL
+            """)
+    BigDecimal riderOwesPlatform(@Param("rider") String rider);
+
+    /**
      * What the collections one remittance or transfer cleared came to. With the rows it wrote, this
      * is what a replayed shop's payment says it kept.
      */
