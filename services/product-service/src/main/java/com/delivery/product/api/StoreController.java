@@ -32,6 +32,7 @@ import com.delivery.product.api.dto.CatalogDtos.PageResponse;
 import com.delivery.product.api.dto.CatalogDtos.PresignUploadRequest;
 import com.delivery.product.api.dto.CatalogDtos.PresignUploadResponse;
 import com.delivery.product.api.dto.CatalogDtos.ProductResponse;
+import com.delivery.product.api.dto.DeliveryZoneDtos.ZoneResponse;
 import com.delivery.product.api.dto.GeoDtos.LocationRequest;
 import com.delivery.product.api.dto.GeoDtos.NearbyPageResponse;
 import com.delivery.product.api.dto.GeoDtos.NearbyStoreResponse;
@@ -48,7 +49,6 @@ import com.delivery.product.api.dto.StoreDtos.StoreCardResponse;
 import com.delivery.product.api.dto.StoreDtos.StoreRequest;
 import com.delivery.product.api.dto.StoreDtos.PowerRequest;
 import com.delivery.product.api.dto.StoreDtos.RadiusRequest;
-import com.delivery.product.api.dto.StoreDtos.ServedZoneResponse;
 import com.delivery.product.api.dto.StoreDtos.StoreResponse;
 import com.delivery.product.api.dto.StoreDtos.VerifiedLocalRequest;
 import com.delivery.product.domain.GeoPoint;
@@ -761,15 +761,11 @@ public class StoreController {
     }
 
     /**
-     * Where a shop delivers by area, for its shop page's map: on the full store only, never on a
-     * card, so the storefront grid costs no query per shop for it.
+     * Where a shop delivers by area, for its shop page's map, in the area picker's own shape: on
+     * the full store only, never on a card, so the storefront grid costs no query per shop for it.
      */
-    private List<ServedZoneResponse> servedZonesOf(Store store) {
-        return deliveryZones.servedAreasOf(store.getId()).stream()
-                .map(zone -> new ServedZoneResponse(zone.getId(), zone.getName(), zone.getRegion(),
-                        zone.getSortOrder(), zone.isActive(), zone.getCenterLat(),
-                        zone.getCenterLng()))
-                .toList();
+    private List<ZoneResponse> servedZonesOf(Store store) {
+        return deliveryZones.servedAreasOf(store.getId()).stream().map(ZoneResponse::of).toList();
     }
 
     private static OfferResponse toOffer(StoreOffer offer) {

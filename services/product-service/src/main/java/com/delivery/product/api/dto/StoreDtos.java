@@ -14,6 +14,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import com.delivery.product.api.dto.DeliveryZoneDtos.ZoneResponse;
 import com.delivery.product.domain.Store;
 import com.delivery.product.domain.StoreOffer;
 
@@ -108,31 +109,18 @@ public final class StoreDtos {
             /** The merchant's delivery circle, or null for zones-only. */
             Integer deliveryRadiusMetres,
             /**
-             * The areas this shop delivers to, in the picker's order — the other half of where it
-             * delivers, beside the circle above. Exactly the areas order placement serves
-             * ({@code DeliveryZoneService#servedAreasOf}), so the shop page's map cannot promise an
+             * The areas this shop delivers to, in the picker's order and in the picker's own shape
+             * ({@link ZoneResponse}) — the other half of where it delivers, beside the circle above.
+             * Exactly the areas order placement serves ({@code DeliveryZoneService#servedAreasOf}),
+             * retired ones included ({@code active} false), so the shop page's map cannot promise an
              * address that checkout then refuses.
              *
              * <p>Empty means the shop does not limit its deliveries by area, never that it delivers
              * nowhere. Never null.
              */
-            List<ServedZoneResponse> deliveryZones,
+            List<ZoneResponse> deliveryZones,
             /** What a SERVICES shop does. Always set for a service shop and null for every other. */
             Store.ServiceCategory serviceCategory) {
-    }
-
-    /**
-     * One area a shop delivers to, in the shape the area picker already reads
-     * ({@code GET /api/delivery-zones}), so a client parses it with the model it has.
-     *
-     * <p>An area is a name the customer picks for their address ("Hamra"), and whether a shop goes
-     * there is decided by that pick alone, never by distance. The centre is roughly the middle of
-     * the neighbourhood, entered by the back office (V30) — a place to put the name on a map, NOT a
-     * boundary — and null until the area has been placed. Both or neither. {@code active} is false
-     * for an area retired from the picker that the shop still serves.
-     */
-    public record ServedZoneResponse(UUID id, String name, String region, int sortOrder,
-                                     boolean active, BigDecimal centerLat, BigDecimal centerLng) {
     }
 
     /** The card shape: everything a storefront grid needs and nothing it does not. */

@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.delivery.product.api.dto.DeliveryZoneDtos.ZoneResponse;
 import com.delivery.product.domain.DeliveryZone;
 import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.domain.Store;
@@ -270,14 +271,6 @@ public class DeliveryZoneController {
                         "Send a centre or clearCentre, not both");
             }
             return true;
-        }
-    }
-
-    public record ZoneResponse(UUID id, String name, String region, int sortOrder, boolean active,
-                               BigDecimal centerLat, BigDecimal centerLng) {
-        static ZoneResponse of(DeliveryZone z) {
-            return new ZoneResponse(z.getId(), z.getName(), z.getRegion(), z.getSortOrder(),
-                    z.isActive(), z.getCenterLat(), z.getCenterLng());
         }
     }
 
