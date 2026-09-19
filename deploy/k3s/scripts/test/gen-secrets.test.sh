@@ -90,14 +90,14 @@ run "$S" && [ "$(cat "$S"/*/* | cksum)" = "$before" ] && ok "second run leaves e
 
 echo "== an existing environment is never handed Keycloak values it does not hold =="
 E="$T/existing"; mkdir -p "$E/platform-secrets" "$E/ops-auth-users"
-echo x > "$E/platform-secrets/POSTGRES_PASSWORD"; echo 'ops:$apr1$x$y' > "$E/ops-auth-users/users"
+echo x > "$E/platform-secrets/POSTGRES_PASSWORD"; echo 'ops:the-existing-entry' > "$E/ops-auth-users/users"
 run "$E" && ok "exits 0" || fail "exit status on an existing environment"
 [ ! -e "$E/keycloak-clients" ] && [ ! -e "$E/demo-logins" ] && ok "keycloak-clients and demo-logins not invented" \
   || fail "minted Keycloak-bound Secrets for an existing environment"
 grep -q "MISSING: keycloak-clients" "$T/out" && grep -q "MISSING: demo-logins" "$T/out" \
   && ok "says which ones are missing and how to create them" || fail "no MISSING notice"
 [ -d "$E/whatsapp-webhook" ] && [ -d "$E/sms-dlr" ] && ok "webhook Secrets created (consistent at any time)" || fail "webhook Secrets missing"
-[ "$(cat "$E/ops-auth-users/users")" = 'ops:$apr1$x$y' ] && [ ! -e "$E.ops-password" ] \
+[ "$(cat "$E/ops-auth-users/users")" = 'ops:the-existing-entry' ] && [ ! -e "$E.ops-password" ] \
   && ok "existing ops-auth-users untouched" || fail "ops-auth-users was replaced"
 
 echo "== a failed lookup stops the script instead of reading as absent =="
