@@ -22,6 +22,7 @@ import org.mockito.quality.Strictness;
 
 import com.delivery.product.api.dto.StoreDtos.HoursRequest;
 import com.delivery.product.api.dto.StoreDtos.StoreRequest;
+import com.delivery.product.domain.TestPin;
 import com.delivery.product.domain.CategoryRepository;
 import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.domain.ProductRepository;
@@ -273,6 +274,7 @@ class StoreAdministrationTest {
                     .mapToObj(day -> new HoursRequest(day, LocalTime.of(9, 0), LocalTime.of(17, 0)))
                     .toList());
 
+            TestPin.pinned(store);
             service.publish(store.getId(), MERCHANT);
             assertThat(store.getPublishedAt()).isEqualTo(CLOCK);
 

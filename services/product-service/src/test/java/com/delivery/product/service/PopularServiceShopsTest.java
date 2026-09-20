@@ -19,6 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
 
+import com.delivery.product.domain.TestPin;
 import com.delivery.product.domain.CategoryRepository;
 import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.domain.ProductRepository;
@@ -112,6 +113,7 @@ class PopularServiceShopsTest {
         shop.replaceHours(Arrays.stream(DayOfWeek.values())
                 .map(day -> new StoreHours(day, LocalTime.MIDNIGHT, LocalTime.of(23, 59, 59)))
                 .toList());
+        TestPin.pinned(shop);
         shop.publish(NOW.minus(Duration.ofDays(90)));
         world.put(shop.getId(), shop);
         ranking.add(shop.getId());

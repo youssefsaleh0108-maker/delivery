@@ -32,6 +32,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import com.delivery.product.api.dto.ItemSearchDtos.ItemSearchPageResponse;
 import com.delivery.product.api.dto.ItemSearchDtos.ItemSearchRequest;
 import com.delivery.product.api.dto.ItemSearchDtos.ShopItemsResponse;
+import com.delivery.product.domain.TestPin;
 import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.domain.Product;
 import com.delivery.product.domain.Store;
@@ -96,6 +97,7 @@ class ItemSearchAccessTest {
         shop.pinAt(GeoPoint.of(33.900800d, 35.482900d));
         shop.replaceHours(List.of(new StoreHours(DayOfWeek.MONDAY, LocalTime.of(8, 0),
                 LocalTime.of(22, 0))));
+        TestPin.pinned(shop);
         shop.publish(Instant.parse("2026-01-01T00:00:00Z"));
         pepsi = new Product("merchant-sub", shop.getId(), "Pepsi 1L", null, new BigDecimal("1.25"), null);
 

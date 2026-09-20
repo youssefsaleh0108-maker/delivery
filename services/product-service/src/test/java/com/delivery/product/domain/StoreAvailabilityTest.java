@@ -35,6 +35,7 @@ class StoreAvailabilityTest {
     private static Store storeOpen(LocalTime from, LocalTime to) {
         Store store = new Store("merchant-1", "Beirut Grill", Store.Vertical.RESTAURANT);
         store.replaceHours(everyDay(from, to));
+        TestPin.pinned(store);
         store.publish(utc(0, 0));
         return store;
     }
@@ -169,14 +170,17 @@ class StoreAvailabilityTest {
         }
 
         /**
-         * The shape {@code StoreService.requireStoreFor} produces for a brand-new merchant. It must
-         * come out orderable: a DRAFT store is invisible to customers, which made the merchant's
-         * very first product unsellable.
+         * The shape {@code StoreService.requireStoreFor} produces for a brand-new merchant, once it
+         * has the pin it now waits for: a default week that comes out orderable in the middle of the
+         * day. (Whether that shop is listed on the spot is
+         * {@code StoreServiceTest}'s question, not this class's; a DRAFT one is invisible to
+         * customers, which is why the shape here has to be right the moment it is.)
          */
         @Test
         void an_auto_provisioned_store_is_open_during_the_day() {
             Store store = new Store("merchant-1", "My Store", Store.Vertical.RESTAURANT);
             store.replaceHours(everyDay(LocalTime.of(9, 0), LocalTime.of(22, 0)));
+            TestPin.pinned(store);
             store.publish(utc(0, 0));
 
             assertThat(store.availabilityAt(utc(12, 0))).isEqualTo(Store.Availability.OPEN);
@@ -195,6 +199,7 @@ class StoreAvailabilityTest {
                             new StoreHours(day, LocalTime.of(6, 30), LocalTime.of(11, 30)),
                             new StoreHours(day, LocalTime.of(14, 0), LocalTime.of(19, 0))))
                     .toList());
+            TestPin.pinned(store);
             store.publish(utc(0, 0));
             return store;
         }
@@ -230,6 +235,7 @@ class StoreAvailabilityTest {
             store.replaceHours(List.of(
                     new StoreHours(DayOfWeek.WEDNESDAY, LocalTime.of(8, 0), LocalTime.of(14, 0)),
                     new StoreHours(DayOfWeek.WEDNESDAY, LocalTime.of(12, 0), LocalTime.of(20, 0))));
+            TestPin.pinned(store);
             store.publish(utc(0, 0));
 
             assertThat(store.closingTimeAt(utc(13, 0))).isEqualTo(LocalTime.of(20, 0));
@@ -242,6 +248,7 @@ class StoreAvailabilityTest {
             Store store = new Store("merchant-1", "Wednesdays only", Store.Vertical.RESTAURANT);
             store.replaceHours(List.of(
                     new StoreHours(DayOfWeek.WEDNESDAY, LocalTime.of(8, 0), LocalTime.of(23, 0))));
+            TestPin.pinned(store);
             store.publish(utc(0, 0));
 
             assertThat(store.availabilityAt(utc(12, 0))).isEqualTo(Store.Availability.OPEN);
@@ -276,6 +283,7 @@ class StoreAvailabilityTest {
             store.updateProfile("Beirut Grill", null, null, Store.Vertical.RESTAURANT,
                     List.of(), "Asia/Beirut", null);
             store.replaceHours(everyDay(LocalTime.of(8, 0), LocalTime.of(23, 0)));
+            TestPin.pinned(store);
             store.publish(utc(0, 0));
 
             // 22:00 UTC on the Wednesday is 01:00 Thursday in Beirut (UTC+3 in August): shut.
@@ -295,6 +303,7 @@ class StoreAvailabilityTest {
             store.updateProfile("Typo", null, null, Store.Vertical.ELECTRONICS,
                     List.of(), "Not/A_Real_Zone", null);
             store.replaceHours(everyDay(LocalTime.of(8, 0), LocalTime.of(23, 0)));
+            TestPin.pinned(store);
             store.publish(utc(0, 0));
 
             assertThat(store.availabilityAt(utc(12, 0))).isEqualTo(Store.Availability.OPEN);

@@ -426,6 +426,7 @@ class ServicesVerticalDatabaseTest {
         store.replaceHours(Arrays.stream(DayOfWeek.values())
                 .map(day -> new StoreHours(day, LocalTime.MIDNIGHT, LocalTime.of(23, 59, 59)))
                 .toList());
+        TestPin.pinned(store);
         store.publish(NOW.minus(Duration.ofDays(30)));
         return store;
     }

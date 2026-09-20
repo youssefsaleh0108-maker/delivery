@@ -27,6 +27,7 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.mock.env.MockEnvironment;
 
+import com.delivery.product.domain.TestPin;
 import com.delivery.product.domain.CategoryRepository;
 import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.domain.ItemSearchRepository;
@@ -233,6 +234,7 @@ class ItemSearchServiceTest {
         Store store = new Store("merchant-" + name, name, Store.Vertical.GROCERY);
         store.pinAt(GeoPoint.of(latitude, longitude));
         store.replaceHours(everyDay(LocalTime.MIDNIGHT, LocalTime.of(23, 59, 59)));
+        TestPin.pinned(store);
         store.publish(LONG_AGO);
         shops.put(store.getId(), store);
         return store;
@@ -316,6 +318,7 @@ class ItemSearchServiceTest {
                     Store.ServiceCategory.PRINTING);
             press.pinAt(GeoPoint.of(33.898200d, 35.482500d));
             press.replaceHours(everyDay(LocalTime.MIDNIGHT, LocalTime.of(23, 59, 59)));
+            TestPin.pinned(press);
             press.publish(LONG_AGO);
             shops.put(press.getId(), press);
             sells(press, "Pepsi flyers, 500");
@@ -399,12 +402,21 @@ class ItemSearchServiceTest {
                     .containsExactlyInAnyOrder("Achrafieh Grocer", "Jounieh Grocer");
         }
 
-        /** A shop that never dropped a pin has no distance, so it is not "near" anything. */
+        /**
+         * A shop that has no pin has no distance, so it is not "near" anything.
+         *
+         * <p>Listed before the pin rule existed and then unpinned, which is the only way this shape
+         * arises now — {@link Store#publish} refuses a pinless shop, but an ACTIVE one that loses
+         * its pin, or that was already live when the rule landed (every ACTIVE shop on dev), stays
+         * listed. This test is what that shop's search behaviour is, and it must keep working.
+         */
         @Test
         void a_shop_with_no_pin_is_found_only_without_a_point() {
             Store unpinned = new Store("merchant-nopin", "No Pin Grocer", Store.Vertical.GROCERY);
             unpinned.replaceHours(everyDay(LocalTime.MIDNIGHT, LocalTime.of(23, 59, 59)));
+            TestPin.pinned(unpinned);
             unpinned.publish(LONG_AGO);
+            unpinned.clearPin();
             shops.put(unpinned.getId(), unpinned);
             sells(unpinned, "Pepsi 1L");
 

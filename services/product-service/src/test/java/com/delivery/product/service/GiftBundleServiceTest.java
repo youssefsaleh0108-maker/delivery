@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Pageable;
 
+import com.delivery.product.domain.TestPin;
 import com.delivery.product.domain.Product;
 import com.delivery.product.domain.ProductRepository;
 import com.delivery.product.domain.Store;
@@ -71,6 +72,7 @@ class GiftBundleServiceTest {
         shop.replaceHours(Arrays.stream(DayOfWeek.values())
                 .map(day -> new StoreHours(day, LocalTime.of(8, 0), LocalTime.of(23, 0)))
                 .toList());
+        TestPin.pinned(shop);
         shop.publish(utc(0, 0));
         return shop;
     }

@@ -24,6 +24,7 @@ import org.springframework.mock.env.MockEnvironment;
 
 import com.delivery.platform.storage.StorageService;
 import com.delivery.product.api.dto.BannerDtos.BannerRequest;
+import com.delivery.product.domain.TestPin;
 import com.delivery.product.domain.Banner;
 import com.delivery.product.domain.BannerRepository;
 import com.delivery.product.domain.Category;
@@ -70,6 +71,7 @@ class ServicesStorefrontIsolationTest {
         store.replaceHours(Arrays.stream(DayOfWeek.values())
                 .map(day -> new StoreHours(day, LocalTime.MIDNIGHT, LocalTime.of(23, 59, 59)))
                 .toList());
+        TestPin.pinned(store);
         store.publish(NOW.minus(Duration.ofDays(30)));
         return store;
     }
