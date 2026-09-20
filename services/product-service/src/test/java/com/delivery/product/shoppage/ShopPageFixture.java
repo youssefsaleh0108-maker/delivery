@@ -131,6 +131,21 @@ final class ShopPageFixture {
         }
     }
 
+    /**
+     * Rewrites everything about the shop that a merchant types for themselves.
+     *
+     * <p>Applied after the shop is built, so the slug still comes from a sane name — which is what
+     * production does too: the slug is minted once at creation and {@code updateProfile} never
+     * touches it, so a merchant who renames the shop cannot rename its page.
+     */
+    ShopPageFixture profile(String name, String tagline, String description, List<String> tags,
+                            String neighbourhood) {
+        shop.updateProfile(name, tagline, description, Store.Vertical.GROCERY, tags,
+                "Asia/Beirut", "Rawche, Beirut");
+        shop.setNeighborhood(neighbourhood);
+        return this;
+    }
+
     ShopPageFixture openEveryDay(LocalTime from, LocalTime to) {
         List<StoreHours> week = new ArrayList<>();
         for (DayOfWeek day : DayOfWeek.values()) {
