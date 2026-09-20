@@ -78,7 +78,10 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
  *       a customer is waiting on it: low effort keeps the thinking short and the bill to a few cents,
  *       while thinking stays on — Opus 5 with thinking off can leak its reasoning into the answer.
  *       The effort travels in the same {@code output_config} as the structured-output schema.</li>
- *   <li><strong>One JPEG</strong>, at most 1568 px on the long edge, and {@code max_tokens} 4000.</li>
+ *   <li><strong>One JPEG</strong>, at most 1568 px on the long edge, and {@code max_tokens} 1500.
+ *       A description is a short JSON object and low effort thinks briefly, so 1500 is ample — and it
+ *       is the ceiling on the dearer half of the bill, since the thinking and the answer are both
+ *       billed as output.</li>
  *   <li><strong>A 25 s timeout and no retry, set on the call</strong>, not on the client: somebody is
  *       holding their phone up waiting, and a second attempt after 25 s is an answer nobody is there
  *       for, billed twice. The client Blitz uses keeps its own 240 s and one retry, untouched — the
@@ -257,9 +260,9 @@ public class ClaudeVisionProvider implements VisionProvider, DisposableBean {
     record DescribeSettings(String model, BetaOutputConfig.Effort effort, Duration timeout,
                             long maxTokens) {
 
-        /** What runs when nothing is configured: Opus 5 at low effort, 25 s, 4000 tokens. */
+        /** What runs when nothing is configured: Opus 5 at low effort, 25 s, 1500 tokens. */
         static final DescribeSettings DEFAULT = new DescribeSettings("claude-opus-5",
-                BetaOutputConfig.Effort.LOW, Duration.ofSeconds(25), 4000);
+                BetaOutputConfig.Effort.LOW, Duration.ofSeconds(25), 1500);
     }
 
     /**
@@ -404,7 +407,7 @@ public class ClaudeVisionProvider implements VisionProvider, DisposableBean {
             @Value("${delivery.catalog.photo-search.claude.model:claude-opus-5}") String describeModel,
             @Value("${delivery.catalog.photo-search.claude.effort:low}") String describeEffort,
             @Value("${delivery.catalog.photo-search.claude.timeout:25s}") Duration describeTimeout,
-            @Value("${delivery.catalog.photo-search.claude.max-tokens:4000}") long describeMaxTokens) {
+            @Value("${delivery.catalog.photo-search.claude.max-tokens:1500}") long describeMaxTokens) {
         this(model, maxTokens, timeout, maxItems,
                 new DescribeSettings(describeModel, effort(describeEffort), describeTimeout,
                         describeMaxTokens),

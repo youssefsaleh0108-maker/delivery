@@ -204,19 +204,19 @@ class ClaudeVisionProviderTest {
     /**
      * The photo search request as the owner decided it: Opus 5 by its own property, adaptive thinking
      * (never disabled) at effort low in the same output_config as the schema, fallbacks as Blitz's, and
-     * 4000 tokens.
+     * 1500 tokens.
      */
     @Test
     void the_describe_request_is_opus_5_adaptive_at_low_effort_with_structured_output_and_fallbacks()
             throws Exception {
         ClaudeVisionProvider.DescribeSettings settings = new ClaudeVisionProvider.DescribeSettings(
-                "claude-opus-5", ClaudeVisionProvider.effort("low"), Duration.ofSeconds(25), 4000);
+                "claude-opus-5", ClaudeVisionProvider.effort("low"), Duration.ofSeconds(25), 1500);
         StructuredMessageCreateParams<DescriptionResult> params =
                 new ClaudeVisionProvider(settings, () -> true, null).buildDescribeParams(PRODUCT);
         MessageCreateParams raw = params.rawParams();
 
         assertThat(raw.model().asString()).isEqualTo("claude-opus-5");
-        assertThat(raw.maxTokens()).isEqualTo(4000L);
+        assertThat(raw.maxTokens()).isEqualTo(1500L);
         assertThat(raw.thinking()).hasValueSatisfying(t -> assertThat(t.isAdaptive()).isTrue());
         assertThat(raw.outputConfig()).hasValueSatisfying(config -> {
             assertThat(config.effort()).contains(BetaOutputConfig.Effort.LOW);
@@ -284,7 +284,7 @@ class ClaudeVisionProviderTest {
     @Test
     void a_description_cut_off_at_the_token_limit_is_a_failure() {
         assertThatThrownBy(() -> describer(null).interpretDescription(new DescribeReply(
-                Optional.of(BetaStopReason.MAX_TOKENS), null, List.of(), 1200, 4000, "claude-opus-5")))
+                Optional.of(BetaStopReason.MAX_TOKENS), null, List.of(), 1200, 1500, "claude-opus-5")))
                 .isInstanceOfSatisfying(VisionException.class,
                         e -> assertThat(e.reason()).isEqualTo(VisionException.Reason.PROVIDER_ERROR));
     }

@@ -248,13 +248,18 @@ delivery:
     # use Claude. Read per call, so a Config Server change plus /actuator/busrefresh flips it.
     #
     # The cost, at Opus 5's $5 per million input and $25 per million output tokens: a photo at 1568 px is
-    # about 2,350 image tokens, plus about 700 of prompt, and low effort answers in 300 to 800 tokens —
-    # about 2 to 4 cents a photo (the token counts are logged per call, with no account and no answer, to
-    # confirm this on dev). The caps bound it: at most $0.40 a customer a day at per-customer-per-day and
-    # $1.20 a merchant a day at merchant-per-day; and, however many accounts there are, about $40 a day for
-    # every customer together at platform-per-day plus about $20 a day for every merchant together at
-    # merchant-platform-per-day. Each kind has its own platform day, so a run of merchants' finds can
-    # neither be spent by customers nor spend what customers are allowed.
+    # about 2,350 image tokens, plus about 700 of prompt — about 1.5 cents of input, whatever the answer.
+    # Low effort usually answers in 300 to 800 tokens, so a photo usually costs about 2 to 4 cents; and
+    # claude.max-tokens is what the worst case can be, since the thinking and the answer are billed
+    # together as output. At 1,500 that worst case is 3.8 cents of output, so about 5 cents a photo.
+    # (The token counts are logged per call, with no account and no answer, to confirm this on dev.)
+    #
+    # The caps then bound the bill, at that worst case: at most $0.53 a customer a day at
+    # per-customer-per-day and $1.58 a merchant a day at merchant-per-day; and, however many accounts
+    # there are, at most about $53 a day for every customer together at platform-per-day plus about $26 a
+    # day for every merchant together at merchant-platform-per-day — about $79 a day for everything.
+    # Each kind has its own platform day, so a run of merchants' finds can neither be spent by customers
+    # nor spend what customers are allowed.
     # per-account-per-minute stops a stuck button spending a day's allowance at once.
     # All counted per account over a rolling day (PhotoQuota), just before the paid call.
     #
@@ -280,7 +285,10 @@ delivery:
         # The whole call, set on the request, with no retry: somebody is holding their phone up waiting.
         # Blitz's client keeps its own timeout and retry.
         timeout: 25s
-        max-tokens: 4000
+        # The ceiling on one photo's dearer half: the thinking and the JSON description together, billed
+        # as output. A description is a short object and low effort thinks briefly, so 1500 leaves room
+        # to spare while holding the worst case a photo can cost to about 5 cents.
+        max-tokens: 1500
         # One product fills most of the photo, so 1568 px on the long edge is detail enough to read a
         # pack's name and barcode, at about half the tokens of Blitz's 2236.
         max-long-edge-px: 1568

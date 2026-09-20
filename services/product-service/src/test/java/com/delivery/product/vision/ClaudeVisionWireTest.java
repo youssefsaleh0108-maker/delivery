@@ -43,7 +43,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *   <li>photo search gives up at its own timeout, far inside the client's;</li>
  *   <li>Blitz, on the same client afterwards, still retries once — the per-call options changed
  *       nothing for it;</li>
- *   <li>the body photo search sends: the model, 4000 tokens, adaptive thinking, effort low beside the
+ *   <li>the body photo search sends: the model, 1500 tokens, adaptive thinking, effort low beside the
  *       JSON schema, fallbacks "default" behind their beta, and one JPEG.</li>
  * </ul>
  */
@@ -103,7 +103,7 @@ class ClaudeVisionWireTest {
     private ClaudeVisionProvider provider(Duration describeTimeout) {
         return new ClaudeVisionProvider("claude-opus-5", 16000, Duration.ofSeconds(30), 120,
                 new ClaudeVisionProvider.DescribeSettings("claude-opus-5", BetaOutputConfig.Effort.LOW,
-                        describeTimeout, 4000),
+                        describeTimeout, 1500),
                 client);
     }
 
@@ -189,7 +189,7 @@ class ClaudeVisionWireTest {
 
             JsonNode body = JSON.readTree(request.body());
             assertThat(body.path("model").asText()).isEqualTo("claude-opus-5");
-            assertThat(body.path("max_tokens").asInt()).isEqualTo(4000);
+            assertThat(body.path("max_tokens").asInt()).isEqualTo(1500);
             assertThat(body.path("thinking").path("type").asText()).isEqualTo("adaptive");
             assertThat(body.path("output_config").path("effort").asText()).isEqualTo("low");
             assertThat(body.path("output_config").path("format").path("type").asText()).isEqualTo("json_schema");
