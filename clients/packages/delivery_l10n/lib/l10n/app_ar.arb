@@ -4118,5 +4118,6 @@
     }
   },
   "heatmapUnmetCouldNotLoad": "تعذَّر تحميل عمليات البحث الآن",
-  "heatmapUnmetPrivacy": "الأعداد تقريبية، ولا شيء هنا يدل على من بحث."
+  "heatmapUnmetPrivacy": "الأعداد تقريبية، ولا شيء هنا يدل على من بحث.",
+  "notifCatMerchantInsights": "الطلب والرؤى"
 }

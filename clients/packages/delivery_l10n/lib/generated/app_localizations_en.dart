@@ -13298,4 +13298,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get heatmapUnmetPrivacy =>
       'Counts are rounded, and nothing here says who searched.';
+
+  @override
+  String get notifCatMerchantInsights => 'Demand and insights';
 }

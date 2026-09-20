@@ -95,6 +95,8 @@ class SearchDemandDatabaseTest {
     private SearchDemandWeekRepository weeks;
     private SearchDemandDigestRepository digests;
     private DeliveryZoneRepository zones;
+    private StoreRepository stores;
+    private ProductRepository products;
     private UnmetDemand unmet;
     private CoarseAreas areas;
     private final DemandWeeks calendar = new DemandWeeks(BEIRUT);
@@ -137,6 +139,8 @@ class SearchDemandDatabaseTest {
         weeks = repositories.getRepository(SearchDemandWeekRepository.class);
         digests = repositories.getRepository(SearchDemandDigestRepository.class);
         zones = repositories.getRepository(DeliveryZoneRepository.class);
+        stores = repositories.getRepository(StoreRepository.class);
+        products = repositories.getRepository(ProductRepository.class);
         tx = new TransactionTemplate(transactionManager());
 
         tx.executeWithoutResult(status -> {
@@ -365,6 +369,31 @@ class SearchDemandDatabaseTest {
         assertThat(logs.findAll()).extracting(SearchDemandLog::getTerm).containsOnly("جديد");
     }
 
+    // ------------------------------------------------------------------- what the merchant sells
+
+    /**
+     * The one query a mock cannot stand in for: it matches a week's terms against
+     * {@code products.search_name}, the generated column V37 folds every product name into. Java has
+     * no copy of that fold, so "does this merchant already sell nescafe" can only be asked here.
+     */
+    @Test
+    @DisplayName("a term the merchant already sells is recognised through the search's own fold")
+    void already_sold_is_matched_on_the_folded_name() {
+        Instant week = calendar.weekOf(NOW);
+        UUID shop = aShopSelling("Nescafé Classic 200g", "حليب نيدو كامل الدسم");
+        SearchDemandWeek sold = row(week, "nescafe");
+        SearchDemandWeek alsoSold = row(week, "نيدو");
+        SearchDemandWeek wanted = row(week, "حفاضات");
+        tx.executeWithoutResult(status -> weeks.saveAll(List.of(sold, alsoSold, wanted)));
+
+        List<UUID> matched = weeks.alreadySold(
+                List.of(sold.getId(), alsoSold.getId(), wanted.getId()), List.of(shop));
+
+        assertThat(matched).containsExactlyInAnyOrder(sold.getId(), alsoSold.getId());
+        // Another merchant's shelf is not this merchant's answer.
+        assertThat(weeks.alreadySold(List.of(sold.getId()), List.of(UUID.randomUUID()))).isEmpty();
+    }
+
     // ----------------------------------------------------------------------------- the digest ledger
 
     @Test
@@ -411,6 +440,33 @@ class SearchDemandDatabaseTest {
                         nearest == null ? null : nearest.doubleValue(), null));
             }
             logs.saveAll(rows);
+        });
+    }
+
+    private SearchDemandWeek row(Instant week, String term) {
+        return new SearchDemandWeek(week, hamra, term, SearchDemandWeek.Kind.NONE, 9, 1, NOW);
+    }
+
+    /** A live shop with these products on its shelf, and its id. */
+    private UUID aShopSelling(String... names) {
+        return tx.execute(status -> {
+            Store shop = new Store("merchant-" + UUID.randomUUID(), "Corner Grocer",
+                    Store.Vertical.GROCERY);
+            shop.pinAt(GeoPoint.of(33.8977d, 35.4829d));
+            shop.replaceHours(java.util.Arrays.stream(java.time.DayOfWeek.values())
+                    .map(day -> new StoreHours(day, java.time.LocalTime.MIDNIGHT,
+                            java.time.LocalTime.of(23, 59, 59)))
+                    .toList());
+            shop.publish(NOW.minus(Duration.ofDays(30)));
+            stores.save(shop);
+            for (String name : names) {
+                Product product = new Product(shop.getMerchantId(), shop.getId(), name, null,
+                        new java.math.BigDecimal("1.50"), null);
+                product.addImage("products/" + UUID.randomUUID() + ".jpg");
+                product.publish();
+                products.save(product);
+            }
+            return shop.getId();
         });
     }
 

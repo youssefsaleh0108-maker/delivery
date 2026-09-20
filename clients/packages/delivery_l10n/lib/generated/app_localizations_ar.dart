@@ -13469,4 +13469,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get heatmapUnmetPrivacy =>
       'الأعداد تقريبية، ولا شيء هنا يدل على من بحث.';
+
+  @override
+  String get notifCatMerchantInsights => 'الطلب والرؤى';
 }

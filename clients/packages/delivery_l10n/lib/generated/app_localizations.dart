@@ -22418,6 +22418,12 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Counts are rounded, and nothing here says who searched.'**
   String get heatmapUnmetPrivacy;
+
+  /// No description provided for @notifCatMerchantInsights.
+  ///
+  /// In en, this message translates to:
+  /// **'Demand and insights'**
+  String get notifCatMerchantInsights;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

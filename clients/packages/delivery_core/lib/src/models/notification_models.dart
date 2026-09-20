@@ -145,7 +145,7 @@ class ConnectorAuditEntry {
 
 // --------------------------------------------------------------------- notification preferences
 
-/// One of the four buckets a notification belongs to, mirroring `NotificationCategory`.
+/// One of the buckets a notification belongs to, mirroring `NotificationCategory`.
 enum NotificationCategory {
   /// Progress on an order the user placed, is preparing, or is delivering.
   orderUpdates('ORDER_UPDATES', 'Order updates'),
@@ -155,6 +155,11 @@ enum NotificationCategory {
 
   /// Marketing. Off unless the user turns it on — consent is not implied by signing up.
   promotions('PROMOTIONS', 'Promotions'),
+
+  /// What the platform has learnt about a merchant's own trade and neighbourhood — the weekly
+  /// demand digest. On by default and droppable: it is advice, not marketing and not a security
+  /// notice, so a merchant who finds it noise must be able to stop it from this very screen.
+  merchantInsights('MERCHANT_INSIGHTS', 'Demand and insights'),
 
   /// Security and account integrity. Always delivered; no preference can suppress it, and the
   /// server sends its rows locked.

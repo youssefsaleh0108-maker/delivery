@@ -6342,5 +6342,6 @@
     }
   },
   "heatmapUnmetCouldNotLoad": "Couldn't load searches right now",
-  "heatmapUnmetPrivacy": "Counts are rounded, and nothing here says who searched."
+  "heatmapUnmetPrivacy": "Counts are rounded, and nothing here says who searched.",
+  "notifCatMerchantInsights": "Demand and insights"
 }
