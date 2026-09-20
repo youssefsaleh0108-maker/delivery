@@ -177,6 +177,7 @@ class PublicShopPageApiTest {
             // Nothing that would let somebody tell the four apart.
             assertThat(refusal.getResponse().getHeader("ETag")).isNull();
             assertThat(refusal.getResponse().getHeader("X-Robots-Tag")).isEqualTo("noindex");
+            assertThat(refusal.getResponse().getHeader("Vary")).isEqualTo("Accept-Language");
         }
         assertThat(body(unknown))
                 .doesNotContain("Dekkanet")

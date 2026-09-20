@@ -216,6 +216,10 @@ public class PublicShopPageController {
         return secured(ResponseEntity.status(HttpStatus.NOT_FOUND))
                 .cacheControl(CacheControl.maxAge(Duration.ofMinutes(1)).cachePublic())
                 .header("X-Robots-Tag", "noindex")
+                // Two renderings of this page too, so a shared cache must not hand an Arabic
+                // refusal to an English reader. It says nothing about which shop was asked for:
+                // all four refusals carry it.
+                .header(HttpHeaders.VARY, HttpHeaders.ACCEPT_LANGUAGE)
                 .contentType(MediaType.TEXT_HTML)
                 .body(body);
     }
