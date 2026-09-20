@@ -29,7 +29,9 @@ import com.delivery.product.service.PhotoSearchException.Scope;
  *   <li>{@code per-account-per-minute} (3) of either kind in a minute, so a stuck button or a script
  *       cannot spend the day's allowance in one burst;
  *   <li>{@code platform-per-day} (1,000) customer searches across the whole platform over a rolling day,
- *       which bounds the whole bill at about $40 a day however many accounts there are.
+ *       and {@code merchant-platform-per-day} (500) finds by photo across it, which together bound the
+ *       whole bill however many accounts there are. Each kind has its own platform day, so a run of
+ *       merchants' finds can neither be spent by customers nor spend what customers are allowed.
  * </ul>
  * Rolling rather than per calendar day, as Blitz's quota is, so a burst cannot straddle midnight to
  * double it.
@@ -37,8 +39,8 @@ import com.delivery.product.service.PhotoSearchException.Scope;
  * <p><strong>One short transaction</strong> ({@link #take}), under a transaction-scoped advisory lock on
  * the account ({@link PhotoSearchUseRepository#lockAccount}, the pattern of
  * {@code CatalogScanRepository#lockMerchant}), so three photos sent at once cannot all see room for
- * one more; a customer search also takes the platform's lock, after the account's, for the platform
- * count. The same transaction deletes the uses no window counts any more, so the table never holds
+ * one more; the platform's lock is then taken, after the account's and in that order for both kinds,
+ * for the platform count. The same transaction deletes the uses no window counts any more, so the table never holds
  * more than two days of them. The caller makes the paid call afterwards, outside it: a pooled
  * connection held across a 25-second call is one taken from every storefront.
  *
@@ -62,13 +64,19 @@ public class PhotoQuota {
 
     /** The limits, clamped to at least one each: a zero in the configuration must not refuse everything. */
     public record Limits(int perCustomerPerDay, int perAccountPerMinute, int platformPerDay,
-                         int merchantPerDay) {
+                         int merchantPerDay, int merchantPlatformPerDay) {
 
         public Limits {
             perCustomerPerDay = Math.max(perCustomerPerDay, 1);
             perAccountPerMinute = Math.max(perAccountPerMinute, 1);
             platformPerDay = Math.max(platformPerDay, 1);
             merchantPerDay = Math.max(merchantPerDay, 1);
+            merchantPlatformPerDay = Math.max(merchantPlatformPerDay, 1);
+        }
+
+        /** The whole platform's day for this kind of use. */
+        int platformPerDay(Kind kind) {
+            return kind == Kind.MERCHANT_FIND ? merchantPlatformPerDay : platformPerDay;
         }
     }
 
@@ -81,9 +89,11 @@ public class PhotoQuota {
                       @Value("${delivery.catalog.photo-search.per-customer-per-day:10}") int perCustomerPerDay,
                       @Value("${delivery.catalog.photo-search.per-account-per-minute:3}") int perAccountPerMinute,
                       @Value("${delivery.catalog.photo-search.platform-per-day:1000}") int platformPerDay,
-                      @Value("${delivery.catalog.photo-search.merchant-per-day:30}") int merchantPerDay) {
+                      @Value("${delivery.catalog.photo-search.merchant-per-day:30}") int merchantPerDay,
+                      @Value("${delivery.catalog.photo-search.merchant-platform-per-day:500}")
+                      int merchantPlatformPerDay) {
         this(uses, clock, new Limits(perCustomerPerDay, perAccountPerMinute, platformPerDay,
-                merchantPerDay));
+                merchantPerDay, merchantPlatformPerDay));
     }
 
     public PhotoQuota(PhotoSearchUseRepository uses, Clock clock, Limits limits) {
@@ -129,17 +139,20 @@ public class PhotoQuota {
                             accountId, kind, minuteAgo), MINUTE, now));
         }
 
-        if (kind == Kind.CUSTOMER_SEARCH) {
-            // After the account's own lock, never before: one order for both, so they cannot deadlock.
-            uses.lockPlatform();
-            long platform = uses.countByKindAndCreatedAtAfter(kind, dayAgo);
-            if (platform >= limits.platformPerDay()) {
-                log.warn("Customer photo search has reached the platform's {} searches in 24 hours",
-                        limits.platformPerDay());
-                throw PhotoSearchException.limit(false, limits.platformPerDay(), Scope.PLATFORM,
-                        secondsUntilFree(uses.findFirstByKindAndCreatedAtAfterOrderByCreatedAtAsc(kind,
-                                dayAgo), DAY, now));
-            }
+        // Both kinds, each against its own platform day: a merchant's find costs the same call to the
+        // same provider as a customer's search, so leaving merchants uncapped would leave the bill
+        // bounded only by how many merchants there are.
+        int platformPerDay = limits.platformPerDay(kind);
+        // After the account's own lock, never before, and in that order for both kinds, so they
+        // cannot deadlock.
+        uses.lockPlatform();
+        long platform = uses.countByKindAndCreatedAtAfter(kind, dayAgo);
+        if (platform >= platformPerDay) {
+            log.warn("{} has reached the platform's {} photos in 24 hours",
+                    merchant ? "Merchant find by photo" : "Customer photo search", platformPerDay);
+            throw PhotoSearchException.limit(merchant, platformPerDay, Scope.PLATFORM,
+                    secondsUntilFree(uses.findFirstByKindAndCreatedAtAfterOrderByCreatedAtAsc(kind,
+                            dayAgo), DAY, now));
         }
 
         uses.save(new PhotoSearchUse(accountId, kind, now));

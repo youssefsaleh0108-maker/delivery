@@ -250,9 +250,12 @@ delivery:
     # The cost, at Opus 5's $5 per million input and $25 per million output tokens: a photo at 1568 px is
     # about 2,350 image tokens, plus about 700 of prompt, and low effort answers in 300 to 800 tokens —
     # about 2 to 4 cents a photo (the token counts are logged per call, with no account and no answer, to
-    # confirm this on dev). The caps bound it: at most $0.40 a customer a day at per-customer-per-day, about
-    # $40 a day for every customer together at platform-per-day, and $1.20 a merchant a day at
-    # merchant-per-day. per-account-per-minute stops a stuck button spending a day's allowance at once.
+    # confirm this on dev). The caps bound it: at most $0.40 a customer a day at per-customer-per-day and
+    # $1.20 a merchant a day at merchant-per-day; and, however many accounts there are, about $40 a day for
+    # every customer together at platform-per-day plus about $20 a day for every merchant together at
+    # merchant-platform-per-day. Each kind has its own platform day, so a run of merchants' finds can
+    # neither be spent by customers nor spend what customers are allowed.
+    # per-account-per-minute stops a stuck button spending a day's allowance at once.
     # All counted per account over a rolling day (PhotoQuota), just before the paid call.
     #
     # max-concurrent photos are read at once, on request threads, each holding one of the forty until the
@@ -265,6 +268,7 @@ delivery:
       per-account-per-minute: 3
       platform-per-day: 1000
       merchant-per-day: 30
+      merchant-platform-per-day: 500
       max-concurrent: 4
       max-source-pixels: 16000000
       claude:

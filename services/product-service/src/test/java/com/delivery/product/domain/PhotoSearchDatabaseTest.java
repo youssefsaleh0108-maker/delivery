@@ -82,10 +82,13 @@ class PhotoSearchDatabaseTest {
     private Product rivals;
     private final MovableClock clock = new MovableClock(Instant.parse("2026-09-20T10:00:00Z"));
 
-    /** The configured limits: ten a day, three a minute, a thousand for the platform, thirty for a merchant. */
-    private static final PhotoQuota.Limits CONFIGURED = new PhotoQuota.Limits(10, 3, 1000, 30);
+    /**
+     * The configured limits: ten a day, three a minute, a thousand for the customers' platform day,
+     * thirty for a merchant, five hundred for the merchants' platform day.
+     */
+    private static final PhotoQuota.Limits CONFIGURED = new PhotoQuota.Limits(10, 3, 1000, 30, 500);
 
-    /** The limits in force; the platform test lowers the platform's day to five to reach it. */
+    /** The limits in force; the platform tests lower a platform day to five to reach it. */
     private PhotoQuota.Limits limits = CONFIGURED;
 
     private static String envOr(String name, String fallback) {
@@ -297,7 +300,7 @@ class PhotoSearchDatabaseTest {
     @Test
     @DisplayName("the platform's day counts every customer, and merchants' finds are not in it")
     void the_platform_day_counts_every_customer() {
-        limits = new PhotoQuota.Limits(10, 3, 5, 30);
+        limits = new PhotoQuota.Limits(10, 3, 5, 30, 500);
         for (int i = 0; i < 40; i++) {
             take("merchant-" + i, Kind.MERCHANT_FIND);
         }
@@ -311,8 +314,38 @@ class PhotoSearchDatabaseTest {
                     assertThat(e.getScope()).isEqualTo(Scope.PLATFORM);
                     assertThat(e.getLimit()).isEqualTo(5);
                 });
-        // Merchants are not held to the customers' platform day.
+        // Merchants are not held to the customers' platform day: they have one of their own.
         assertThat(take("merchant-more", Kind.MERCHANT_FIND)).isEqualTo(29);
+    }
+
+    /**
+     * The other half of the cap above. A find by photo is the same paid call as a search, so with no
+     * platform day of their own a hundred merchants at thirty finds each would be three thousand calls
+     * a day that nothing refused.
+     */
+    @Test
+    @DisplayName("the merchants have a platform day of their own, which customers neither spend nor share")
+    void the_platform_day_counts_every_merchant() {
+        limits = new PhotoQuota.Limits(10, 3, 1000, 30, 5);
+        for (int i = 0; i < 20; i++) {
+            take("shopper-" + i, Kind.CUSTOMER_SEARCH);
+        }
+        for (int i = 0; i < 5; i++) {
+            take("shop-" + i, Kind.MERCHANT_FIND);
+        }
+
+        assertThatThrownBy(() -> take("shop-new", Kind.MERCHANT_FIND))
+                .isInstanceOfSatisfying(PhotoSearchException.class, e -> {
+                    // The merchant's own code, and the scope that says it is the platform rather than
+                    // this shop that has had enough today.
+                    assertThat(e.getCode()).isEqualTo("PHOTO_FIND_LIMIT");
+                    assertThat(e.getScope()).isEqualTo(Scope.PLATFORM);
+                    assertThat(e.getLimit()).isEqualTo(5);
+                    assertThat(e.getRetryAfterSeconds()).isNotNull();
+                });
+        // Refused, so not counted; and the customers' own day is untouched by any of it.
+        assertThat(stored("shop-new")).isZero();
+        assertThat(take("shopper-new", Kind.CUSTOMER_SEARCH)).isEqualTo(9);
     }
 
     @Test

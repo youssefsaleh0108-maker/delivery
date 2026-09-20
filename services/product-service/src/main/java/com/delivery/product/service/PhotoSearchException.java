@@ -59,7 +59,10 @@ public class PhotoSearchException extends RuntimeException {
         DAY,
         /** The account's last minute. */
         MINUTE,
-        /** Every customer's photo searches over the platform's rolling day. */
+        /**
+         * Every account's photos of this kind over the platform's rolling day: the customers' day for
+         * a search, the merchants' own for a find.
+         */
         PLATFORM
     }
 
@@ -93,7 +96,10 @@ public class PhotoSearchException extends RuntimeException {
         String message = switch (scope) {
             case DAY -> "You can use " + limit + " photos a day. Try again later.";
             case MINUTE -> "You can use " + limit + " photos a minute. Wait a moment and try again.";
-            case PLATFORM -> "Search by photo is very busy today. Try again later, or search by name.";
+            case PLATFORM -> merchant
+                    ? "Finding products by photo is very busy today. Try again later, or search your "
+                            + "catalogue by name."
+                    : "Search by photo is very busy today. Try again later, or search by name.";
         };
         return new PhotoSearchException(merchant ? Refusal.FIND_LIMIT : Refusal.SEARCH_LIMIT, message,
                 limit, scope, Math.max(1L, retryAfterSeconds));

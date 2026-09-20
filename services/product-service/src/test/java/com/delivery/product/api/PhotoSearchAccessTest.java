@@ -288,6 +288,16 @@ class PhotoSearchAccessTest {
         ResponseEntity<ProblemDetail> merchant = new ApiExceptionHandler().onPhotoSearchRefused(
                 PhotoSearchException.limit(true, 3, PhotoSearchException.Scope.MINUTE, 20));
         assertThat(merchant.getBody().getProperties()).containsEntry("code", "PHOTO_FIND_LIMIT");
+
+        // The merchants' own platform day: their code, and a scope that tells the app the number is
+        // the platform's rather than this shop's, so it does not say "you have used 500 today".
+        ResponseEntity<ProblemDetail> merchantPlatform = new ApiExceptionHandler().onPhotoSearchRefused(
+                PhotoSearchException.limit(true, 500, PhotoSearchException.Scope.PLATFORM, 300));
+        assertThat(merchantPlatform.getStatusCode().value()).isEqualTo(429);
+        assertThat(merchantPlatform.getBody().getProperties())
+                .containsEntry("code", "PHOTO_FIND_LIMIT")
+                .containsEntry("limit", 500)
+                .containsEntry("scope", "PLATFORM");
     }
 
     @Test
