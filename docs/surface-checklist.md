@@ -1513,7 +1513,7 @@ that does not exist, and a screen listed here with no tick is one nobody has dri
 
   - [ ] n/a — a route — Tick that the body is exactly 'User-agent: *' / 'Allow: /' and that the word 'admin' does not appear. A Disallow line here would publish the staff door in the one file every scanner reads first, and would stop crawlers ever fetching the page whose noindex tag does the real work.  `nginx `location = /robots.txt { add_header Content-Type text/plain; return 200 "User-agent: *\nAllow: /\n"; }``
 
-## CustomerShell — mobile_app (Flutter), demo login customer / 100001
+## CustomerShell — mobile_app (Flutter), demo login customer / its passcode from the demo-logins Secret
 
 33 screens, 281 controls.
 
