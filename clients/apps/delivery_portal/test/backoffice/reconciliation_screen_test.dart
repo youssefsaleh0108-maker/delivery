@@ -106,13 +106,15 @@ void main() {
   late AccountingApi api;
   late DeliveryProviderApi providers;
   late String floatJson;
+  late String unsettledJson;
+  late String summaryJson;
   late ResponseBody Function() carriers;
   late ResponseBody Function(RequestOptions) remit;
 
   ResponseBody route(RequestOptions options) {
     if (options.path.contains('sync-log')) return _json(_syncLogJson);
-    if (options.path.contains('summary')) return _json(_summaryJson);
-    if (options.path.contains('unsettled')) return _json(_unsettledJson);
+    if (options.path.contains('summary')) return _json(summaryJson);
+    if (options.path.contains('unsettled')) return _json(unsettledJson);
     // Before /float, which its own path also contains.
     if (options.path.contains('remit')) return remit(options);
     if (options.path.contains('/float/carriers')) return carriers();
@@ -128,6 +130,8 @@ void main() {
 
   setUp(() {
     floatJson = _floatJson();
+    unsettledJson = _unsettledJson;
+    summaryJson = _summaryJson;
     carriers = () => _json(_carriersJson);
     remit = (RequestOptions options) => _json(
         '{"remittanceId":"r1","holderRef":"eeeeeeee-5555-4555-8555-555555555555",'
@@ -580,6 +584,64 @@ void main() {
       expect(button.enabled, isFalse);
       // A dash, never a zero, where the figure would be.
       expect(find.descendant(of: shopRow(), matching: find.text('—')), findsOneWidget);
+    });
+  });
+
+  /// PT-2: the ledger knew four of the ten legs the accounting service writes and did not know
+  /// SETTLED_IN_CASH at all, so most of it read "Unknown" — including both rows dev was listing as
+  /// unsettled, which are cash remittances — and no tile or filter could reach a cash-settled row.
+  group('PT-2: every leg and status the service writes', () {
+    testWidgets('names a cash remittance and a cash-settled row', (WidgetTester tester) async {
+      unsettledJson = '''
+[{"id":"t9","orderId":"99999999-9999-4999-8999-999999999999","leg":"CASH_REMITTANCE",
+  "accountRef":"ACC-PLATFORM","amount":254.87,"currency":"USD","direction":"CREDIT",
+  "status":"SETTLED_IN_CASH","coreBankingRef":null,"failureReason":null,"attempts":0,
+  "createdAt":"2026-09-19T10:00:00Z","postedAt":"2026-09-19T10:00:00Z"},
+ {"id":"t10","orderId":"88888888-8888-4888-8888-888888888888","leg":"GIFT_WRAP_CREDIT",
+  "accountRef":"ACC-MERCHANT","amount":3.00,"currency":"USD","direction":"CREDIT",
+  "status":"SETTLED_IN_CASH","coreBankingRef":null,"failureReason":null,"attempts":0,
+  "createdAt":"2026-09-19T10:00:00Z","postedAt":"2026-09-19T10:00:00Z"}]''';
+      await pump(tester);
+
+      expect(find.text('Cash banked'), findsOneWidget);
+      expect(find.text('Gift wrapping'), findsOneWidget);
+      expect(find.text('Settled in cash'), findsWidgets);
+      expect(find.text('Unknown'), findsNothing);
+    });
+
+    testWidgets('shows a leg this build has never heard of by its own name',
+        (WidgetTester tester) async {
+      unsettledJson = '''
+[{"id":"t11","orderId":"77777777-1111-4111-8111-111111111111","leg":"DUTY_WITHHELD",
+  "accountRef":"ACC-PLATFORM","amount":1.50,"currency":"USD","direction":"CREDIT",
+  "status":"ESCROWED","coreBankingRef":null,"failureReason":null,"attempts":0,
+  "createdAt":"2026-09-19T10:00:00Z","postedAt":null}]''';
+      await pump(tester);
+
+      // An operator can act on the server's own word for it; "Unknown" tells them nothing.
+      expect(find.text('DUTY_WITHHELD'), findsOneWidget);
+      expect(find.text('ESCROWED'), findsOneWidget);
+      expect(find.text('Unknown'), findsNothing);
+    });
+
+    testWidgets('counts cash-settled rows as settled, and can filter for them',
+        (WidgetTester tester) async {
+      summaryJson = '''
+{"byStatus":{"POSTED":{"count":2,"debits":10.00,"credits":10.00},
+             "SETTLED_IN_CASH":{"count":118,"debits":500.00,"credits":500.00},
+             "PENDING":{"count":1,"debits":0.00,"credits":13.11}},
+ "unsettledCount":1,"amountAtRisk":13.11,"atRiskDebits":0.00,"atRiskCredits":13.11}''';
+      await pump(tester);
+
+      // 2 posted and 118 settled in cash: a platform with no bank settles almost everything in
+      // cash, and the tile used to report that as 2.
+      expect(find.text('120'), findsOneWidget);
+      expect(find.textContaining('118 in cash'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Settled in cash'));
+      await tester.pumpAndSettle();
+
+      expect(adapter.calls.any((String c) => c.contains('status=SETTLED_IN_CASH')), isTrue);
     });
   });
 

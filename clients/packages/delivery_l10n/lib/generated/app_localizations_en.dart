@@ -12688,4 +12688,58 @@ class DeliveryStringsEn extends DeliveryStrings {
   String reconBankedAmountChanged(String holder, String amount) {
     return '$holder now holds $amount for the platform, not the amount you confirmed. Nothing was recorded.';
   }
+
+  @override
+  String get reconLegCustomerDebit => 'Customer charged';
+
+  @override
+  String get reconLegCashCollected => 'Cash taken at the door';
+
+  @override
+  String get reconLegMerchantCredit => 'Merchant payout';
+
+  @override
+  String get reconLegGiftWrapCredit => 'Gift wrapping';
+
+  @override
+  String get reconLegRiderCredit => 'Rider payout';
+
+  @override
+  String get reconLegProviderCredit => 'Delivery company payout';
+
+  @override
+  String get reconLegPlatformCommission => 'Commission';
+
+  @override
+  String get reconLegPlatformSubsidy => 'Platform contribution';
+
+  @override
+  String get reconLegPlatformLoss => 'Absorbed after pickup';
+
+  @override
+  String get reconLegCashRemittance => 'Cash banked';
+
+  @override
+  String get reconLegPayout => 'Paid out';
+
+  @override
+  String get reconLegCustomerRefund => 'Refund';
+
+  @override
+  String get reconStatusPending => 'Pending';
+
+  @override
+  String get reconStatusPosted => 'Posted';
+
+  @override
+  String get reconStatusSettledInCash => 'Settled in cash';
+
+  @override
+  String get reconStatusFailed => 'Failed';
+
+  @override
+  String get reconStatusCompensated => 'Reversed';
+
+  @override
+  String get reconStatusAbandoned => 'Abandoned';
 }

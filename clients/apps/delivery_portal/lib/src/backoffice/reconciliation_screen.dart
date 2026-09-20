@@ -425,12 +425,16 @@ class _SummaryTiles extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int posted = summary.byStatus[SettlementStatus.posted]?.count ?? 0;
-    final int failed = summary.byStatus[SettlementStatus.failed]?.count ?? 0;
-    final int pending = summary.byStatus[SettlementStatus.pending]?.count ?? 0;
+    // Settled is both ways of being settled (PT-2). With no bank deployed almost every row is
+    // SETTLED_IN_CASH, so a tile that counted POSTED alone reported a working platform as having
+    // settled nothing.
+    final int settled = summary.countOf(SettlementStatus.posted) +
+        summary.countOf(SettlementStatus.settledInCash);
+    final int failed = summary.countOf(SettlementStatus.failed);
+    final int pending = summary.countOf(SettlementStatus.pending);
 
-    final int reversed = summary.byStatus[SettlementStatus.compensated]?.count ?? 0;
-    final int abandoned = summary.byStatus[SettlementStatus.abandoned]?.count ?? 0;
+    final int reversed = summary.countOf(SettlementStatus.compensated);
+    final int abandoned = summary.countOf(SettlementStatus.abandoned);
 
     return StatRow(tiles: <Widget>[
       // First, because it is the only number that says whether to worry. Its colour is the answer:
@@ -457,10 +461,13 @@ class _SummaryTiles extends StatelessWidget {
             : '$_holders holding · ${_ago(_oldest)}',
       ),
       StatTile(
-        value: '$posted',
+        value: '$settled',
         label: 'Settled',
         icon: Icons.check_circle_outline_rounded,
         accent: DeliveryAccent.positive,
+        footnote: summary.countOf(SettlementStatus.settledInCash) == 0
+            ? null
+            : '${summary.countOf(SettlementStatus.settledInCash)} in cash',
       ),
       StatTile(
         value: '$pending',
@@ -872,6 +879,7 @@ class _Filters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
     return Wrap(
       spacing: DeliverySpacing.sm,
       children: <Widget>[
@@ -883,13 +891,16 @@ class _Filters extends StatelessWidget {
         ),
         for (final SettlementStatus status in <SettlementStatus>[
           SettlementStatus.posted,
+          // Cash-settled rows are most of the ledger on a platform with no bank, and there was no
+          // way to ask for them at all (PT-2).
+          SettlementStatus.settledInCash,
           SettlementStatus.failed,
           SettlementStatus.pending,
           SettlementStatus.compensated,
           SettlementStatus.abandoned,
         ])
           ChoiceChip(
-            label: Text(status.label),
+            label: Text(_statusLabel(t, status)),
             selected: selected == status,
             onSelected: (_) => onSelected(status),
           ),
@@ -897,6 +908,38 @@ class _Filters extends StatelessWidget {
     );
   }
 }
+
+/// What a settlement leg is called here, in the reader's language.
+///
+/// A leg this build has never heard of is shown by the server's own name for it (PT-2): an
+/// operator can act on "GIFT_WRAP_CREDIT" and can do nothing with "Unknown".
+String _legLabel(DeliveryStrings t, AccountingTransaction row) => switch (row.leg) {
+      SettlementLeg.customerDebit => t.reconLegCustomerDebit,
+      SettlementLeg.cashCollected => t.reconLegCashCollected,
+      SettlementLeg.merchantCredit => t.reconLegMerchantCredit,
+      SettlementLeg.giftWrapCredit => t.reconLegGiftWrapCredit,
+      SettlementLeg.riderCredit => t.reconLegRiderCredit,
+      SettlementLeg.providerCredit => t.reconLegProviderCredit,
+      SettlementLeg.platformCommission => t.reconLegPlatformCommission,
+      SettlementLeg.platformSubsidy => t.reconLegPlatformSubsidy,
+      SettlementLeg.platformLoss => t.reconLegPlatformLoss,
+      SettlementLeg.cashRemittance => t.reconLegCashRemittance,
+      SettlementLeg.payout => t.reconLegPayout,
+      SettlementLeg.customerRefund => t.reconLegCustomerRefund,
+      SettlementLeg.unknown => row.legName,
+    };
+
+/// The same for a status, which is also what its filter chip is called.
+String _statusLabel(DeliveryStrings t, SettlementStatus status, [AccountingTransaction? row]) =>
+    switch (status) {
+      SettlementStatus.pending => t.reconStatusPending,
+      SettlementStatus.posted => t.reconStatusPosted,
+      SettlementStatus.settledInCash => t.reconStatusSettledInCash,
+      SettlementStatus.failed => t.reconStatusFailed,
+      SettlementStatus.compensated => t.reconStatusCompensated,
+      SettlementStatus.abandoned => t.reconStatusAbandoned,
+      SettlementStatus.unknown => row?.statusName ?? status.label,
+    };
 
 class _TransactionTable extends StatelessWidget {
   const _TransactionTable({required this.rows, required this.api});
@@ -934,10 +977,10 @@ class _TransactionTable extends StatelessWidget {
               DataRow(
                 cells: <DataCell>[
                   DataCell(Text(_shortId(t.orderId))),
-                  DataCell(Text(t.leg.label)),
+                  DataCell(Text(_legLabel(DeliveryStrings.of(context), t))),
                   DataCell(Text(t.accountRef)),
                   DataCell(Text('${t.isDebit ? '−' : '+'}${_money(t.amount)}')),
-                  DataCell(_StatusChip(status: t.status, reason: t.failureReason)),
+                  DataCell(_StatusChip(row: t, reason: t.failureReason)),
                   // Missing on anything the bank never accepted, which is itself the signal.
                   DataCell(Text(t.coreBankingRef ?? '—')),
                   DataCell(
@@ -961,21 +1004,23 @@ class _TransactionTable extends StatelessWidget {
 }
 
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.status, this.reason});
+  const _StatusChip({required this.row, this.reason});
 
-  final SettlementStatus status;
+  final AccountingTransaction row;
   final String? reason;
 
   @override
   Widget build(BuildContext context) {
-    final DeliveryStatusColor colour = switch (status) {
-      SettlementStatus.posted => DeliveryStatusColor.delivered,
+    final DeliveryStatusColor colour = switch (row.status) {
+      // Settled is settled, however it was discharged: cash at the door counts (PT-2).
+      SettlementStatus.posted || SettlementStatus.settledInCash => DeliveryStatusColor.delivered,
       SettlementStatus.failed => DeliveryStatusColor.inTransit,
       SettlementStatus.pending => DeliveryStatusColor.preparing,
       _ => DeliveryStatusColor.offline,
     };
 
-    final Widget badge = DeliveryStatusBadge(status: colour, label: status.label);
+    final Widget badge = DeliveryStatusBadge(
+        status: colour, label: _statusLabel(DeliveryStrings.of(context), row.status, row));
 
     // The failure reason is the first thing anyone wants after seeing FAILED, so it is one hover
     // away rather than one dialog away.
@@ -992,7 +1037,8 @@ class _SyncLogDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('${transaction.leg.label} · ${_money(transaction.amount)}'),
+      title: Text('${_legLabel(DeliveryStrings.of(context), transaction)} · '
+          '${_money(transaction.amount)}'),
       content: SizedBox(
         width: 700,
         child: FutureBuilder<List<SyncLogEntry>>(

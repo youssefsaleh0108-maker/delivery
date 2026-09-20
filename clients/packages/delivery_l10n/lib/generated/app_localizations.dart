@@ -21476,6 +21476,114 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'{holder} now holds {amount} for the platform, not the amount you confirmed. Nothing was recorded.'**
   String reconBankedAmountChanged(String holder, String amount);
+
+  /// No description provided for @reconLegCustomerDebit.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer charged'**
+  String get reconLegCustomerDebit;
+
+  /// No description provided for @reconLegCashCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash taken at the door'**
+  String get reconLegCashCollected;
+
+  /// No description provided for @reconLegMerchantCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Merchant payout'**
+  String get reconLegMerchantCredit;
+
+  /// No description provided for @reconLegGiftWrapCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Gift wrapping'**
+  String get reconLegGiftWrapCredit;
+
+  /// No description provided for @reconLegRiderCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider payout'**
+  String get reconLegRiderCredit;
+
+  /// No description provided for @reconLegProviderCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery company payout'**
+  String get reconLegProviderCredit;
+
+  /// No description provided for @reconLegPlatformCommission.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission'**
+  String get reconLegPlatformCommission;
+
+  /// No description provided for @reconLegPlatformSubsidy.
+  ///
+  /// In en, this message translates to:
+  /// **'Platform contribution'**
+  String get reconLegPlatformSubsidy;
+
+  /// No description provided for @reconLegPlatformLoss.
+  ///
+  /// In en, this message translates to:
+  /// **'Absorbed after pickup'**
+  String get reconLegPlatformLoss;
+
+  /// No description provided for @reconLegCashRemittance.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash banked'**
+  String get reconLegCashRemittance;
+
+  /// No description provided for @reconLegPayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid out'**
+  String get reconLegPayout;
+
+  /// No description provided for @reconLegCustomerRefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund'**
+  String get reconLegCustomerRefund;
+
+  /// No description provided for @reconStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get reconStatusPending;
+
+  /// No description provided for @reconStatusPosted.
+  ///
+  /// In en, this message translates to:
+  /// **'Posted'**
+  String get reconStatusPosted;
+
+  /// No description provided for @reconStatusSettledInCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Settled in cash'**
+  String get reconStatusSettledInCash;
+
+  /// No description provided for @reconStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get reconStatusFailed;
+
+  /// No description provided for @reconStatusCompensated.
+  ///
+  /// In en, this message translates to:
+  /// **'Reversed'**
+  String get reconStatusCompensated;
+
+  /// No description provided for @reconStatusAbandoned.
+  ///
+  /// In en, this message translates to:
+  /// **'Abandoned'**
+  String get reconStatusAbandoned;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

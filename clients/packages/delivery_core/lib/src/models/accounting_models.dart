@@ -5,12 +5,27 @@ import 'statement_models.dart' show Money;
 
 /// Which part of a settlement a transaction row is.
 ///
-/// Mirrors `AccountingTransaction.Leg`. Kept as an enum with a label rather than a raw string so
-/// three screens cannot each invent their own wording for "PLATFORM_COMMISSION".
+/// Mirrors `AccountingTransaction.Leg`, and mirrors ALL of it. It used to list four of the ten the
+/// service writes, so the back-office ledger called the other six "Unknown" — including both rows
+/// dev was listing as unsettled, which were cash remittances. When the service adds a leg, add it
+/// here: `settlement_wire_values_test.dart` is the reminder.
+///
+/// [label] is the English wording, one place for it rather than one per screen; the portal renders
+/// a translated one and falls back to this. A value this client has never heard of decodes to
+/// [unknown] and is shown by its own wire name — see [AccountingTransaction.legName] — because
+/// "CUSTOMER_REFUND" tells an operator something and "Unknown" tells them nothing.
 enum SettlementLeg {
   customerDebit('CUSTOMER_DEBIT', 'Customer charged'),
+  cashCollected('CASH_COLLECTED', 'Cash taken at the door'),
   merchantCredit('MERCHANT_CREDIT', 'Merchant payout'),
+  giftWrapCredit('GIFT_WRAP_CREDIT', 'Gift wrapping'),
+  riderCredit('RIDER_CREDIT', 'Rider payout'),
+  providerCredit('PROVIDER_CREDIT', 'Delivery company payout'),
   platformCommission('PLATFORM_COMMISSION', 'Commission'),
+  platformSubsidy('PLATFORM_SUBSIDY', 'Platform contribution'),
+  platformLoss('PLATFORM_LOSS', 'Absorbed after pickup'),
+  cashRemittance('CASH_REMITTANCE', 'Cash banked'),
+  payout('PAYOUT', 'Paid out'),
   customerRefund('CUSTOMER_REFUND', 'Refund'),
   unknown('UNKNOWN', 'Unknown');
 
@@ -25,13 +40,24 @@ enum SettlementLeg {
       );
 }
 
-/// Mirrors `AccountingTransaction.Status`.
+/// Mirrors `AccountingTransaction.Status`, and mirrors all of it.
+///
+/// `SETTLED_IN_CASH` was missing, which is the status of nearly every row the platform writes:
+/// with no bank deployed, settlement discharges each leg as it is written. So the ledger called
+/// them "Unknown" and no tile or filter could reach them.
 enum SettlementStatus {
   /// Created, not yet confirmed by the bank.
   pending('PENDING', 'Pending'),
 
   /// The bank moved the money.
   posted('POSTED', 'Posted'),
+
+  /// Discharged without a bank: cash at the door, or a platform that has no bank connector.
+  ///
+  /// Done, and done successfully — as complete as POSTED, and the commoner of the two here. A
+  /// screen that treats only POSTED as settled reports a working platform as having settled
+  /// nothing.
+  settledInCash('SETTLED_IN_CASH', 'Settled in cash'),
 
   /// The bank refused, or the platform gave up. Recoverable by an operator.
   failed('FAILED', 'Failed'),
@@ -56,6 +82,9 @@ enum SettlementStatus {
 
   /// Whether this row still needs somebody to do something about it.
   bool get needsAttention => this == pending || this == failed;
+
+  /// Whether the money reached whoever it was for, however it was discharged.
+  bool get isSettled => this == posted || this == settledInCash;
 }
 
 class AccountingTransaction {
@@ -73,16 +102,28 @@ class AccountingTransaction {
     this.coreBankingRef,
     this.failureReason,
     this.postedAt,
-  });
+    String? legWire,
+    String? statusWire,
+  })  : legWire = legWire ?? '',
+        statusWire = statusWire ?? '';
 
   final String id;
   final String orderId;
   final SettlementLeg leg;
+
+  /// What the server called this leg, kept whether or not [leg] recognised it.
+  ///
+  /// A value newer than this build decodes to [SettlementLeg.unknown], and the screen shows this
+  /// instead: an operator can act on "GIFT_WRAP_CREDIT" and can do nothing with "Unknown".
+  final String legWire;
   final String accountRef;
   final double amount;
   final String currency;
   final String direction;
   final SettlementStatus status;
+
+  /// What the server called this status, kept for the same reason as [legWire].
+  final String statusWire;
 
   /// The bank's own identifier. This is the number quoted in a dispute.
   final String? coreBankingRef;
@@ -93,10 +134,20 @@ class AccountingTransaction {
 
   bool get isDebit => direction == 'DEBIT';
 
+  /// What to call this leg on screen when no translation is to hand: its name, or the server's own
+  /// word for a leg this build has never heard of.
+  String get legName => leg == SettlementLeg.unknown && legWire.isNotEmpty ? legWire : leg.label;
+
+  /// The same for the status.
+  String get statusName =>
+      status == SettlementStatus.unknown && statusWire.isNotEmpty ? statusWire : status.label;
+
   factory AccountingTransaction.fromJson(Map<String, dynamic> json) => AccountingTransaction(
         id: json['id'] as String,
         orderId: json['orderId'] as String,
         leg: SettlementLeg.fromWire(json['leg'] as String? ?? 'UNKNOWN'),
+        legWire: json['leg'] as String?,
+        statusWire: json['status'] as String?,
         accountRef: json['accountRef'] as String? ?? '',
         amount: (json['amount'] as num?)?.toDouble() ?? 0,
         currency: json['currency'] as String? ?? 'USD',

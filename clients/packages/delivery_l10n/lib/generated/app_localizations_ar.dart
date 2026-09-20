@@ -12847,4 +12847,58 @@ class DeliveryStringsAr extends DeliveryStrings {
   String reconBankedAmountChanged(String holder, String amount) {
     return 'يحمل $holder الآن $amount للمنصة، وليس المبلغ الذي أكّدته. لم يُسجَّل أي شيء.';
   }
+
+  @override
+  String get reconLegCustomerDebit => 'خُصم من العميل';
+
+  @override
+  String get reconLegCashCollected => 'نقد مقبوض عند الباب';
+
+  @override
+  String get reconLegMerchantCredit => 'مستحقات المتجر';
+
+  @override
+  String get reconLegGiftWrapCredit => 'تغليف الهدية';
+
+  @override
+  String get reconLegRiderCredit => 'مستحقات السائق';
+
+  @override
+  String get reconLegProviderCredit => 'مستحقات شركة التوصيل';
+
+  @override
+  String get reconLegPlatformCommission => 'عمولة المنصة';
+
+  @override
+  String get reconLegPlatformSubsidy => 'مساهمة المنصة';
+
+  @override
+  String get reconLegPlatformLoss => 'خسارة بعد الاستلام';
+
+  @override
+  String get reconLegCashRemittance => 'نقد مودَع';
+
+  @override
+  String get reconLegPayout => 'مبلغ مدفوع';
+
+  @override
+  String get reconLegCustomerRefund => 'استرداد';
+
+  @override
+  String get reconStatusPending => 'قيد الانتظار';
+
+  @override
+  String get reconStatusPosted => 'مُرحَّل';
+
+  @override
+  String get reconStatusSettledInCash => 'سُوّي نقدًا';
+
+  @override
+  String get reconStatusFailed => 'فشل';
+
+  @override
+  String get reconStatusCompensated => 'معكوس';
+
+  @override
+  String get reconStatusAbandoned => 'متروك';
 }
