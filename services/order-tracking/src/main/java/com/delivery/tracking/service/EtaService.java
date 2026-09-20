@@ -91,16 +91,33 @@ public class EtaService {
 
         // When this order's rider also holds siblings of it from the same checkout, the rider's
         // latest fix is the latest across all of them, and the journey runs through the siblings'
-        // shops still ahead (see RunPlan) — the same answer the checkout map gives. Every order's
-        // fix is read through the gate, and only for a caller who is on that order.
-        List<OrderParticipants> riderOrders = riderOrdersOf(order);
+        // shops still ahead (see RunPlan) — the same answer the checkout map gives. Only for a
+        // caller the whole run is: for anyone else the order is estimated as if it were alone.
+        List<OrderParticipants> riderOrders = seesTheRun(order, userId, isBackoffice)
+                ? riderOrdersOf(order)
+                : List.of(order);
         List<RiderSighting> sightings = new ArrayList<>();
         for (OrderParticipants each : riderOrders) {
-            if (each.getOrderId().equals(orderId) || isBackoffice || each.isVisibleTo(userId)) {
-                sightings.add(tracking.sightingFor(each, userId, isBackoffice));
-            }
+            sightings.add(tracking.sightingFor(each, userId, isBackoffice));
         }
         return estimate(order, riderOrders, RunSighting.of(sightings), now);
+    }
+
+    /**
+     * Whether this caller's estimate may run through the rider's other orders of the checkout: the
+     * customer, whose orders they all are, the rider carrying them, and the back office.
+     *
+     * <p>Never a shop. The other orders are the customer's other shops, and an estimate that goes
+     * through them tells a merchant that their customer is buying elsewhere, roughly where that
+     * shop is — it is the difference between two estimates — and that it is still to be collected.
+     * A shop's own order is estimated as if it were the only one: straight to the door once
+     * collected, never "still picking up" because somebody else's goods are not aboard yet.
+     */
+    private static boolean seesTheRun(OrderParticipants order, String userId,
+                                      boolean isBackoffice) {
+        return isBackoffice
+                || order.getCustomerId().equals(userId)
+                || (order.getRiderId() != null && order.getRiderId().equals(userId));
     }
 
     /**
