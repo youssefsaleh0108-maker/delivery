@@ -36,6 +36,7 @@
     <image.name>delivery-${project.artifactId}</image.name>
 
     <springdoc.version>2.7.0</springdoc.version>
+    <zxing.version>3.5.1</zxing.version>
   </properties>
 
   <!-- GitHub Packages serves the com.delivery:platform-* jars. It requires authentication even for
@@ -171,10 +172,35 @@
       <version>2.34.0</version>
     </dependency>
 
+    <!-- The QR code on a shop's public page (ShopQrCode).
+         Encoding only, and `core` only: the image is written with ImageIO, which is in the JDK, so
+         zxing's `javase` module and the AWT-adjacent dependencies behind it stay out of the
+         runtime. A QR encoder is a Reed-Solomon codec plus the specification's mask scoring —
+         several hundred lines of arithmetic that is either exactly right or silently produces a
+         symbol that will not scan off a printed sign, which is not a thing to hand-roll for a
+         feature whose whole point is a card on a counter. Pinned, like the Anthropic client: the
+         Spring BOM does not manage it. -->
+    <dependency>
+      <groupId>com.google.zxing</groupId>
+      <artifactId>core</artifactId>
+      <version>${zxing.version}</version>
+    </dependency>
+
     <!-- Was inherited from the root pom, which applied it to every module without exception. -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- Decodes the QR code back, in the test that proves a printed sign works
+         (ShopQrCodeTest). Test scope, deliberately: the service never reads a QR code, and the
+         decoder is a genuinely separate path from the encoder — PNG bytes, luminance, binarise,
+         detect, decode — so the test is not the encoder agreeing with itself. -->
+    <dependency>
+      <groupId>com.google.zxing</groupId>
+      <artifactId>javase</artifactId>
+      <version>${zxing.version}</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
