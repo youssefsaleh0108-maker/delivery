@@ -11,9 +11,11 @@ import java.time.Duration;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.function.LongSupplier;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.CacheControl;
@@ -66,7 +68,29 @@ public class PublicShopPageController {
     /** The sitemap: an hour. A new shop is worth finding today, not within five minutes. */
     private static final Duration SITEMAP_MAX_AGE = Duration.ofHours(1);
 
+    /**
+     * How long a rendered QR code is kept, and how many.
+     *
+     * <p>The image cannot go stale — it is a pure function of a slug a shop keeps for life, which
+     * is why the response says immutable for a year. The entry expires only so that a shop nobody
+     * has asked about since yesterday stops holding a kilobyte, and the count is bounded because
+     * this pod has 512 MiB. Every code is about 1.5 kB, so this is under a megabyte held.
+     */
+    private static final Duration QR_MEMO_FOR = Duration.ofDays(1);
+
+    private static final int QR_MEMO_ENTRIES = 512;
+
     private final PublicShopPageService pages;
+
+    /**
+     * The QR codes this service has already drawn, by slug.
+     *
+     * <p>Encoding one is a million pixel writes into a 1,024² bitmap and a PNG encode, and it is
+     * the same million every time: a printed sign is scanned, the phone opens the page, the page
+     * offers "QR code to print" again, and a shop that prints a batch of cards asks for the same
+     * image all afternoon. Drawing it once per slug is the whole of this.
+     */
+    private final ShopPageCache<byte[]> qrCodes;
 
     /**
      * The address this page believes it lives at.
@@ -100,14 +124,22 @@ public class PublicShopPageController {
      */
     private final String contentSecurityPolicy;
 
+    @Autowired
     public PublicShopPageController(
             PublicShopPageService pages,
             @Value("${delivery.public.base-url:https://www.youdrop.shop}") String baseUrl,
             @Value("${delivery.storage.minio.public-endpoint:}") String imageOrigin) {
+        this(pages, baseUrl, imageOrigin, System::nanoTime);
+    }
+
+    /** The clock the memos age on, injectable so a test can step over an expiry. */
+    PublicShopPageController(PublicShopPageService pages, String baseUrl, String imageOrigin,
+                             LongSupplier nanoClock) {
         this.pages = pages;
         this.baseUrl = trimTrailingSlash(baseUrl);
         this.stylesheet = readStylesheet();
         this.contentSecurityPolicy = policyFor(imageOrigin);
+        this.qrCodes = new ShopPageCache<>(QR_MEMO_FOR, QR_MEMO_ENTRIES, nanoClock);
     }
 
     // ---------------------------------------------------------------- the page
@@ -138,8 +170,13 @@ public class PublicShopPageController {
     /**
      * The QR code of the page's own URL.
      *
-     * <p>Answered from the same {@code read} the page is, so a shop nobody may see has no printable
-     * code either — a QR that outlived its shop is a sign on a counter pointing at a 404.
+     * <p>Refused for a shop nobody may see — a QR that outlived its shop is a sign on a counter
+     * pointing at a 404 — but by asking whether the shop exists, which is one indexed lookup, and
+     * not by building the page. Reading the page here cost six queries and up to a hundred and
+     * twenty products, all of it thrown away, to decide whether to draw a square; and then the
+     * square was drawn from scratch as well, a million pixel writes at a time, for an image that
+     * cannot change. The existence check still runs on every request, so a shop suspended this
+     * morning stops having a printable code this morning; only the pixels are remembered.
      */
     @GetMapping("/s/{slug}/qr.png")
     public ResponseEntity<byte[]> qr(@PathVariable String slug,
@@ -147,14 +184,12 @@ public class PublicShopPageController {
                                      @RequestHeader(name = HttpHeaders.ACCEPT_LANGUAGE,
                                              required = false) String acceptLanguage,
                                      HttpServletRequest request) {
-        try {
-            pages.read(slug);
-        } catch (ShopPageNotFoundException absent) {
+        if (!pages.exists(slug)) {
             return notFound(ShopPageText.choose(lang, acceptLanguage));
         }
         // The un-suffixed page URL, not this request's: what the sign points at is the page, in
         // whichever language the phone that scans it prefers.
-        byte[] png = ShopQrCode.pngOf(baseUrl + "/s/" + slug);
+        byte[] png = qrCodes.get(slug, () -> ShopQrCode.pngOf(baseUrl + "/s/" + slug));
         return asset(png, MediaType.IMAGE_PNG, request);
     }
 

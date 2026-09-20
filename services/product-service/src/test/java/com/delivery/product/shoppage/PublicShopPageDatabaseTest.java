@@ -212,6 +212,21 @@ class PublicShopPageDatabaseTest {
     }
 
     @Test
+    @DisplayName("the QR code's cheap check answers exactly what the page's own read answers")
+    void existsAgreesWithRead() {
+        // Two ways of asking the same question — /s/{slug}/qr.png asks this one because it needs
+        // nothing but the answer — so a shop must never be printable without being readable.
+        assertThat(pages.exists(live.getSlug())).isTrue();
+        for (Store hidden : List.of(draft, suspended, pinless, closedCategoryProvider)) {
+            assertThat(pages.exists(hidden.getSlug()))
+                    .as("%s has no page, so it has no printable code either", hidden.getName())
+                    .isFalse();
+        }
+        assertThat(pages.exists("a-slug-that-never-existed-0000ffff")).isFalse();
+        assertThat(pages.exists(live.getId().toString())).isFalse();
+    }
+
+    @Test
     @DisplayName("an id is not a slug: the page has one address, not two")
     void anIdIsNotASlug() {
         assertThatThrownBy(() -> pages.read(live.getId().toString()))

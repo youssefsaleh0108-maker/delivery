@@ -6,11 +6,17 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import com.delivery.product.shoppage.ShopPageFixture.Item;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -239,6 +245,28 @@ class PublicShopPageApiTest {
         ShopPageFixture hidden = new ShopPageFixture().suspended();
         hidden.mvc().perform(get("/s/" + hidden.slug() + "/qr.png"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("the QR code asks whether the shop exists; it does not read the shop's shelf")
+    void theCodeDoesNotReadThePage() throws Exception {
+        ShopPageFixture shop = stocked();
+        MockMvc mvc = shop.mvc();
+
+        MvcResult first = mvc.perform(get("/s/" + shop.slug() + "/qr.png"))
+                .andExpect(status().isOk()).andReturn();
+        MvcResult again = mvc.perform(get("/s/" + shop.slug() + "/qr.png"))
+                .andExpect(status().isOk()).andReturn();
+
+        // The whole point: drawing a square never needed the catalogue, and reading it cost this
+        // request six queries and up to a hundred and twenty products that were then thrown away.
+        verify(shop.products(), never()).findActiveInStore(any(), any(), anyString(), any());
+        // One lookup per request — the shop can still be suspended between two scans — and the
+        // same bytes, which the memo hands back without encoding a million pixels again.
+        verify(shop.stores(), times(2)).findBySlug(shop.slug());
+        assertThat(first.getResponse().getContentAsByteArray())
+                .isEqualTo(again.getResponse().getContentAsByteArray());
+        assertThat(first.getResponse().getHeader("Cache-Control")).contains("immutable");
     }
 
     // ---------------------------------------------------------------- caching and headers

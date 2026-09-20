@@ -150,6 +150,20 @@ public class PublicShopPageService {
     }
 
     /**
+     * Whether this slug has a page at all, without building one.
+     *
+     * <p>One indexed lookup and the same {@link #publiclyVisible} rule {@link #read} applies — not a
+     * second copy of it, and not a read of the page either. It is what {@code /s/{slug}/qr.png}
+     * asks: the QR code is a pure function of the slug, so the only thing the request needs from
+     * the database is whether there is a shop behind it, and answering that with a whole page read
+     * cost six queries and a hundred and twenty products to draw a square.
+     */
+    @Transactional(readOnly = true)
+    public boolean exists(String slug) {
+        return stores.findBySlug(slug).filter(this::publiclyVisible).isPresent();
+    }
+
+    /**
      * Every shop that has a page, for the sitemap.
      *
      * <p>The same rule as {@link #read}, asked of the whole table: a shop that would 404 must not be

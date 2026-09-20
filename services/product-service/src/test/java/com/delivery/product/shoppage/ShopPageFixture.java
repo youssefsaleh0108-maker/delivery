@@ -224,6 +224,18 @@ final class ShopPageFixture {
         return shop;
     }
 
+    /**
+     * The mocked repositories, for the tests that count what a request actually asked the database
+     * — "the QR code does not read the shelf" and "a second reader inside the window reads nothing".
+     */
+    ProductRepository products() {
+        return products;
+    }
+
+    StoreRepository stores() {
+        return stores;
+    }
+
     String slug() {
         return shop.getSlug();
     }
