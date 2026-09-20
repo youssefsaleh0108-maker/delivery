@@ -7,6 +7,7 @@ resources:
 - namespace.yaml
 - ../../base
 - ingress.yaml
+- resource-safety.yaml
 
   # DEV SENDS REAL MAIL through the operator's relay — these override platform-common's
   # mailpit sink (envFrom: the later source wins). qa deliberately keeps the sink: a test
@@ -22,6 +23,16 @@ resources:
   # A value set from the portal's auto-approval screen wins over this one; dev has none for riders.
 configMapGenerator:
 - literals:
+  # What this environment IS. Read by base/demo-storefront-gate.yaml, which keeps the eight demo
+  # shops here and deletes them in a production environment, and by scripts/verify.sh, which
+  # refuses a `production` overlay that still carries any of the switches below.
+  - ENVIRONMENT_TIER=development
+  # The simulators, back ON — explicitly, here, rather than as a default in platform-common that
+  # every environment inherited including production (PD-1).
+  - SIMULATE_WALLETS=true
+  - WHATSAPP_SIMULATOR_ENABLED=true
+  # Nominatim sees this; dev's requests should not look like the live shop's.
+  - NOMINATIM_USER_AGENT=YouDrop-dev (youssef.saleh0108@gmail.com)
   - KEYCLOAK_PUBLIC_URL=https://iam-dev.youdrop.shop
   - KEYCLOAK_ISSUER_URI=https://iam-dev.youdrop.shop/realms/delivery-platform
   - MINIO_PUBLIC_ENDPOINT=https://api-dev.youdrop.shop
@@ -42,15 +53,30 @@ configMapGenerator:
   # Dev only: accept rider positions from anywhere. Emulators report Mountain View, and dev's
   # riders are mostly emulators. Overrides platform-common's "true"; qa keeps it on.
   - TRACKING_SERVICE_AREA_ENABLED=false
+  # A smaller heap FRACTION, because dev's containers are smaller (see resource-safety.yaml).
+  #
+  # platform-common sets MaxRAMPercentage=70 against a 512Mi limit, which leaves ~154Mi outside the
+  # heap — the figure its comment says fits C1 and SerialGC. dev's limit is 416Mi to fit the 9 GiB
+  # quota, and 70% of that would leave only ~125Mi, which is BELOW that figure: the same
+  # OOMKill-restart-repeat spiral the comment describes, times fourteen. 60% of 416Mi leaves
+  # ~166Mi, slightly MORE non-heap room than dev has today, and a 250Mi heap ceiling instead of
+  # 358Mi. The services idle at 160-350Mi of total RSS, so this trades heap headroom (they will
+  # collect more often) for the native headroom that is what actually kills a container.
+  #
+  # envFrom order makes this win: platform-common is applied first, platform-env second. qa keeps
+  # 512Mi and 70%, unchanged — production is not the environment that gets squeezed.
+  - JAVA_OPTS=-XX:MaxRAMPercentage=60 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k
   name: platform-env
 
 generatorOptions:
   disableNameSuffixHash: true
 
-# order-manager lives in its own repository, and dev runs its moving `:develop` tag, so a new
-# order-manager build changes nothing Argo CD can see. Changing this value rolls the pods, and
-# imagePullPolicy: Always makes them pull the new build. Set it to the order-manager commit that
-# should be running.
+# order-manager lives in its own repository and nothing bumps this overlay when it builds, so this
+# annotation was the only record of which build dev was meant to run — while the image tag was the
+# moving `:develop`, with imagePullPolicy: Always. The two had already come apart: this said
+# `429ce9e` while `:develop` pointed at build `044d1b8b` (2026-09-20). The image below is now
+# pinned to that same build's immutable `sha-` tag, so the annotation and the image cannot disagree
+# again; keep them in step when you promote a new order-manager build.
 patches:
 - patch: |-
     - op: replace
@@ -62,17 +88,124 @@ patches:
 - patch: |-
     - op: add
       path: /spec/template/metadata/annotations/youdrop.shop~1order-manager-build
-      value: "429ce9e"
+      value: "044d1b8b"
   target:
     kind: Deployment
     name: order-manager
+
+# ---------------------------------------------------------------------------- resource safety
+# Everything below exists because dev and production share one 23 GiB node with no swap. See
+# resource-safety.yaml for the quota these figures are fitted to, and cluster/priority-classes.yaml
+# for what the priority buys.
+
+# Every workload in this namespace is the one that gets preempted and the one that gets evicted
+# first. `name: .*` is a regex, so this is one patch per kind rather than one per workload — and a
+# workload added later cannot forget it. scripts/verify.sh fails if any pod in the rendered overlay
+# has no priorityClassName.
+- patch: |-
+    - op: add
+      path: /spec/template/spec/priorityClassName
+      value: dev-standard
+  target:
+    kind: Deployment
+    name: ".*"
+- patch: |-
+    - op: add
+      path: /spec/template/spec/priorityClassName
+      value: dev-standard
+  target:
+    kind: StatefulSet
+    name: ".*"
+- patch: |-
+    - op: add
+      path: /spec/template/spec/priorityClassName
+      value: dev-standard
+  target:
+    kind: Job
+    name: ".*"
+# A CronJob's pod template is one level deeper. dev's backup CronJobs stay SUSPENDED (base sets
+# that): dev's data is demo data, and dev's 9 GiB quota has no room for another pod — a backup pod
+# here would be refused at admission and the CronJob would report a failure every hour. To run one
+# by hand for a test, scale a service to zero first, or test on the environment that is becoming
+# production, which is the one whose backups matter.
+- patch: |-
+    - op: add
+      path: /spec/jobTemplate/spec/template/spec/priorityClassName
+      value: dev-standard
+  target:
+    kind: CronJob
+    name: ".*"
+
+# The fourteen Spring services: 512Mi -> 416Mi, paired with the 60% heap fraction above. This is
+# the one change on this branch that has not been measured against a running service, so it goes to
+# dev first and is watched for a day. If pods start restarting with reason OOMKilled, the way back
+# is these two numbers: 512Mi here and MaxRAMPercentage=70 in platform-env, plus limits.memory 11Gi
+# in resource-safety.yaml, and dev is exactly as it was.
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: 416Mi
+  target:
+    kind: Deployment
+    name: "^(product-service|order-manager|order-tracking|transfer-service|connector-settings|notifications-manager|app-notification|email-connector|push-connector|sms-connector|accounting-service|whatsapp-service|onboarding-service|config-server)$"
+
+# The data layer, sized for what dev actually holds: a 34 MB delivery database, 13 MB of Keycloak,
+# 68 MB of objects. Postgres keeps shared_buffers=512MB from base, so 1Gi is the floor rather than
+# a target. Keycloak is NOT reduced — it was OOMKilled at 1Gi on this very node, and taking it
+# lower is the one cut that is certain to break something.
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: 1024Mi
+  target: { kind: StatefulSet, name: postgres }
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: 96Mi
+  target: { kind: StatefulSet, name: redis }
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: 352Mi
+  target: { kind: StatefulSet, name: rabbitmq }
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: 256Mi
+  target: { kind: StatefulSet, name: minio }
+# A sink dev does not send to: dev mails through the M365 relay (SMTP_HOST above), so mailpit here
+# holds nothing but whatever a test pointed at it by hand.
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: 64Mi
+  target: { kind: Deployment, name: mailpit }
+# nginx serving a directory of static files. 96Mi was the compose stack's number and nothing has
+# ever come near it; 64Mi is what pays for the postgres-exporter inside dev's 9 GiB.
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: 64Mi
+  target: { kind: Deployment, name: portal }
+# Two containers in one pod: a dev-mode Vault holding about twenty KV entries, and a shell script
+# that re-seeds them from platform-secrets.
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: 128Mi
+    - op: replace
+      path: /spec/template/spec/containers/1/resources/limits/memory
+      value: 96Mi
+  target: { kind: Deployment, name: vault }
 
 # Which build each service runs. CI rewrites these lines after every image build on this
 # environment's branch (see reusable-service-ci.yml, update-environment-manifest) and Argo CD
 # deploys the result — edit by merge, not by hand.
 images:
 - name: docker.io/youssefsaleh0108/delivery-order-manager
-  newTag: develop
+  # Was `develop`, which moves on every order-manager merge (PIN-1). This is the build `develop`
+  # pointed at on 2026-09-20, by its own immutable tag.
+  newTag: sha-044d1b8b2a5b22d6143bbfa05ec8b688f35d564f
 - name: ghcr.io/youssefsaleh0108-maker/accounting-service
   newName: ghcr.io/youssefsaleh0108-maker/accounting-service
   newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7

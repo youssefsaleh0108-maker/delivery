@@ -18,7 +18,10 @@ spec:
     spec:
       containers:
         - name: keycloak
-          image: quay.io/keycloak/keycloak:26.0
+          # keycloak 26.0, pinned by digest (PIN-1). `26.0` is a minor stream, and a Keycloak that
+          # comes back on a newer minor runs its own database migration against the realm — the
+          # one upgrade on this platform that cannot be rolled back by restarting the old image.
+          image: quay.io/keycloak/keycloak:26.0@sha256:09a381c715ab0b111835b70f2905955274843a219c6f27efb348e4d9f4086858
           args: ["start-dev", "--import-realm"]
           env:
             - name: KC_BOOTSTRAP_ADMIN_USERNAME
@@ -154,7 +157,7 @@ spec:
       containers:
         # 1) The dev-mode server — unchanged from before except it no longer runs alone in the pod.
         - name: vault
-          image: hashicorp/vault:1.18
+          image: hashicorp/vault:1.18@sha256:750bb37c1638fa194ab37053a81618c61bb0491ddec6fccac87c07a8e6cd8166
           args: ["server", "-dev", "-dev-listen-address=0.0.0.0:8200"]
           env:
             - name: VAULT_DEV_ROOT_TOKEN_ID
@@ -179,7 +182,7 @@ spec:
         #    probing talk to Vault over loopback, never the Service, so the sidecar's own readiness
         #    never gates its work (no deadlock).
         - name: vault-reseed
-          image: hashicorp/vault:1.18
+          image: hashicorp/vault:1.18@sha256:750bb37c1638fa194ab37053a81618c61bb0491ddec6fccac87c07a8e6cd8166
           command: ["/bin/sh", "/bootstrap/reconcile.sh"]
           env:
             - name: VAULT_ADDR
@@ -278,7 +281,7 @@ spec:
     spec:
       containers:
         - name: config-server
-          image: ghcr.io/youssefsaleh0108-maker/config-server:main
+          image: ghcr.io/youssefsaleh0108-maker/config-server:sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
           envFrom:
             - configMapRef: { name: platform-common }
             - secretRef: { name: platform-secrets }

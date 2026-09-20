@@ -1,0 +1,82 @@
+# A wall between the two environments, in both namespaces.
+#
+# Today there is none: every pod in delivery-dev can open a connection to every pod in delivery-qa,
+# including its Postgres on 5432 with a superuser password that both namespaces' pods already hold
+# in their own environment. Nothing malicious is needed for that to matter — a dev service pointed
+# at the wrong host by a typo writes to production, and the first sign is the data.
+#
+# k3s ships a NetworkPolicy controller (kube-router) unless it was started with
+# --disable-network-policy. If it is disabled these objects are accepted and enforce nothing, which
+# is the one failure mode worth knowing about because it is silent. `scripts/rotate-secrets.sh <ns>
+# netpol-proof` opens the connections these rules forbid and reports what actually happened.
+#
+# INGRESS ONLY, deliberately. A default-deny on egress would also deny DNS, the M365 relay, the
+# Let's Encrypt HTTP-01 callback path and every outbound call a connector makes, and getting that
+# list wrong takes the platform off the air in a way that looks like an application bug. The
+# property being bought here is "delivery-dev cannot reach delivery-qa", and denying ingress at the
+# destination buys it whichever side initiates.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  # Every pod in this namespace.
+  podSelector: {}
+  policyTypes: [Ingress]
+  # No ingress rules at all: nothing may connect in, until one of the policies below allows it.
+  # NetworkPolicies are additive, so this is the floor and the rest are the exceptions.
+---
+# The environment talking to itself: thirteen services, the config server, Keycloak, Vault and the
+# data layer are all in here and all talk to each other.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-same-namespace
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        # An empty podSelector inside `from` means "any pod in THIS namespace" — it does not reach
+        # across namespaces, which is exactly the distinction this file exists for. Writing
+        # `namespaceSelector: {}` instead would mean "any pod in ANY namespace" and would undo the
+        # whole policy; that is the classic mistake here.
+        - podSelector: {}
+---
+# The edge. Traefik runs in kube-system and is the only way a request from outside reaches any of
+# these pods; without this rule every hostname on the box answers with a gateway error.
+#
+# By namespace rather than by pod label so a Traefik upgrade that renames its labels cannot take
+# the platform down. kube-system is a namespace only the cluster owner can create workloads in, so
+# widening the rule to all of it is not widening the trust.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-edge
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+---
+# Prometheus scrapes every pod in here on its actuator port, and Promtail reads logs from the node
+# rather than over the network — but Loki, Grafana and Alertmanager all live in `monitoring` too,
+# and the postgres-exporter's scrape crosses this boundary as well.
+#
+# `kubernetes.io/metadata.name` is set automatically by the API server on every namespace, so this
+# selector needs nothing added to the monitoring namespace to work.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring

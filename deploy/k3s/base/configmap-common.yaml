@@ -47,15 +47,28 @@ data:
   # No tracing backend is deployed; both flags or the exporter floods the log with retries.
   OTEL_SDK_DISABLED: "true"
   MANAGEMENT_TRACING_ENABLED: "false"
-  # Mail and SMS go to the mailpit sink by design — a tester can register with a made-up address.
-  # Real relay creds would come through platform-secrets and an overlay change, deliberately.
-  SMTP_HOST: mailpit
-  SMTP_PORT: "1025"
-  SMTP_USER: ""
-  SMTP_AUTH: "false"
-  SMTP_STARTTLS: "false"
-  EMAIL_FROM: no-reply@mydelivery.local
-  SMS_TEST_INBOX: sms-test-inbox@dev.local
+  # THE MAIL SINK IS NOT HERE ANY MORE (PD-1).
+  #
+  # SMTP_HOST=mailpit, SMTP_PORT=1025, no auth, no TLS and EMAIL_FROM=no-reply@mydelivery.local
+  # used to be defaults on this file — which meant they were the defaults for PRODUCTION too, and
+  # the way they would have shown up is the quietest failure this platform has: every verification
+  # code, every receipt and every rider invitation delivered successfully to a sink nobody reads,
+  # with no error anywhere, while customers waited for an email that was sitting in mailpit.
+  #
+  # Both environments already set all six in their own platform-env, so removing them changes
+  # nothing about dev or qa. What it changes is what happens to an environment that FORGETS: it now
+  # fails to start a mail send instead of quietly sending to a sink, and scripts/verify.sh fails if
+  # any overlay leaves one of them out.
+  #
+  # SMS_TEST_INBOX is the same shape — every simulated SMS becomes an email to it — and is likewise
+  # set per environment.
+  #
+  # Which environment this is. It is READ, not decoration: base/demo-storefront-gate.yaml uses it
+  # to decide whether the eight demo shops survive, and scripts/verify.sh refuses a `production`
+  # overlay that still carries a test switch. Deliberately NOT given a default here: an environment
+  # that has not said what it is must not be guessed at in either direction.
+  #   development | test | production
+  #
   # Internal service-to-service addresses.
   PRODUCT_SERVICE_URL: http://product-service:8103
   ORDER_MANAGER_URL: http://order-manager:8101
@@ -68,8 +81,18 @@ data:
   # The Lebanese-market switches, as the compose stack ran them.
   MARKET_LBP_PER_USD: "90000"
   RIDER_CHANGE_LIMIT_LBP: "100000"
-  SIMULATE_WALLETS: "true"
-  WHATSAPP_SIMULATOR_ENABLED: "true"
+  # THE SIMULATORS ARE OFF HERE (PD-1). Both were `true` on this shared file, so every environment
+  # got them — production included, by default, silently.
+  #
+  # SIMULATE_WALLETS makes the Whish/OMT simulator offer wallet payment methods at checkout: a
+  # customer choosing one in production would be taken through a payment that never happened, for
+  # an order the platform then treats as paid. WHATSAPP_SIMULATOR_ENABLED replaces the Meta Cloud
+  # API with a loopback that accepts any webhook it is handed.
+  #
+  # dev and qa turn them back on explicitly in their own platform-env, where it is one line in a
+  # file named after the environment rather than a default nobody re-reads.
+  SIMULATE_WALLETS: "false"
+  WHATSAPP_SIMULATOR_ENABLED: "false"
   # WHATSAPP_APP_SECRET and WHATSAPP_VERIFY_TOKEN are NOT here any more. They were literals in
   # this file, so they were in the repository and in every pod on the platform, while only
   # whatsapp-service reads them. They now come from the whatsapp-webhook Secret, minted per
@@ -84,5 +107,8 @@ data:
   # platform-env turns it off, because dev's riders are emulators reporting Mountain View. The box
   # is delivery.tracking.ping.service-area in order-tracking's application.yml.
   TRACKING_SERVICE_AREA_ENABLED: "true"
-  # Nominatim refuses to be called without an identifying User-Agent.
-  NOMINATIM_USER_AGENT: "YouDrop-dev (youssef.saleh0108@gmail.com)"
+  # Nominatim refuses to be called without an identifying User-Agent. This one said "YouDrop-dev"
+  # in every environment, which is what Nominatim's operators would have seen from a live shop's
+  # geocoding — and a User-Agent that misidentifies itself is the sort of thing a free service
+  # blocks rather than asks about. The honest name is the default; dev's overlay appends "-dev".
+  NOMINATIM_USER_AGENT: "YouDrop (youssef.saleh0108@gmail.com)"
