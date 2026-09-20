@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,7 +41,8 @@ import com.delivery.product.service.PhotoSearchException.Scope;
  * the account ({@link PhotoSearchUseRepository#lockAccount}, the pattern of
  * {@code CatalogScanRepository#lockMerchant}), so three photos sent at once cannot all see room for
  * one more; the platform's lock is then taken, after the account's and in that order for both kinds,
- * for the platform count. The same transaction deletes the uses no window counts any more, so the table never holds
+ * for the platform count. Every {@link #SWEEP_EVERY}, and before the lock rather than under it, the
+ * same transaction also deletes the uses no window counts any more, so the table never holds much
  * more than two days of them. The caller makes the paid call afterwards, outside it: a pooled
  * connection held across a 25-second call is one taken from every storefront.
  *
@@ -60,7 +62,19 @@ public class PhotoQuota {
     static final Duration MINUTE = Duration.ofMinutes(1);
 
     /** Uses older than this answer no limit and are deleted. Twice the longest window, for slack. */
-    static final Duration KEEP = Duration.ofHours(48);
+    public static final Duration KEEP = Duration.ofHours(48);
+
+    /**
+     * How often one instance sweeps rows no window counts any more.
+     *
+     * <p>Not once per photo, which is what it was: {@link #sweep} is a delete across the whole table,
+     * and running it under an account's lock made every photo pay for every other account's old rows,
+     * and made two accounts' photos contend on rows neither of them owns. Not {@code @Scheduled}
+     * either, for the reason {@code GeocodeCache#evictStale} gives — several replicas, no scheduler
+     * lock. Ten minutes leaves the table at most a few rows past two days deep, since a row is only
+     * written when a photo is really read.
+     */
+    public static final Duration SWEEP_EVERY = Duration.ofMinutes(10);
 
     /** The limits, clamped to at least one each: a zero in the configuration must not refuse everything. */
     public record Limits(int perCustomerPerDay, int perAccountPerMinute, int platformPerDay,
@@ -83,6 +97,9 @@ public class PhotoQuota {
     private final PhotoSearchUseRepository uses;
     private final Clock clock;
     private final Limits limits;
+
+    /** When this instance last swept. Epoch, so the first photo after a start sweeps once. */
+    private final AtomicReference<Instant> sweptAt = new AtomicReference<>(Instant.EPOCH);
 
     @Autowired
     public PhotoQuota(PhotoSearchUseRepository uses, Clock clock,
@@ -117,9 +134,12 @@ public class PhotoQuota {
      */
     @Transactional
     public int take(String accountId, Kind kind) {
-        uses.lockAccount(accountId);
         Instant now = clock.instant();
-        uses.deleteOlderThan(now.minus(KEEP));
+        // Before the lock is taken, and only when it is due: nothing this deletes is counted by any
+        // window below, so its only job is to keep the table small, and it has no business holding an
+        // account's lock while it does it.
+        sweepIfDue(now);
+        uses.lockAccount(accountId);
         boolean merchant = kind == Kind.MERCHANT_FIND;
 
         int perDay = perDay(kind);
@@ -157,6 +177,30 @@ public class PhotoQuota {
 
         uses.save(new PhotoSearchUse(accountId, kind, now));
         return (int) Math.max(0, perDay - today - 1);
+    }
+
+    /**
+     * Deletes the uses no window counts any more, if this instance has not done so for
+     * {@link #SWEEP_EVERY}. One thread wins the turn; the rest go straight on to their photo.
+     */
+    private void sweepIfDue(Instant now) {
+        Instant last = sweptAt.get();
+        if (now.isBefore(last.plus(SWEEP_EVERY)) || !sweptAt.compareAndSet(last, now)) {
+            return;
+        }
+        sweep(now);
+    }
+
+    /**
+     * Deletes every use older than {@link #KEEP}, whoever's it is.
+     *
+     * <p>Public so an operator or a future single-runner job can call it, as
+     * {@code GeocodeCache#evictStale} is. Joins the caller's transaction when there is one, which is
+     * what {@link #take} wants of it.
+     */
+    @Transactional
+    public void sweep(Instant now) {
+        uses.deleteOlderThan(now.minus(KEEP));
     }
 
     /** How many uses of this kind the account has left over the rolling day, without counting one. */

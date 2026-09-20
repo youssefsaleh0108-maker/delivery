@@ -217,8 +217,16 @@ class PhotoSearchDatabaseTest {
     }
 
     private int take(EntityManager manager, String account, Kind kind) {
-        PhotoQuota quota = new PhotoQuota(new JpaRepositoryFactory(manager)
-                .getRepository(PhotoSearchUseRepository.class), clock, limits);
+        return take(manager, new PhotoQuota(new JpaRepositoryFactory(manager)
+                .getRepository(PhotoSearchUseRepository.class), clock, limits), account, kind);
+    }
+
+    /** One use through a quota that outlives the call, for the tests about what it remembers. */
+    private int take(PhotoQuota quota, String account, Kind kind) {
+        return take(em, quota, account, kind);
+    }
+
+    private int take(EntityManager manager, PhotoQuota quota, String account, Kind kind) {
         manager.getTransaction().begin();
         try {
             int left = quota.take(account, kind);
@@ -378,6 +386,35 @@ class PhotoSearchDatabaseTest {
 
         assertThat(stored("old-customer")).isZero();
         assertThat(stored("someone-else")).isEqualTo(1);
+    }
+
+    /**
+     * The sweep is a delete across the whole table. Running it for every photo made each one pay for
+     * every other account's old rows, under that account's own lock. One instance does it on a timer
+     * instead, and the photos in between do not touch anybody else's rows.
+     */
+    @Test
+    @DisplayName("one instance sweeps on a timer, not once per photo")
+    void the_sweep_is_not_per_photo() {
+        PhotoQuota quota = new PhotoQuota(uses, clock, limits);
+        take(quota, "old-customer", Kind.CUSTOMER_SEARCH);
+
+        // Five minutes short of the row falling out of the window: this photo sweeps, because the
+        // instance has not for two days, and finds nothing to take.
+        clock.advance(PhotoQuota.KEEP.minus(Duration.ofMinutes(5)));
+        take(quota, "shopper", Kind.CUSTOMER_SEARCH);
+        assertThat(stored("old-customer")).isEqualTo(1);
+
+        // Six minutes later the row IS past the window — and the photo leaves it there, because this
+        // instance swept six minutes ago and SWEEP_EVERY is ten.
+        clock.advance(Duration.ofMinutes(6));
+        take(quota, "another", Kind.CUSTOMER_SEARCH);
+        assertThat(stored("old-customer")).isEqualTo(1);
+
+        // Once the ten minutes are up, the next photo takes it.
+        clock.advance(Duration.ofMinutes(5));
+        take(quota, "later", Kind.CUSTOMER_SEARCH);
+        assertThat(stored("old-customer")).isZero();
     }
 
     @Test
