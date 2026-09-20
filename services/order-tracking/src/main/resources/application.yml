@@ -203,10 +203,16 @@ delivery:
       max-fix-age: 5m
 
     checkout-map:
-      # A multi-shop checkout's map is computed at most this often, and the answer is shared by
-      # everyone allowed to see it (CheckoutTrackingService). Each computation is a round of
-      # position reads and — with a routing engine — routing requests, and the screen polls.
+      # A multi-shop checkout's map is computed at most this often, per checkout and reader
+      # (CheckoutTrackingService). Each computation is a round of position reads and — with a
+      # routing engine — routing requests, and the screen polls.
       recompute-after: 5s
+      # How long "your rider has other deliveries" stays latched for one (checkout, rider), in
+      # Redis. The raw answer turns back to no at the other customer's door, as the rider hands
+      # over, so the flip itself would say where that customer lives; it is latched instead. Far
+      # longer than a delivery takes, because nothing reads it once the rider's orders here are
+      # finished — the key is only reclaimed. See OtherDeliveriesLatch.
+      other-deliveries-latch-ttl: 12h
 
     routing:
       # Which provider computes ETAs. HAVERSINE_DEV is the dev implementation: a straight line at

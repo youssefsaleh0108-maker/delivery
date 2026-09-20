@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -99,11 +101,13 @@ class CheckoutTrackingServiceTest {
     private final List<OrderParticipants> others = new ArrayList<>();
     private final Map<String, LatestFix> latest = new HashMap<>();
     private final Map<UUID, TrackingEvent> orderFixes = new HashMap<>();
+    private final Map<String, String> latchStore = new HashMap<>();
 
     private OrderParticipantsRepository participants;
     private TrackingService tracking;
     private EtaService eta;
     private CheckoutTrackingService service;
+    private StringRedisTemplate latchRedis;
 
     /** A clock the memo test can move past its window. */
     static final class MutableClock extends Clock {
@@ -163,6 +167,12 @@ class CheckoutTrackingServiceTest {
                     .toList();
         });
 
+        // The repository's rule for "other deliveries": a live order of this rider's that is not
+        // this checkout's, orders placed alone included.
+        when(participants.riderHasOtherLiveOrders(anyString(), any())).thenAnswer(call -> all()
+                .anyMatch(o -> call.getArgument(0).equals(o.getRiderId()) && o.isTrackable()
+                        && !call.getArgument(1).equals(o.getCheckoutId())));
+
         PresenceService presence = mock(PresenceService.class);
         when(presence.latestFix(anyString()))
                 .thenAnswer(call -> Optional.ofNullable(latest.get(call.<String>getArgument(0))));
@@ -181,7 +191,16 @@ class CheckoutTrackingServiceTest {
         eta = new EtaService(tracking, participants, providers, Duration.ofMinutes(5));
         RoutePaths paths = new RoutePaths(providers, mock(StringRedisTemplate.class),
                 new ObjectMapper(), Duration.ofHours(24), 150, Duration.ofSeconds(60));
-        service = new CheckoutTrackingService(participants, tracking, eta, paths,
+        latchRedis = mock(StringRedisTemplate.class);
+        ValueOperations<String, String> latchValues = mock(ValueOperations.class);
+        when(latchRedis.opsForValue()).thenReturn(latchValues);
+        doAnswer(call -> latchStore.put(call.getArgument(0), call.getArgument(1)))
+                .when(latchValues).set(anyString(), anyString(), any(Duration.class));
+        when(latchRedis.hasKey(anyString()))
+                .thenAnswer(call -> latchStore.containsKey(call.<String>getArgument(0)));
+        OtherDeliveriesLatch latch = new OtherDeliveriesLatch(participants, latchRedis,
+                Duration.ofHours(12));
+        service = new CheckoutTrackingService(participants, tracking, eta, paths, latch,
                 Duration.ofMinutes(5), Duration.ofSeconds(5), clock);
     }
 
@@ -753,21 +772,76 @@ class CheckoutTrackingServiceTest {
         assertThat(row(view, A).eta().provider()).isEqualTo(HaversineRouteProvider.NAME);
     }
 
-    @Test
-    @DisplayName("says when the rider is also carrying somebody else's order — and nothing more")
-    void other_deliveries_flag() {
-        order(A, "Hamra Bakery", SHOP_A, "READY", RIDER);
-        order(B, "Achrafieh Pharmacy", SHOP_B, "READY", OTHER_RIDER);
-        when(participants.riderHasOtherLiveOrders(RIDER, CHECKOUT)).thenReturn(true);
+    @Nested
+    @DisplayName("the rider's other deliveries")
+    class OtherDeliveries {
 
-        CheckoutView view = view();
+        @Test
+        @DisplayName("says when the rider is also carrying somebody else's order — and nothing more")
+        void other_deliveries_flag() {
+            order(A, "Hamra Bakery", SHOP_A, "READY", RIDER);
+            order(B, "Achrafieh Pharmacy", SHOP_B, "READY", OTHER_RIDER);
+            theirOrder(RIDER, "PICKED_UP");
 
-        RiderView busy = view.riders().stream().filter(r -> r.orderIds().contains(A)).findFirst()
-                .orElseThrow();
-        RiderView free = view.riders().stream().filter(r -> r.orderIds().contains(B)).findFirst()
-                .orElseThrow();
-        assertThat(busy.hasOtherDeliveries()).isTrue();
-        assertThat(free.hasOtherDeliveries()).isFalse();
+            CheckoutView view = view();
+
+            RiderView busy = view.riders().stream().filter(r -> r.orderIds().contains(A))
+                    .findFirst().orElseThrow();
+            RiderView free = view.riders().stream().filter(r -> r.orderIds().contains(B))
+                    .findFirst().orElseThrow();
+            assertThat(busy.hasOtherDeliveries()).isTrue();
+            assertThat(free.hasOtherDeliveries()).isFalse();
+        }
+
+        /**
+         * The flag turning back to no would happen at the other customer's door, as the rider
+         * hands over: it stays yes until this checkout's orders are finished and the rider leaves
+         * the map.
+         */
+        @Test
+        @DisplayName("stays yes when the rider delivers the outside order")
+        void delivering_the_outside_order_does_not_clear_it() {
+            collected(A, "Hamra Bakery", SHOP_A, RIDER, clock.instant().minusSeconds(900));
+            OrderParticipants theirs = theirOrder(RIDER, "PICKED_UP");
+            riderAt(A, RIDER, offset(SHOP_A, 200, 0), Duration.ofSeconds(30));
+            assertThat(view().riders().get(0).hasOtherDeliveries()).isTrue();
+
+            theirs.apply(RIDER, "DELIVERED");
+            theirs.stampMilestones("DELIVERED", clock.instant());
+            assertThat(participants.riderHasOtherLiveOrders(RIDER, CHECKOUT))
+                    .as("the raw answer has turned").isFalse();
+            clock.advance(Duration.ofSeconds(6));
+            riderAt(A, RIDER, offset(THEIR_DOOR, 500, 0), Duration.ZERO);
+
+            CheckoutView after = view();
+
+            assertThat(after.riders().get(0).hasOtherDeliveries()).isTrue();
+            // The back office's read is latched the same way: the latch is the checkout's.
+            clock.advance(Duration.ofSeconds(6));
+            assertThat(service.view(CHECKOUT, "backoffice-sub", true).riders().get(0)
+                    .hasOtherDeliveries()).isTrue();
+        }
+
+        @Test
+        @DisplayName("says no for a rider who has only ever carried this checkout's orders")
+        void no_for_a_rider_with_nothing_else() {
+            collected(A, "Hamra Bakery", SHOP_A, RIDER, clock.instant().minusSeconds(900));
+            order(B, "Achrafieh Pharmacy", SHOP_B, "READY", RIDER);
+
+            assertThat(view().riders().get(0).hasOtherDeliveries()).isFalse();
+            assertThat(latchStore).isEmpty();
+        }
+
+        /** A "no" that might have been latched could be the flip itself: Redis down is yes. */
+        @Test
+        @DisplayName("says yes when the latch cannot be read")
+        void yes_when_the_latch_cannot_be_read() {
+            order(A, "Hamra Bakery", SHOP_A, "READY", RIDER);
+            doThrow(new org.springframework.data.redis.RedisConnectionFailureException("down"))
+                    .when(latchRedis).hasKey(anyString());
+
+            assertThat(view().riders().get(0).hasOtherDeliveries()).isTrue();
+        }
     }
 
     @Nested

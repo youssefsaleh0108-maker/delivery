@@ -38,6 +38,7 @@ import com.delivery.tracking.route.RoutePaths;
 import com.delivery.tracking.route.RouteProviderRegistry;
 import com.delivery.tracking.service.CheckoutTrackingService;
 import com.delivery.tracking.service.EtaService;
+import com.delivery.tracking.service.OtherDeliveriesLatch;
 import com.delivery.tracking.service.RiderSighting;
 import com.delivery.tracking.service.TrackingService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -94,7 +95,9 @@ class CheckoutTrackingControllerAccessTest {
         RoutePaths paths = new RoutePaths(providers, mock(StringRedisTemplate.class),
                 new ObjectMapper(), Duration.ofHours(24), 150, Duration.ofSeconds(60));
         CheckoutTrackingService service = new CheckoutTrackingService(participants, tracking, eta,
-                paths, Duration.ofMinutes(5), Duration.ofSeconds(5));
+                paths, new OtherDeliveriesLatch(participants, mock(StringRedisTemplate.class),
+                        Duration.ofHours(12)),
+                Duration.ofMinutes(5), Duration.ofSeconds(5));
 
         mvc = MockMvcBuilders.standaloneSetup(new CheckoutTrackingController(service)).build();
     }

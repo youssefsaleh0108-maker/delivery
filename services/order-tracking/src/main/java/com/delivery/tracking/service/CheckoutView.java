@@ -92,8 +92,11 @@ public record CheckoutView(
      *                           position), {@code ON_ANOTHER_DELIVERY} (nothing) or {@code NO_FIX}
      * @param position           the latest fix the caller may see across those orders; null when
      *                           there is none or the rider is not {@code VISIBLE}
-     * @param hasOtherDeliveries whether they are also carrying orders that are not this checkout's.
-     *                           A yes/no and nothing more — never whose, where or how many
+     * @param hasOtherDeliveries whether they are also carrying orders that are not this checkout's
+     *                           — or have been at any point since this map first saw them do so,
+     *                           because the turn back to no happens at the other customer's door
+     *                           (see {@link OtherDeliveriesLatch}). A yes/no and nothing more:
+     *                           never whose, where or how many
      */
     public record RiderView(
             List<UUID> orderIds,

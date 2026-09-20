@@ -61,6 +61,7 @@ import com.delivery.tracking.service.CheckoutTrackingService;
 import com.delivery.tracking.service.EtaService;
 import com.delivery.tracking.service.FixPolicy;
 import com.delivery.tracking.service.FleetMembershipGuard;
+import com.delivery.tracking.service.OtherDeliveriesLatch;
 import com.delivery.tracking.service.PresenceService;
 import com.delivery.tracking.service.TrackingService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -211,7 +212,8 @@ class CheckoutMapPrivacyTest {
                 Duration.ofSeconds(60));
         // Recomputed on every read, so each read below sees the reports before it.
         CheckoutTrackingService checkouts = new CheckoutTrackingService(participants, tracking,
-                eta, paths, Duration.ofMinutes(5), Duration.ZERO);
+                eta, paths, new OtherDeliveriesLatch(participants, redis, Duration.ofHours(12)),
+                Duration.ofMinutes(5), Duration.ZERO);
 
         mvc = MockMvcBuilders.standaloneSetup(
                         new TrackingController(tracking, eta, mock(SimpMessagingTemplate.class)),
@@ -374,6 +376,7 @@ class CheckoutMapPrivacyTest {
         assertThat(map.at("/riders/0/position").isNull()).isTrue();
         assertThat(map.path("paths").size()).isZero();
         assertThat(map.at("/orders/0/eta/reason").asText()).isEqualTo("RIDER_ON_ANOTHER_DELIVERY");
+        assertThat(map.at("/riders/0/hasOtherDeliveries").asBoolean()).isTrue();
 
         // At their door, and the first fixes on this customer's order still there.
         riderReports(theirs, DOOR_B);
@@ -385,6 +388,8 @@ class CheckoutMapPrivacyTest {
         assertThat(map.at("/riders/0/sighting").asText()).isEqualTo("ON_ANOTHER_DELIVERY");
         assertThat(map.at("/riders/0/position").isNull()).isTrue();
         assertThat(sighting(CUSTOMER, first)).isEqualTo("ON_ANOTHER_DELIVERY");
+        // Their order is delivered, and the flag does not flip back here, at their door.
+        assertThat(map.at("/riders/0/hasOtherDeliveries").asBoolean()).isTrue();
 
         // Clear of it: this customer's rider, on this customer's journey, and nothing else.
         GeoPoint away = at(1_200, 300);
@@ -394,6 +399,7 @@ class CheckoutMapPrivacyTest {
         map = json.readTree(clear);
         assertThat(map.at("/riders/0/sighting").asText()).isEqualTo("VISIBLE");
         assertThat(map.at("/riders/0/position/lat").asDouble()).isCloseTo(away.lat(), within(1e-6));
+        assertThat(map.at("/riders/0/hasOtherDeliveries").asBoolean()).isTrue();
         double run = metres(away, SHOP_2) + metres(SHOP_2, DOOR_A);
         for (JsonNode row : map.path("orders")) {
             assertThat(row.at("/eta/remainingMetres").asDouble()).isCloseTo(run, within(1d));

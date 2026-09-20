@@ -74,6 +74,7 @@ public class CheckoutTrackingService {
     private final TrackingService tracking;
     private final EtaService eta;
     private final RoutePaths paths;
+    private final OtherDeliveriesLatch otherDeliveries;
     private final Duration maxFixAge;
     private final Duration recomputeAfter;
     private final Clock clock;
@@ -84,22 +85,26 @@ public class CheckoutTrackingService {
                                    TrackingService tracking,
                                    EtaService eta,
                                    RoutePaths paths,
+                                   OtherDeliveriesLatch otherDeliveries,
                                    // The ETA's own staleness rule, so the marker's "last seen" and
                                    // the missing estimate always agree.
                                    @Value("${delivery.tracking.eta.max-fix-age:5m}") Duration maxFixAge,
                                    @Value("${delivery.tracking.checkout-map.recompute-after:5s}")
                                    Duration recomputeAfter) {
-        this(participants, tracking, eta, paths, maxFixAge, recomputeAfter, Clock.systemUTC());
+        this(participants, tracking, eta, paths, otherDeliveries, maxFixAge, recomputeAfter,
+                Clock.systemUTC());
     }
 
     /** With a clock a test can move past the window. */
     CheckoutTrackingService(OrderParticipantsRepository participants, TrackingService tracking,
-                            EtaService eta, RoutePaths paths, Duration maxFixAge,
+                            EtaService eta, RoutePaths paths,
+                            OtherDeliveriesLatch otherDeliveries, Duration maxFixAge,
                             Duration recomputeAfter, Clock clock) {
         this.participants = participants;
         this.tracking = tracking;
         this.eta = eta;
         this.paths = paths;
+        this.otherDeliveries = otherDeliveries;
         this.maxFixAge = maxFixAge;
         this.recomputeAfter = recomputeAfter;
         this.clock = clock;
@@ -197,7 +202,8 @@ public class CheckoutTrackingService {
             riders.add(new RiderView(visitOrder, run, seen.state(),
                     shown.map(p -> new RiderFix(p.lat(), p.lng(), p.recordedAt(), !fresh))
                             .orElse(null),
-                    participants.riderHasOtherLiveOrders(entry.getKey(), checkoutId)));
+                    // Latched: a flip back to "no" happens at another customer's door.
+                    otherDeliveries.hasOtherDeliveries(checkoutId, entry.getKey())));
 
             // The live leg: only from a fresh fix the caller may see, and only when every stop on
             // it has a pin.
