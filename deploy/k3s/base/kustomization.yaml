@@ -8,6 +8,7 @@ resources:
   - services.yaml
   - portal.yaml
   - network-policies.yaml
+  - backup.yaml
 
 configMapGenerator:
   - name: postgres-init
@@ -37,6 +38,13 @@ configMapGenerator:
   - name: portal-nginx
     files:
       - nginx.conf=assets/portal-nginx.conf
+  # Unlike the one-shot bootstrap Jobs, a CronJob re-reads its ConfigMap on every run, so a changed
+  # script takes effect at the next schedule with nothing to rename and nothing to bump.
+  - name: backup-scripts
+    files:
+      - assets/backup/postgres-backup.sh
+      - assets/backup/minio-backup.sh
+      - assets/backup/restore-test.sh
 
 # Generated ConfigMaps keep stable names: the Jobs and mounts reference them by name, and a
 # content change should roll the pods through the overlay apply, not create orphans.

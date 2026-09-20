@@ -379,8 +379,8 @@ for env in dev qa; do
   want=prod-critical; [ "$env" = dev ] && want=dev-standard
   # Count pod templates (every Deployment, StatefulSet and Job has exactly one) against the number
   # that name a priority. A workload added later without one is what this catches.
-  templates=$(grep -c '^      priorityClassName:\|^          priorityClassName:' "$tmp/render-$env.yaml" || true)
-  workloads=$(grep -c '^kind: \(Deployment\|StatefulSet\|Job\)$' "$tmp/render-$env.yaml" || true)
+  templates=$(grep -c '^ *priorityClassName:' "$tmp/render-$env.yaml" || true)
+  workloads=$(grep -c '^kind: \(Deployment\|StatefulSet\|Job\|CronJob\)$' "$tmp/render-$env.yaml" || true)
   [ "$templates" = "$workloads" ] && [ "$workloads" -gt 0 ] \
     && ok "$env: all $workloads workloads carry a priorityClassName" \
     || fail "$env: $workloads workloads but $templates priorityClassName(s)"
@@ -418,15 +418,31 @@ grep -q 'persistentVolumeReclaimPolicy' scripts/rotate-secrets.sh \
 # dev's rendered limits against dev's own quota, from the same two files the cluster reads.
 if [ -s "$tmp/render-dev.yaml" ]; then
   quota=$(awk '/^ *limits\.memory:/ { print $2; exit }' overlays/dev/resource-safety.yaml)
+  # A ResourceQuota counts RUNNING PODS, so this models the same thing: every Deployment,
+  # StatefulSet and Job contributes its pod, and a CronJob contributes its pod only if it is not
+  # suspended (a suspended one never creates one). Within a pod, initContainers count alongside
+  # containers because a native sidecar runs beside the main container rather than before it.
   used=$(awk '
-    /^ *limits: *$/ { inlim = 1; next }
-    inlim && /^ *memory: / {
-      v = $2; n = v + 0
-      if (v ~ /Mi$/) n *= 1048576; else if (v ~ /Gi$/) n *= 1073741824; else if (v ~ /Ki$/) n *= 1024
-      total += n; inlim = 0; next
+    BEGIN { RS = "\n---\n" }
+    {
+      # The record ENDS just before the "\n---\n" separator, so the last line has no trailing
+      # newline of its own — hence (\n|$) rather than \n on the suspend match.
+      if ($0 ~ /(^|\n)kind: CronJob\n/ && $0 ~ /(^|\n)  suspend: true(\n|$)/) next
+      n = split($0, lines, "\n")
+      inlim = 0
+      for (i = 1; i <= n; i++) {
+        l = lines[i]
+        if (l ~ /^ *limits: *$/) { inlim = 1; continue }
+        if (!inlim) continue
+        if (l ~ /^ *(cpu|ephemeral-storage): /) continue
+        if (l ~ /^ *memory: /) {
+          split(l, f, ":"); v = f[2]; gsub(/ /, "", v); m = v + 0
+          if (v ~ /Mi$/) m *= 1048576; else if (v ~ /Gi$/) m *= 1073741824; else if (v ~ /Ki$/) m *= 1024
+          total += m
+        }
+        inlim = 0
+      }
     }
-    inlim && /^ *(cpu|ephemeral-storage): / { next }
-    { inlim = 0 }
     END { printf "%d", total }
   ' "$tmp/render-dev.yaml")
   cap=$(printf '%s' "$quota" | awk '{ v = $0; n = v + 0; if (v ~ /Mi$/) n *= 1048576; else if (v ~ /Gi$/) n *= 1073741824; printf "%d", n }')
@@ -449,6 +465,60 @@ if [ -s "$tmp/render-qa.yaml" ]; then
     && ok "qa postgres requests what it may use ($pg_req = $pg_lim)" \
     || fail "qa postgres requests $pg_req against a $pg_lim limit: it is evicted as if it were over budget"
 fi
+
+echo "== backups (BK-1) =="
+for cj in postgres-backup minio-backup restore-test; do
+  grep -q "^  name: $cj$" base/backup.yaml \
+    && ok "CronJob $cj" \
+    || fail "base/backup.yaml has no $cj CronJob"
+done
+# Suspended in base, so a namespace created later starts safe instead of starting to upload.
+[ "$(grep -c '^  suspend: true$' base/backup.yaml)" = 3 ] \
+  && ok "all three ship suspended in base" \
+  || fail "base/backup.yaml must ship every backup CronJob suspended: an overlay opts in"
+if [ -s "$tmp/render-dev.yaml" ] && [ -s "$tmp/render-qa.yaml" ]; then
+  [ "$(grep -c '^  suspend: true$' "$tmp/render-dev.yaml")" = 3 ] \
+    && ok "dev keeps them suspended (its quota has no room for a backup pod)" \
+    || fail "dev un-suspends a backup CronJob: the pod would be refused by dev's ResourceQuota"
+  [ "$(grep -c '^  suspend: false$' "$tmp/render-qa.yaml")" = 3 ] \
+    && ok "qa runs all three" \
+    || fail "qa does not un-suspend the backup CronJobs, so nothing is backed up"
+fi
+# Every Secret these Jobs read must be optional, or the pod cannot START before the owner has
+# created it — which is a CreateContainerConfigError, not a message anybody can act on.
+for s in backup-rclone backup-age backup-deadman; do
+  n=$(grep -c "secretName: $s" base/backup.yaml || true)
+  opt=$(grep -A1 "secretName: $s" base/backup.yaml | grep -c 'optional: true' || true)
+  [ "$n" -gt 0 ] && [ "$n" = "$opt" ] \
+    && ok "$s is mounted optional in all $n place(s)" \
+    || fail "$s is mounted non-optionally: the backup pod would not start until it exists"
+done
+# ...and the scripts must then say what is missing and SUCCEED, rather than crash-looping.
+for f in base/assets/backup/postgres-backup.sh base/assets/backup/minio-backup.sh; do
+  grep -q 'NOT CONFIGURED' "$f" && grep -q '^  exit 0$' "$f" \
+    && ok "${f##*/} exits 0 when the destination is not configured" \
+    || fail "${f##*/} does not exit 0 when unconfigured: the CronJob would crash-loop"
+done
+# pg_dump refuses to dump a server NEWER than itself, so the backup image's major version must
+# never fall behind Postgres's. This is the check that catches a Postgres upgrade done alone.
+server_major=$(sed -n 's|.*image: postgis/postgis:\([0-9]*\)-.*|\1|p' base/data-layer.yaml | head -n1)
+dump_major=$(sed -n 's|.*image: postgres:\([0-9]*\)-alpine@.*|\1|p' base/backup.yaml | head -n1)
+[ -n "$server_major" ] && [ "$server_major" = "$dump_major" ] \
+  && ok "the backup image is Postgres $dump_major, the same major as the server" \
+  || fail "Postgres is $server_major and the backup image is $dump_major: pg_dump refuses a newer server"
+# A backup nobody can restore is not a backup, so the way back ships with the way out.
+[ -s scripts/restore.sh ] && grep -q 'into-live' scripts/restore.sh \
+  && ok "scripts/restore.sh exists and can restore into a live environment" \
+  || fail "there is no scripts/restore.sh"
+grep -q 'Backups' README.md && grep -q 'lifecycle' README.md \
+  && ok "README documents the backups and their retention" \
+  || fail "README.md does not document the backups"
+# Nothing on this branch may print a secret. These scripts read passwords from the environment and
+# keys from mounted files; an echo of either is the bug this catches.
+leak=$(grep -n 'echo.*\$\(PGPASSWORD\|MINIO_ROOT_PASSWORD\|AGE\)' base/assets/backup/*.sh scripts/restore.sh | tr '\n' ' ')
+[ -z "$leak" ] \
+  && ok "no backup script echoes a credential" \
+  || fail "a backup script prints a credential: $leak"
 
 echo "== every YAML alias resolves =="
 # A ConfigMap's `data:` values are strings to Kubernetes, so a dangling `*alias` inside one is

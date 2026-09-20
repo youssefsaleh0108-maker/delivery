@@ -75,6 +75,24 @@ patches:
       - op: add
         path: /spec/template/spec/priorityClassName
         value: prod-critical
+  - target: { kind: CronJob, name: ".*" }
+    patch: |-
+      - op: add
+        path: /spec/jobTemplate/spec/template/spec/priorityClassName
+        value: prod-critical
+
+  # ------------------------------------------------------------------------------- backups ON
+  # base/backup.yaml ships all three suspended, so a namespace created later starts safe rather
+  # than starting to upload. This is the environment whose data matters, so this is where they run.
+  #
+  # Un-suspending them does NOT start backing anything up on its own: until the `backup-rclone` and
+  # `backup-age` Secrets exist on the box, each run says what is missing and exits 0, and the
+  # BackupNotConfigured alert is what reports the state. See base/backup.yaml for the exact keys.
+  - target: { kind: CronJob, name: "^(postgres-backup|minio-backup|restore-test)$" }
+    patch: |-
+      - op: replace
+        path: /spec/suspend
+        value: false
 
   # Postgres asks for exactly what it is allowed to use.
   #

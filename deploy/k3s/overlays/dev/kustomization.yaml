@@ -113,6 +113,18 @@ patches:
   target:
     kind: Job
     name: ".*"
+# A CronJob's pod template is one level deeper. dev's backup CronJobs stay SUSPENDED (base sets
+# that): dev's data is demo data, and dev's 9 GiB quota has no room for another pod — a backup pod
+# here would be refused at admission and the CronJob would report a failure every hour. To run one
+# by hand for a test, scale a service to zero first, or test on the environment that is becoming
+# production, which is the one whose backups matter.
+- patch: |-
+    - op: add
+      path: /spec/jobTemplate/spec/template/spec/priorityClassName
+      value: dev-standard
+  target:
+    kind: CronJob
+    name: ".*"
 
 # The fourteen Spring services: 512Mi -> 416Mi, paired with the 60% heap fraction above. This is
 # the one change on this branch that has not been measured against a running service, so it goes to

@@ -247,6 +247,120 @@ in `platform-common`, and the ops basic-auth hash in `gen-secrets.sh`. None of t
   them means changing the roles, the Vault seed and two Deployments together — the production
   secrets refactor. The roles nothing logs in as cannot log in at all.
 
+## Backups
+
+Until now there were none: no CronJob, no WAL archive, and the k3s datastore that holds every
+Secret was never copied off the box either. Three CronJobs (`base/backup.yaml`) change that. They
+ship **suspended** and `overlays/qa` — the environment becoming production — is what runs them;
+dev's data is demo data and dev's memory quota has no room for another pod.
+
+| | when | what |
+| --- | --- | --- |
+| `postgres-backup` | hourly, :17 | `pg_dumpall --globals-only` + `pg_dump -Fc` of `delivery` and `keycloak`, encrypted with `age` in the pod, uploaded with rclone, **read back and size-checked**, then a dead-man ping |
+| `minio-backup` | nightly, 02:40 | `rclone sync` of every bucket, skipping `product-images/scans/` |
+| `restore-test` | Sunday 04:00 | restores into a throwaway Postgres **in its own pod** and checks Flyway versions and row counts against live |
+
+All times UTC. Archive names are UTC timestamps, so sorting them by name sorts them by age.
+
+### What the owner must provide
+
+Nothing here is in git, nothing is invented by a script, and **until all of it exists every run
+says what is missing and exits 0** — it does not crash-loop, and it does not ping the dead-man, so
+`BackupNotConfigured` is what reports the state. On the box, per environment:
+
+```sh
+# 1. An age key pair. The PRIVATE half never comes near this cluster: it is the reason a stolen
+#    backup is not a stolen database. Keep two copies, offline, in different places — lose it and
+#    every backup ever taken is lost with it.
+age-keygen -o /root/youdrop-backup.key      # then move it OFF this box
+grep 'public key' /root/youdrop-backup.key  # age1...
+
+read -rs AGE_RECIPIENT   # paste the age1... public key; nothing is echoed
+printf %s "$AGE_RECIPIENT" | kubectl -n delivery-qa create secret generic backup-age \
+  --from-file=recipient=/dev/stdin
+unset AGE_RECIPIENT
+
+# 2. The destination. Write rclone.conf with a remote called `dest`; `rclone config` is the easy
+#    way, on any machine, then copy the file over. B2 is the plan's recommendation (S3 API, object
+#    lock, cheap); R2 and a Hetzner Storage Box also work.
+kubectl -n delivery-qa create secret generic backup-rclone \
+  --from-file=rclone.conf=/root/rclone.conf \
+  --from-literal=dest='dest:youdrop-backups'
+shred -u /root/rclone.conf
+
+# 3. OPTIONAL, and strongly recommended: the dead-man switch. Create a check at healthchecks.io
+#    with a 2-hour period and a 30-minute grace, and put its ping URL here. NOT in a ConfigMap and
+#    NOT in git: this repository is public, and anyone who can ping that URL can keep the switch
+#    alive while the backups are dead.
+read -rs HC_URL
+printf %s "$HC_URL" | kubectl -n delivery-qa create secret generic backup-deadman \
+  --from-file=url=/dev/stdin
+unset HC_URL
+
+kubectl -n delivery-qa create job --from=cronjob/postgres-backup backup-first-run
+kubectl -n delivery-qa logs job/backup-first-run
+```
+
+**At the destination, set the bucket's lifecycle rules** — retention is enforced there, not by any
+script, which is why the job writes to three prefixes:
+
+| prefix | written | expire after |
+| --- | --- | --- |
+| `<ns>/postgres/hourly/` | every hour | **72 hours** |
+| `<ns>/postgres/daily/` | at 03:17 UTC | **35 days** |
+| `<ns>/postgres/monthly/` | at 03:17 on the 1st | **12 months** |
+| `<ns>/minio/` | nightly (a mirror) | keep; rely on **object versioning** |
+
+Two settings the scripts cannot check for you and that decide whether these are real backups:
+**object versioning** (the MinIO job is a `sync`, so a deletion at the source propagates within a
+day — versioning is the only thing that keeps the previous copy) and **object lock**, so a
+compromise of these credentials cannot delete the history.
+
+`merchant-kyc` holds applicants' identity documents and today is synced as-is. If the destination
+is not one you would put those in, point `dest` at an **rclone `crypt` remote** wrapping it: the
+jobs only ever use the remote name, so nothing here changes.
+
+### Restoring
+
+`scripts/restore.sh <namespace> <step>`, on the box, one step at a time. The order matters and
+`dry-run` is not optional:
+
+```sh
+bash scripts/restore.sh delivery-qa list                  # what is there, and how old
+bash scripts/restore.sh delivery-qa fetch latest          # download one archive; no decryption
+bash scripts/restore.sh delivery-qa open  /root/restore-… # asks for the path to your age key
+bash scripts/restore.sh delivery-qa dry-run /root/restore-…   # into a scratch DB, beside live
+bash scripts/restore.sh delivery-qa into-live /root/restore-… # the irreversible one
+bash scripts/restore.sh delivery-qa minio product-images  # objects, by bucket or `all`
+```
+
+- `open` never takes the key on a command line; it asks for the **path** to the key file.
+- `dry-run` restores into `delivery_restore_<time>` in the running Postgres, compares Flyway
+  versions and row counts against live, and drops it again. **Read the Flyway line.** Restoring an
+  older schema under the current service images starts services that then fail their migration
+  check, and Flyway does not migrate backwards.
+- `into-live` refuses while anything is running (`kubectl -n <ns> scale deploy --all --replicas=0`
+  first), asks you to type the namespace back, and **renames** the databases it replaces to
+  `delivery_before_restore` / `keycloak_before_restore` rather than dropping them. Everything
+  written since the backup was taken is gone; if the data is not actually corrupt, fix forward.
+- `minio` uses `copy`, never `sync`: it adds and overwrites, and never deletes what is live.
+
+**Run one full drill before go-live**, with the real offline key, and time it. RPO is one hour
+(the schedule) and RTO is about two (fetch, decrypt, restore, restart). The weekly `restore-test`
+proves the path automatically but runs in its **dump-only** mode unless a second age identity is
+put in `backup-age/restore-test.key` — the private key being offline is exactly why it cannot
+decrypt a real archive on its own. It says which mode it ran in its log.
+
+### What is not backed up, deliberately
+
+Redis (a cache), RabbitMQ (transient; the outbox republishes), `product-images/scans/` (Merchant
+Blitz input — once a scan has produced products the photograph can be taken again), and **the k3s
+datastore**, which holds every Secret. That last one is a real gap: `gen-secrets.sh` can mint a new
+environment's credentials, but a restore into a *fresh* namespace needs the Keycloak client secrets
+and the database passwords that the old one held, or nothing signs in. Copy `/var/lib/rancher/k3s/
+server/db/` off the box on the same schedule, or keep `rotate-secrets.sh <ns> backup`'s output
+(`/root/secret-backup-<ns>-<time>/`) somewhere off it.
+
 ## One node, two environments: what happens under memory pressure
 
 The box is 8 vCPU / **23 GiB with no swap**, and it runs dev and the environment that becomes
