@@ -7277,7 +7277,7 @@ abstract class DeliveryStrings {
   /// No description provided for @custWaitingGroupPayments.
   ///
   /// In en, this message translates to:
-  /// **'Waiting for group payments'**
+  /// **'Waiting for the group to confirm'**
   String get custWaitingGroupPayments;
 
   /// No description provided for @custTimeRemaining.
@@ -7295,7 +7295,7 @@ abstract class DeliveryStrings {
   /// No description provided for @custPaymentProgress.
   ///
   /// In en, this message translates to:
-  /// **'Payment progress'**
+  /// **'Split progress'**
   String get custPaymentProgress;
 
   /// No description provided for @custNPaid.
@@ -7435,12 +7435,6 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Decline invitation'**
   String get custDeclineInvitation;
-
-  /// No description provided for @custAllSharesPaid.
-  ///
-  /// In en, this message translates to:
-  /// **'All Shares Paid!'**
-  String get custAllSharesPaid;
 
   /// No description provided for @custGroupSplitSummary.
   ///
@@ -22340,6 +22334,18 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'A shop with no pin has no distance, no delivery circle and no place in \"near you\".'**
   String get boShopPinWhy;
+
+  /// No description provided for @custAllSharesAgreed.
+  ///
+  /// In en, this message translates to:
+  /// **'All Shares Agreed!'**
+  String get custAllSharesAgreed;
+
+  /// No description provided for @custSharesAgreedAtDoor.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has been paid yet — the rider collects each share at the door.'**
+  String get custSharesAgreedAtDoor;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

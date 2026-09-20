@@ -109,7 +109,7 @@ class _FriendSplitScreenState extends State<FriendSplitScreen> {
           ? Center(
               child: YdEmptyState(
                 icon: Icons.check_circle_outline,
-                title: t.custAllSharesPaid,
+                title: t.custAllSharesAgreed,
                 message: '',
               ),
             )

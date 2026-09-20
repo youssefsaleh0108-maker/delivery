@@ -1983,11 +1983,11 @@
   "custYourShareYou": "Your share (You)",
   "cust15MinNote": "Friends have 15 min to pay after the invite",
   "custSendInvites": "Send Invites",
-  "custWaitingGroupPayments": "Waiting for group payments",
+  "custWaitingGroupPayments": "Waiting for the group to confirm",
   "custTimeRemaining": "Time remaining",
   "custSplitNWays": "{amount} split {n} ways",
   "@custSplitNWays": { "placeholders": { "amount": { "type": "String" }, "n": { "type": "int" } } },
-  "custPaymentProgress": "Payment progress",
+  "custPaymentProgress": "Split progress",
   "custNPaid": "{paid} / {total} Paid",
   "@custNPaid": { "placeholders": { "paid": { "type": "int" }, "total": { "type": "int" } } },
   "custCollectedOf": "{collected} of {total} collected",
@@ -2017,7 +2017,6 @@
   "custPayMyShare": "Pay My Share ({amount})",
   "@custPayMyShare": { "placeholders": { "amount": { "type": "String" } } },
   "custDeclineInvitation": "Decline invitation",
-  "custAllSharesPaid": "All Shares Paid!",
   "custGroupSplitSummary": "Group Split Summary",
   "custRiderCollectNote": "Rider will collect {amount} from {name} at delivery",
   "@custRiderCollectNote": { "placeholders": { "amount": { "type": "String" }, "name": { "type": "String" } } },
@@ -6305,5 +6304,7 @@
   "boShopPinSaved": "Pin saved",
   "boShopPinFailed": "The pin could not be saved",
   "boShopPinGone": "That shop is no longer there",
-  "boShopPinWhy": "A shop with no pin has no distance, no delivery circle and no place in \"near you\"."
+  "boShopPinWhy": "A shop with no pin has no distance, no delivery circle and no place in \"near you\".",
+  "custAllSharesAgreed": "All Shares Agreed!",
+  "custSharesAgreedAtDoor": "Nothing has been paid yet — the rider collects each share at the door."
 }
