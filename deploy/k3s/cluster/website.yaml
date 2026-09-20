@@ -78,6 +78,49 @@ spec:
 # apex before its DNS exists would not merely fail to work, it would jeopardise renewals for every
 # other hostname on this box. Add `|| Host("youdrop.shop")` to the match below once the A record
 # points at the node, and Traefik will pick the certificate up on the next reload.
+# PT-1 for the public site. Its own Middleware rather than the portal's: a Traefik Middleware is
+# namespaced, and the ones in overlays/ingress.template.yaml live in delivery-dev and delivery-qa.
+# Referencing one of those from here would tie the single public site to one environment's
+# namespace, which is exactly the coupling this file exists to avoid.
+#
+# HSTS matches the portal's: 180 days, no includeSubDomains (hosts that do not exist yet would
+# inherit it), no preload (a browser-shipped list is very hard to undo).
+#
+# The CSP is the whole site's working set, read off the files: three HTML pages, site.js,
+# register.js, lib/qr.js, two stylesheets, self-hosted Rubik, local SVG/JPEG. No inline script, no
+# inline style (admin.html's <style> block moved to admin.css for this), no data: or blob: URL, no
+# third-party origin of any kind.
+#
+# connect-src names the two hosts clients/website/config.js points at: register.js calls
+# /api/onboarding/** and PUTs an applicant's papers to a presigned MinIO URL on the API host, and
+# the receipt's document panel exchanges a passcode at the realm's token endpoint on the IAM host.
+# THOSE TWO LINES AND config.js MOVE TOGETHER — at go-live, when www stops pointing at dev.
+# scripts/verify.sh fails if this policy and config.js name different hosts.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: site-security-headers
+  namespace: youdrop-site
+spec:
+  headers:
+    stsSeconds: 15552000
+    stsIncludeSubdomains: false
+    stsPreload: false
+    contentTypeNosniff: true
+    frameDeny: true
+    referrerPolicy: strict-origin-when-cross-origin
+    contentSecurityPolicy: >-
+      default-src 'self';
+      script-src 'self';
+      style-src 'self';
+      img-src 'self';
+      font-src 'self';
+      connect-src 'self' https://api-dev.youdrop.shop https://iam-dev.youdrop.shop;
+      object-src 'none';
+      base-uri 'self';
+      form-action 'self';
+      frame-ancestors 'none'
+---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
@@ -91,3 +134,5 @@ spec:
     - kind: Rule
       match: Host(`www.youdrop.shop`)
       services: [{ name: website, port: 80 }]
+      middlewares:
+        - { name: site-security-headers }

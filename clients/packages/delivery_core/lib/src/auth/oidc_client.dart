@@ -44,6 +44,18 @@ abstract interface class OidcClient {
   /// not a login callback. On mobile this is always null.
   Future<TokenSet?> completeRedirect(AuthConfig config);
 
+  /// Web only: sign this browser back in through the SSO session Keycloak already holds for it,
+  /// without showing anybody a login form.
+  ///
+  /// The web build keeps its refresh token in memory and nowhere else, so a reload starts with no
+  /// session at all. The browser's Keycloak cookie survives though, and it is what turns an F5
+  /// from "sign in again" into a redirect the user never sees: `prompt=none` asks for a code and
+  /// gets `login_required` back instead of a login page when there is no session to use.
+  ///
+  /// Navigates the page away and never returns when it does attempt one. Returns null when it
+  /// does not — nothing to resume, an attempt already made in this tab, or not the web at all.
+  Future<TokenSet?> resumeSession(AuthConfig config);
+
   Future<TokenSet> refresh(AuthConfig config, String refreshToken);
 
   Future<void> signOut(AuthConfig config, String? refreshToken);

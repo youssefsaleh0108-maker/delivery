@@ -73,7 +73,7 @@ check 'holds DELIVERY, not APPLICANT' 'DELIVERY' "$(roles "$RT")"
 
 echo '=== 2. And can actually take work ==============================================='
 CUST=$(printf '%s' "$DEMO_CUSTOMER_PASSWORD" | curl -s -X POST "$KC" -d client_id=mobile-app -d username=customer --data-urlencode "password@-" -d grant_type=password | jq -r .access_token)
-MERCH=$(printf '%s' "$DEMO_MERCHANT_PASSWORD" | curl -s -X POST "$KC" -d client_id=delivery-portal -d username=merchant --data-urlencode "password@-" -d grant_type=password | jq -r .access_token)
+MERCH=$(printf '%s' "$DEMO_MERCHANT_PASSWORD" | curl -s -X POST "$KC" -d client_id=mobile-app -d username=merchant --data-urlencode "password@-" -d grant_type=password | jq -r .access_token)
 P=$(curl -s "$GW/api/products/mine?size=50" -H "Authorization: Bearer $MERCH" | jq -r '[(.content // .)[]|select(.status=="ACTIVE")][0].id')
 O=$(curl -s -X POST "$GW/api/orders" -H "Authorization: Bearer $CUST" -H 'Content-Type: application/json' \
   -d "{\"items\":[{\"productId\":\"$P\",\"qty\":1}],\"deliveryAddress\":\"Auto St\",\"paymentMethod\":\"CASH\"}" | jq -r .id)

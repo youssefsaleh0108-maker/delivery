@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
@@ -98,10 +99,12 @@ class AuthService {
     OidcClient? oidcClient,
     FlutterSecureStorage? storage,
     http.Client? httpClient,
+    bool? persistRefreshToken,
   })  : _config = config,
         _oidc = oidcClient ?? createOidcClient(),
         _storage = storage ?? const FlutterSecureStorage(),
-        _httpClient = httpClient;
+        _httpClient = httpClient,
+        _persistRefreshToken = persistRefreshToken ?? !kIsWeb;
 
   static const String _refreshTokenKey = 'delivery.refresh_token';
 
@@ -109,11 +112,32 @@ class AuthService {
   final OidcClient _oidc;
   final FlutterSecureStorage _storage;
 
+  /// Whether the refresh token is written to storage, or held only in [session].
+  ///
+  /// False on the web, and that is the point. `flutter_secure_storage` has no secure storage to
+  /// offer a browser: its web backend is `window.localStorage`, which is same-origin, readable by
+  /// any script that manages to run on the page, and survives the tab being closed — and it parked
+  /// the AES key that "encrypts" the value in the very next entry, so the pair was worth exactly
+  /// as much as the plaintext. A back-office refresh token sitting there was a month of unattended
+  /// access to anybody who got one script onto the origin.
+  ///
+  /// So on the web the refresh token lives in this object and nowhere else: a reload loses it, and
+  /// the browser signs in again in silence through the Keycloak SSO session it still holds (see
+  /// [restore]). Mobile keeps persisting, where the platform's keystore is real and closing the
+  /// app is not meant to sign anybody out.
+  ///
+  /// Constructor-injectable so a test can exercise the web behaviour on the Dart VM, where
+  /// [kIsWeb] is false.
+  final bool _persistRefreshToken;
+
   /// Used by [brokerAvailable] only, and injectable so a test can answer as Keycloak would. Null
   /// means a fresh client per call, closed afterwards.
   final http.Client? _httpClient;
 
   AuthSession? _session;
+
+  /// The refresh grant in flight, if any. See [refresh].
+  Future<AuthSession>? _refreshing;
 
   AuthSession? get session => _session;
 
@@ -294,6 +318,20 @@ class AuthService {
       return _adopt(redirected);
     }
 
+    if (!_persistRefreshToken) {
+      // Web. Nothing was kept across the reload on purpose, so there is no token to read — but
+      // Keycloak still holds this browser's SSO session, and asking it is cheaper and safer than
+      // storing a credential for a month. Navigates away and returns null while it works; the
+      // code comes back to completeRedirect above on the next load. Null with no navigation means
+      // there is genuinely nobody signed in, and the caller shows its sign-in screen.
+      //
+      // Clear anything an earlier build of this app left in localStorage on the way past: a
+      // refresh token that outlived the code that wrote it is the worst of both designs.
+      await _storage.delete(key: _refreshTokenKey);
+      final TokenSet? resumed = await _oidc.resumeSession(_config);
+      return resumed == null ? null : _adopt(resumed);
+    }
+
     final String? refreshToken = await _storage.read(key: _refreshTokenKey);
     if (refreshToken == null) {
       return null;
@@ -307,7 +345,54 @@ class AuthService {
     }
   }
 
-  Future<AuthSession> refresh([String? refreshToken]) async {
+  /// Exchanges a refresh token for a new session — one grant at a time, always.
+  ///
+  /// <p>The realm rotates refresh tokens (`revokeRefreshToken`, `refreshTokenMaxReuse: 0`): every
+  /// refresh returns a new token and invalidates the one it was bought with. Presenting a spent
+  /// token is how a stolen one is detected, and Keycloak's answer to it is to kill the entire
+  /// session — not just refuse the request.
+  ///
+  /// <p>That makes a race fatal rather than merely wasteful. Two refreshes that start before
+  /// either returns both carry the same token; the first rotates it, the second presents a token
+  /// that no longer exists, and the user is signed out of a session that was perfectly healthy.
+  /// The Dio interceptor serialises the requests that go through one [ApiClient], but not
+  /// everything does: a notification socket reconnecting, a screen calling this directly, a second
+  /// Dio — each is its own path to the same token. So the guard lives here, at the one place every
+  /// path meets.
+  ///
+  /// <p>A caller with no token of its own joins the grant already in the air and gets its result.
+  /// A caller that names a token — [restore] with a stored one, [redeemBiometricStash] with a
+  /// stashed one — waits for that grant to land before spending its own, because two tokens in
+  /// flight at once is exactly what rotation punishes.
+  Future<AuthSession> refresh([String? refreshToken]) {
+    final Future<AuthSession>? inFlight = _refreshing;
+    if (inFlight != null && refreshToken == null) {
+      return inFlight;
+    }
+
+    final Future<AuthSession> pending = _refreshAfter(inFlight, refreshToken);
+    _refreshing = pending;
+    // Clear the slot when this one finishes, unless a later grant has already claimed it. The
+    // listener is separate from what the caller gets back, so its copy of a failure needs
+    // swallowing or it surfaces as an unhandled async error.
+    pending.whenComplete(() {
+      if (identical(_refreshing, pending)) _refreshing = null;
+    }).ignore();
+    return pending;
+  }
+
+  Future<AuthSession> _refreshAfter(
+      Future<AuthSession>? previous, String? refreshToken) async {
+    if (previous != null) {
+      // Wait for it, but do not inherit its outcome: this caller brought its own token, and the
+      // previous grant failing says nothing about whether this one will.
+      try {
+        await previous;
+      } catch (_) {
+        // Deliberately ignored; see above.
+      }
+    }
+    // Read after the wait, so a caller with no token of its own picks up the rotated one.
     final String? token = refreshToken ?? _session?.refreshToken;
     if (token == null) {
       throw StateError('No refresh token available; the user must sign in.');
@@ -328,7 +413,13 @@ class AuthService {
     final AuthSession? leaving = _session;
     _session = null;
     await _storage.delete(key: _refreshTokenKey);
-    if (keepForBiometrics && refreshToken != null && leaving != null) {
+    // The stash is storage under another name, so the web's rule applies to it too. Nothing on the
+    // web asks for it — there is no fingerprint reader behind a browser tab — but a build that did
+    // would otherwise write to localStorage the one token this service exists to keep out of it.
+    if (keepForBiometrics &&
+        _persistRefreshToken &&
+        refreshToken != null &&
+        leaving != null) {
       await _storage.write(key: _bioRefreshKey, value: refreshToken);
       await _storage.write(key: _bioSubjectKey, value: leaving.subject ?? '');
       await _storage.write(
@@ -393,9 +484,10 @@ class AuthService {
   }
 
   Future<AuthSession> _adopt(TokenSet tokens) async {
-    // Only the refresh token is persisted. The access token is short-lived (5 minutes in this
-    // realm) and stays in memory, so a stolen device backup yields nothing directly usable.
-    if (tokens.refreshToken != null) {
+    // Only the refresh token is persisted, and only where storage is real. The access token is
+    // short-lived (5 minutes in this realm) and stays in memory, so a stolen device backup yields
+    // nothing directly usable. On the web nothing is written at all — see [_persistRefreshToken].
+    if (tokens.refreshToken != null && _persistRefreshToken) {
       await _storage.write(key: _refreshTokenKey, value: tokens.refreshToken);
     }
 
