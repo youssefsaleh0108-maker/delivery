@@ -312,6 +312,7 @@ String custNotifCategoryLabel(DeliveryStrings t, NotificationPreference pref) =>
       NotificationCategory.orderUpdates => t.notifCatOrderUpdates,
       NotificationCategory.chat => t.notifCatChat,
       NotificationCategory.promotions => t.notifCatPromotions,
+      NotificationCategory.merchantInsights => t.notifCatMerchantInsights,
       NotificationCategory.account => t.notifCatAccount,
       null => pref.categoryWire,
     };

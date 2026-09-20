@@ -53,6 +53,11 @@ jobs:
   # this platform publishes under its own domain must never offer a crawler — or a stranger — a shop
   # that is a draft, suspended, unpinned or filed under a closed category. A mocked repository can only
   # agree with whatever it was told to say.
+  # SearchDemandDatabaseTest above all, and for a reason the others do not have: it reads
+  # information_schema and asserts the exact set of columns search_demand_log (V40) has. The search
+  # log's whole design is that it cannot be used to follow a customer — no account, no session, no
+  # device, no pin, no sequential key — and a promise like that made in a comment lasts until somebody
+  # adds a column. Made as an assertion, and run here, it fails the build instead.
   database-tests:
     runs-on: ubuntu-latest
     permissions:
@@ -86,12 +91,12 @@ jobs:
 
       # -am builds the platform libraries this module depends on, as the build job does. The test
       # filter matches nothing in them, which failIfNoSpecifiedTests=false allows.
-      - name: Storefront isolation, item search, delivery areas, the photo quota and the public page against PostGIS
+      - name: Storefront isolation, item search, delivery areas, the photo quota, the demand log and the public page against PostGIS
         env:
           PRODUCT_TEST_DB_URL: jdbc:postgresql://localhost:5432/postgres
         run: >-
           mvn -B -U -pl services/product-service -am test
-          -Dtest=ServicesVerticalDatabaseTest,ItemSearchDatabaseTest,DeliveryAreaDatabaseTest,PhotoSearchDatabaseTest,PublicShopPageDatabaseTest
+          -Dtest=ServicesVerticalDatabaseTest,ItemSearchDatabaseTest,DeliveryAreaDatabaseTest,PhotoSearchDatabaseTest,SearchDemandDatabaseTest,PublicShopPageDatabaseTest
           -Dsurefire.failIfNoSpecifiedTests=false
 
       # Fully qualified, because these tests no longer all live in one package: the public page's is
@@ -104,6 +109,7 @@ jobs:
             com.delivery.product.domain.ItemSearchDatabaseTest \
             com.delivery.product.domain.DeliveryAreaDatabaseTest \
             com.delivery.product.domain.PhotoSearchDatabaseTest \
+            com.delivery.product.domain.SearchDemandDatabaseTest \
             com.delivery.product.shoppage.PublicShopPageDatabaseTest; do
             report=services/product-service/target/surefire-reports/TEST-$test.xml
             if [ ! -f "$report" ]; then

@@ -53,6 +53,7 @@ import com.delivery.product.service.PhotoSearchException;
 import com.delivery.product.service.PhotoSearchService;
 import com.delivery.product.service.PhotoSearchService.PhotoSearchResult;
 import com.delivery.product.service.ProductImageService;
+import com.delivery.product.service.SearchDemandRecorder;
 import com.delivery.product.service.StoreService;
 import com.delivery.product.service.StoreService.StoreView;
 import com.delivery.product.vision.Descriptions;
@@ -113,7 +114,8 @@ class PhotoSearchAccessTest {
                 understood, result, false, ItemQuery.of(null, List.of("pepsi 1l", "بيبسي", "pepsi"), null), 7));
 
         ProxyFactory secured = new ProxyFactory(new PhotoSearchController(photoSearch, storeService, catalog,
-                mock(ProductImageService.class), DataSize.ofMegabytes(2)));
+                mock(ProductImageService.class), mock(SearchDemandRecorder.class),
+                DataSize.ofMegabytes(2)));
         secured.setProxyTargetClass(true);
         secured.addAdvisor(AuthorizationManagerBeforeMethodInterceptor.preAuthorize());
         controller = (PhotoSearchController) secured.getProxy();

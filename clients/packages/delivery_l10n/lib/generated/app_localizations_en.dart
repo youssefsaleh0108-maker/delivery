@@ -13243,4 +13243,62 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get custSharesAgreedAtDoor =>
       'Nothing has been paid yet — the rider collects each share at the door.';
+
+  @override
+  String get heatmapUnmetTitle => 'What your neighbours could not find';
+
+  @override
+  String get heatmapUnmetBlurb =>
+      'Words people searched for near your shop that came back with nothing, or only with shops far away.';
+
+  @override
+  String get heatmapUnmetThisWeek => 'This week';
+
+  @override
+  String get heatmapUnmetLastWeek => 'Last week';
+
+  @override
+  String heatmapUnmetAbout(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'about $count searches',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get heatmapUnmetNothingNearby => 'Nobody nearby sells it';
+
+  @override
+  String heatmapUnmetOnlyFar(String km) {
+    return 'Nearest is over $km km away';
+  }
+
+  @override
+  String get heatmapUnmetYouSell => 'You sell this already';
+
+  @override
+  String get heatmapUnmetQuietTitle => 'Nothing to report this week';
+
+  @override
+  String heatmapUnmetQuietMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'A word appears once $count different people have asked for it around here in one week, so no single household can be picked out.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get heatmapUnmetCouldNotLoad => 'Couldn\'t load searches right now';
+
+  @override
+  String get heatmapUnmetPrivacy =>
+      'Counts are rounded, and nothing here says who searched.';
+
+  @override
+  String get notifCatMerchantInsights => 'Demand and insights';
 }

@@ -30,6 +30,24 @@ public enum NotificationCategory {
     PROMOTIONS(false, false),
 
     /**
+     * What the platform has learnt about a merchant's own trade and neighbourhood: the weekly demand
+     * digest, and whatever joins it.
+     *
+     * <p><strong>On by default, and droppable</strong> — both halves are decisions. On, because a
+     * shop that has just opened is exactly who benefits from being told what their street searched
+     * for and nobody sold, and a signal nobody has opted into is a signal nobody reads. Droppable,
+     * because it is advice: a merchant who finds it noise must be able to stop it from the settings
+     * screen they already have, and a message that cannot be stopped teaches people to silence the
+     * app entirely.
+     *
+     * <p>Not {@link #PROMOTIONS}, although both are things a merchant did not ask for one by one.
+     * Promotions are the platform selling; this is the platform reporting what it saw on the
+     * merchant's own street. Filing it under marketing would mean a shop that declined to be
+     * advertised at also stopped hearing what their customers wanted, which is not the same choice.
+     */
+    MERCHANT_INSIGHTS(true, false),
+
+    /**
      * Security and account integrity: one-time codes, password and email changes, suspensions,
      * application decisions.
      *
@@ -94,6 +112,9 @@ public enum NotificationCategory {
         if (type.startsWith("marketing.") || type.startsWith("promotion.")
                 || type.startsWith("promo.")) {
             return PROMOTIONS;
+        }
+        if (type.startsWith("demand.")) {
+            return MERCHANT_INSIGHTS;
         }
         return ACCOUNT;
     }

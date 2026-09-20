@@ -48,6 +48,7 @@ import com.delivery.product.service.ItemSearchService.ShopMatch;
 import com.delivery.product.service.ItemSearchThrottle;
 import com.delivery.product.service.ItemSearchThrottle.SearchThrottledException;
 import com.delivery.product.service.ProductImageService;
+import com.delivery.product.service.SearchDemandRecorder;
 import com.delivery.product.service.StoreService;
 import com.delivery.product.service.StoreService.StoreView;
 
@@ -108,7 +109,8 @@ class ItemSearchAccessTest {
         answering(true, 345.4d);
 
         ProxyFactory secured = new ProxyFactory(new ItemSearchController(itemSearch, storeService,
-                catalog, mock(ProductImageService.class), new ItemSearchThrottle(BURST, 1)));
+                catalog, mock(ProductImageService.class), new ItemSearchThrottle(BURST, 1),
+                mock(SearchDemandRecorder.class)));
         secured.setProxyTargetClass(true);
         secured.addAdvisor(AuthorizationManagerBeforeMethodInterceptor.preAuthorize());
         controller = (ItemSearchController) secured.getProxy();

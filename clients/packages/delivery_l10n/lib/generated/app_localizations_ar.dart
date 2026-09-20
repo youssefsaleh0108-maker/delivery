@@ -13409,4 +13409,67 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get custSharesAgreedAtDoor =>
       'لم يُدفع شيء بعد — السائق يحصّل كل حصة عند الباب.';
+
+  @override
+  String get heatmapUnmetTitle => 'ما لم يجده جيرانك';
+
+  @override
+  String get heatmapUnmetBlurb =>
+      'كلمات بحث عنها الناس قرب متجرك فلم تُرجع شيئاً، أو أرجعت متاجر بعيدة فقط.';
+
+  @override
+  String get heatmapUnmetThisWeek => 'هذا الأسبوع';
+
+  @override
+  String get heatmapUnmetLastWeek => 'الأسبوع الماضي';
+
+  @override
+  String heatmapUnmetAbout(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'حوالي $count عملية بحث',
+      many: 'حوالي $count عملية بحث',
+      few: 'حوالي $count عمليات بحث',
+      two: 'عمليتا بحث تقريباً',
+      one: 'عملية بحث واحدة تقريباً',
+      zero: 'لا عمليات بحث',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get heatmapUnmetNothingNearby => 'لا أحد قريب يبيعها';
+
+  @override
+  String heatmapUnmetOnlyFar(String km) {
+    return 'أقرب متجر يبيعها على بعد أكثر من $km كم';
+  }
+
+  @override
+  String get heatmapUnmetYouSell => 'أنت تبيع هذا أصلاً';
+
+  @override
+  String get heatmapUnmetQuietTitle => 'لا جديد هذا الأسبوع';
+
+  @override
+  String heatmapUnmetQuietMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'تظهر الكلمة بعد أن يبحث عنها $count أشخاص مختلفون في المنطقة خلال أسبوع واحد، حتى لا يمكن تمييز منزل بعينه.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get heatmapUnmetCouldNotLoad => 'تعذَّر تحميل عمليات البحث الآن';
+
+  @override
+  String get heatmapUnmetPrivacy =>
+      'الأعداد تقريبية، ولا شيء هنا يدل على من بحث.';
+
+  @override
+  String get notifCatMerchantInsights => 'الطلب والرؤى';
 }
