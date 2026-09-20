@@ -5,9 +5,9 @@ select '== I0 legs by leg/status/direction: leg|status|dir|count|sum';
 select leg, status, direction, count(*), sum(amount) from accounting.transactions
  group by 1,2,3 order by 1,2,3;
 
-select '== I1 orders whose legs do not balance (debit-credit), excl remittances: order|net';
+select '== I1 orders whose legs do not balance (debit-credit), excl remittances and payouts: order|net';
 select order_id, sum(case when direction='DEBIT' then amount else -amount end) as net
-  from accounting.transactions where leg <> 'CASH_REMITTANCE'
+  from accounting.transactions where leg not in ('CASH_REMITTANCE','PAYOUT')
  group by order_id
 having sum(case when direction='DEBIT' then amount else -amount end) <> 0;
 
@@ -18,7 +18,7 @@ select t.order_id, t.amount, o.total_amount
 
 select '== I2b settled orders with zero total (no collection leg) count';
 select count(distinct t.order_id) from accounting.transactions t
- where t.leg <> 'CASH_REMITTANCE'
+ where t.leg not in ('CASH_REMITTANCE','PAYOUT')
    and not exists (select 1 from accounting.transactions c where c.order_id=t.order_id
                    and c.leg in ('CASH_COLLECTED','CUSTOMER_DEBIT'));
 

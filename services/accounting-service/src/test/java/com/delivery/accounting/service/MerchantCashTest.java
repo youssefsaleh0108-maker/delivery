@@ -470,10 +470,11 @@ class MerchantCashTest {
             RiderEarningsService earnings = new RiderEarningsService(riderLedger,
                     org.mockito.Mockito.mock(
                             com.delivery.accounting.domain.RiderCashOutRepository.class),
-                    floats,
+                    floats, transactions,
                     new com.delivery.accounting.payout.RiderPayoutProviders(List.of(
                             new com.delivery.accounting.payout.ManualPayoutProvider()), "MANUAL"),
-                    new BigDecimal("5.00"), new BigDecimal("100.00"), true, "UTC", "USD");
+                    "ACC-PLATFORM", new BigDecimal("5.00"), new BigDecimal("100.00"), true, "UTC",
+                    "USD");
             when(riderLedger.balanceOf(SHOP)).thenReturn(new BigDecimal("20.00"));
             // What the account owes the platform as a rider: its bag. The query reads RIDER rows
             // only, and MerchantCashConstraintTest proves against Postgres that the till is not in it.

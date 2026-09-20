@@ -1,5 +1,6 @@
 package com.delivery.accounting.domain;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -117,6 +118,23 @@ public interface AccountingTransactionRepository extends JpaRepository<Accountin
     /** Every leg of one kind in one state: the remittances a ledger-only start-up settles. */
     List<AccountingTransaction> findByLegAndStatus(AccountingTransaction.Leg leg,
                                                    AccountingTransaction.Status status);
+
+    /**
+     * What one kind of leg came to across every party in a window — the platform's own view of
+     * money it paid out (RECON-11).
+     *
+     * <p>Not scoped to a counterparty, deliberately: a payout is attributed to whoever received it,
+     * so the platform's statement cannot find its own payments by looking for its own legs. It is
+     * the one figure on that statement that is about everybody else's rows.
+     */
+    @Query("""
+            select coalesce(sum(t.amount), 0) from AccountingTransaction t
+             where t.leg = :leg
+               and t.createdAt >= :from and t.createdAt < :to
+            """)
+    BigDecimal sumOfLegBetween(@Param("leg") AccountingTransaction.Leg leg,
+                               @Param("from") Instant from,
+                               @Param("to") Instant to);
 
     @Query("select t.status, count(t), coalesce(sum(t.amount), 0) from AccountingTransaction t "
             + "group by t.status")

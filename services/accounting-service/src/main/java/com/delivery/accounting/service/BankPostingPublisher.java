@@ -84,6 +84,8 @@ public class BankPostingPublisher {
             // anyway so that if one ever is, the line says what happened rather than being blank.
             case CASH_COLLECTED -> "Cash taken for order #" + shortOrder;
             case CASH_REMITTANCE -> "Takings banked, ref #" + shortOrder;
+            // Recorded after an operator has already paid it, so no bank is ever asked for one.
+            case PAYOUT -> "Payout, ref #" + shortOrder;
             case MERCHANT_CREDIT -> "Payout for order #" + shortOrder;
             // Its own words, never "commission": the shop is being paid for wrapping a gift, and a
             // statement months later should say so rather than hide it inside the goods payout.

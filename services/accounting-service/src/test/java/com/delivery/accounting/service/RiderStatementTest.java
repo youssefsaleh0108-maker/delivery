@@ -52,14 +52,17 @@ class RiderStatementTest {
     private RiderCashOutRepository cashOuts;
     @Mock
     private CashFloatRepository floatEntries;
+    @Mock
+    private com.delivery.accounting.domain.AccountingTransactionRepository transactions;
 
     private RiderEarningsService service;
 
     @BeforeEach
     void setUp() {
-        service = new RiderEarningsService(ledger, cashOuts, floatEntries,
+        service = new RiderEarningsService(ledger, cashOuts, floatEntries, transactions,
                 new RiderPayoutProviders(List.of(new ManualPayoutProvider()), "MANUAL"),
-                new BigDecimal("5.00"), new BigDecimal("100.00"), true, "UTC", "USD");
+                "ACC-PLATFORM", new BigDecimal("5.00"), new BigDecimal("100.00"), true, "UTC",
+                "USD");
     }
 
     private RiderLedgerEntry job(String amount, Instant at) {

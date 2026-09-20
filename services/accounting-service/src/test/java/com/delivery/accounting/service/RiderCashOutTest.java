@@ -57,6 +57,8 @@ class RiderCashOutTest {
     private RiderLedgerRepository ledger;
     @Mock
     private CashFloatRepository floatEntries;
+    @Mock
+    private com.delivery.accounting.domain.AccountingTransactionRepository transactions;
 
     /**
      * A cash-out repository that behaves like the real table's unique partial index.
@@ -135,9 +137,10 @@ class RiderCashOutTest {
     }
 
     private RiderEarningsService serviceWith(RiderCashOutRepository cashOuts) {
-        return new RiderEarningsService(ledger, cashOuts, floatEntries,
+        return new RiderEarningsService(ledger, cashOuts, floatEntries, transactions,
                 new RiderPayoutProviders(List.of(new ManualPayoutProvider()), "MANUAL"),
-                new BigDecimal("5.00"), new BigDecimal("100.00"), true, "UTC", "USD");
+                "ACC-PLATFORM", new BigDecimal("5.00"), new BigDecimal("100.00"), true, "UTC",
+                "USD");
     }
 
     private void hasEarned(String balance) {

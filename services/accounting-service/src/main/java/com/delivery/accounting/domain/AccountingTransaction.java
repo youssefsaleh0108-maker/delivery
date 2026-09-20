@@ -84,6 +84,19 @@ public class AccountingTransaction {
          * a synthetic order id — the remittance's own.
          */
         CASH_REMITTANCE,
+        /**
+         * Money the platform handed over: a points redemption paid, a rider's cash-out paid.
+         *
+         * <p>A DEBIT against the party that was paid, because that is what reduces what the
+         * platform owes them — and what their statement has to show, or it keeps asking for money
+         * that has already been sent. It belongs to no single order and carries the payout's own
+         * id, as {@link #CASH_REMITTANCE} carries the remittance's, so the unique {@code (order_id,
+         * leg)} is what stops one redemption being recorded twice.
+         *
+         * <p>Never part of an order's arithmetic: the checks that an order's debits equal its
+         * credits exclude it for the same reason they exclude a remittance.
+         */
+        PAYOUT,
         /** Compensation: money returned when a settlement could not be completed. */
         CUSTOMER_REFUND
     }
@@ -231,6 +244,25 @@ public class AccountingTransaction {
         entry.status = Status.SETTLED_IN_CASH;
         entry.postedAt = Instant.now();
         return entry;
+    }
+
+    /**
+     * Money the platform has already handed over, recorded after the fact (RECON-11).
+     *
+     * <p>Terminal as it is written, for the reason a cash collection is: nothing is waiting on a
+     * bank. An operator pays a redemption or a cash-out outside this system and records that they
+     * did — see {@code PointsService.markPaid} and {@code RiderEarningsService.payCashOut} — so by
+     * the time this row exists the money has moved, and asking a connector to move it again is the
+     * one thing that must not happen.
+     *
+     * <p>Booked against the PLATFORM's account, which is the account it left. Who received it is
+     * the counterparty on the leg, not an account number this service has never been told.
+     */
+    public static AccountingTransaction paidOut(UUID payoutId, String platformAccount,
+                                                BigDecimal amount, String currency,
+                                                String correlationId) {
+        return obligation(payoutId, Leg.PAYOUT, platformAccount, amount, currency,
+                Direction.DEBIT, correlationId);
     }
 
     /**

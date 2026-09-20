@@ -55,7 +55,9 @@ public class RiderEarningsService {
     private final RiderLedgerRepository ledger;
     private final RiderCashOutRepository cashOuts;
     private final CashFloatRepository floatEntries;
+    private final com.delivery.accounting.domain.AccountingTransactionRepository transactions;
     private final RiderPayoutProviders payoutProviders;
+    private final String platformAccount;
     private final BigDecimal minimumCashOut;
     private final BigDecimal maximumTip;
     private final boolean offsetCashFloat;
@@ -66,7 +68,13 @@ public class RiderEarningsService {
     public RiderEarningsService(RiderLedgerRepository ledger,
                                 RiderCashOutRepository cashOuts,
                                 CashFloatRepository floatEntries,
+                                // Where a cash-out paid is written down, so that what the platform
+                                // has handed a rider reduces what its books say it owes (RECON-11).
+                                com.delivery.accounting.domain.AccountingTransactionRepository
+                                        transactions,
                                 RiderPayoutProviders payoutProviders,
+                                @Value("${delivery.accounting.platform-account:ACC-PLATFORM}")
+                                String platformAccount,
                                 // Below this a cash-out is refused. Nothing here pays automatically
                                 // — an operator does — so a queue of 40-cent requests costs more in
                                 // their time than the requests are worth.
@@ -93,7 +101,9 @@ public class RiderEarningsService {
         this.ledger = ledger;
         this.cashOuts = cashOuts;
         this.floatEntries = floatEntries;
+        this.transactions = transactions;
         this.payoutProviders = payoutProviders;
+        this.platformAccount = platformAccount;
         this.minimumCashOut = minimumCashOut;
         this.maximumTip = maximumTip;
         this.offsetCashFloat = offsetCashFloat;
@@ -530,6 +540,14 @@ public class RiderEarningsService {
         // taking it again would charge the rider twice for one payout.
         ledger.save(RiderLedgerEntry.cashOutPaid(
                 request.getRiderRef(), request.getId(), request.getCurrency()));
+        // And on the ledger itself (RECON-11): money the platform handed over, as a debit against
+        // the rider it went to. The rider's own statement reads the row above — this is what puts
+        // the payment in the platform's books, which had no record of it at all.
+        transactions.save(com.delivery.accounting.domain.AccountingTransaction.paidOut(
+                        request.getId(), platformAccount, request.getAmount(),
+                        request.getCurrency(), null)
+                .attributedTo(com.delivery.accounting.domain.CounterpartyKind.RIDER,
+                        request.getRiderRef()));
         return request;
     }
 

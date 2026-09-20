@@ -204,6 +204,13 @@ public class StatementService {
                 ledger.orderCount() + " orders", commissionLabel()));
         addIfAny(lines, Statement.Line.credit("Gift wrapping", wrapping, null));
 
+        // What the platform has already handed this shop, in points redeemed for money (RECON-11).
+        // A debit, because it is a debt discharged: without it the statement kept asking for money
+        // that had been paid, month after month.
+        BigDecimal paidOut = ledger.sumOf(Leg.PAYOUT);
+        addIfAny(lines, Statement.Line.debit("Paid to you", paidOut,
+                "points you redeemed, paid by the platform"));
+
         BigDecimal kept = ledger.keptAtTheCounter(ref);
         // The till as the float holds it now, whenever each pickup was paid for — and as a shop,
         // never as the rider the same account may also be.
@@ -217,9 +224,9 @@ public class StatementService {
                         + "platform its commission, including any not yet paid from earlier "
                         + "periods"));
 
-        // Independently of the lines, as on every statement: the shop's credits, less the share it
-        // kept and what it still owes out of its till.
-        BigDecimal control = goods.add(wrapping).subtract(kept).subtract(owed);
+        // Independently of the lines, as on every statement: the shop's credits, less what it has
+        // been paid, the share it kept and what it still owes out of its till.
+        BigDecimal control = goods.add(wrapping).subtract(paidOut).subtract(kept).subtract(owed);
 
         List<Statement.Entry> entries = ledger.entriesFor(Leg.MERCHANT_CREDIT, take);
         return Statement.of(CounterpartyKind.MERCHANT, ref, name, range, currency,
@@ -282,9 +289,14 @@ public class StatementService {
                 "the platform's money, now held by your company"));
         addIfAny(lines, Statement.Line.credit("Cash paid to the platform", paid, null));
 
+        // What the platform has already handed the company, in points redeemed (RECON-11).
+        BigDecimal paidOut = ledger.sumOf(Leg.PAYOUT);
+        addIfAny(lines, Statement.Line.debit("Paid to you", paidOut,
+                "points you redeemed, paid by the platform"));
+
         // Independently of the lines, as on every statement: the fee legs, plus what was paid in,
-        // less what was taken into custody.
-        BigDecimal control = owed.add(paid).subtract(received);
+        // less what was taken into custody and what has already been paid out.
+        BigDecimal control = owed.add(paid).subtract(received).subtract(paidOut);
 
         List<Statement.Entry> entries = ledger.entriesFor(Leg.PROVIDER_CREDIT, take);
         return Statement.of(CounterpartyKind.CARRIER, ref, name, range, currency,
@@ -558,13 +570,21 @@ public class StatementService {
         BigDecimal commission = ledger.sumOf(Leg.PLATFORM_COMMISSION);
         BigDecimal subsidy = ledger.sumOf(Leg.PLATFORM_SUBSIDY);
 
+        // Everything the platform handed out in the period, to everybody (RECON-11). Read across
+        // counterparties rather than off the platform's own legs: a payout is attributed to
+        // whoever received it, so the platform cannot find its own payments among its own rows.
+        BigDecimal paidOut = orZero(transactions.sumOfLegBetween(
+                Leg.PAYOUT, range.fromInstant(), range.toExclusive()));
+
         List<Statement.Line> lines = new ArrayList<>();
         addIfAny(lines, Statement.Line.debit("Commission earned", commission,
                 ledger.orderCount() + " orders"));
         addIfAny(lines, Statement.Line.credit("Subsidies paid", subsidy,
                 "free delivery and promotions the platform absorbed"));
+        addIfAny(lines, Statement.Line.credit("Paid out", paidOut,
+                "points redeemed and riders' cash-outs the platform paid"));
 
-        BigDecimal control = subsidy.subtract(commission);
+        BigDecimal control = subsidy.add(paidOut).subtract(commission);
 
         List<Statement.Entry> entries = ledger.own().stream()
                 .filter(t -> t.getLeg() == Leg.PLATFORM_COMMISSION
