@@ -170,6 +170,13 @@ patches:
       path: /spec/template/spec/containers/0/resources/limits/memory
       value: 64Mi
   target: { kind: Deployment, name: mailpit }
+# nginx serving a directory of static files. 96Mi was the compose stack's number and nothing has
+# ever come near it; 64Mi is what pays for the postgres-exporter inside dev's 9 GiB.
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: 64Mi
+  target: { kind: Deployment, name: portal }
 # Two containers in one pod: the dev-mode server and the reseed sidecar.
 - patch: |-
     - op: replace

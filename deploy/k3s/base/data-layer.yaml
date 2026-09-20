@@ -91,6 +91,59 @@ spec:
     - port: 5432
       targetPort: 5432
 ---
+# How many connections are open, and whether the database is answering at all.
+#
+# Postgres allows 200 connections, three reserved for superusers, and the README's connection
+# budget puts the services' Hikari pools at 98 maximum between them — so the platform runs at half
+# the wall and nothing watched the other half. Past 197 the failure is not graceful: a service that
+# cannot get a connection blocks for Hikari's 30-second timeout, and the losers are whichever
+# services started last rather than whichever matter least.
+#
+# A separate Deployment rather than a sidecar on the StatefulSet: a sidecar would restart Postgres
+# every time the exporter changed, and this is the one workload on the platform that should restart
+# as rarely as possible.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-exporter
+  labels: { app: postgres-exporter }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: postgres-exporter }
+  template:
+    metadata:
+      labels: { app: postgres-exporter }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9187"
+    spec:
+      containers:
+        - name: exporter
+          image: quay.io/prometheuscommunity/postgres-exporter:v0.17.1@sha256:38606faa38c54787525fb0ff2fd6b41b4cfb75d455c1df294927c5f611699b17
+          env:
+            # Split into URI + user + password so the password is never part of a URL: a DSN in
+            # DATA_SOURCE_NAME would put it in the pod spec, in `kubectl describe`, and in every
+            # log line the exporter writes about a connection failure.
+            - name: DATA_SOURCE_URI
+              value: postgres:5432/delivery?sslmode=disable
+            - name: DATA_SOURCE_USER
+              value: delivery
+            - name: DATA_SOURCE_PASS
+              valueFrom: { secretKeyRef: { name: platform-secrets, key: POSTGRES_PASSWORD } }
+            # Connection counts are per database and the alert sums them, so the default
+            # per-database collectors are all this needs. The expensive ones stay off.
+            - name: PG_EXPORTER_DISABLE_SETTINGS_METRICS
+              value: "true"
+          ports:
+            - containerPort: 9187
+          readinessProbe:
+            httpGet: { path: /metrics, port: 9187 }
+            periodSeconds: 30
+          resources:
+            requests: { memory: 24Mi, cpu: 10m }
+            limits: { memory: 64Mi }
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:

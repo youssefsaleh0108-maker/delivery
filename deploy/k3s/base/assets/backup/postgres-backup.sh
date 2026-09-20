@@ -21,6 +21,49 @@ umask 077
 
 say() { echo "[backup $STAMP] $*"; }
 
+# ----------------------------------------------------------------------- telling Prometheus
+# A CronJob cannot be scraped: by the time Prometheus comes round the pod is gone, and whether this
+# run did anything is exactly what has to outlive it. node-exporter's textfile collector is the
+# standard answer — a file written here is served as metrics until it is replaced.
+#
+# The label is `env`, not `namespace`: the scrape already attaches namespace=monitoring (that is
+# where node-exporter lives), and a metric carrying its own `namespace` would be renamed
+# `exported_namespace` and every alert written against the obvious name would match nothing.
+METRICS_DIR=/metrics-out
+METRICS_FILE="$METRICS_DIR/backup-$NS-postgres.prom"
+ENV_LABEL="${NS#delivery-}"
+
+# The previous run's success time, carried forward so that a run which FAILS does not erase the
+# record of the last one that worked — which is the number the alert measures.
+prev_success() {
+  [ -f "$METRICS_FILE" ] || return 0
+  sed -n 's/^youdrop_backup_last_success_timestamp_seconds{.*} //p' "$METRICS_FILE" | head -n1
+}
+
+# publish <configured 0|1> <success-epoch or empty> <bytes or empty>
+publish() {
+  [ -d "$METRICS_DIR" ] || return 0
+  L="env=\"$ENV_LABEL\",backup=\"postgres\""
+  {
+    echo "# HELP youdrop_backup_configured Whether this backup has a destination and a key to encrypt to."
+    echo "# TYPE youdrop_backup_configured gauge"
+    echo "youdrop_backup_configured{$L} $1"
+    if [ -n "$2" ]; then
+      echo "# HELP youdrop_backup_last_success_timestamp_seconds When a backup was last uploaded and verified."
+      echo "# TYPE youdrop_backup_last_success_timestamp_seconds gauge"
+      echo "youdrop_backup_last_success_timestamp_seconds{$L} $2"
+    fi
+    if [ -n "$3" ]; then
+      echo "# HELP youdrop_backup_bytes The size of the encrypted archive last uploaded."
+      echo "# TYPE youdrop_backup_bytes gauge"
+      echo "youdrop_backup_bytes{$L} $3"
+    fi
+  } > "$METRICS_FILE.tmp" 2>/dev/null || return 0
+  # Replaced atomically: node-exporter reads this directory on every scrape and a half-written file
+  # is a parse error that takes out the whole textfile collector, not just this metric.
+  mv "$METRICS_FILE.tmp" "$METRICS_FILE" 2>/dev/null || rm -f "$METRICS_FILE.tmp"
+}
+
 # --------------------------------------------------------------------------------- preconditions
 missing=""
 [ -s /etc/rclone/rclone.conf ] || missing="$missing backup-rclone/rclone.conf"
@@ -30,6 +73,7 @@ if [ -n "$missing" ]; then
   say "NOT CONFIGURED — nothing was backed up. Missing:$missing"
   say "Create them on the box; see 'Backups' in deploy/k3s/README.md. Exiting 0 so this Job does"
   say "not crash-loop; the BackupNotConfigured alert is what reports this state."
+  publish 0 "$(prev_success)" ""
   exit 0
 fi
 DEST=$(cat /etc/rclone/dest)
@@ -116,6 +160,8 @@ REMOTE_SIZE=$(rclone size "$HOURLY" --json 2>/dev/null | sed -n 's/.*"bytes":\([
 [ "$REMOTE_SIZE" = "$SIZE" ] \
   || { say "FAILED: uploaded $SIZE bytes, the destination reports '${REMOTE_SIZE:-nothing}'"; exit 1; }
 say "verified $REMOTE_SIZE bytes at $HOURLY"
+# Only now, with the object read back at the right size, is this a backup.
+publish 1 "$(date -u +%s)" "$SIZE"
 
 # ------------------------------------------------------------------------------------- dead man
 # The only signal that survives the whole box dying. Everything else in this file is observed from

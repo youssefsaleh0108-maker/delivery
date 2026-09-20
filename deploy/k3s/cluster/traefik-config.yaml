@@ -18,6 +18,22 @@ spec:
       # The ACME challenge is answered before this redirect applies, so port 80 still validates.
       - --entrypoints.web.http.redirections.entrypoint.to=:443
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      # Metrics, because the edge is the only thing that sees a request before it becomes an
+      # application's problem: the 5xx rate including the requests that never reached a service,
+      # the 429s the rate limiter produces (invisible from inside — the request never arrives), and
+      # `traefik_tls_certs_not_after`, which is the only place the expiry of the ACME certificates
+      # is a number rather than a surprise.
+      #
+      # NO new entrypoint is defined. Prometheus metrics default to the `traefik` entrypoint, which
+      # this chart always creates on :9000 and is already serving /ping for the liveness probe.
+      # Adding `--entrypoints.metrics.address=:9100` instead would risk colliding with an
+      # entrypoint a future chart version defines, and a Traefik that refuses to start takes every
+      # hostname on this box down with it. Prometheus scrapes the pod IP on 9000 (the `traefik`
+      # job in cluster/monitoring.yaml).
+      - --metrics.prometheus=true
+      - --metrics.prometheus.addEntryPointsLabels=true
+      - --metrics.prometheus.addRoutersLabels=true
+      - --metrics.prometheus.addServicesLabels=true
     persistence:
       enabled: true
       size: 128Mi

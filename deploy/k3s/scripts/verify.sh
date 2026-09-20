@@ -351,6 +351,26 @@ if command -v kubectl >/dev/null 2>&1; then
       fail "overlays/$env does not render: $(head -n3 "$tmp/render-$env.err" | tr '\n' ' ')"
     fi
   done
+  # cluster/ is applied with `kubectl apply -f`, not through an overlay, so nothing else here ever
+  # parses it. A kustomization that lists the files is the cheapest way to make the same parser
+  # read them — and these are the manifests whose failure mode is "monitoring did not come back".
+  mkdir -p "$tmp/cluster"
+  { echo 'apiVersion: kustomize.config.k8s.io/v1beta1'
+    echo 'kind: Kustomization'
+    echo 'resources:'
+    for f in cluster/*.yaml; do
+      # The Traefik HelmChartConfig's `valuesContent` is a Helm document, not Kubernetes objects,
+      # and kustomize has no schema for the CRD; it parses as YAML, which is all that is claimed.
+      case "$f" in *traefik-config.yaml) continue ;; esac
+      cp "$f" "$tmp/cluster/"
+      echo "  - ${f##*/}"
+    done
+  } > "$tmp/cluster/kustomization.yaml"
+  if kubectl kustomize "$tmp/cluster" > "$tmp/cluster-render.yaml" 2>"$tmp/cluster.err"; then
+    ok "cluster/ parses ($(grep -c '^kind:' "$tmp/cluster-render.yaml") objects)"
+  else
+    fail "cluster/ does not parse: $(head -n3 "$tmp/cluster.err" | tr '\n' ' ')"
+  fi
 else
   echo "  --    kubectl not on PATH: the kustomize render is not checked here"
 fi
@@ -549,6 +569,98 @@ for f in $(find base cluster overlays -name '*.yaml'); do
   fi
 done
 [ "${dangling:-0}" = 1 ] || ok "no dangling aliases in base, cluster or overlays"
+
+echo "== alerting: it reaches somebody (AL-1) =="
+mon=cluster/monitoring.yaml
+alert=cluster/alerting.yaml
+# A Prometheus with rules and no Alertmanager behind it is what both environments ran for their
+# whole lives: every rule evaluated, every alert marked firing, nobody told.
+grep -q '^    alerting:' "$mon" && grep -q 'targets: \["alertmanager:9093"\]' "$mon" \
+  && ok "Prometheus sends firing alerts to Alertmanager" \
+  || fail "cluster/monitoring.yaml has no alerting: block, so nothing leaves Prometheus"
+for want in alertmanager node-exporter kube-state-metrics; do
+  grep -q "name: $want$" "$alert" \
+    && ok "$want is deployed" \
+    || fail "cluster/alerting.yaml does not deploy $want"
+done
+grep -q 'smtp_auth_password_file' "$alert" \
+  && ok "the relay password is read from a file, not written in the ConfigMap" \
+  || fail "Alertmanager's SMTP password is not a _file reference: it would be in the ConfigMap"
+grep -q 'smtp_password\|smtp_auth_password:' "$alert" \
+  && fail "cluster/alerting.yaml contains a literal SMTP password" \
+  || ok "no literal SMTP password in cluster/alerting.yaml"
+grep -q 'alertmanager-smtp' scripts/setup-monitoring.sh \
+  && ok "setup-monitoring.sh copies the relay password into monitoring" \
+  || fail "nothing creates alertmanager-smtp, so every alert email fails to send"
+grep -q 'cluster/alerting.yaml' scripts/setup-monitoring.sh \
+  && ok "setup-monitoring.sh applies cluster/alerting.yaml" \
+  || fail "setup-monitoring.sh never applies cluster/alerting.yaml"
+# Telegram must be OFF by being absent. Alertmanager validates its whole configuration at startup
+# and refuses to start on a half-filled receiver — which would take monitoring down entirely.
+awk '/telegram_configs:/ && $0 !~ /^ *#/ { found = 1 } END { exit !found }' "$alert" \
+  && fail "an active telegram receiver is configured; a placeholder chat_id stops Alertmanager starting" \
+  || ok "Telegram is off (the receiver is commented, with instructions)"
+# kube-state-metrics must not be able to read Secrets: `list` on secrets returns their values.
+awk 'BEGIN{RS="\n---\n"} /(^|\n)kind: ClusterRole\n/ && /kube-state-metrics/ {print}' "$alert" \
+  | sed 's/#.*//' | grep -q 'secrets' \
+  && fail "the kube-state-metrics ClusterRole grants access to secrets, which returns their values" \
+  || ok "kube-state-metrics cannot read Secrets"
+grep -q 'metrics.prometheus=true' cluster/traefik-config.yaml \
+  && ok "Traefik exports its metrics (5xx, 429 and certificate expiry)" \
+  || fail "Traefik metrics are off: nothing can see the 5xx rate, the 429 rate or a certificate about to expire"
+sed 's/#.*//' cluster/traefik-config.yaml | grep -q 'entrypoints\.metrics\.address' \
+  && fail "a new Traefik entrypoint is defined for metrics: a name collision with the chart's own takes the whole edge down" \
+  || ok "Traefik metrics reuse the chart's existing entrypoint"
+grep -q 'postgres-exporter' base/data-layer.yaml \
+  && ok "the Postgres connection count has an exporter behind it" \
+  || fail "nothing exports pg_stat_activity_count, so the connection alert can never fire"
+
+# Every rule the production plan asks for, by name.
+for a in NodeDiskFilling NodeMemoryCritical PodCrashLooping JobFailed BackupDidNotReport \
+         CertificateExpiringSoon HighServerErrorRate PostgresConnectionsHigh \
+         RateLimitRejectionsHigh SmsRateHigh SettlementFailuresRecorded RestoreTestFailing; do
+  grep -q "alert: $a$" "$mon" \
+    && ok "rule $a" \
+    || fail "no alert rule called $a"
+done
+# ...and each one has an expression. An alert with no expr is not a rule, it is a comment.
+noexpr=$(awk '
+  /^ *- alert: / { name = $3; seen = 0 }
+  /^ *expr: / { if (name != "") seen = 1 }
+  /^ *- alert: / && prev != "" && !prevseen { print prev }
+  { if ($0 ~ /^ *- alert: /) { prev = name; prevseen = 0 } else if ($0 ~ /^ *expr: /) prevseen = 1 }
+  END { if (prev != "" && !prevseen) print prev }
+' "$mon" | tr '\n' ' ')
+[ -z "$noexpr" ] \
+  && ok "every alert rule has an expression" \
+  || fail "alert rule(s) with no expr: $noexpr"
+
+# A rule whose metric nothing produces never fires, and looks exactly like a rule that is fine.
+# Every custom metric an expression names is resolved back to whatever emits it.
+#
+# PENDING is the honest half: these two need a service change this branch does not own (see the
+# report). They are listed here so the gap is visible and so removing a name from this line is the
+# entire edit once the metric exists.
+PENDING_METRICS="delivery_sms_sent_total delivery_settlement_failures"
+for m in $(grep -o 'delivery_[a-z_]*\|youdrop_[a-z_]*' "$mon" | sort -u); do
+  case " $PENDING_METRICS " in
+    *" $m "*)
+      ok "$m is PENDING a service change (the rule is written and waiting)"
+      continue ;;
+  esac
+  # Micrometer names its meters with dots and Prometheus exports them with underscores, and which
+  # separator sits where is not recoverable from the exported name — so each `_` is allowed to be
+  # either. `_total` is the suffix Prometheus adds to a counter. Main sources only: a test that
+  # asserts on the scraped name is not something that produces the metric.
+  pat=$(printf '%s' "$m" | sed 's/_total$//; s/_/[._]/g')
+  if grep -rEq "\"$pat\"" --include='*.java' ../../platform/*/src/main ../../services/*/src/main 2>/dev/null; then
+    ok "$m is registered by a service"
+  elif grep -q "$m" base/assets/backup/*.sh; then
+    ok "$m is written by a backup job (node-exporter textfile)"
+  else
+    fail "the rules use $m and nothing in this repository produces it: that alert can never fire"
+  fi
+done
 
 echo "== monitoring =="
 mon=cluster/monitoring.yaml

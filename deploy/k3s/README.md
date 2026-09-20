@@ -457,9 +457,102 @@ redeploy; the only way to remove one is to name it under `deleteDatasources`, wh
 does for the `jaeger` datasource somebody added against a tracing backend this platform does not
 run.
 
-Alert rules live in the `prometheus-rules` ConfigMap. **There is no Alertmanager**, so nothing
-pages: a firing alert shows in the Prometheus UI and as the `ALERTS` series in Grafana. Two rules
-today — a dead-letter queue with anything in it, and any scrape target down for 15 minutes.
+## Alerting
+
+Until now nothing paged. Prometheus evaluated its rules, marked them firing, and told nobody —
+there was no Alertmanager to tell. `cluster/alerting.yaml` adds the three pieces that were missing
+and `scripts/setup-monitoring.sh` installs them alongside Prometheus and Grafana:
+
+| | what it adds |
+| --- | --- |
+| **Alertmanager** | groups, de-duplicates and **emails** what Prometheus fires, through the M365 relay |
+| **node-exporter** | the box itself: disk, memory, load — the numbers no container can see |
+| **kube-state-metrics** | the API server's view: crash loops, failed Jobs, CronJob outcomes |
+
+Traefik's own metrics are switched on too (`cluster/traefik-config.yaml`), which is where the 5xx
+rate, the 429 rate and **certificate expiry** come from, and each environment gets a
+`postgres-exporter` for the connection count.
+
+Alerts go to **one email address**, set in `cluster/alerting.yaml` under `receivers`. Changing it
+is a one-line edit plus `setup-monitoring.sh`, and it is worth checking twice: an address nobody
+reads is the same as no alerting at all. The relay password is **not** in that file — it is copied
+out of an environment's `platform-secrets` into `alertmanager-smtp` by `setup-monitoring.sh` and
+read at send time from a mounted file.
+
+`page` means money in the wrong place or an environment that is down; it repeats hourly. Everything
+else repeats every four hours, and anything from `delivery-dev` once a day.
+
+**Telegram is off by being absent, not by a switch.** Alertmanager validates its whole
+configuration at startup and refuses to start on a half-filled receiver — a placeholder `chat_id`
+would take monitoring down. The receiver is written out, commented, with the three steps to enable
+it, at the end of `cluster/alerting.yaml`.
+
+### The rules
+
+| alert | fires when |
+| --- | --- |
+| `NodeMemoryCritical` / `NodeMemoryLow` | under 10% / 20% of the node's memory available |
+| `NodeDiskFilling` / `NodeDiskCritical` | a filesystem over 80% / 92% |
+| `PodCrashLooping`, `ContainerOOMKilled`, `JobFailed`, `DeploymentNotReady` | the workload is not running |
+| `BackupNotConfigured`, `BackupDidNotReport`, `MinioBackupDidNotReport` | nothing is being backed up |
+| `RestoreTestFailing`, `RestoreTestStale` | the backups cannot be turned back into a database |
+| `CertificateExpiringSoon` / `Critical` | under 14 / 5 days of certificate left |
+| `HighServerErrorRate` | over 2% of requests answering 5xx for ten minutes |
+| `RateLimitRejectionsHigh` | over 1 req/s being 429'd — likely real users behind CGNAT |
+| `PostgresConnectionsHigh` / `Climbing` | over 170 / 140 of the 197 usable connections |
+| `SmsRateHigh` | over 200 SMS in an hour — the warning before the provider's spend cap |
+| `SettlementFailuresRecorded` | any unresolved settlement failure (RECON-04) |
+
+The backup alerts read **node-exporter's textfile collector**: a CronJob is gone by the time
+anything could scrape it, so each job writes a `.prom` file into
+`/var/lib/node-exporter/textfile` and node-exporter serves it until it is replaced.
+`youdrop_restore_test_ok` is the single most important number here — it is the difference between
+having backups and believing you have them.
+
+**Two rules are written and waiting on a metric that does not exist yet**: `SmsRateHigh` needs
+`delivery.sms.sent` in sms-connector, and `SettlementFailuresRecorded` needs
+`delivery.settlement.failures` in accounting-service (the `settlement_failure` rows are recorded,
+but nothing gauges them). `scripts/verify.sh` lists them as PENDING so the gap cannot be forgotten;
+when each metric lands, deleting its name from `PENDING_METRICS` in that script is the whole edit.
+
+### Proving an alert really arrives
+
+Do this once, after `setup-monitoring.sh`, and again after changing the address. Every step below
+is reversible and nothing production depends on it.
+
+```sh
+# 1. Prometheus knows where to send. Expect one alertmanager with health "up".
+kubectl -n monitoring exec deploy/prometheus -- \
+  wget -qO- http://localhost:9090/api/v1/alertmanagers
+
+# 2. Alertmanager can reach the relay. Fire a synthetic alert straight at it — this skips
+#    Prometheus and tests only the delivery path, which is the part that is usually broken.
+kubectl -n monitoring exec deploy/alertmanager -- sh -c 'wget -qO- --post-data="[{
+  \"labels\": {\"alertname\":\"AlertingPathTest\",\"severity\":\"page\",\"namespace\":\"delivery-qa\"},
+  \"annotations\": {\"summary\":\"If you are reading this, alerting works.\"}
+}]" --header="Content-Type: application/json" http://localhost:9093/api/v2/alerts'
+
+# 3. The email should arrive within a minute (severity page has group_wait 0s). If it does not:
+kubectl -n monitoring logs deploy/alertmanager --tail=50 | grep -i 'smtp\|notify'
+#    "authentication failed" -> alertmanager-smtp is stale; re-run setup-monitoring.sh
+#    "no such host"          -> the pod cannot reach smtp.office365.com; check egress
+#    nothing at all          -> the alert never reached Alertmanager; go back to step 1
+
+# 4. Clear it. Synthetic alerts expire on their own after 5 minutes, or:
+kubectl -n monitoring exec deploy/alertmanager -- \
+  amtool --alertmanager.url=http://localhost:9093 silence add alertname=AlertingPathTest -d 10m -c "path test"
+```
+
+To test the whole chain including Prometheus, stop a scrape target and wait fifteen minutes for
+`ScrapeTargetDown` — `kubectl -n delivery-dev scale deploy/mailpit --replicas=0`, then scale it
+back. Use **dev** for that, never the environment that is becoming production.
+
+**What none of this covers:** an alert about this box, sent from this box, does not arrive when the
+box is what failed. The backup job's dead-man switch and an **external uptime monitor** on
+api/iam/portal/www are the only things that notice that, and neither lives in this repository.
+
+Alert rules live in the `prometheus-rules` ConfigMap, in three files: `settlement.yaml`,
+`platform.yaml` and `infrastructure.yaml`.
 
 ## Draining a dead-letter queue
 

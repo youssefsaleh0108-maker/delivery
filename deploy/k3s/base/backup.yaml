@@ -84,6 +84,7 @@ spec:
                 - { name: age, mountPath: /etc/age, readOnly: true }
                 - { name: deadman, mountPath: /etc/deadman, readOnly: true }
                 - { name: work, mountPath: /work }
+                - { name: metrics-out, mountPath: /metrics-out }
               resources:
                 requests: { memory: 96Mi, cpu: 50m }
                 limits: { memory: 256Mi }
@@ -98,6 +99,11 @@ spec:
               secret: { secretName: backup-age, optional: true }
             - name: deadman
               secret: { secretName: backup-deadman, optional: true }
+            # node-exporter serves whatever .prom files land here, so this is how a Job that is
+            # gone by the next scrape still has a metric. The DaemonSet makes the directory
+            # sticky-writable; see cluster/alerting.yaml.
+            - name: metrics-out
+              hostPath: { path: /var/lib/node-exporter/textfile, type: DirectoryOrCreate }
             # On disk, not in memory: an emptyDir with medium Memory counts against the container's
             # memory limit, and a database dump would take the pod out.
             - name: work
@@ -143,6 +149,7 @@ spec:
                 - { name: script, mountPath: /backup, readOnly: true }
                 - { name: rclone, mountPath: /etc/rclone, readOnly: true }
                 - { name: deadman, mountPath: /etc/deadman, readOnly: true }
+                - { name: metrics-out, mountPath: /metrics-out }
               resources:
                 requests: { memory: 96Mi, cpu: 50m }
                 limits: { memory: 256Mi }
@@ -153,6 +160,8 @@ spec:
               secret: { secretName: backup-rclone, optional: true }
             - name: deadman
               secret: { secretName: backup-deadman, optional: true }
+            - name: metrics-out
+              hostPath: { path: /var/lib/node-exporter/textfile, type: DirectoryOrCreate }
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -221,6 +230,7 @@ spec:
                 - { name: rclone, mountPath: /etc/rclone, readOnly: true }
                 - { name: age, mountPath: /etc/age, readOnly: true }
                 - { name: work, mountPath: /work }
+                - { name: metrics-out, mountPath: /metrics-out }
               resources:
                 requests: { memory: 128Mi, cpu: 50m }
                 limits: { memory: 384Mi }
@@ -231,6 +241,11 @@ spec:
               secret: { secretName: backup-rclone, optional: true }
             - name: age
               secret: { secretName: backup-age, optional: true }
+            - name: metrics-out
+              # node-exporter serves whatever .prom files land here, so this is how a Job that is
+              # gone by the next scrape still has a metric. The DaemonSet makes the directory
+              # sticky-writable; see cluster/alerting.yaml.
+              hostPath: { path: /var/lib/node-exporter/textfile, type: DirectoryOrCreate }
             - name: work
               emptyDir: { sizeLimit: 4Gi }
             - name: scratch

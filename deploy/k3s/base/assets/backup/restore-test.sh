@@ -29,6 +29,30 @@ say()  { echo "[restore-test $STAMP] $*"; }
 ok()   { echo "  ok    $*"; }
 bad()  { echo "  FAIL  $*"; fails=$((fails + 1)); }
 
+# See postgres-backup.sh: a CronJob leaves its result in node-exporter's textfile directory,
+# because by the time anything could scrape it the pod is gone. `youdrop_restore_test_ok` is the
+# single most important number on this platform — it is the difference between having backups and
+# believing you have backups.
+METRICS_DIR=/metrics-out
+METRICS_FILE="$METRICS_DIR/restore-test-$NS.prom"
+ENV_LABEL="${NS#delivery-}"
+publish() {   # publish <ok 0|1> <mode>
+  [ -d "$METRICS_DIR" ] || return 0
+  L="env=\"$ENV_LABEL\",mode=\"$2\""
+  {
+    echo "# HELP youdrop_restore_test_ok 1 if the last weekly restore test restored a usable database."
+    echo "# TYPE youdrop_restore_test_ok gauge"
+    echo "youdrop_restore_test_ok{$L} $1"
+    echo "# TYPE youdrop_restore_test_last_run_timestamp_seconds gauge"
+    echo "youdrop_restore_test_last_run_timestamp_seconds{$L} $(date -u +%s)"
+  } > "$METRICS_FILE.tmp" 2>/dev/null || return 0
+  mv "$METRICS_FILE.tmp" "$METRICS_FILE" 2>/dev/null || rm -f "$METRICS_FILE.tmp"
+}
+# Anything that stops this script before its own verdict — the scratch database never starting, a
+# dump that dies half way — must still be reported as a failure. Without this the metric would
+# simply stop being updated, and "stale" reads very differently from "failed".
+trap 'publish 0 "${MODE:-unknown}"' EXIT
+
 mkdir -p "$WORK"
 cd "$WORK"
 apk add --no-cache age rclone >/dev/null
@@ -155,9 +179,12 @@ done
 
 rm -rf "$WORK"/*.dump "$WORK"/globals.sql
 echo
+trap - EXIT
 if [ "$fails" = 0 ]; then
+  publish 1 "$MODE"
   say "PASS (mode: $MODE${ARCHIVE:+, archive: $ARCHIVE})"
 else
+  publish 0 "$MODE"
   say "FAILED: $fails check(s) (mode: $MODE). The backups cannot be relied on until this passes."
   exit 1
 fi

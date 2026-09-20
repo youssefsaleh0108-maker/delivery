@@ -11,12 +11,36 @@ NS="${NAMESPACE:?NAMESPACE is not set}"
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 say() { echo "[minio-backup $STAMP] $*"; }
 
+# See postgres-backup.sh for why a CronJob has to leave its result in node-exporter's textfile
+# directory, and why the label is `env` rather than `namespace`.
+METRICS_DIR=/metrics-out
+METRICS_FILE="$METRICS_DIR/backup-$NS-minio.prom"
+ENV_LABEL="${NS#delivery-}"
+prev_success() {
+  [ -f "$METRICS_FILE" ] || return 0
+  sed -n 's/^youdrop_backup_last_success_timestamp_seconds{.*} //p' "$METRICS_FILE" | head -n1
+}
+publish() {   # publish <configured 0|1> <success-epoch or empty>
+  [ -d "$METRICS_DIR" ] || return 0
+  L="env=\"$ENV_LABEL\",backup=\"minio\""
+  {
+    echo "# TYPE youdrop_backup_configured gauge"
+    echo "youdrop_backup_configured{$L} $1"
+    if [ -n "$2" ]; then
+      echo "# TYPE youdrop_backup_last_success_timestamp_seconds gauge"
+      echo "youdrop_backup_last_success_timestamp_seconds{$L} $2"
+    fi
+  } > "$METRICS_FILE.tmp" 2>/dev/null || return 0
+  mv "$METRICS_FILE.tmp" "$METRICS_FILE" 2>/dev/null || rm -f "$METRICS_FILE.tmp"
+}
+
 missing=""
 [ -s /etc/rclone/rclone.conf ] || missing="$missing backup-rclone/rclone.conf"
 [ -s /etc/rclone/dest ] || missing="$missing backup-rclone/dest"
 if [ -n "$missing" ]; then
   say "NOT CONFIGURED — nothing was copied. Missing:$missing"
   say "See 'Backups' in deploy/k3s/README.md. Exiting 0 rather than crash-looping."
+  publish 0 "$(prev_success)"
   exit 0
 fi
 DEST=$(cat /etc/rclone/dest)
@@ -56,6 +80,7 @@ rclone sync src: "$DEST/$NS/minio" \
 # see README. Without versioning, this command propagates a deletion within a day.
 say "checking what is at the other end"
 rclone size "$DEST/$NS/minio" --json
+publish 1 "$(date -u +%s)"
 
 if [ -s /etc/deadman/minio-url ]; then
   wget -q -T 15 -O /dev/null "$(cat /etc/deadman/minio-url)" \
