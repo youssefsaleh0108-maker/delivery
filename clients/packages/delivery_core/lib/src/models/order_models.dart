@@ -521,6 +521,69 @@ class RiderPosition {
       );
 }
 
+/// What the tracking service lets this caller know of where an order's rider is, mirroring
+/// `RiderSighting.State` in order-tracking.
+///
+/// Everything but [visible] comes without a position, and each is a different sentence on a
+/// customer's screen: the rider is not at an unknown place, they are somewhere this customer is not
+/// shown — still far from the shop, or on somebody else's delivery.
+enum RiderSightingState {
+  /// The rider is shown.
+  visible('VISIBLE'),
+
+  /// Not collected yet, and the rider is still more than 2 km from the shop. An estimate is given;
+  /// the rider's position is not.
+  headingToShop('HEADING_TO_SHOP'),
+
+  /// The rider is on another customer's delivery, or at another customer's door. Nothing else is
+  /// given — no position, no distance, no time.
+  onAnotherDelivery('ON_ANOTHER_DELIVERY'),
+
+  /// The shop, once the order is collected: it sees the rider only until pickup.
+  afterPickup('AFTER_PICKUP'),
+
+  /// No fix of the rider's on this delivery yet.
+  noFix('NO_FIX'),
+
+  /// Delivered or cancelled.
+  closed('CLOSED'),
+
+  /// A state this build does not know. Shown as no position, never as one.
+  unknown('UNKNOWN');
+
+  const RiderSightingState(this.wire);
+
+  final String wire;
+
+  static RiderSightingState fromWire(String? value) => RiderSightingState.values.firstWhere(
+        (RiderSightingState s) => s.wire == value,
+        orElse: () => RiderSightingState.unknown,
+      );
+}
+
+/// `GET /api/tracking/orders/{id}/rider`: the state, and the position exactly when it is visible.
+class RiderSighting {
+  const RiderSighting({required this.orderId, required this.state, this.position});
+
+  final String orderId;
+  final RiderSightingState state;
+
+  /// Present exactly when [state] is [RiderSightingState.visible].
+  final RiderPosition? position;
+
+  factory RiderSighting.fromJson(Map<String, dynamic> json) {
+    final RiderSightingState state = RiderSightingState.fromWire(json['state'] as String?);
+    final Object? position = json['position'];
+    return RiderSighting(
+      orderId: json['orderId'] as String,
+      state: state,
+      position: state == RiderSightingState.visible && position is Map<String, dynamic>
+          ? RiderPosition.fromJson(position)
+          : null,
+    );
+  }
+}
+
 /// Backoffice dashboard counters.
 class OrderStats {
   const OrderStats({

@@ -10,6 +10,8 @@ export 'src/util/image_prep.dart';
 export 'src/util/device_location.dart';
 export 'src/util/market_rates.dart';
 export 'src/util/map_tiles.dart';
+export 'src/util/rider_location.dart';
+export 'src/util/rider_location_reporter.dart';
 export 'src/api/auto_approval_api.dart';
 export 'src/models/auto_approval_models.dart';
 export 'src/api/banner_api.dart';
@@ -124,3 +126,8 @@ export 'src/models/order_attachment_models.dart';
 // with a reason, and the trail. The hold a provider reads on their offer is Product.moderation.
 export 'src/api/backoffice_catalog_api.dart';
 export 'src/models/offer_moderation_models.dart';
+// The checkout map: every order of a multi-shop checkout on one map, from Order Tracking, and the
+// polyline decoder its road geometry needs.
+export 'src/api/checkout_tracking_api.dart';
+export 'src/models/checkout_tracking_models.dart';
+export 'src/util/polyline.dart';

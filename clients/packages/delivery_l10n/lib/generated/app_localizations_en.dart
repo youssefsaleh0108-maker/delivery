@@ -12674,4 +12674,220 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get dareaMapUnavailable =>
       'The map can\'t load right now. The delivery area is described below.';
+
+  @override
+  String get riderGpsOffTitle =>
+      'Location is off — customers can\'t see you on the map';
+
+  @override
+  String get riderGpsServicesOffBody =>
+      'Turn on your phone\'s location so customers can follow their delivery.';
+
+  @override
+  String get riderGpsDeniedBody =>
+      'YouDrop needs your location only while the app is open.';
+
+  @override
+  String get riderGpsBlockedBody =>
+      'Location is blocked for YouDrop. Allow it in the app\'s settings.';
+
+  @override
+  String get riderGpsApproximateTitle =>
+      'Precise location is off — customers can\'t see where you are';
+
+  @override
+  String get riderGpsApproximateBody =>
+      'Turn on precise location for YouDrop in the app\'s settings.';
+
+  @override
+  String get riderGpsMockedTitle =>
+      'A fake-location app is on — your location isn\'t being shared';
+
+  @override
+  String get riderGpsMockedBody =>
+      'Turn off the mock location app in your phone\'s developer options.';
+
+  @override
+  String get riderGpsNoFixTitle =>
+      'No GPS signal — customers can\'t see you on the map';
+
+  @override
+  String get riderGpsNoFixBody =>
+      'This clears by itself once your phone finds you. Open sky helps.';
+
+  @override
+  String get riderGpsClockTitle => 'Your location is being refused';
+
+  @override
+  String get riderGpsClockBody =>
+      'Your phone\'s date and time look wrong. Set them to automatic.';
+
+  @override
+  String get riderGpsAllow => 'Allow location';
+
+  @override
+  String get riderGpsSharingNote =>
+      'Shared only while YouDrop is open: with the customer you\'re delivering to, the shop until you collect, your delivery company while you\'re on duty, and YouDrop support.';
+
+  @override
+  String get riderGpsLegUnknownTitle =>
+      'Customers can\'t see you — which delivery are you on?';
+
+  @override
+  String get riderGpsLegUnknownBody =>
+      'You\'re carrying orders to more than one address. Open the one you\'re heading to and tap Start navigation.';
+
+  @override
+  String get riderGpsDisclosureTitle => 'Who sees your location';
+
+  @override
+  String get riderGpsDisclosureIntro =>
+      'While you work, YouDrop shares your location with:';
+
+  @override
+  String get riderGpsDisclosureCustomer =>
+      'The customer of the delivery you\'re on';
+
+  @override
+  String get riderGpsDisclosureShop => 'The shop, until you collect the order';
+
+  @override
+  String get riderGpsDisclosureCompany =>
+      'Your delivery company, while you\'re on duty';
+
+  @override
+  String get riderGpsDisclosureSupport => 'YouDrop support';
+
+  @override
+  String get riderGpsDisclosureWhen =>
+      'Only while YouDrop is open on your screen, and only while you\'re on duty or carrying an order. Never in the background.';
+
+  @override
+  String get riderGpsDisclosureKept =>
+      'Your route on each delivery is kept for 30 days, then deleted. YouDrop support keeps the last place your phone reported until it reports a new one.';
+
+  @override
+  String get riderGpsDisclosureContinue => 'Continue';
+
+  @override
+  String get riderGpsDisclosureNotNow => 'Not now';
+
+  @override
+  String get etaRiderOnAnotherDelivery =>
+      'Your rider is finishing another delivery first';
+
+  @override
+  String get custRiderShownNearShop =>
+      'Your rider appears on the map once they\'re near the shop';
+
+  @override
+  String get custRouteAfterPickup =>
+      'Your rider\'s route is drawn once they pick up your order.';
+
+  @override
+  String checkoutMapTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Your $count-shop order',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String checkoutMapSeeAll(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'See all $count on one map',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get checkoutMapApproximate =>
+      'Approximate path — straight lines, not roads';
+
+  @override
+  String get checkoutMapNoRiderYet => 'No rider yet';
+
+  @override
+  String get checkoutMapRiderToShop => 'Your rider is on the way to the shop';
+
+  @override
+  String get checkoutMapRiderHasIt => 'Your rider has it';
+
+  @override
+  String checkoutMapRiderLastSeen(String ago) {
+    return 'Your rider was last seen $ago';
+  }
+
+  @override
+  String checkoutMapStop(int number) {
+    return 'Stop $number';
+  }
+
+  @override
+  String checkoutMapStopExpected(int number) {
+    return 'Stop $number · expected';
+  }
+
+  @override
+  String get checkoutMapOtherDeliveries =>
+      'Your rider has other deliveries; times may be longer';
+
+  @override
+  String get checkoutMapShopNoPin =>
+      'This shop isn\'t on the map: it has no location pin';
+
+  @override
+  String get checkoutMapDoorNoPin =>
+      'Your address isn\'t on the map: it was saved without a pin';
+
+  @override
+  String checkoutMapDeliveredAt(String time) {
+    return 'Delivered at $time';
+  }
+
+  @override
+  String get checkoutMapCancelledSeeWhy => 'Cancelled — see why';
+
+  @override
+  String checkoutMapEtaEstimate(String time, int minutes) {
+    return 'Estimated arrival $time · about $minutes min';
+  }
+
+  @override
+  String get checkoutMapAllFinished =>
+      'Every order from this basket is finished';
+
+  @override
+  String get checkoutMapLoadFailed => 'Couldn\'t load your order map';
+
+  @override
+  String get checkoutMapNotFound => 'This order map isn\'t available';
+
+  @override
+  String get checkoutMapTilesDown =>
+      'The map couldn\'t load. Each order\'s progress is listed below.';
+
+  @override
+  String get checkoutMapNothingToDraw =>
+      'None of these places has a map pin yet';
+
+  @override
+  String get checkoutMapUnnamedShop => 'A shop';
+
+  @override
+  String get checkoutMapYourRider => 'Your rider';
+
+  @override
+  String checkoutMapRiderMarkerLastSeen(String ago) {
+    return 'Your rider, last seen $ago';
+  }
+
+  @override
+  String checkoutMapShopPinStop(String shop, int number) {
+    return '$shop, stop $number';
+  }
 }

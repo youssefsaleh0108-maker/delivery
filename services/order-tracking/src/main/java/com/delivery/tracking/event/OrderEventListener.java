@@ -1,5 +1,8 @@
 package com.delivery.tracking.event;
 
+import java.math.BigDecimal;
+import java.time.DateTimeException;
+import java.time.Instant;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -92,6 +95,11 @@ public class OrderEventListener {
                     .orElseGet(() -> participants.save(new OrderParticipants(
                             orderId, customerId, merchantId, riderId, status)));
             order.applyRoute(carrierId, pickup, dropoff);
+            // The checkout map (V17): which checkout the order is part of, the shop it is from, and
+            // when it was collected and finished — stamped from the snapshot's own status, which a
+            // finished order no longer takes on (OrderParticipants#apply).
+            order.applyCheckout(uuidOrNull(node, "checkoutId"), textOrNull(node, "storeName"));
+            order.stampMilestones(status, instantOrNow(node, "occurredAt"));
 
             // Which fleet a rider carries for, inferred from an order that names both. The weakest
             // of the two sources this service has - see CarrierMembership.Source - and the only one
@@ -164,6 +172,40 @@ public class OrderEventListener {
             log.warn("Ignoring out-of-range {}/{} on an order event", latField, lngField);
             return null;
         }
+    }
+
+    /** A text field, or null when it is absent, null or not text. */
+    private static String textOrNull(JsonNode node, String field) {
+        JsonNode value = node.path(field);
+        return value.isTextual() ? value.asText() : null;
+    }
+
+    /**
+     * When the event says it happened, or now when it does not say or cannot be read.
+     *
+     * <p>Now rather than nothing: Order Manager stamps every snapshot, and an event that somehow
+     * did not would otherwise leave a collected order unnumbered on the customer's map for good.
+     * This runs moments after the publish, so "when we heard" is the nearest honest stand-in — and
+     * because the earliest stamp wins, a real one arriving afterwards still replaces it.
+     *
+     * <p>ISO-8601 text is what Spring's mapper writes; epoch seconds are accepted too, being what
+     * a mapper with timestamps switched on would write instead.
+     */
+    private static Instant instantOrNow(JsonNode node, String field) {
+        JsonNode value = node.path(field);
+        try {
+            if (value.isTextual()) {
+                return Instant.parse(value.asText());
+            }
+            if (value.isNumber()) {
+                BigDecimal seconds = value.decimalValue();
+                return Instant.ofEpochSecond(seconds.longValue(),
+                        seconds.remainder(BigDecimal.ONE).movePointRight(9).longValue());
+            }
+        } catch (DateTimeException | ArithmeticException e) {
+            log.warn("Ignoring unparseable {} on an order event", field);
+        }
+        return Instant.now();
     }
 
     /** Matches the key platform-observability's filter uses on the HTTP side. */

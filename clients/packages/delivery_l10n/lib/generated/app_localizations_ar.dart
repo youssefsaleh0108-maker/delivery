@@ -12833,4 +12833,219 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get dareaMapUnavailable =>
       'تعذّر تحميل الخريطة الآن. منطقة التوصيل موصوفة أدناه.';
+
+  @override
+  String get riderGpsOffTitle => 'الموقع مطفأ — لا يراك الزبائن على الخريطة';
+
+  @override
+  String get riderGpsServicesOffBody =>
+      'شغّل خدمة الموقع في هاتفك ليتابع الزبائن توصيل طلباتهم.';
+
+  @override
+  String get riderGpsDeniedBody =>
+      'يحتاج YouDrop إلى موقعك فقط أثناء فتح التطبيق.';
+
+  @override
+  String get riderGpsBlockedBody =>
+      'الموقع محظور على YouDrop. اسمح به من إعدادات التطبيق.';
+
+  @override
+  String get riderGpsApproximateTitle =>
+      'الموقع الدقيق مطفأ — لا يعرف الزبائن أين أنت';
+
+  @override
+  String get riderGpsApproximateBody =>
+      'فعّل الموقع الدقيق لـ YouDrop من إعدادات التطبيق.';
+
+  @override
+  String get riderGpsMockedTitle => 'تطبيق موقع وهمي مفعّل — موقعك لا يُشارَك';
+
+  @override
+  String get riderGpsMockedBody =>
+      'أوقف تطبيق الموقع الوهمي من خيارات المطوّرين في هاتفك.';
+
+  @override
+  String get riderGpsNoFixTitle =>
+      'لا توجد إشارة GPS — لا يراك الزبائن على الخريطة';
+
+  @override
+  String get riderGpsNoFixBody =>
+      'يزول هذا وحده حين يحدّد هاتفك موقعك. المكان المكشوف يساعد.';
+
+  @override
+  String get riderGpsClockTitle => 'موقعك مرفوض';
+
+  @override
+  String get riderGpsClockBody =>
+      'يبدو أن تاريخ هاتفك ووقته غير صحيحين. اضبطهما على الوضع التلقائي.';
+
+  @override
+  String get riderGpsAllow => 'اسمح بالموقع';
+
+  @override
+  String get riderGpsSharingNote =>
+      'يُشارَك موقعك فقط أثناء فتح YouDrop: مع الزبون الذي توصل إليه، ومع المتجر حتى تستلم الطلب، ومع شركة التوصيل التي تعمل لديها أثناء مناوبتك، ومع دعم YouDrop.';
+
+  @override
+  String get riderGpsLegUnknownTitle =>
+      'لا يراك الزبائن — أي توصيلة تقوم بها الآن؟';
+
+  @override
+  String get riderGpsLegUnknownBody =>
+      'تحمل طلبات إلى أكثر من عنوان. افتح الطلب الذي تتجه إليه واضغط «بدء التوجيه».';
+
+  @override
+  String get riderGpsDisclosureTitle => 'من يرى موقعك';
+
+  @override
+  String get riderGpsDisclosureIntro => 'أثناء عملك، يشارك YouDrop موقعك مع:';
+
+  @override
+  String get riderGpsDisclosureCustomer => 'زبون التوصيلة التي تقوم بها الآن';
+
+  @override
+  String get riderGpsDisclosureShop => 'المتجر، حتى تستلم الطلب';
+
+  @override
+  String get riderGpsDisclosureCompany =>
+      'شركة التوصيل التي تعمل لديها، أثناء مناوبتك';
+
+  @override
+  String get riderGpsDisclosureSupport => 'فريق دعم YouDrop';
+
+  @override
+  String get riderGpsDisclosureWhen =>
+      'فقط أثناء فتح YouDrop على شاشتك، وفقط أثناء مناوبتك أو حملك طلبًا. لا يُشارَك أبدًا في الخلفية.';
+
+  @override
+  String get riderGpsDisclosureKept =>
+      'يُحفظ مسارك في كل توصيلة 30 يومًا ثم يُحذف. ويحتفظ دعم YouDrop بآخر مكان أبلغ عنه هاتفك إلى أن يُبلغ عن مكان جديد.';
+
+  @override
+  String get riderGpsDisclosureContinue => 'متابعة';
+
+  @override
+  String get riderGpsDisclosureNotNow => 'ليس الآن';
+
+  @override
+  String get etaRiderOnAnotherDelivery => 'السائق ينهي توصيلة أخرى أولًا';
+
+  @override
+  String get custRiderShownNearShop =>
+      'يظهر السائق على الخريطة حين يقترب من المتجر';
+
+  @override
+  String get custRouteAfterPickup =>
+      'يُرسم مسار السائق على الخريطة حين يستلم طلبك.';
+
+  @override
+  String checkoutMapTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'طلبك من $count متجر',
+      many: 'طلبك من $count متجرًا',
+      few: 'طلبك من $count متاجر',
+      two: 'طلبك من متجرين',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String checkoutMapSeeAll(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'اعرض الطلبات الـ$count على خريطة واحدة',
+      many: 'اعرض الطلبات الـ$count على خريطة واحدة',
+      few: 'اعرض الطلبات الـ$count على خريطة واحدة',
+      two: 'اعرض الطلبين على خريطة واحدة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get checkoutMapApproximate => 'مسار تقريبي — خطوط مستقيمة لا طرقات';
+
+  @override
+  String get checkoutMapNoRiderYet => 'لا يوجد سائق بعد';
+
+  @override
+  String get checkoutMapRiderToShop => 'سائقك في الطريق إلى المتجر';
+
+  @override
+  String get checkoutMapRiderHasIt => 'طلبك مع سائقك';
+
+  @override
+  String checkoutMapRiderLastSeen(String ago) {
+    return 'آخر ظهور لسائقك $ago';
+  }
+
+  @override
+  String checkoutMapStop(int number) {
+    return 'المحطة $number';
+  }
+
+  @override
+  String checkoutMapStopExpected(int number) {
+    return 'المحطة $number · متوقعة';
+  }
+
+  @override
+  String get checkoutMapOtherDeliveries =>
+      'لدى سائقك توصيلات أخرى، وقد تطول الأوقات';
+
+  @override
+  String get checkoutMapShopNoPin =>
+      'هذا المتجر غير ظاهر على الخريطة: لا يوجد له دبوس موقع';
+
+  @override
+  String get checkoutMapDoorNoPin =>
+      'عنوانك غير ظاهر على الخريطة: حُفظ دون دبوس موقع';
+
+  @override
+  String checkoutMapDeliveredAt(String time) {
+    return 'تم التوصيل الساعة $time';
+  }
+
+  @override
+  String get checkoutMapCancelledSeeWhy => 'أُلغي — اعرف السبب';
+
+  @override
+  String checkoutMapEtaEstimate(String time, int minutes) {
+    return 'الوصول المقدّر $time · نحو $minutes دقيقة';
+  }
+
+  @override
+  String get checkoutMapAllFinished => 'انتهت كل الطلبات من هذه السلة';
+
+  @override
+  String get checkoutMapLoadFailed => 'تعذّر تحميل خريطة طلبك';
+
+  @override
+  String get checkoutMapNotFound => 'خريطة هذا الطلب غير متاحة';
+
+  @override
+  String get checkoutMapTilesDown =>
+      'تعذّر تحميل الخريطة. تقدّم كل طلب مذكور أدناه.';
+
+  @override
+  String get checkoutMapNothingToDraw =>
+      'لا يوجد لأي من هذه الأماكن دبوس على الخريطة بعد';
+
+  @override
+  String get checkoutMapUnnamedShop => 'متجر';
+
+  @override
+  String get checkoutMapYourRider => 'سائقك';
+
+  @override
+  String checkoutMapRiderMarkerLastSeen(String ago) {
+    return 'سائقك، آخر ظهور $ago';
+  }
+
+  @override
+  String checkoutMapShopPinStop(String shop, int number) {
+    return '$shop، المحطة $number';
+  }
 }

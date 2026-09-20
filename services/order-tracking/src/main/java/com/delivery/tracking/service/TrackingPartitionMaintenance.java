@@ -31,9 +31,11 @@ import org.springframework.transaction.annotation.Transactional;
  *       insert past the last partition fails. Keeping a week ahead means maintenance has to be
  *       dead for a week before a rider ping is refused, and the startup run means a service that
  *       has been down over a boundary catches up before it accepts traffic.</li>
- *   <li><strong>Roll up.</strong> Before a day is dropped, reduce it to one row per order. A
- *       delivery dispute arrives weeks late and asks where the rider went; dropping the day
- *       without a summary makes that unanswerable.</li>
+ *   <li><strong>Roll up.</strong> Before a day is dropped, reduce it to one row per order: how
+ *       many points, when the first and last were taken, and how far apart they were. A delivery
+ *       dispute arrives weeks late and asks whether the rider was tracked and for how long;
+ *       dropping the day without a summary makes that unanswerable. Where the rider was is not
+ *       kept past the retention window — see {@link #rollUpExpired}.</li>
  *   <li><strong>Drop.</strong> {@code DROP TABLE} on a partition, not {@code DELETE}. A delete of
  *       a day's pings on this table is millions of rows, a long transaction and a vacuum problem;
  *       dropping the partition is a catalogue update.</li>
@@ -130,7 +132,20 @@ public class TrackingPartitionMaintenance {
     }
 
     /**
-     * Summarises every partition about to be dropped.
+     * Summarises every partition about to be dropped — without the positions.
+     *
+     * <p>The summary used to keep each order's first and last point of the day. With real
+     * positions those are the shop (or, from older builds, the claim — often the rider's home)
+     * and, more often than not, the customer's door: kept for good, while the trail they came from
+     * is deleted after {@code raw-ping-retention-days}. So the rollup outlived the very retention
+     * it was part of. It now keeps the count, the first and last times and the straight-line
+     * metres between the two points — how long the rider was tracked and roughly how far —
+     * and no coordinate.
+     *
+     * <p>The four coordinate columns are written as NULL — V18 dropped their NOT NULL for this —
+     * rather than any made-up point, and nothing reads them: no entity, repository or endpoint
+     * maps this table. Rows rolled up before this change keep the coordinates they were written
+     * with; nothing here deletes or rewrites them (see V18 for why that is safe).
      *
      * <p>Reads from the partition directly rather than the parent, so the scan touches only the day
      * being retired instead of the whole table.
@@ -150,10 +165,10 @@ public class TrackingPartitionMaintenance {
                            count(*),
                            min(recorded_at),
                            max(recorded_at),
-                           (array_agg(lat ORDER BY recorded_at))[1],
-                           (array_agg(lng ORDER BY recorded_at))[1],
-                           (array_agg(lat ORDER BY recorded_at DESC))[1],
-                           (array_agg(lng ORDER BY recorded_at DESC))[1],
+                           NULL::double precision,
+                           NULL::double precision,
+                           NULL::double precision,
+                           NULL::double precision,
                            public.ST_Distance(
                                (array_agg(location ORDER BY recorded_at))[1],
                                (array_agg(location ORDER BY recorded_at DESC))[1])

@@ -1,6 +1,7 @@
 package com.delivery.tracking.route;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -46,8 +47,11 @@ public class MapboxRouteProvider implements RouteProvider {
             RestClient.Builder builder,
             @Value("${delivery.tracking.routing.mapbox.base-url:https://api.mapbox.com}") String baseUrl,
             @Value("${delivery.tracking.routing.mapbox.access-token:}") String accessToken,
-            @Value("${delivery.tracking.routing.mapbox.profile:mapbox/driving-traffic}") String profile) {
-        this.client = builder.baseUrl(baseUrl).build();
+            @Value("${delivery.tracking.routing.mapbox.profile:mapbox/driving-traffic}") String profile,
+            @Value("${delivery.tracking.routing.connect-timeout:1s}") Duration connectTimeout,
+            @Value("${delivery.tracking.routing.read-timeout:2s}") Duration readTimeout) {
+        this.client = RoutingTimeouts.apply(builder.clone().baseUrl(baseUrl), connectTimeout,
+                readTimeout).build();
         this.accessToken = accessToken;
         this.profile = profile;
     }
@@ -116,5 +120,71 @@ public class MapboxRouteProvider implements RouteProvider {
                     e.getClass().getSimpleName());
             return Optional.empty();
         }
+    }
+
+    /**
+     * The routed path through the stops, in the same shape OSRM returns it.
+     *
+     * <p>Never cached ({@link #mayCachePaths()} stays false): Mapbox's product terms forbid storing
+     * results from its Navigation APIs, so every drawing is its own billed request. That is the
+     * cost to weigh before this provider is switched on, and it is why a checkout map computes at
+     * most once every few seconds whoever is watching.
+     *
+     * <p>No geometry means no path, never a straight-line substitute — see {@link RoutePath}.
+     */
+    @Override
+    public Optional<RoutePath> path(List<GeoPoint> stops) {
+        if (!isConfigured() || stops.size() < 2) {
+            return Optional.empty();
+        }
+
+        // The profile and the coordinates go into the path as they are, not as expanded variables:
+        // variable expansion percent-encodes reserved characters, which would turn the profile's
+        // own slash (mapbox/driving-traffic) into %2F and the separators into %2C and %3B. Both are
+        // configuration or numbers formatted here, never caller input.
+        String coordinates = LngLat.list(stops);
+
+        try {
+            JsonNode response = client.get()
+                    .uri(uri -> uri.path("/directions/v5/" + profile + "/" + coordinates)
+                            .queryParam("overview", "simplified")
+                            .queryParam("geometries", "polyline6")
+                            // The token rides the query string, so nothing below logs a URI.
+                            .queryParam("access_token", accessToken)
+                            .build())
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, (request, res) -> {
+                        // Classified below rather than thrown.
+                    })
+                    .body(JsonNode.class);
+
+            if (response == null || !"Ok".equals(response.path("code").asText())) {
+                log.warn("Mapbox Directions returned no usable path (code {})",
+                        response == null ? "none" : response.path("code").asText());
+                return Optional.empty();
+            }
+
+            JsonNode route = response.path("routes").path(0);
+            JsonNode geometry = route.path("geometry");
+            if (route.isMissingNode() || !geometry.isTextual() || geometry.asText().isEmpty()) {
+                return Optional.empty();
+            }
+
+            double metres = route.path("distance").asDouble();
+            long seconds = Math.round(route.path("duration").asDouble());
+            return Optional.of(new RoutePath(metres, Duration.ofSeconds(seconds), NAME,
+                    geometry.asText()));
+
+        } catch (Exception e) {
+            log.warn("Mapbox path lookup failed; drawing no path. Cause: {}",
+                    e.getClass().getSimpleName());
+            return Optional.empty();
+        }
+    }
+
+    /** Roads, as Mapbox returned them. */
+    @Override
+    public PathGeometry pathGeometry() {
+        return PathGeometry.ROAD;
     }
 }

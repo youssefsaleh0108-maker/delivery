@@ -116,4 +116,45 @@ void main() {
       expect(presence.lastSeenAt, isNull);
     });
   });
+
+  group('what the tracking service says of the rider', () {
+    test('a visible rider comes with a position; every other state comes without one', () {
+      final RiderSighting shown = RiderSighting.fromJson(<String, dynamic>{
+        'orderId': 'o-1',
+        'state': 'VISIBLE',
+        'position': <String, dynamic>{
+          'orderId': 'o-1',
+          'riderId': 'r-1',
+          'lat': 33.89,
+          'lng': 35.5,
+          'recordedAt': '2026-09-19T10:00:00Z',
+        },
+      });
+      expect(shown.state, RiderSightingState.visible);
+      expect(shown.position!.lat, 33.89);
+
+      for (final String state in <String>['HEADING_TO_SHOP', 'ON_ANOTHER_DELIVERY',
+          'AFTER_PICKUP', 'NO_FIX', 'CLOSED', 'SOMETHING_NEW']) {
+        final RiderSighting withheld = RiderSighting.fromJson(<String, dynamic>{
+          'orderId': 'o-1',
+          'state': state,
+          'position': null,
+        });
+        expect(withheld.position, isNull, reason: state);
+      }
+      expect(RiderSightingState.fromWire('SOMETHING_NEW'), RiderSightingState.unknown);
+    });
+
+    test('an ETA refused because the rider is on another delivery says so, with no number', () {
+      final OrderEta eta = OrderEta.fromJson(<String, dynamic>{
+        'orderId': 'o-1',
+        'available': false,
+        'reason': 'RIDER_ON_ANOTHER_DELIVERY',
+        'provider': 'HAVERSINE_DEV',
+      });
+
+      expect(eta.reason, EtaUnavailableReason.riderOnAnotherDelivery);
+      expect(eta.remainingSeconds, isNull);
+    });
+  });
 }

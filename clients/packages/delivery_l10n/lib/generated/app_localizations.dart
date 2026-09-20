@@ -21458,6 +21458,324 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'The map can\'t load right now. The delivery area is described below.'**
   String get dareaMapUnavailable;
+
+  /// No description provided for @riderGpsOffTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Location is off — customers can\'t see you on the map'**
+  String get riderGpsOffTitle;
+
+  /// No description provided for @riderGpsServicesOffBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on your phone\'s location so customers can follow their delivery.'**
+  String get riderGpsServicesOffBody;
+
+  /// No description provided for @riderGpsDeniedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'YouDrop needs your location only while the app is open.'**
+  String get riderGpsDeniedBody;
+
+  /// No description provided for @riderGpsBlockedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Location is blocked for YouDrop. Allow it in the app\'s settings.'**
+  String get riderGpsBlockedBody;
+
+  /// No description provided for @riderGpsApproximateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Precise location is off — customers can\'t see where you are'**
+  String get riderGpsApproximateTitle;
+
+  /// No description provided for @riderGpsApproximateBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on precise location for YouDrop in the app\'s settings.'**
+  String get riderGpsApproximateBody;
+
+  /// No description provided for @riderGpsMockedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A fake-location app is on — your location isn\'t being shared'**
+  String get riderGpsMockedTitle;
+
+  /// No description provided for @riderGpsMockedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off the mock location app in your phone\'s developer options.'**
+  String get riderGpsMockedBody;
+
+  /// No description provided for @riderGpsNoFixTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No GPS signal — customers can\'t see you on the map'**
+  String get riderGpsNoFixTitle;
+
+  /// No description provided for @riderGpsNoFixBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This clears by itself once your phone finds you. Open sky helps.'**
+  String get riderGpsNoFixBody;
+
+  /// No description provided for @riderGpsClockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your location is being refused'**
+  String get riderGpsClockTitle;
+
+  /// No description provided for @riderGpsClockBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your phone\'s date and time look wrong. Set them to automatic.'**
+  String get riderGpsClockBody;
+
+  /// No description provided for @riderGpsAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow location'**
+  String get riderGpsAllow;
+
+  /// No description provided for @riderGpsSharingNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared only while YouDrop is open: with the customer you\'re delivering to, the shop until you collect, your delivery company while you\'re on duty, and YouDrop support.'**
+  String get riderGpsSharingNote;
+
+  /// No description provided for @riderGpsLegUnknownTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers can\'t see you — which delivery are you on?'**
+  String get riderGpsLegUnknownTitle;
+
+  /// No description provided for @riderGpsLegUnknownBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re carrying orders to more than one address. Open the one you\'re heading to and tap Start navigation.'**
+  String get riderGpsLegUnknownBody;
+
+  /// No description provided for @riderGpsDisclosureTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Who sees your location'**
+  String get riderGpsDisclosureTitle;
+
+  /// No description provided for @riderGpsDisclosureIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'While you work, YouDrop shares your location with:'**
+  String get riderGpsDisclosureIntro;
+
+  /// No description provided for @riderGpsDisclosureCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'The customer of the delivery you\'re on'**
+  String get riderGpsDisclosureCustomer;
+
+  /// No description provided for @riderGpsDisclosureShop.
+  ///
+  /// In en, this message translates to:
+  /// **'The shop, until you collect the order'**
+  String get riderGpsDisclosureShop;
+
+  /// No description provided for @riderGpsDisclosureCompany.
+  ///
+  /// In en, this message translates to:
+  /// **'Your delivery company, while you\'re on duty'**
+  String get riderGpsDisclosureCompany;
+
+  /// No description provided for @riderGpsDisclosureSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'YouDrop support'**
+  String get riderGpsDisclosureSupport;
+
+  /// No description provided for @riderGpsDisclosureWhen.
+  ///
+  /// In en, this message translates to:
+  /// **'Only while YouDrop is open on your screen, and only while you\'re on duty or carrying an order. Never in the background.'**
+  String get riderGpsDisclosureWhen;
+
+  /// No description provided for @riderGpsDisclosureKept.
+  ///
+  /// In en, this message translates to:
+  /// **'Your route on each delivery is kept for 30 days, then deleted. YouDrop support keeps the last place your phone reported until it reports a new one.'**
+  String get riderGpsDisclosureKept;
+
+  /// No description provided for @riderGpsDisclosureContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get riderGpsDisclosureContinue;
+
+  /// No description provided for @riderGpsDisclosureNotNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get riderGpsDisclosureNotNow;
+
+  /// No description provided for @etaRiderOnAnotherDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider is finishing another delivery first'**
+  String get etaRiderOnAnotherDelivery;
+
+  /// No description provided for @custRiderShownNearShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider appears on the map once they\'re near the shop'**
+  String get custRiderShownNearShop;
+
+  /// No description provided for @custRouteAfterPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider\'s route is drawn once they pick up your order.'**
+  String get custRouteAfterPickup;
+
+  /// No description provided for @checkoutMapTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, other{Your {count}-shop order}}'**
+  String checkoutMapTitle(int count);
+
+  /// No description provided for @checkoutMapSeeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, other{See all {count} on one map}}'**
+  String checkoutMapSeeAll(int count);
+
+  /// No description provided for @checkoutMapApproximate.
+  ///
+  /// In en, this message translates to:
+  /// **'Approximate path — straight lines, not roads'**
+  String get checkoutMapApproximate;
+
+  /// No description provided for @checkoutMapNoRiderYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No rider yet'**
+  String get checkoutMapNoRiderYet;
+
+  /// No description provided for @checkoutMapRiderToShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider is on the way to the shop'**
+  String get checkoutMapRiderToShop;
+
+  /// No description provided for @checkoutMapRiderHasIt.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider has it'**
+  String get checkoutMapRiderHasIt;
+
+  /// No description provided for @checkoutMapRiderLastSeen.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider was last seen {ago}'**
+  String checkoutMapRiderLastSeen(String ago);
+
+  /// No description provided for @checkoutMapStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop {number}'**
+  String checkoutMapStop(int number);
+
+  /// No description provided for @checkoutMapStopExpected.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop {number} · expected'**
+  String checkoutMapStopExpected(int number);
+
+  /// No description provided for @checkoutMapOtherDeliveries.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider has other deliveries; times may be longer'**
+  String get checkoutMapOtherDeliveries;
+
+  /// No description provided for @checkoutMapShopNoPin.
+  ///
+  /// In en, this message translates to:
+  /// **'This shop isn\'t on the map: it has no location pin'**
+  String get checkoutMapShopNoPin;
+
+  /// No description provided for @checkoutMapDoorNoPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Your address isn\'t on the map: it was saved without a pin'**
+  String get checkoutMapDoorNoPin;
+
+  /// No description provided for @checkoutMapDeliveredAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered at {time}'**
+  String checkoutMapDeliveredAt(String time);
+
+  /// No description provided for @checkoutMapCancelledSeeWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled — see why'**
+  String get checkoutMapCancelledSeeWhy;
+
+  /// No description provided for @checkoutMapEtaEstimate.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated arrival {time} · about {minutes} min'**
+  String checkoutMapEtaEstimate(String time, int minutes);
+
+  /// No description provided for @checkoutMapAllFinished.
+  ///
+  /// In en, this message translates to:
+  /// **'Every order from this basket is finished'**
+  String get checkoutMapAllFinished;
+
+  /// No description provided for @checkoutMapLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load your order map'**
+  String get checkoutMapLoadFailed;
+
+  /// No description provided for @checkoutMapNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'This order map isn\'t available'**
+  String get checkoutMapNotFound;
+
+  /// No description provided for @checkoutMapTilesDown.
+  ///
+  /// In en, this message translates to:
+  /// **'The map couldn\'t load. Each order\'s progress is listed below.'**
+  String get checkoutMapTilesDown;
+
+  /// No description provided for @checkoutMapNothingToDraw.
+  ///
+  /// In en, this message translates to:
+  /// **'None of these places has a map pin yet'**
+  String get checkoutMapNothingToDraw;
+
+  /// No description provided for @checkoutMapUnnamedShop.
+  ///
+  /// In en, this message translates to:
+  /// **'A shop'**
+  String get checkoutMapUnnamedShop;
+
+  /// No description provided for @checkoutMapYourRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider'**
+  String get checkoutMapYourRider;
+
+  /// No description provided for @checkoutMapRiderMarkerLastSeen.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider, last seen {ago}'**
+  String checkoutMapRiderMarkerLastSeen(String ago);
+
+  /// No description provided for @checkoutMapShopPinStop.
+  ///
+  /// In en, this message translates to:
+  /// **'{shop}, stop {number}'**
+  String checkoutMapShopPinStop(String shop, int number);
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

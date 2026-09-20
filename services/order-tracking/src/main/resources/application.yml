@@ -150,6 +150,41 @@ delivery:
     # single dropped ping does not push every watcher through to Postgres.
     location-cache-ttl: 60s
 
+    ping:
+      # What a rider's reported position must be before it is recorded (FixPolicy). A refused
+      # report answers 422 with a `reason` and leaves no trace in either store.
+      #
+      # Wider than this and the fix cannot place a rider on a street — it is an "approximate
+      # location" permission or a cell tower. The rider app refuses the same fixes before sending.
+      max-accuracy-m: 100
+      # A fix older than this says where the rider was, not where they are. Well past a slow
+      # mobile round trip; well short of the presence window below.
+      max-fix-age: 60s
+      # How far ahead of ours a phone's clock may be before its fixes are refused as future-dated.
+      # Inside it, a fix is recorded as arriving now, so nothing stored is ever in the future.
+      max-clock-skew: 30s
+      # Faster than this between two fixes and the second is a glitch or a spoof. A scooter or a
+      # car on the coast road stays well under it; a multipath jump of kilometres does not.
+      max-speed-kmh: 150
+      # How long the last accepted fix anchors that speed check. Past it, the next fix starts
+      # fresh — so one bad anchor refuses a rider for at most this long.
+      jump-window: 5m
+      # A fix less than this after the rider's last accepted one is answered 202 and neither
+      # recorded nor pushed; so is one dated at or before it. The app sends at most every 10 s.
+      min-interval: 5s
+      # Where a fix may come from: Lebanon (33.05–34.69 N, 35.10–36.63 E) with about 15 km of
+      # margin. Outside it a fix is refused as OUTSIDE_SERVICE_AREA — the old simulator's London,
+      # an emulator's Mountain View, a spoofing app's default. On unless the environment turns it
+      # off, which only dev does (deploy/k3s/overlays/dev), because dev's riders are emulators.
+      # Off or on, a rider's last fix outside the box is never what the next one is judged
+      # against, so the first real fix after an app upgrade is not refused as a jump.
+      service-area:
+        enabled: ${TRACKING_SERVICE_AREA_ENABLED:true}
+        min-lat: 32.91
+        max-lat: 34.83
+        min-lng: 34.93
+        max-lng: 36.80
+
     presence:
       # How long after the last fix a rider still counts as present. Past this they read as STALE,
       # not ON_DUTY: a phone that died cannot tell us it died, so silence has to be what changes the
@@ -167,6 +202,18 @@ delivery:
       # a customer would rather see a slightly aged estimate than have it blink out under a bridge.
       max-fix-age: 5m
 
+    checkout-map:
+      # A multi-shop checkout's map is computed at most this often, per checkout and reader
+      # (CheckoutTrackingService). Each computation is a round of position reads and — with a
+      # routing engine — routing requests, and the screen polls.
+      recompute-after: 5s
+      # How long "your rider has other deliveries" stays latched for one (checkout, rider), in
+      # Redis. The raw answer turns back to no at the other customer's door, as the rider hands
+      # over, so the flip itself would say where that customer lives; it is latched instead. Far
+      # longer than a delivery takes, because nothing reads it once the rider's orders here are
+      # finished — the key is only reclaimed. See OtherDeliveriesLatch.
+      other-deliveries-latch-ttl: 12h
+
     routing:
       # Which provider computes ETAs. HAVERSINE_DEV is the dev implementation: a straight line at
       # the average speed below, with no idea that roads exist. It is the default because the
@@ -180,6 +227,13 @@ delivery:
       # Effective door-to-door speed for the dev provider, including junctions and handovers — not
       # a vehicle's top speed. The one number here worth tuning against observed delivery times.
       average-speed-kmh: 18
+      # What a routing call is given, as CarrierDirectoryClient's roster call is. A customer's map
+      # makes several of them per refresh and a request thread waits on each, so a routing host
+      # that has stopped answering must fail in a second or two instead of holding the thread that
+      # should be taking rider pings. Past them the map draws straight lines and says they are
+      # approximate, and the ETA reports the outage rather than a different kind of number.
+      connect-timeout: 1s
+      read-timeout: 2s
       osrm:
         # Deliberately empty. The public demo server is rate-limited, carries no availability
         # guarantee, and would ship every customer's address to a volunteer's box; a self-hosted
@@ -191,6 +245,22 @@ delivery:
         # access-token comes from Vault at secret/order-tracking, never from here. Mapbox
         # authenticates by query parameter, so nothing in MapboxRouteProvider ever logs a URI.
         profile: mapbox/driving-traffic
+      paths:
+        # The lines a checkout map draws (RoutePaths). Kept in Redis only for a provider whose
+        # terms allow it — OSRM. Never Mapbox, whose terms forbid storing Navigation API results,
+        # and never the dev provider, which is arithmetic. A planned shop → door path is the same
+        # road all day.
+        planned-ttl: 24h
+        # A rider's leg is re-routed once they are this far from where it was last routed from, or
+        # once the window below has passed, whichever comes first.
+        leg-refresh-metres: 150
+        leg-refresh-after: 60s
+
+    # How long a delivery's trail is kept: a day's tracking_events partition is dropped once the day
+    # is older than this (TrackingPartitionMaintenance). What survives it is a per-order summary
+    # with no position in it. The rider app's location disclosure states this number
+    # (riderGpsDisclosureKept in delivery_l10n) — change the two together.
+    raw-ping-retention-days: 30
 
     # Shift boundaries are kept far longer than raw GPS: payroll and late disputes ask about them
     # months later, and the table is a few rows per rider per day rather than millions. The same

@@ -7,6 +7,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import 'cart.dart';
+import 'checkout_map_screen.dart';
 import 'order_details_screen.dart';
 import 'order_outbox.dart';
 import 'outbox_card.dart';
@@ -35,9 +36,14 @@ class MyOrdersScreen extends StatefulWidget {
     required this.cart,
     required this.onOpenBasket,
     this.outbox,
+    this.checkoutTrackingApi,
   });
 
   final OrderApi api;
+
+  /// The checkout map. With it, a multi-shop checkout's badge on each of its cards opens every
+  /// order of the checkout on one map; without it the badge stays the plain statement it was.
+  final CheckoutTrackingApi? checkoutTrackingApi;
 
   /// Checkouts queued while offline, drawn above the live orders (Figma 121:279's outbox). Null
   /// draws none — a test that is not about them.
@@ -169,6 +175,10 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
       )).then((_) => _refresh());
       return;
     }
+    _openDetailsById(order.id, preview: order);
+  }
+
+  void _openDetailsById(String orderId, {DeliveryOrder? preview}) {
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => OrderDetailsScreen(
         orderApi: widget.api,
@@ -176,12 +186,35 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
         trackingApi: widget.trackingApi,
         trackingSocket: widget.trackingSocket,
         chatApi: widget.chatApi,
+        checkoutTrackingApi: widget.checkoutTrackingApi,
         cart: widget.cart,
         onOpenBasket: widget.onOpenBasket,
-        orderId: order.id,
-        preview: order,
+        orderId: orderId,
+        preview: preview,
       ),
     )).then((_) => _refresh());
+  }
+
+  /// Every order of the checkout this one was placed in, on one map. A row there opens that
+  /// order's page, rendered straight away when this list already holds it.
+  void _openCheckoutMap(DeliveryOrder order) {
+    final CheckoutTrackingApi? api = widget.checkoutTrackingApi;
+    final String? checkoutId = order.checkoutId;
+    if (api == null || checkoutId == null) return;
+    openCheckoutMap(
+      context,
+      api: api,
+      checkoutId: checkoutId,
+      shopCount: order.checkoutSize,
+      liveSocket: widget.trackingSocket,
+      onOpenOrder: (String id) {
+        DeliveryOrder? known;
+        for (final DeliveryOrder o in _orders) {
+          if (o.id == id) known = o;
+        }
+        _openDetailsById(id, preview: known);
+      },
+    );
   }
 
   Future<void> _cancel(DeliveryOrder order) async {
@@ -364,6 +397,9 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
             order: order,
             position: _positions[order.id],
             onTap: () => _openDetails(order),
+            onOpenCheckoutMap: widget.checkoutTrackingApi != null && order.isPartOfCheckout
+                ? () => _openCheckoutMap(order)
+                : null,
             onCancel: order.availableActions.contains(OrderAction.cancel)
                 ? () => _cancel(order)
                 : null,
@@ -381,12 +417,20 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
 
 class _OrderCard extends StatelessWidget {
   const _OrderCard(
-      {required this.order, this.position, this.onCancel, this.onTap, this.onReorder});
+      {required this.order,
+      this.position,
+      this.onCancel,
+      this.onTap,
+      this.onReorder,
+      this.onOpenCheckoutMap});
 
   final DeliveryOrder order;
   final RiderPosition? position;
   final VoidCallback? onCancel;
   final VoidCallback? onTap;
+
+  /// Opens the checkout map; null keeps the checkout badge a plain statement.
+  final VoidCallback? onOpenCheckoutMap;
 
   /// The frame's Reorder button, drawn on the past-order cards only.
   final VoidCallback? onReorder;
@@ -449,7 +493,14 @@ class _OrderCard extends StatelessWidget {
                     // One of several shops' orders placed in one checkout, said on every one of
                     // them — so the cards a multi-shop basket became read as one purchase, not as
                     // orders the customer does not remember making.
-                    if (order.isPartOfCheckout) ...<Widget>[
+                    // With the checkout map wired, the same badge is the way to every one of them
+                    // on one map.
+                    if (order.isPartOfCheckout && onOpenCheckoutMap != null)
+                      CheckoutMapBadge(
+                        shopCount: order.checkoutSize!,
+                        onPressed: onOpenCheckoutMap!,
+                      )
+                    else if (order.isPartOfCheckout) ...<Widget>[
                       const SizedBox(height: DeliverySpacing.xs),
                       YdBadge(
                         label: t.multiCartPartOfOrder(order.checkoutSize!),

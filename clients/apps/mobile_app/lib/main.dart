@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -27,6 +28,7 @@ import 'src/splash_screen.dart';
 import 'src/welcome_screen.dart';
 import 'src/merchant_shell.dart';
 import 'src/rider_home_screen.dart';
+import 'src/rider_location_simulator.dart';
 
 /// One codebase, two very different users.
 ///
@@ -134,6 +136,32 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   late final StoreApi _storeApi = StoreApi(_dio);
   late final OrderApi _orderApi = OrderApi(_dio);
 
+  /// Where the rider app's position comes from: the phone's GPS.
+  ///
+  /// The simulator exists for a debug build on an emulator, and only when asked for with
+  /// `--dart-define=RIDER_SIMULATED_GPS=true`. Both halves of the condition are compile-time
+  /// constants, so in a profile or release build the branch is dead and the simulator is compiled
+  /// out — no define can put a fake position into a build a rider installs.
+  RiderLocationSource _riderLocationSource() {
+    if (kDebugMode && riderGpsSimulationRequested) {
+      return SimulatedRiderLocationSource(shopPin: _firstShopPin);
+    }
+    return const DeviceRiderLocationSource();
+  }
+
+  /// The simulator's start: the pin of the first shop the rider is collecting from, if any.
+  Future<({double lat, double lng})?> _firstShopPin() async {
+    final Paged<DeliveryOrder> live = await _orderApi.assigned(
+        size: 5, statuses: const <OrderStatus>[OrderStatus.ready, OrderStatus.pickedUp]);
+    for (final DeliveryOrder order in live.content) {
+      final String? storeId = order.storeId;
+      if (storeId == null) continue;
+      final Store store = await _storeApi.read(storeId);
+      if (store.hasPin) return (lat: store.latitude!, lng: store.longitude!);
+    }
+    return null;
+  }
+
   /// The shop owner's own catalogue — a different endpoint from the storefront a customer browses,
   /// because a merchant sees their unpublished and archived products too.
   late final CatalogApi _catalogApi = CatalogApi(_dio);
@@ -182,6 +210,10 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   // the app decides those features exist. Removing a line here turns the feature off everywhere,
   // silently — treat it like the release switch it is.
   late final TrackingApi _trackingApi = TrackingApi(_dio);
+
+  /// A multi-shop checkout's orders on one map, from Order Tracking — opened after such a checkout
+  /// and from each of its orders' badges.
+  late final CheckoutTrackingApi _checkoutTrackingApi = CheckoutTrackingApi(_dio);
   late final GeocodingApi _geocodingApi = GeocodingApi(_dio);
   late final AggregatesApi _aggregatesApi = AggregatesApi(_dio);
 
@@ -599,6 +631,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
       geocodingApi: _geocodingApi,
       trackingApi: _trackingApi,
       trackingSocket: _trackingSocket,
+      checkoutTrackingApi: _checkoutTrackingApi,
       chatApi: _chatApi,
       neighbourhoodChatApi: _neighbourhoodChatApi,
       shopChatApi: _shopChatApi,
@@ -1009,6 +1042,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               chatApi: _chatApi,
               socket: _socket,
               prefsApi: _prefsApi,
+              locationSource: _riderLocationSource(),
               session: session,
               locale: _locale,
               pendingApproval: pending,
