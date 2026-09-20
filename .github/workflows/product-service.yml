@@ -58,6 +58,13 @@ jobs:
   # log's whole design is that it cannot be used to follow a customer — no account, no session, no
   # device, no pin, no sequential key — and a promise like that made in a comment lasts until somebody
   # adds a column. Made as an assertion, and run here, it fails the build instead.
+  #
+  # ApplicationContextBootTest runs here too, and it is the reason this job matters beyond SQL: it is
+  # the only test that boots this service's real Spring context. DemandWeeks reached dev with two
+  # public constructors and no @Autowired — Spring declined to guess, the context failed at start-up,
+  # and the pod crash-looped while every unit test passed, because each of them builds its subject
+  # with `new`. It wants the same throwaway PostGIS as the rest (real Flyway, real Hibernate
+  # validation), so it shares this job's container rather than starting a second one.
   database-tests:
     runs-on: ubuntu-latest
     permissions:
@@ -91,12 +98,12 @@ jobs:
 
       # -am builds the platform libraries this module depends on, as the build job does. The test
       # filter matches nothing in them, which failIfNoSpecifiedTests=false allows.
-      - name: Storefront isolation, item search, delivery areas, the photo quota, the demand log and the public page against PostGIS
+      - name: The context boot, storefront isolation, item search, delivery areas, the photo quota, the demand log and the public page against PostGIS
         env:
           PRODUCT_TEST_DB_URL: jdbc:postgresql://localhost:5432/postgres
         run: >-
           mvn -B -U -pl services/product-service -am test
-          -Dtest=ServicesVerticalDatabaseTest,ItemSearchDatabaseTest,DeliveryAreaDatabaseTest,PhotoSearchDatabaseTest,SearchDemandDatabaseTest,PublicShopPageDatabaseTest
+          -Dtest=ApplicationContextBootTest,ServicesVerticalDatabaseTest,ItemSearchDatabaseTest,DeliveryAreaDatabaseTest,PhotoSearchDatabaseTest,SearchDemandDatabaseTest,PublicShopPageDatabaseTest
           -Dsurefire.failIfNoSpecifiedTests=false
 
       # Fully qualified, because these tests no longer all live in one package: the public page's is
@@ -105,6 +112,7 @@ jobs:
       - name: Fail if the database tests did not run
         run: |
           for test in \
+            com.delivery.product.ApplicationContextBootTest \
             com.delivery.product.domain.ServicesVerticalDatabaseTest \
             com.delivery.product.domain.ItemSearchDatabaseTest \
             com.delivery.product.domain.DeliveryAreaDatabaseTest \
