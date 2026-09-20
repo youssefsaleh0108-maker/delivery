@@ -34,13 +34,15 @@ ResponseBody _json(String body, {int status = 200}) => ResponseBody.fromString(b
       Headers.contentTypeHeader: <String>[Headers.jsonContentType]
     });
 
+/// Each status with its two sides apart, as the server sends them (RECON-13): an order's debits
+/// and its credits are the same money described twice, so nothing adds them together.
 const String _summaryJson = '''
-{"byStatus":{"POSTED":{"count":9,"amount":300.00},
-             "FAILED":{"count":1,"amount":35.00},
-             "PENDING":{"count":2,"amount":15.00},
-             "COMPENSATED":{"count":1,"amount":20.00},
-             "ABANDONED":{"count":1,"amount":2.50}},
- "unsettledCount":3,"amountAtRisk":50.00}''';
+{"byStatus":{"POSTED":{"count":9,"debits":150.00,"credits":150.00},
+             "FAILED":{"count":1,"debits":0.00,"credits":35.00},
+             "PENDING":{"count":2,"debits":15.00,"credits":15.00},
+             "COMPENSATED":{"count":1,"debits":10.00,"credits":10.00},
+             "ABANDONED":{"count":1,"debits":0.00,"credits":2.50}},
+ "unsettledCount":3,"amountAtRisk":50.00,"atRiskDebits":15.00,"atRiskCredits":50.00}''';
 
 const String _unsettledJson = '''
 [
@@ -556,6 +558,17 @@ void main() {
       );
     });
 
+    testWidgets('RECON-13: the tile counts what the shop owes, never the whole till',
+        (WidgetTester tester) async {
+      await pump(tester);
+
+      // 5.00 of commission out of the shop's till, plus the rider's 42.75. The till's other
+      // 35.00 is the shop's own share of pickups it was paid for at its counter.
+      expect(find.text('\$47.75'), findsOneWidget);
+      expect(find.text('\$82.75'), findsNothing);
+      expect(find.textContaining('2 holding'), findsOneWidget);
+    });
+
     testWidgets('cannot be recorded when the server did not say what the shop owes',
         (WidgetTester tester) async {
       floatJson = floatJson.replaceAll(',"owed":"5.00","retained":"35.00"', '');
@@ -597,8 +610,10 @@ void main() {
       expect(find.text('ABCDEF12'), findsNWidgets(2));
       expect(find.text('\$254.87'), findsOneWidget);
       expect(find.text('\$76.39'), findsOneWidget);
-      // The tile counts all the cash out there; no line adds the two debts together.
+      // The tile counts all the cash out there; no line adds the two debts together. And the
+      // rider is one person holding it, not two (RECON-13).
       expect(find.text('\$331.26'), findsOneWidget);
+      expect(find.textContaining('1 holding'), findsOneWidget);
       expect(
           find.descendant(of: find.byType(ListView).first, matching: find.text('\$331.26')),
           findsNothing);

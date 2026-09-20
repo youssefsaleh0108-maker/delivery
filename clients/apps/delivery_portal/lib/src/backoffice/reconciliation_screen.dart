@@ -397,6 +397,22 @@ class _SummaryTiles extends StatelessWidget {
       .map((CashHolder h) => h.oldest)
       .reduce((DateTime a, DateTime b) => a.isBefore(b) ? a : b);
 
+  /// The platform's money that is still out there, counted once (RECON-13).
+  ///
+  /// A shop's till is mostly the shop's own share of pickups it was paid for at its counter: the
+  /// platform is owed only its commission out of it, which is what [CashHolder.owed] says. Adding
+  /// whole tills reported a shop's own money as the platform's — on dev, 52.50 of till against
+  /// 6.56 actually owed. Everybody else's line is theirs in full, whether it is owed to the
+  /// platform or to their delivery company, because either way it has not reached the platform.
+  double get _cashOnHand => float.fold<double>(0, (double sum, CashHolder h) {
+        if (!h.isShop) return sum + h.amount;
+        final int? owed = h.owed?.minorUnits;
+        return owed == null ? sum : sum + owed / 100;
+      });
+
+  /// How many people are holding it. A rider owing the platform and their company is one person.
+  int get _holders => float.map((CashHolder h) => h.holderRef).toSet().length;
+
   /// Held cash is normal; held cash that is <em>old</em> is not.
   ///
   /// The amount alone is a poor signal — a busy Saturday afternoon and a rider who stopped
@@ -432,13 +448,13 @@ class _SummaryTiles extends StatelessWidget {
       // has failed — but it is the money the bank cannot see, so it belongs next to the number
       // that says whether to worry rather than buried among the counts.
       StatTile(
-        value: _money(float.fold<double>(0, (double s, CashHolder h) => s + h.amount)),
+        value: _money(_cashOnHand),
         label: 'Cash on hand',
         icon: Icons.payments_outlined,
         accent: _floatAccent,
         footnote: float.isEmpty
             ? 'nobody holding'
-            : '${float.length} holding · ${_ago(_oldest)}',
+            : '$_holders holding · ${_ago(_oldest)}',
       ),
       StatTile(
         value: '$posted',

@@ -319,26 +319,49 @@ public class ReconciliationController {
     /**
      * The landing view: totals by status, and how much money is in an unresolved state.
      *
-     * <p>{@code atRisk} is the number that matters — value that has been debited from customers but
-     * not yet paid out, or that failed on the way. A count of rows does not convey that; an amount
-     * does.
+     * <p>{@code amountAtRisk} is the number that matters — value that has been debited from
+     * customers but not yet paid out, or that failed on the way. A count of rows does not convey
+     * that; an amount does.
+     *
+     * <p><strong>Debits are not added to credits (RECON-13).</strong> The two sides of an order are
+     * the same money described twice — invariant I1 — so the old total counted every unfinished
+     * settlement at double its worth: dev reported 331.26 at risk over two banked hand-overs worth
+     * 331.26 between them, once as the collection and once as the payment. Each status now carries
+     * its {@code debits} and {@code credits} apart, and the figure at risk is the larger of the two
+     * across PENDING and FAILED: the money involved, counted once, whichever side of it is stuck.
      */
     @GetMapping("/summary")
     public Map<String, Object> summary() {
-        Map<String, Object> byStatus = new LinkedHashMap<>();
-        BigDecimal atRisk = BigDecimal.ZERO;
+        Map<String, Map<String, Object>> byStatus = new LinkedHashMap<>();
+        BigDecimal atRiskDebits = BigDecimal.ZERO;
+        BigDecimal atRiskCredits = BigDecimal.ZERO;
         long unsettled = 0;
 
-        for (Object[] row : transactions.summariseByStatus()) {
+        for (Object[] row : transactions.summariseByStatusAndDirection()) {
             AccountingTransaction.Status status = (AccountingTransaction.Status) row[0];
-            long count = (Long) row[1];
-            BigDecimal total = (BigDecimal) row[2];
+            AccountingTransaction.Direction direction = (AccountingTransaction.Direction) row[1];
+            long count = (Long) row[2];
+            BigDecimal total = (BigDecimal) row[3];
 
-            byStatus.put(status.name(), Map.of("count", count, "amount", total));
+            Map<String, Object> figures = byStatus.computeIfAbsent(status.name(), key -> {
+                Map<String, Object> blank = new LinkedHashMap<>();
+                blank.put("count", 0L);
+                blank.put("debits", BigDecimal.ZERO);
+                blank.put("credits", BigDecimal.ZERO);
+                return blank;
+            });
+            boolean debit = direction == AccountingTransaction.Direction.DEBIT;
+            figures.put("count", (Long) figures.get("count") + count);
+            figures.put(debit ? "debits" : "credits",
+                    ((BigDecimal) figures.get(debit ? "debits" : "credits")).add(total));
 
             if (status == AccountingTransaction.Status.PENDING
                     || status == AccountingTransaction.Status.FAILED) {
-                atRisk = atRisk.add(total);
+                if (debit) {
+                    atRiskDebits = atRiskDebits.add(total);
+                } else {
+                    atRiskCredits = atRiskCredits.add(total);
+                }
                 unsettled += count;
             }
         }
@@ -346,7 +369,10 @@ public class ReconciliationController {
         return Map.of(
                 "byStatus", byStatus,
                 "unsettledCount", unsettled,
-                "amountAtRisk", atRisk);
+                "amountAtRisk", atRiskDebits.max(atRiskCredits),
+                // Both sides beside it, so nobody has to guess which one the figure above is.
+                "atRiskDebits", atRiskDebits,
+                "atRiskCredits", atRiskCredits);
     }
 
     /**

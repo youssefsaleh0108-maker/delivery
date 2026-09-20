@@ -114,6 +114,10 @@ class AccountingTransaction {
 ///
 /// [amountAtRisk] is the one that matters: value debited from customers but not yet paid out, or
 /// that failed on the way. A count of rows does not convey that; an amount does.
+///
+/// Each status carries its two sides apart (RECON-13). An order's debits and its credits are the
+/// same money described twice, so a figure that added them reported every unfinished settlement at
+/// double its worth; the server sends [debits] and [credits] and adds neither to the other.
 class ReconciliationSummary {
   const ReconciliationSummary({
     required this.byStatus,
@@ -121,22 +125,29 @@ class ReconciliationSummary {
     required this.amountAtRisk,
   });
 
-  final Map<SettlementStatus, ({int count, double amount})> byStatus;
+  final Map<SettlementStatus, ({int count, double debits, double credits})> byStatus;
   final int unsettledCount;
   final double amountAtRisk;
 
   bool get isClean => unsettledCount == 0;
 
+  /// How many rows are in this status, whichever way they point.
+  int countOf(SettlementStatus status) => byStatus[status]?.count ?? 0;
+
   factory ReconciliationSummary.fromJson(Map<String, dynamic> json) {
-    final Map<SettlementStatus, ({int count, double amount})> byStatus =
-        <SettlementStatus, ({int count, double amount})>{};
+    final Map<SettlementStatus, ({int count, double debits, double credits})> byStatus =
+        <SettlementStatus, ({int count, double debits, double credits})>{};
 
     (json['byStatus'] as Map<String, dynamic>? ?? <String, dynamic>{})
         .forEach((String key, dynamic value) {
       final Map<String, dynamic> entry = value as Map<String, dynamic>;
+      // A server from before the split sent one "amount" that was the two sides added together.
+      // It is deliberately not read: the counts are what the tiles show, and that figure was the
+      // bug.
       byStatus[SettlementStatus.fromWire(key)] = (
         count: (entry['count'] as num?)?.toInt() ?? 0,
-        amount: (entry['amount'] as num?)?.toDouble() ?? 0,
+        debits: (entry['debits'] as num?)?.toDouble() ?? 0,
+        credits: (entry['credits'] as num?)?.toDouble() ?? 0,
       );
     });
 

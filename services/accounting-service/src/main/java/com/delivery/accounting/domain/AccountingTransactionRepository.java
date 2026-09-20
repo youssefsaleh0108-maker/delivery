@@ -136,9 +136,19 @@ public interface AccountingTransactionRepository extends JpaRepository<Accountin
                                @Param("from") Instant from,
                                @Param("to") Instant to);
 
-    @Query("select t.status, count(t), coalesce(sum(t.amount), 0) from AccountingTransaction t "
-            + "group by t.status")
-    List<Object[]> summariseByStatus();
+    /**
+     * The landing view's totals, split by direction as well as status (RECON-13).
+     *
+     * <p>Debits and credits of one order are the same money seen from two sides — that is invariant
+     * I1 — so a total that added them reported every settlement twice: dev's summary called 331.26
+     * of banked cash "at risk" by counting the two sides of it. Split, each side can be reported
+     * for what it is and neither is added to the other.
+     *
+     * <p>[status, direction, count, sum].
+     */
+    @Query("select t.status, t.direction, count(t), coalesce(sum(t.amount), 0) "
+            + "from AccountingTransaction t group by t.status, t.direction")
+    List<Object[]> summariseByStatusAndDirection();
 
     /**
      * Legs the saga is still waiting on, older than a given moment.
