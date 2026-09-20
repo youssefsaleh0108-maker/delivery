@@ -723,28 +723,63 @@ step_refresh_rotation() {
   kc_fresh
   check "refreshTokenMaxReuse" 0 "$(kc "$ADMIN" | jq -r '.refreshTokenMaxReuse')"
 
-  # One real round trip: a grant, the token it returns, and then the same token again. The second
-  # one must be refused — that is rotation working, and a 200 here would mean it is not on.
-  if secret_has demo-logins customer; then
-    secret_key_to demo-logins customer "$WORK/cust-pass"
-    curl -s -X POST "$TOKEN_URL" -d grant_type=password -d client_id=mobile-app -d username=customer \
-      --data-urlencode "password@$WORK/cust-pass" | jq -j '.refresh_token // empty' > "$WORK/rt1"
-    rm -f "$WORK/cust-pass"
-    if [ -s "$WORK/rt1" ]; then
-      curl -s -X POST "$TOKEN_URL" -d grant_type=refresh_token -d client_id=mobile-app \
-        --data-urlencode "refresh_token@$WORK/rt1" | jq -j '.refresh_token // empty' > "$WORK/rt2"
-      [ -s "$WORK/rt2" ] && ok "a refresh returned a token" || bad "the first refresh returned nothing"
-      check "the spent token is refused" 400 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$TOKEN_URL" \
-        -d grant_type=refresh_token -d client_id=mobile-app --data-urlencode "refresh_token@$WORK/rt1")"
-      check "the rotated token still works" 200 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$TOKEN_URL" \
-        -d grant_type=refresh_token -d client_id=mobile-app --data-urlencode "refresh_token@$WORK/rt2")"
-      rm -f "$WORK/rt1" "$WORK/rt2"
-    else
-      skip "the demo customer did not sign in, so rotation is not proved end to end"
-    fi
-  else
+  # Two real sign-ins, because the two things being proved CANNOT share a session.
+  #
+  # The first version of this used one: refresh, replay the spent token, then check the rotated one
+  # still worked. It failed on dev, and it was right to — replaying a spent token is what makes
+  # Keycloak revoke the SESSION, so by the time the last assertion ran the rotated token had been
+  # killed by the assertion before it. The check was measuring its own side effect. Each half now
+  # gets a session of its own, and the revocation is asserted rather than tripped over.
+  if ! secret_has demo-logins customer; then
     skip "no demo-logins/customer in $NS, so rotation is not proved end to end"
+    return 0
   fi
+  secret_key_to demo-logins customer "$WORK/cust-pass"
+
+  # sign_in <file>: a fresh session's refresh token into <file>. The password goes in from a file
+  # and never appears in argv or in the output.
+  sign_in() {
+    curl -s -X POST "$TOKEN_URL" -d grant_type=password -d client_id=mobile-app -d username=customer \
+      --data-urlencode "password@$WORK/cust-pass" | jq -j '.refresh_token // empty' > "$1"
+  }
+  # spend <in> <out>: one refresh grant. Prints its HTTP code; the new token, if any, lands in <out>.
+  spend() {
+    curl -s -o "$WORK/spend-body" -w '%{http_code}' -X POST "$TOKEN_URL" \
+      -d grant_type=refresh_token -d client_id=mobile-app --data-urlencode "refresh_token@$1"
+    jq -j '.refresh_token // empty' < "$WORK/spend-body" > "$2" 2>/dev/null || : > "$2"
+    rm -f "$WORK/spend-body"
+  }
+
+  echo "== session one: the chain keeps working"
+  sign_in "$WORK/a1"
+  if [ ! -s "$WORK/a1" ]; then
+    rm -f "$WORK/cust-pass"
+    skip "the demo customer did not sign in, so rotation is not proved end to end"
+    return 0
+  fi
+  check "a refresh is answered" 200 "$(spend "$WORK/a1" "$WORK/a2")"
+  [ -s "$WORK/a2" ] && ok "...and it returned a NEW refresh token" || bad "the refresh returned no new token: rotation is not on"
+  check "the token it returned can be spent in turn" 200 "$(spend "$WORK/a2" "$WORK/a3")"
+  # Leave nothing behind: this session is still alive and nobody is using it.
+  curl -s -o /dev/null -X POST "$IAM/realms/$REALM/protocol/openid-connect/logout" \
+    -d client_id=mobile-app --data-urlencode "refresh_token@$WORK/a3"
+  rm -f "$WORK/a1" "$WORK/a2" "$WORK/a3"
+
+  echo "== session two: a replayed token ends the session"
+  sign_in "$WORK/b1"
+  check "a refresh is answered" 200 "$(spend "$WORK/b1" "$WORK/b2")"
+  check "the token it replaced is refused" 400 "$(spend "$WORK/b1" "$WORK/b-dead")"
+  # The refusal is only half of it. Keycloak treats a replay as a stolen token and revokes the
+  # whole session, so the token the legitimate client is holding dies too — which is exactly why
+  # a client that can run two refresh grants at once signs its user out under rotation.
+  check "...and the live token dies with it" 400 "$(spend "$WORK/b2" "$WORK/b-dead")"
+  rm -f "$WORK/b1" "$WORK/b2" "$WORK/b-dead" "$WORK/cust-pass"
+
+  # NOT asserted here, deliberately, because it is Keycloak's behaviour rather than ours and a
+  # check that fails when a future release improves it would be noise: only the CURRENT token is
+  # guarded. A refresh token from two rotations back is still accepted while the session lives,
+  # and spending it neither fails nor revokes anything. See README.md, "what rotation does not
+  # stop" — the client session window is the real bound on an old token's usefulness.
 }
 
 step_test_accounts() {

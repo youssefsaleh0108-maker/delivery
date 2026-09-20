@@ -302,6 +302,20 @@ grep -q 'port-forward svc/keycloak' scripts/rotate-secrets.sh \
 grep -q '^ADMIN="\$IAM' scripts/rotate-secrets.sh \
   && fail "rotate-secrets.sh builds the admin API URL from the public hostname again" \
   || ok "no admin API URL is built from the public iam hostname"
+# refresh-rotation's first version signed in ONCE: it replayed the spent token and then checked
+# that the rotated one still worked. It failed on dev, and it was right to — replaying a spent
+# token is what makes Keycloak revoke the session, so the last assertion was killed by the one
+# before it. This script has neither jq nor a Keycloak to re-run it against, so it pins the SHAPE
+# that made the mistake possible: one session, and a success expected after the replay.
+step=$(awk '/^step_refresh_rotation/ {on=1} on {print} on && /^}/ {exit}' scripts/rotate-secrets.sh)
+signins=$(printf '%s\n' "$step" | grep -c 'sign_in "\$WORK/' || true)
+[ "${signins:-0}" -ge 2 ] \
+  && ok "refresh-rotation signs in twice, so its two proofs cannot share a session" \
+  || fail "refresh-rotation signs in ${signins:-0} time(s): the replay proof and the chain proof need a session each"
+after=$(printf '%s\n' "$step" | awk '/the token it replaced is refused/ {on = 1; next} on && /check .* 200 /' | wc -l | tr -d ' ')
+[ "${after:-0}" = 0 ] \
+  && ok "nothing expects a token to be accepted after the replay" \
+  || fail "$after assertion(s) expect a 200 after the replay, which has already revoked the session"
 
 echo "== every YAML alias resolves =="
 # A ConfigMap's `data:` values are strings to Kubernetes, so a dangling `*alias` inside one is

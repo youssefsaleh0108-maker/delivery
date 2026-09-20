@@ -165,6 +165,28 @@ them* below for what it creates and who reads each one.
   APK people have installed both contain it. Realm-wide SSO stays 30 d / 90 d because it is the
   phones' session too — which is also why a portal user reaching the 8 h idle limit gets a silent
   PKCE round trip rather than a password prompt.
+
+  **What rotation does and does not stop.** Measured on dev after the step ran, with
+  `revokeRefreshToken` true, `refreshTokenMaxReuse` 0 and no client override:
+
+  | | |
+  | --- | --- |
+  | Replay the token that was **just** spent | refused (`invalid_grant`), **and the session is revoked** — the live token dies with it |
+  | Replay a token from **two rotations earlier** | **accepted.** It mints a new token, and the token the client is holding keeps working |
+
+  So Keycloak guards the CURRENT token, not the chain. A refresh token copied out of a browser or
+  a backup is still usable for as long as its session lives, unless the thief is unlucky enough to
+  race the real client's very next refresh. **The client session window is the real bound**, which
+  is why `delivery-portal` has one: 8 h idle / 24 h max, after which a stolen portal token is
+  worth nothing. `mobile-app` has no override and inherits the realm's 30 d idle / 90 d max, so a
+  token taken from a phone stays good for up to thirty quiet days. Giving `mobile-app` its own
+  window is a live decision about how often customers and riders are asked to sign in again, not a
+  change to make quietly — see the report that came with this branch.
+
+  `refresh-rotation` proves both halves of the first row, and it needs **two sign-ins** to do it:
+  the replay is what revokes the session, so a proof that replays first and then checks the
+  rotated token is measuring its own side effect. It did exactly that on the first run and failed;
+  `scripts/verify.sh` now pins the shape so it cannot come back.
 - **The Keycloak admin console is not public.** The edge refuses `/admin` on `iam-dev` and
   `iam-qa` (`overlays/ingress.template.yaml`, the `deny-public` middleware), which covers the
   console and the admin REST API; `/realms` is untouched, so authorize, token, JWKS, logout and
