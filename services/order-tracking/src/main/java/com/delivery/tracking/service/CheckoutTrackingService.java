@@ -271,11 +271,9 @@ public class CheckoutTrackingService {
                 stops.putAll(plan.stopNumbers());
                 expected.addAll(plan.expected());
             }
-            for (OrderParticipants order : riderOrders) {
-                EtaResult estimate = eta.estimate(order, riderOrders, seen, now);
-                etas.put(order.getOrderId(),
-                        shown.isPresent() ? estimate : estimate.withoutDistance());
-            }
+            // One journey, measured once: every order of the run carries the same answer.
+            eta.estimateRun(riderOrders, seen, now).forEach((orderId, estimate) ->
+                    etas.put(orderId, shown.isPresent() ? estimate : estimate.withoutDistance()));
 
             List<UUID> visitOrder = plan.visitOrder().stream()
                     .map(OrderParticipants::getOrderId)
@@ -292,7 +290,8 @@ public class CheckoutTrackingService {
                 GeoPoint from = new GeoPoint(shown.get().lat(), shown.get().lng());
                 List<GeoPoint> ahead = new ArrayList<>(plan.aheadPins());
                 ahead.add(door.get());
-                Optional<RoutePath> leg = paths.riderLeg(from, ahead);
+                Optional<RoutePath> leg = paths.riderLeg(entry.getKey(),
+                        isBackoffice ? BACKOFFICE : callerId, from, ahead);
                 if (leg.isPresent()) {
                     List<GeoPoint> points = new ArrayList<>();
                     points.add(from);

@@ -24,10 +24,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *       road all day, so a routed answer is kept for a day, keyed by provider and by the stops
  *       rounded to five decimal places (about a metre: a pin nudged by a rounding error is the same
  *       pin).</li>
- *   <li><b>Rider legs</b> — from the rider's latest fix through the stops still ahead. The rider
- *       moves, so the leg is recomputed only once they have moved {@code leg-refresh-metres} from
- *       where it was last routed from, or {@code leg-refresh-after} has passed. Between those, every
- *       refresh of every customer watching reuses one routed answer.</li>
+ *   <li><b>Rider legs</b> — from the rider's latest fix through the stops still ahead, keyed by
+ *       that rider and the reader being drawn them as well as by the stops. The rider moves, so
+ *       the leg is recomputed only once they have moved {@code leg-refresh-metres} from where it
+ *       was last routed from, or {@code leg-refresh-after} has passed. Between those, every
+ *       refresh of that reader's screens reuses one routed answer.</li>
  * </ul>
  *
  * <p>Only a provider that says it {@link RouteProvider#mayCachePaths() may be cached} is: OSRM,
@@ -104,36 +105,48 @@ public class RoutePaths {
     }
 
     /**
-     * A rider's remaining journey: from {@code rider} through {@code ahead} in order, the last of
+     * A rider's remaining journey: from {@code from} through {@code ahead} in order, the last of
      * which is the door.
      *
-     * <p>Keyed by the stops ahead — not by who the rider is — and valid while the rider is within
-     * {@code leg-refresh-metres} of where the stored leg was routed from. A leg routed from a point
-     * that close is the same road for the customer's purposes, and its length and time are what the
-     * stored answer says until the refresh window closes.
+     * <p>Valid while the rider is within {@code leg-refresh-metres} of where the stored leg was
+     * routed from. A leg routed from a point that close is the same road for the customer's
+     * purposes, and its length and time are what the stored answer says until the refresh window
+     * closes.
+     *
+     * <p>Keyed by the rider and the reader as well as the stops, because the stored leg's geometry
+     * <em>starts at where it was routed from</em> — a point up to the refresh distance away from
+     * the rider it is now drawn for. Keyed by the stops alone, two riders heading to the same
+     * remaining stops would be drawn from each other's positions, and a leg routed for a reader
+     * who may see more of the rider (the back office) would be drawn for one who may see less. A
+     * reader only ever gets a line that starts where that reader's own rider was.
+     *
+     * @param riderId whose journey this is
+     * @param reader  who is being drawn it, as the checkout map keys its own answers
      */
-    public Optional<RoutePath> riderLeg(GeoPoint rider, List<GeoPoint> ahead) {
+    public Optional<RoutePath> riderLeg(String riderId, String reader, GeoPoint from,
+                                        List<GeoPoint> ahead) {
         RouteProvider provider = providers.active();
         List<GeoPoint> stops = new ArrayList<>(ahead.size() + 1);
-        stops.add(rider);
+        stops.add(from);
         stops.addAll(ahead);
         if (!provider.mayCachePaths()) {
             return orStraight(provider.path(stops), stops);
         }
-        String key = LEG_PREFIX + provider.name() + ":" + keyOf(ahead);
+        String key = LEG_PREFIX + provider.name() + ":" + riderId + ":" + reader + ":"
+                + keyOf(ahead);
         Optional<Stored> cached = read(key);
         if (cached.isPresent()
                 && cached.get().provider().equals(provider.name())
                 && cached.get().originLat() != null
                 && cached.get().originLng() != null
-                && HaversineRouteProvider.distanceMetres(rider,
+                && HaversineRouteProvider.distanceMetres(from,
                         new GeoPoint(cached.get().originLat(), cached.get().originLng()))
                         < legRefreshMetres) {
             return Optional.of(cached.get().toPath());
         }
         Optional<RoutePath> fresh = provider.path(stops);
         // The time half of the refresh rule is the entry's own expiry.
-        fresh.ifPresent(path -> write(key, Stored.of(path, rider), legRefreshAfter));
+        fresh.ifPresent(path -> write(key, Stored.of(path, from), legRefreshAfter));
         return orStraight(fresh, stops);
     }
 

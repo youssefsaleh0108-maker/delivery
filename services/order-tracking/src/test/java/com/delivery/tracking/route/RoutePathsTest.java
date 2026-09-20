@@ -35,6 +35,8 @@ class RoutePathsTest {
     private static final GeoPoint SHOP = new GeoPoint(33.8938, 35.5018);
     private static final GeoPoint DOOR = new GeoPoint(33.8981, 35.5214);
     private static final GeoPoint RIDER = new GeoPoint(33.8900, 35.4950);
+    private static final String RIDER_ID = "rider-sub";
+    private static final String READER = "customer-sub";
 
     /** A routing host that answers every question and counts them. */
     static final class CountingProvider implements RouteProvider {
@@ -159,7 +161,7 @@ class RoutePathsTest {
         osrm.answers = false;
         RoutePaths paths = pathsWith(osrm);
 
-        RoutePath fallback = paths.riderLeg(RIDER, List.of(SHOP, DOOR)).orElseThrow();
+        RoutePath fallback = paths.riderLeg(RIDER_ID, READER, RIDER, List.of(SHOP, DOOR)).orElseThrow();
 
         assertThat(fallback.polyline6()).isNull();
         assertThat(fallback.provider()).isEqualTo(HaversineRouteProvider.NAME);
@@ -181,9 +183,9 @@ class RoutePathsTest {
         CountingProvider osrm = new CountingProvider("OSRM", true);
         RoutePaths paths = pathsWith(osrm);
 
-        RoutePath first = paths.riderLeg(RIDER, List.of(SHOP, DOOR)).orElseThrow();
+        RoutePath first = paths.riderLeg(RIDER_ID, READER, RIDER, List.of(SHOP, DOOR)).orElseThrow();
         // About 55 m north: the same road for the customer's purposes.
-        RoutePath nearby = paths.riderLeg(new GeoPoint(33.8905, 35.4950), List.of(SHOP, DOOR))
+        RoutePath nearby = paths.riderLeg(RIDER_ID, READER, new GeoPoint(33.8905, 35.4950), List.of(SHOP, DOOR))
                 .orElseThrow();
         assertThat(nearby).isEqualTo(first);
         assertThat(osrm.asked).hasSize(1);
@@ -193,10 +195,40 @@ class RoutePathsTest {
 
         // About 330 m on: routed again, from where the rider now is.
         GeoPoint moved = new GeoPoint(33.8930, 35.4950);
-        RoutePath rerouted = paths.riderLeg(moved, List.of(SHOP, DOOR)).orElseThrow();
+        RoutePath rerouted = paths.riderLeg(RIDER_ID, READER, moved, List.of(SHOP, DOOR)).orElseThrow();
         assertThat(osrm.asked).hasSize(2);
         assertThat(osrm.asked.get(1)).containsExactly(moved, SHOP, DOOR);
         assertThat(rerouted).isNotEqualTo(first);
+    }
+
+    /**
+     * A stored leg's geometry starts where it was routed from, up to the refresh distance from
+     * where the rider is now. Shared by stops alone, one rider's line would be drawn for another
+     * standing nearby with the same stops left, and a line routed for the back office — which sees
+     * the rider where a customer may not — would be drawn for the customer.
+     */
+    @Test
+    @DisplayName("keeps a leg per rider and per reader, never shared between them")
+    void a_leg_is_not_shared_between_riders_or_readers() {
+        CountingProvider osrm = new CountingProvider("OSRM", true);
+        RoutePaths paths = pathsWith(osrm);
+
+        paths.riderLeg(RIDER_ID, READER, RIDER, List.of(SHOP, DOOR));
+        // Another rider, a few metres away, with the same stops left.
+        paths.riderLeg("rider-other", READER, new GeoPoint(33.8901, 35.4950), List.of(SHOP, DOOR));
+        // The same rider, read by the back office.
+        paths.riderLeg(RIDER_ID, "*", RIDER, List.of(SHOP, DOOR));
+        // And the first reader again: theirs is still there.
+        paths.riderLeg(RIDER_ID, READER, RIDER, List.of(SHOP, DOOR));
+
+        assertThat(osrm.asked).hasSize(3);
+        assertThat(store.keySet()).containsExactlyInAnyOrder(
+                RoutePaths.LEG_PREFIX + "OSRM:" + RIDER_ID + ":" + READER
+                        + ":33.89380,35.50180;33.89810,35.52140",
+                RoutePaths.LEG_PREFIX + "OSRM:rider-other:" + READER
+                        + ":33.89380,35.50180;33.89810,35.52140",
+                RoutePaths.LEG_PREFIX + "OSRM:" + RIDER_ID + ":*"
+                        + ":33.89380,35.50180;33.89810,35.52140");
     }
 
     /** Mapbox's terms forbid storing its results: every drawing is its own request. */
@@ -208,8 +240,8 @@ class RoutePathsTest {
 
         paths.planned(List.of(SHOP, DOOR));
         paths.planned(List.of(SHOP, DOOR));
-        paths.riderLeg(RIDER, List.of(SHOP, DOOR));
-        paths.riderLeg(RIDER, List.of(SHOP, DOOR));
+        paths.riderLeg(RIDER_ID, READER, RIDER, List.of(SHOP, DOOR));
+        paths.riderLeg(RIDER_ID, READER, RIDER, List.of(SHOP, DOOR));
 
         assertThat(mapbox.asked).hasSize(4);
         verifyNoInteractions(redis);
@@ -256,7 +288,7 @@ class RoutePathsTest {
         RoutePaths paths = pathsWith(osrm);
 
         assertThat(paths.planned(List.of(SHOP, DOOR))).isPresent();
-        assertThat(paths.riderLeg(RIDER, List.of(DOOR))).isPresent();
+        assertThat(paths.riderLeg(RIDER_ID, READER, RIDER, List.of(DOOR))).isPresent();
         assertThat(osrm.asked).hasSize(2);
     }
 }

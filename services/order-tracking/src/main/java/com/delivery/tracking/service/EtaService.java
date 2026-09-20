@@ -3,7 +3,10 @@ package com.delivery.tracking.service;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -133,6 +136,32 @@ public class EtaService {
      * @param sighting    {@link TrackingService#sightingFor} for this caller across
      *                    {@code riderOrders}, folded
      */
+    /**
+     * Every order of one rider's run, estimated together.
+     *
+     * <p>A run is one journey: the same rider, the same stops ahead, the same door, so it is
+     * measured once and each order is handed the same answer under its own id. Measuring it per
+     * order meant a three-shop checkout asking the routing provider for the same legs three times
+     * over, on every refresh, of every watcher.
+     *
+     * <p>An order whose door is not the rest of the run's is measured on its own. A checkout is
+     * one basket to one address by construction, but this projection is fed by messages, and the
+     * one thing that must not happen is an order quietly carrying another order's estimate.
+     *
+     * @return one estimate per order, in the order given
+     */
+    Map<UUID, EtaResult> estimateRun(List<OrderParticipants> riderOrders, RunSighting sighting,
+                                     Instant now) {
+        Map<Optional<GeoPoint>, EtaResult> byDoor = new HashMap<>();
+        Map<UUID, EtaResult> estimates = new LinkedHashMap<>();
+        for (OrderParticipants order : riderOrders) {
+            EtaResult shared = byDoor.computeIfAbsent(order.dropoff(),
+                    door -> estimate(order, riderOrders, sighting, now));
+            estimates.put(order.getOrderId(), shared.forOrder(order.getOrderId()));
+        }
+        return estimates;
+    }
+
     EtaResult estimate(OrderParticipants order, List<OrderParticipants> riderOrders,
                        RunSighting sighting, Instant now) {
         if (!order.isComplete() && sighting.elsewhere()) {
@@ -325,6 +354,13 @@ public class EtaService {
                                      Instant fixRecordedAt, Instant now) {
             return new EtaResult(orderId, false, reason, null, null, null, null,
                     provider, fixRecordedAt, now);
+        }
+
+        /** The same estimate, under another order's id: a run's journey is one journey. */
+        EtaResult forOrder(UUID id) {
+            return id.equals(orderId) ? this
+                    : new EtaResult(id, available, reason, leg, remainingMetres, remainingSeconds,
+                            estimatedArrival, provider, fixRecordedAt, computedAt);
         }
 
         /**

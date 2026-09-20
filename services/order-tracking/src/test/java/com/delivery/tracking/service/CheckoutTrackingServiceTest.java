@@ -954,6 +954,30 @@ class CheckoutTrackingServiceTest {
         }
 
         /**
+         * A run is one journey. Measured per order, a three-shop checkout asked the routing
+         * provider for the same legs three times over, on every refresh, of every watcher.
+         */
+        @Test
+        @DisplayName("measures a run's journey once, not once per order")
+        void a_run_is_measured_once() {
+            collected(A, "Hamra Bakery", SHOP_A, RIDER, clock.instant().minusSeconds(600));
+            order(B, "Achrafieh Pharmacy", SHOP_B, "READY", RIDER);
+            order(C, "Ras Beirut Grocer", SHOP_C, "READY", RIDER);
+            riderAt(A, RIDER, new GeoPoint(33.8950, 35.5050), Duration.ofSeconds(20));
+            CountingRouter router = new CountingRouter();
+
+            CheckoutView view = serviceRoutedBy(router).view(CHECKOUT, CUSTOMER, false);
+
+            // Rider → B → C → door is three legs, asked for once rather than once per order.
+            assertThat(router.estimates.get()).isEqualTo(3);
+            assertThat(router.paths.get()).isEqualTo(1);
+            assertThat(row(view, B).eta().remainingMetres())
+                    .isEqualTo(row(view, A).eta().remainingMetres());
+            assertThat(view.orders()).allSatisfy(o ->
+                    assertThat(o.eta().orderId()).as("each under its own id").isEqualTo(o.orderId()));
+        }
+
+        /**
          * Computing a map calls out to a routing engine several times. Inside a transaction, every
          * one of those seconds is a connection held from the pool the rider pings need, so the
          * method must not be transactional — each read inside takes its own.
@@ -989,6 +1013,28 @@ class CheckoutTrackingServiceTest {
         @Override
         public PathGeometry pathGeometry() {
             return PathGeometry.ROAD;
+        }
+    }
+
+    /** A routing host that answers everything, and counts what it was asked. */
+    private static final class CountingRouter extends SilentRouter {
+        private final AtomicInteger estimates = new AtomicInteger();
+        private final AtomicInteger paths = new AtomicInteger();
+
+        @Override
+        public Optional<com.delivery.tracking.route.RouteEstimate> estimate(GeoPoint from,
+                                                                            GeoPoint to) {
+            estimates.incrementAndGet();
+            return Optional.of(new com.delivery.tracking.route.RouteEstimate(
+                    HaversineRouteProvider.distanceMetres(from, to), Duration.ofSeconds(60),
+                    name()));
+        }
+
+        @Override
+        public Optional<com.delivery.tracking.route.RoutePath> path(List<GeoPoint> stops) {
+            paths.incrementAndGet();
+            return Optional.of(new com.delivery.tracking.route.RoutePath(1_000,
+                    Duration.ofSeconds(60), name(), "road"));
         }
     }
 
