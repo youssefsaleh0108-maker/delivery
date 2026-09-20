@@ -66,15 +66,25 @@ class MerchantCashTest {
     @Mock
     private AccountDirectory accounts;
 
-    /** A row of the cash-on-hand query, shaped as Spring Data projects it. */
+    /** A row of the per-holder query the companies' list reads, shaped as Spring Data projects it. */
     private record Balance(String getHolderRef, HolderKind getHolderKind, BigDecimal getAmount,
                            long getOrders, Instant getOldest)
             implements CashFloatRepository.HolderBalance {
     }
 
+    /** A row of the cash-on-hand query: a shop's till is owed to the platform, so no company. */
+    private record Line(String getHolderRef, HolderKind getHolderKind, String getCarrierRef,
+                        BigDecimal getAmount, long getOrders, Instant getOldest)
+            implements CashFloatRepository.CreditorBalance {
+    }
+
     private CashFloatService cashFloat() {
-        CashFloatService service =
-                new CashFloatService(floats, transactions, postings, "ACC-PLATFORM", "USD");
+        return cashFloat(SettlementService.SettlementMode.LEDGER_ONLY);
+    }
+
+    private CashFloatService cashFloat(SettlementService.SettlementMode mode) {
+        CashFloatService service = new CashFloatService(floats, transactions, postings,
+                "ACC-PLATFORM", "USD", mode);
         // save() returns what it is given, as a real repository does for a new row.
         lenient().when(floats.save(any(CashFloatEntry.class))).thenAnswer(i -> i.getArgument(0));
         lenient().when(transactions.save(any(AccountingTransaction.class)))
@@ -114,8 +124,8 @@ class MerchantCashTest {
         }
 
         private CarrierCashService.OnHand listedWith(int hoursOld) {
-            when(floats.outstandingByHolder()).thenReturn(List.of(new Balance(SHOP,
-                    HolderKind.MERCHANT, new BigDecimal("52.50"), 2,
+            when(floats.outstandingByCreditor()).thenReturn(List.of(new Line(SHOP,
+                    HolderKind.MERCHANT, null, new BigDecimal("52.50"), 2,
                     NOW.minus(Duration.ofHours(hoursOld)))));
             List<CarrierCashService.OnHand> list = service.cashOnHand();
             assertThat(list).hasSize(1);
@@ -246,13 +256,33 @@ class MerchantCashTest {
             // The float balances: every note the till held is paid or kept, and none twice.
             assertThat(payment.getAmount().add(share.getAmount())).isEqualByComparingTo("40.00");
 
-            // Only what reached the platform is posted.
+            // Only what reached the platform is recorded on the ledger, and with no bank deployed
+            // it is settled as it is written rather than left waiting for one (RECON-06).
             ArgumentCaptor<AccountingTransaction> posting =
                     ArgumentCaptor.forClass(AccountingTransaction.class);
             verify(transactions).save(posting.capture());
             assertThat(posting.getValue().getLeg())
                     .isEqualTo(AccountingTransaction.Leg.CASH_REMITTANCE);
             assertThat(posting.getValue().getAmount()).isEqualByComparingTo("5.00");
+            assertThat(posting.getValue().getStatus())
+                    .isEqualTo(AccountingTransaction.Status.SETTLED_IN_CASH);
+            verifyNoInteractions(postings);
+        }
+
+        @Test
+        @DisplayName("with a bank configured, the commission the shop paid is asked of it")
+        void withABankThePaymentIsPosted() {
+            List<CashFloatEntry> till = tillHolds(pickup("40.00", "35.00", "5.00"));
+            assertThat(till).isNotEmpty();
+
+            cashFloat(SettlementService.SettlementMode.BANK).remit(SHOP, "corr-1",
+                    new BigDecimal("5.00"), BY_THE_OPERATOR, HolderKind.MERCHANT).orElseThrow();
+
+            ArgumentCaptor<AccountingTransaction> posting =
+                    ArgumentCaptor.forClass(AccountingTransaction.class);
+            verify(transactions).save(posting.capture());
+            assertThat(posting.getValue().getStatus())
+                    .isEqualTo(AccountingTransaction.Status.PENDING);
             verify(postings).request(posting.getValue());
         }
 
@@ -440,13 +470,15 @@ class MerchantCashTest {
             RiderEarningsService earnings = new RiderEarningsService(riderLedger,
                     org.mockito.Mockito.mock(
                             com.delivery.accounting.domain.RiderCashOutRepository.class),
-                    floats,
+                    floats, transactions,
                     new com.delivery.accounting.payout.RiderPayoutProviders(List.of(
                             new com.delivery.accounting.payout.ManualPayoutProvider()), "MANUAL"),
-                    new BigDecimal("5.00"), new BigDecimal("100.00"), true, "UTC", "USD");
+                    "ACC-PLATFORM", new BigDecimal("5.00"), new BigDecimal("100.00"), true, "UTC",
+                    "USD");
             when(riderLedger.balanceOf(SHOP)).thenReturn(new BigDecimal("20.00"));
-            when(floats.outstandingTotalFor(SHOP, HolderKind.RIDER))
-                    .thenReturn(new BigDecimal("13.25"));
+            // What the account owes the platform as a rider: its bag. The query reads RIDER rows
+            // only, and MerchantCashConstraintTest proves against Postgres that the till is not in it.
+            when(floats.riderOwesPlatform(SHOP)).thenReturn(new BigDecimal("13.25"));
             lenient().when(floats.outstandingTotalFor(SHOP, HolderKind.MERCHANT))
                     .thenReturn(new BigDecimal("40.00"));
 

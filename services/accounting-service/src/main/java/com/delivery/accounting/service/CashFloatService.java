@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,18 +55,35 @@ public class CashFloatService {
     private final BankPostingPublisher postings;
     private final String platformAccount;
     private final String currency;
+    private final SettlementService.SettlementMode settlementMode;
 
+    /** With no bank, the deployed default — see {@link SettlementService.SettlementMode}. */
+    public CashFloatService(CashFloatRepository floatEntries,
+                            AccountingTransactionRepository transactions,
+                            BankPostingPublisher postings,
+                            String platformAccount,
+                            String currency) {
+        this(floatEntries, transactions, postings, platformAccount, currency,
+                SettlementService.SettlementMode.LEDGER_ONLY);
+    }
+
+    @Autowired
     public CashFloatService(CashFloatRepository floatEntries,
                             AccountingTransactionRepository transactions,
                             BankPostingPublisher postings,
                             @Value("${delivery.accounting.platform-account:ACC-PLATFORM}")
                             String platformAccount,
-                            @Value("${delivery.accounting.currency:USD}") String currency) {
+                            @Value("${delivery.accounting.currency:USD}") String currency,
+                            // The same switch settlement reads, so a remittance and the legs it pays
+                            // for are discharged the same way (RECON-06).
+                            @Value("${delivery.accounting.settlement-mode:LEDGER_ONLY}")
+                            SettlementService.SettlementMode settlementMode) {
         this.floatEntries = floatEntries;
         this.transactions = transactions;
         this.postings = postings;
         this.platformAccount = platformAccount;
         this.currency = currency;
+        this.settlementMode = settlementMode;
     }
 
     /**
@@ -157,6 +175,11 @@ public class CashFloatService {
      * subject holds when that is all of one kind, exactly as before, and refuses when it is not,
      * rather than record the till and the bag as one payment of whichever kind happened to be oldest.
      *
+     * <p><strong>Only cash owed to the platform (RECON-03).</strong> A delivery company's rider owes
+     * the notes from the company's jobs to the company, which records its own hand-over
+     * ({@link #handOver}); they are never cleared here. Banking a rider clears their platform-fleet
+     * cash, and {@code expected} is checked against that figure alone.
+     *
      * <p><strong>A shop keeps its share.</strong> A shop's till is cleared against what the shop owes
      * out of it, never against the till ({@link ShopTill}): what it pays is REMITTED and posted as
      * every payment is, and the share it keeps is RETAINED and posted nowhere, because none of it
@@ -231,19 +254,70 @@ public class CashFloatService {
             collected.clearedBy(remittance.getId());
         }
 
-        // The remittance carries its own id as the transaction's order id. A remittance belongs to
-        // no single order — it covers many — and the column is not nullable, so the alternative is
-        // pretending it belongs to one of them.
-        AccountingTransaction posting = new AccountingTransaction(
-                remittance.getId(), Leg.CASH_REMITTANCE, platformAccount,
-                total, currency, Direction.CREDIT, correlationId);
-        transactions.save(posting);
+        recordRemittance(remittance.getId(), total, correlationId);
 
         log.info("{} banked {} covering {} collections", holderRef, total, outstanding.size());
-
-        afterCommit(() -> postings.request(posting));
         return Optional.of(
                 new Remittance(remittance.getId(), holderRef, total, outstanding.size()));
+    }
+
+    /**
+     * Writes the {@code CASH_REMITTANCE} leg for money that reached the platform.
+     *
+     * <p>The remittance carries its own id as the transaction's order id. A remittance belongs to
+     * no single order — it covers many — and the column is not nullable, so the alternative is
+     * pretending it belongs to one of them.
+     *
+     * <p><strong>Discharged the way settlement is (RECON-06).</strong> With no bank
+     * ({@code LEDGER_ONLY}, the deployed default) the leg is recorded as settled the moment it is
+     * written, exactly as every settlement leg already is. It used to be written PENDING and asked
+     * of a Core Banking connector nobody deployed, so it waited for ever: every banked hand-over sat
+     * in {@code /summary}'s amount at risk and on the unsettled work list, and held the
+     * SettlementLegsStuck alert on for good. Under {@code BANK} it is still a real posting, asked of
+     * the bank once this has committed.
+     */
+    private void recordRemittance(UUID remittanceId, BigDecimal amount, String correlationId) {
+        AccountingTransaction posting = new AccountingTransaction(
+                remittanceId, Leg.CASH_REMITTANCE, platformAccount,
+                amount, currency, Direction.CREDIT, correlationId);
+        if (settlementMode == SettlementService.SettlementMode.LEDGER_ONLY) {
+            posting.recordWithoutBank();
+            transactions.save(posting);
+            return;
+        }
+        transactions.save(posting);
+        afterCommit(() -> postings.request(posting));
+    }
+
+    /**
+     * Settles every remittance still waiting for a bank, when there is no bank (RECON-06).
+     *
+     * <p>The rows written before remittances were recorded as settled at birth: PENDING, asked of
+     * a connector nobody runs, and so never answered. This discharges them by the same step a new
+     * remittance takes ({@link AccountingTransaction#recordWithoutBank}), and only them — a leg
+     * that failed stays failed for an operator to look at. Nothing is deleted.
+     *
+     * <p>Idempotent: it reads only PENDING remittances and leaves each one terminal, so a second
+     * run finds nothing. Under {@code BANK} it does nothing at all, because there the bank's answer
+     * is what settles a remittance.
+     *
+     * @return how many remittances it settled
+     */
+    @Transactional
+    public int settlePendingRemittancesWithoutBank() {
+        if (settlementMode != SettlementService.SettlementMode.LEDGER_ONLY) {
+            return 0;
+        }
+        List<AccountingTransaction> waiting = transactions.findByLegAndStatus(
+                Leg.CASH_REMITTANCE, AccountingTransaction.Status.PENDING);
+        if (waiting.isEmpty()) {
+            return 0;
+        }
+        waiting.forEach(AccountingTransaction::recordWithoutBank);
+        transactions.saveAll(waiting);
+        log.info("Settled {} remittance(s) left waiting for a bank that is not deployed",
+                waiting.size());
+        return waiting.size();
     }
 
     /**
@@ -413,13 +487,9 @@ public class CashFloatService {
         }
 
         if (paid != null) {
-            // As on every remittance: the payment's own id stands in for an order, and the bank is
-            // asked only once this has committed.
-            AccountingTransaction posting = new AccountingTransaction(
-                    paid.getId(), Leg.CASH_REMITTANCE, platformAccount,
-                    owing.owed(), currency, Direction.CREDIT, correlationId);
-            transactions.save(posting);
-            afterCommit(() -> postings.request(posting));
+            // As on every remittance: the payment's own id stands in for an order, and it is
+            // discharged the way every remittance is.
+            recordRemittance(paid.getId(), owing.owed(), correlationId);
         }
 
         log.info("{} paid {} out of a till of {} and kept {} as its share, covering {} pickups",

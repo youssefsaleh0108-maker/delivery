@@ -53,6 +53,8 @@ class RiderTipTest {
     private RiderCashOutRepository cashOuts;
     @Mock
     private CashFloatRepository floatEntries;
+    @Mock
+    private com.delivery.accounting.domain.AccountingTransactionRepository transactions;
 
     private RiderEarningsService service;
     private UUID orderId;
@@ -60,9 +62,10 @@ class RiderTipTest {
     @BeforeEach
     void setUp() {
         orderId = UUID.randomUUID();
-        service = new RiderEarningsService(ledger, cashOuts, floatEntries,
+        service = new RiderEarningsService(ledger, cashOuts, floatEntries, transactions,
                 new RiderPayoutProviders(List.of(new ManualPayoutProvider()), "MANUAL"),
-                new BigDecimal("5.00"), new BigDecimal("100.00"), true, "UTC", "USD");
+                "ACC-PLATFORM", new BigDecimal("5.00"), new BigDecimal("100.00"), true, "UTC",
+                "USD");
     }
 
     /** The job earning written when the order was delivered, which is what a tip attaches to. */

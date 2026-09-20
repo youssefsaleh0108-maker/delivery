@@ -402,5 +402,32 @@ void main() {
       expect(company.overdue, isFalse);
       expect(company.isCarrier, isTrue);
     });
+
+    test('RECON-03: a rider\'s line says who the cash is owed to, and what may be confirmed', () {
+      final CashHolder platform = CashHolder.fromJson(<String, dynamic>{
+        'holderRef': 'rider-1',
+        'holderKind': 'RIDER',
+        'carrierRef': null,
+        'amount': 254.87,
+        'orders': 7,
+        'oldest': '2026-09-18T09:00:00Z',
+        'owed': '254.87',
+      });
+      final CashHolder forCompany = CashHolder.fromJson(<String, dynamic>{
+        'holderRef': 'rider-1',
+        'holderKind': 'RIDER',
+        'carrierRef': '5857ac51-0000-4000-8000-000000000000',
+        'amount': 76.39,
+        'orders': 2,
+        'oldest': '2026-09-19T09:00:00Z',
+      });
+
+      expect(platform.isOwedToCompany, isFalse);
+      expect(platform.owed?.amount, '254.87');
+      expect(forCompany.isOwedToCompany, isTrue);
+      expect(forCompany.carrierRef, '5857ac51-0000-4000-8000-000000000000');
+      // Not the platform's to record, so nothing to confirm — never a zero.
+      expect(forCompany.owed, isNull);
+    });
   });
 }

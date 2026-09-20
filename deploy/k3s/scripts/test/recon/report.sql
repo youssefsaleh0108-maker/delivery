@@ -22,8 +22,12 @@ select 'carrier|' || (coalesce((select sum(amount) from accounting.transactions
      - coalesce((select sum(amount) from accounting.cash_float where holder_ref = :'c' and holder_kind = 'PROVIDER'
            and entry_kind = 'COLLECTED' and handover_id is not null
            and created_at >= :'f'::timestamptz and created_at < :'t'::timestamptz), 0))::numeric(12,2);
-select 'platform|' || (coalesce((select sum(case when leg = 'PLATFORM_SUBSIDY' then amount else -amount end)
-         from accounting.transactions where leg in ('PLATFORM_COMMISSION', 'PLATFORM_SUBSIDY')
+-- Commission earned, less what the platform gave away (PLATFORM_SUBSIDY), absorbed on an order
+-- closed after pickup (PLATFORM_LOSS, RECON-10) and paid out in redemptions and cash-outs (PAYOUT,
+-- RECON-11) - which is what the platform's statement now adds up.
+select 'platform|' || (coalesce((select sum(case when leg = 'PLATFORM_COMMISSION' then -amount else amount end)
+         from accounting.transactions
+        where leg in ('PLATFORM_COMMISSION', 'PLATFORM_SUBSIDY', 'PLATFORM_LOSS', 'PAYOUT')
            and created_at >= :'f'::timestamptz and created_at < :'t'::timestamptz), 0))::numeric(12,2);
 select 'merchant goods sold (orders.subtotal of settled orders)|' || coalesce(sum(o.subtotal), 0)
   from orders.orders o where exists (select 1 from accounting.transactions t where t.order_id = o.id

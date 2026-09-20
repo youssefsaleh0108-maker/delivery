@@ -76,24 +76,38 @@ class _ReconciliationScreenState extends State<ReconciliationScreen> {
     }
   }
 
-  /// Records that a holder has banked everything they were carrying.
+  /// Records that a rider has banked the cash they owe the platform.
   ///
   /// Confirmed first, because there is no way back. The ledger can discharge a collection but not
   /// un-discharge one, so an accidental click here means a rider is shown as square with the
   /// platform while still holding the notes.
+  ///
+  /// <strong>Against the figure on screen, and only the platform's (RECON-03).</strong> The line's
+  /// own figure goes with the confirmation, and a key made once per confirmation: if the rider
+  /// collected more since the page loaded the server records nothing and says what they hold now,
+  /// and a double press records one banking. Cash a rider holds for a delivery company is a line of
+  /// its own that has no button here — it is the company's to take in at its hub — and the server
+  /// never clears it from this route either.
   Future<void> _remit(CashHolder holder) async {
     // A shop's till is settled on terms of its own, against what it owes rather than what it holds.
     if (holder.isShop) return _remitShop(holder);
+    if (holder.isOwedToCompany) return;
 
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    // The figure the operator is looking at, exactly as the server wrote it. A server from before
+    // the list carried it sent the amount alone, which is the same figure for a rider.
+    final Money expected = holder.owed ?? Money(holder.amount.toStringAsFixed(2));
+    final String requestKey = CarrierCashApi.newRequestKey();
     final bool confirmed = await showDialog<bool>(
           context: context,
           builder: (BuildContext context) => AlertDialog(
             title: const Text('Record a hand-over'),
             content: Text(
               'Confirm ${_shortId(holder.holderRef)} has handed over '
-              '${_money(holder.amount)} in cash, covering ${holder.orders} '
+              '${_cash(expected)} in cash, covering ${holder.orders} '
               '${holder.orders == 1 ? 'order' : 'orders'}.\n\n'
-              'This clears their whole balance and cannot be undone.',
+              'This clears the cash they owe the platform and cannot be undone. Cash they hold '
+              'for a delivery company is not touched.',
             ),
             actions: <Widget>[
               TextButton(
@@ -116,12 +130,20 @@ class _ReconciliationScreenState extends State<ReconciliationScreen> {
     try {
       // Which of the account's cash this is: one account can be a rider and a shop at once, and the
       // server will not guess between the bag and the till.
-      final Remittance receipt =
-          await widget.api.remit(holder.holderRef, holderKind: holder.holderKind);
+      final Remittance receipt = await widget.api.remit(
+        holder.holderRef,
+        expected: expected,
+        requestKey: requestKey,
+        holderKind: holder.holderKind,
+      );
       messenger.showSnackBar(SnackBar(
         content: Text(receipt.isEmpty
             ? 'Nothing was outstanding — somebody may have recorded this already.'
             : 'Recorded ${_money(receipt.amount)} from ${_shortId(receipt.holderRef)}.'),
+      ));
+    } on CashAmountChanged catch (e) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(t.reconBankedAmountChanged(_shortId(holder.holderRef), _cash(e.current))),
       ));
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('Could not record it: $e')));
@@ -289,7 +311,7 @@ class _ReconciliationScreenState extends State<ReconciliationScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(
                     DeliverySpacing.lg, 0, DeliverySpacing.lg, DeliverySpacing.lg),
-                child: _CashOnHand(holders: riders, onRemit: _remit),
+                child: _CashOnHand(holders: riders, names: data.names, onRemit: _remit),
               ),
             // Hidden when no company holds or is owed anything, as cash on hand is; shown with its
             // own sentence when it could not be loaded, because silence would read as "none".
@@ -375,6 +397,22 @@ class _SummaryTiles extends StatelessWidget {
       .map((CashHolder h) => h.oldest)
       .reduce((DateTime a, DateTime b) => a.isBefore(b) ? a : b);
 
+  /// The platform's money that is still out there, counted once (RECON-13).
+  ///
+  /// A shop's till is mostly the shop's own share of pickups it was paid for at its counter: the
+  /// platform is owed only its commission out of it, which is what [CashHolder.owed] says. Adding
+  /// whole tills reported a shop's own money as the platform's — on dev, 52.50 of till against
+  /// 6.56 actually owed. Everybody else's line is theirs in full, whether it is owed to the
+  /// platform or to their delivery company, because either way it has not reached the platform.
+  double get _cashOnHand => float.fold<double>(0, (double sum, CashHolder h) {
+        if (!h.isShop) return sum + h.amount;
+        final int? owed = h.owed?.minorUnits;
+        return owed == null ? sum : sum + owed / 100;
+      });
+
+  /// How many people are holding it. A rider owing the platform and their company is one person.
+  int get _holders => float.map((CashHolder h) => h.holderRef).toSet().length;
+
   /// Held cash is normal; held cash that is <em>old</em> is not.
   ///
   /// The amount alone is a poor signal — a busy Saturday afternoon and a rider who stopped
@@ -387,12 +425,16 @@ class _SummaryTiles extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int posted = summary.byStatus[SettlementStatus.posted]?.count ?? 0;
-    final int failed = summary.byStatus[SettlementStatus.failed]?.count ?? 0;
-    final int pending = summary.byStatus[SettlementStatus.pending]?.count ?? 0;
+    // Settled is both ways of being settled (PT-2). With no bank deployed almost every row is
+    // SETTLED_IN_CASH, so a tile that counted POSTED alone reported a working platform as having
+    // settled nothing.
+    final int settled = summary.countOf(SettlementStatus.posted) +
+        summary.countOf(SettlementStatus.settledInCash);
+    final int failed = summary.countOf(SettlementStatus.failed);
+    final int pending = summary.countOf(SettlementStatus.pending);
 
-    final int reversed = summary.byStatus[SettlementStatus.compensated]?.count ?? 0;
-    final int abandoned = summary.byStatus[SettlementStatus.abandoned]?.count ?? 0;
+    final int reversed = summary.countOf(SettlementStatus.compensated);
+    final int abandoned = summary.countOf(SettlementStatus.abandoned);
 
     return StatRow(tiles: <Widget>[
       // First, because it is the only number that says whether to worry. Its colour is the answer:
@@ -410,19 +452,22 @@ class _SummaryTiles extends StatelessWidget {
       // has failed — but it is the money the bank cannot see, so it belongs next to the number
       // that says whether to worry rather than buried among the counts.
       StatTile(
-        value: _money(float.fold<double>(0, (double s, CashHolder h) => s + h.amount)),
+        value: _money(_cashOnHand),
         label: 'Cash on hand',
         icon: Icons.payments_outlined,
         accent: _floatAccent,
         footnote: float.isEmpty
             ? 'nobody holding'
-            : '${float.length} holding · ${_ago(_oldest)}',
+            : '$_holders holding · ${_ago(_oldest)}',
       ),
       StatTile(
-        value: '$posted',
+        value: '$settled',
         label: 'Settled',
         icon: Icons.check_circle_outline_rounded,
         accent: DeliveryAccent.positive,
+        footnote: summary.countOf(SettlementStatus.settledInCash) == 0
+            ? null
+            : '${summary.countOf(SettlementStatus.settledInCash)} in cash',
       ),
       StatTile(
         value: '$pending',
@@ -460,10 +505,17 @@ class _SummaryTiles extends StatelessWidget {
 ///
 /// Sorted oldest-first rather than largest-first. The biggest balance is usually just the busiest
 /// rider; the oldest one is the question worth asking.
+///
+/// A rider carrying cash for a delivery company as well as the platform's is on it twice, once per
+/// debt (RECON-03): the platform's line is the one "Banked" records, and the company's line says
+/// who it is owed to and has no button, because the company takes it in at its own hub.
 class _CashOnHand extends StatelessWidget {
-  const _CashOnHand({required this.holders, required this.onRemit});
+  const _CashOnHand({required this.holders, required this.names, required this.onRemit});
 
   final List<CashHolder> holders;
+
+  /// Company names by provider id; a short id stands in for one it does not know.
+  final Map<String, String> names;
   final Future<void> Function(CashHolder) onRemit;
 
   @override
@@ -497,8 +549,13 @@ class _CashOnHand extends StatelessWidget {
               padding: const EdgeInsets.all(DeliverySpacing.sm),
               itemCount: sorted.length,
               separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (BuildContext context, int i) =>
-                  _HolderRow(holder: sorted[i], onRemit: onRemit),
+              itemBuilder: (BuildContext context, int i) => _HolderRow(
+                holder: sorted[i],
+                company: sorted[i].carrierRef == null
+                    ? null
+                    : names[sorted[i].carrierRef!] ?? _shortId(sorted[i].carrierRef!),
+                onRemit: onRemit,
+              ),
             ),
           ),
         ),
@@ -508,9 +565,12 @@ class _CashOnHand extends StatelessWidget {
 }
 
 class _HolderRow extends StatelessWidget {
-  const _HolderRow({required this.holder, required this.onRemit});
+  const _HolderRow({required this.holder, required this.onRemit, this.company});
 
   final CashHolder holder;
+
+  /// Who a rider's line is owed to when it is a delivery company's cash; null when the platform's.
+  final String? company;
   final Future<void> Function(CashHolder) onRemit;
 
   @override
@@ -549,8 +609,13 @@ class _HolderRow extends StatelessWidget {
                           t.carrCashOrderCount(holder.orders),
                           t.svcCashShopTakenAtCounter(_money(holder.amount)),
                         ].join(' · ')
-                      : '${holder.orders} ${holder.orders == 1 ? 'order' : 'orders'} '
-                          '· since ${_ago(holder.oldest)}',
+                      : <String>[
+                          if (company != null) t.reconOwedToCompany(company!),
+                          '${holder.orders} ${holder.orders == 1 ? 'order' : 'orders'} '
+                              '· since ${_ago(holder.oldest)}',
+                        ].join(' · '),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: meta,
                 ),
               ],
@@ -579,6 +644,14 @@ class _HolderRow extends StatelessWidget {
               onPressed: holder.owed == null ? null : () => onRemit(holder),
               icon: const Icon(Icons.account_balance_outlined, size: 16),
               label: Text(t.carrCashBoRecordPayment),
+            )
+          else if (holder.isOwedToCompany)
+            // The company's to take in at its hub, never the platform's to record as banked
+            // (RECON-03): no button, and the reason one hover away.
+            Tooltip(
+              message: t.reconCompanyTakesItIn,
+              child: const Icon(Icons.local_shipping_outlined,
+                  size: 18, color: DeliveryColors.muted),
             )
           else
             OutlinedButton.icon(
@@ -806,6 +879,7 @@ class _Filters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
     return Wrap(
       spacing: DeliverySpacing.sm,
       children: <Widget>[
@@ -817,13 +891,16 @@ class _Filters extends StatelessWidget {
         ),
         for (final SettlementStatus status in <SettlementStatus>[
           SettlementStatus.posted,
+          // Cash-settled rows are most of the ledger on a platform with no bank, and there was no
+          // way to ask for them at all (PT-2).
+          SettlementStatus.settledInCash,
           SettlementStatus.failed,
           SettlementStatus.pending,
           SettlementStatus.compensated,
           SettlementStatus.abandoned,
         ])
           ChoiceChip(
-            label: Text(status.label),
+            label: Text(_statusLabel(t, status)),
             selected: selected == status,
             onSelected: (_) => onSelected(status),
           ),
@@ -831,6 +908,38 @@ class _Filters extends StatelessWidget {
     );
   }
 }
+
+/// What a settlement leg is called here, in the reader's language.
+///
+/// A leg this build has never heard of is shown by the server's own name for it (PT-2): an
+/// operator can act on "GIFT_WRAP_CREDIT" and can do nothing with "Unknown".
+String _legLabel(DeliveryStrings t, AccountingTransaction row) => switch (row.leg) {
+      SettlementLeg.customerDebit => t.reconLegCustomerDebit,
+      SettlementLeg.cashCollected => t.reconLegCashCollected,
+      SettlementLeg.merchantCredit => t.reconLegMerchantCredit,
+      SettlementLeg.giftWrapCredit => t.reconLegGiftWrapCredit,
+      SettlementLeg.riderCredit => t.reconLegRiderCredit,
+      SettlementLeg.providerCredit => t.reconLegProviderCredit,
+      SettlementLeg.platformCommission => t.reconLegPlatformCommission,
+      SettlementLeg.platformSubsidy => t.reconLegPlatformSubsidy,
+      SettlementLeg.platformLoss => t.reconLegPlatformLoss,
+      SettlementLeg.cashRemittance => t.reconLegCashRemittance,
+      SettlementLeg.payout => t.reconLegPayout,
+      SettlementLeg.customerRefund => t.reconLegCustomerRefund,
+      SettlementLeg.unknown => row.legName,
+    };
+
+/// The same for a status, which is also what its filter chip is called.
+String _statusLabel(DeliveryStrings t, SettlementStatus status, [AccountingTransaction? row]) =>
+    switch (status) {
+      SettlementStatus.pending => t.reconStatusPending,
+      SettlementStatus.posted => t.reconStatusPosted,
+      SettlementStatus.settledInCash => t.reconStatusSettledInCash,
+      SettlementStatus.failed => t.reconStatusFailed,
+      SettlementStatus.compensated => t.reconStatusCompensated,
+      SettlementStatus.abandoned => t.reconStatusAbandoned,
+      SettlementStatus.unknown => row?.statusName ?? status.label,
+    };
 
 class _TransactionTable extends StatelessWidget {
   const _TransactionTable({required this.rows, required this.api});
@@ -868,10 +977,10 @@ class _TransactionTable extends StatelessWidget {
               DataRow(
                 cells: <DataCell>[
                   DataCell(Text(_shortId(t.orderId))),
-                  DataCell(Text(t.leg.label)),
+                  DataCell(Text(_legLabel(DeliveryStrings.of(context), t))),
                   DataCell(Text(t.accountRef)),
                   DataCell(Text('${t.isDebit ? '−' : '+'}${_money(t.amount)}')),
-                  DataCell(_StatusChip(status: t.status, reason: t.failureReason)),
+                  DataCell(_StatusChip(row: t, reason: t.failureReason)),
                   // Missing on anything the bank never accepted, which is itself the signal.
                   DataCell(Text(t.coreBankingRef ?? '—')),
                   DataCell(
@@ -895,21 +1004,23 @@ class _TransactionTable extends StatelessWidget {
 }
 
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.status, this.reason});
+  const _StatusChip({required this.row, this.reason});
 
-  final SettlementStatus status;
+  final AccountingTransaction row;
   final String? reason;
 
   @override
   Widget build(BuildContext context) {
-    final DeliveryStatusColor colour = switch (status) {
-      SettlementStatus.posted => DeliveryStatusColor.delivered,
+    final DeliveryStatusColor colour = switch (row.status) {
+      // Settled is settled, however it was discharged: cash at the door counts (PT-2).
+      SettlementStatus.posted || SettlementStatus.settledInCash => DeliveryStatusColor.delivered,
       SettlementStatus.failed => DeliveryStatusColor.inTransit,
       SettlementStatus.pending => DeliveryStatusColor.preparing,
       _ => DeliveryStatusColor.offline,
     };
 
-    final Widget badge = DeliveryStatusBadge(status: colour, label: status.label);
+    final Widget badge = DeliveryStatusBadge(
+        status: colour, label: _statusLabel(DeliveryStrings.of(context), row.status, row));
 
     // The failure reason is the first thing anyone wants after seeing FAILED, so it is one hover
     // away rather than one dialog away.
@@ -926,7 +1037,8 @@ class _SyncLogDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('${transaction.leg.label} · ${_money(transaction.amount)}'),
+      title: Text('${_legLabel(DeliveryStrings.of(context), transaction)} · '
+          '${_money(transaction.amount)}'),
       content: SizedBox(
         width: 700,
         child: FutureBuilder<List<SyncLogEntry>>(

@@ -5,12 +5,27 @@ import 'statement_models.dart' show Money;
 
 /// Which part of a settlement a transaction row is.
 ///
-/// Mirrors `AccountingTransaction.Leg`. Kept as an enum with a label rather than a raw string so
-/// three screens cannot each invent their own wording for "PLATFORM_COMMISSION".
+/// Mirrors `AccountingTransaction.Leg`, and mirrors ALL of it. It used to list four of the ten the
+/// service writes, so the back-office ledger called the other six "Unknown" — including both rows
+/// dev was listing as unsettled, which were cash remittances. When the service adds a leg, add it
+/// here: `settlement_wire_values_test.dart` is the reminder.
+///
+/// [label] is the English wording, one place for it rather than one per screen; the portal renders
+/// a translated one and falls back to this. A value this client has never heard of decodes to
+/// [unknown] and is shown by its own wire name — see [AccountingTransaction.legName] — because
+/// "CUSTOMER_REFUND" tells an operator something and "Unknown" tells them nothing.
 enum SettlementLeg {
   customerDebit('CUSTOMER_DEBIT', 'Customer charged'),
+  cashCollected('CASH_COLLECTED', 'Cash taken at the door'),
   merchantCredit('MERCHANT_CREDIT', 'Merchant payout'),
+  giftWrapCredit('GIFT_WRAP_CREDIT', 'Gift wrapping'),
+  riderCredit('RIDER_CREDIT', 'Rider payout'),
+  providerCredit('PROVIDER_CREDIT', 'Delivery company payout'),
   platformCommission('PLATFORM_COMMISSION', 'Commission'),
+  platformSubsidy('PLATFORM_SUBSIDY', 'Platform contribution'),
+  platformLoss('PLATFORM_LOSS', 'Absorbed after pickup'),
+  cashRemittance('CASH_REMITTANCE', 'Cash banked'),
+  payout('PAYOUT', 'Paid out'),
   customerRefund('CUSTOMER_REFUND', 'Refund'),
   unknown('UNKNOWN', 'Unknown');
 
@@ -25,13 +40,24 @@ enum SettlementLeg {
       );
 }
 
-/// Mirrors `AccountingTransaction.Status`.
+/// Mirrors `AccountingTransaction.Status`, and mirrors all of it.
+///
+/// `SETTLED_IN_CASH` was missing, which is the status of nearly every row the platform writes:
+/// with no bank deployed, settlement discharges each leg as it is written. So the ledger called
+/// them "Unknown" and no tile or filter could reach them.
 enum SettlementStatus {
   /// Created, not yet confirmed by the bank.
   pending('PENDING', 'Pending'),
 
   /// The bank moved the money.
   posted('POSTED', 'Posted'),
+
+  /// Discharged without a bank: cash at the door, or a platform that has no bank connector.
+  ///
+  /// Done, and done successfully — as complete as POSTED, and the commoner of the two here. A
+  /// screen that treats only POSTED as settled reports a working platform as having settled
+  /// nothing.
+  settledInCash('SETTLED_IN_CASH', 'Settled in cash'),
 
   /// The bank refused, or the platform gave up. Recoverable by an operator.
   failed('FAILED', 'Failed'),
@@ -56,6 +82,9 @@ enum SettlementStatus {
 
   /// Whether this row still needs somebody to do something about it.
   bool get needsAttention => this == pending || this == failed;
+
+  /// Whether the money reached whoever it was for, however it was discharged.
+  bool get isSettled => this == posted || this == settledInCash;
 }
 
 class AccountingTransaction {
@@ -73,16 +102,28 @@ class AccountingTransaction {
     this.coreBankingRef,
     this.failureReason,
     this.postedAt,
-  });
+    String? legWire,
+    String? statusWire,
+  })  : legWire = legWire ?? '',
+        statusWire = statusWire ?? '';
 
   final String id;
   final String orderId;
   final SettlementLeg leg;
+
+  /// What the server called this leg, kept whether or not [leg] recognised it.
+  ///
+  /// A value newer than this build decodes to [SettlementLeg.unknown], and the screen shows this
+  /// instead: an operator can act on "GIFT_WRAP_CREDIT" and can do nothing with "Unknown".
+  final String legWire;
   final String accountRef;
   final double amount;
   final String currency;
   final String direction;
   final SettlementStatus status;
+
+  /// What the server called this status, kept for the same reason as [legWire].
+  final String statusWire;
 
   /// The bank's own identifier. This is the number quoted in a dispute.
   final String? coreBankingRef;
@@ -93,10 +134,20 @@ class AccountingTransaction {
 
   bool get isDebit => direction == 'DEBIT';
 
+  /// What to call this leg on screen when no translation is to hand: its name, or the server's own
+  /// word for a leg this build has never heard of.
+  String get legName => leg == SettlementLeg.unknown && legWire.isNotEmpty ? legWire : leg.label;
+
+  /// The same for the status.
+  String get statusName =>
+      status == SettlementStatus.unknown && statusWire.isNotEmpty ? statusWire : status.label;
+
   factory AccountingTransaction.fromJson(Map<String, dynamic> json) => AccountingTransaction(
         id: json['id'] as String,
         orderId: json['orderId'] as String,
         leg: SettlementLeg.fromWire(json['leg'] as String? ?? 'UNKNOWN'),
+        legWire: json['leg'] as String?,
+        statusWire: json['status'] as String?,
         accountRef: json['accountRef'] as String? ?? '',
         amount: (json['amount'] as num?)?.toDouble() ?? 0,
         currency: json['currency'] as String? ?? 'USD',
@@ -114,6 +165,10 @@ class AccountingTransaction {
 ///
 /// [amountAtRisk] is the one that matters: value debited from customers but not yet paid out, or
 /// that failed on the way. A count of rows does not convey that; an amount does.
+///
+/// Each status carries its two sides apart (RECON-13). An order's debits and its credits are the
+/// same money described twice, so a figure that added them reported every unfinished settlement at
+/// double its worth; the server sends [debits] and [credits] and adds neither to the other.
 class ReconciliationSummary {
   const ReconciliationSummary({
     required this.byStatus,
@@ -121,22 +176,29 @@ class ReconciliationSummary {
     required this.amountAtRisk,
   });
 
-  final Map<SettlementStatus, ({int count, double amount})> byStatus;
+  final Map<SettlementStatus, ({int count, double debits, double credits})> byStatus;
   final int unsettledCount;
   final double amountAtRisk;
 
   bool get isClean => unsettledCount == 0;
 
+  /// How many rows are in this status, whichever way they point.
+  int countOf(SettlementStatus status) => byStatus[status]?.count ?? 0;
+
   factory ReconciliationSummary.fromJson(Map<String, dynamic> json) {
-    final Map<SettlementStatus, ({int count, double amount})> byStatus =
-        <SettlementStatus, ({int count, double amount})>{};
+    final Map<SettlementStatus, ({int count, double debits, double credits})> byStatus =
+        <SettlementStatus, ({int count, double debits, double credits})>{};
 
     (json['byStatus'] as Map<String, dynamic>? ?? <String, dynamic>{})
         .forEach((String key, dynamic value) {
       final Map<String, dynamic> entry = value as Map<String, dynamic>;
+      // A server from before the split sent one "amount" that was the two sides added together.
+      // It is deliberately not read: the counts are what the tiles show, and that figure was the
+      // bug.
       byStatus[SettlementStatus.fromWire(key)] = (
         count: (entry['count'] as num?)?.toInt() ?? 0,
-        amount: (entry['amount'] as num?)?.toDouble() ?? 0,
+        debits: (entry['debits'] as num?)?.toDouble() ?? 0,
+        credits: (entry['credits'] as num?)?.toDouble() ?? 0,
       );
     });
 
@@ -192,6 +254,7 @@ class CashHolder {
     required this.oldest,
     this.overdue,
     this.owed,
+    this.carrierRef,
   });
 
   final String holderRef;
@@ -199,6 +262,14 @@ class CashHolder {
   /// RIDER; PROVIDER for a delivery company holding what its riders handed it; or MERCHANT for a
   /// shop holding what its counter took for pickup orders.
   final String holderKind;
+
+  /// The delivery company a rider's line is owed to, or null when the line is owed to the platform.
+  ///
+  /// A rider can carry the platform's cash and a company's at once, and the server lists each debt
+  /// as its own line (RECON-03). A company's line is the company's to take in at its hub, never the
+  /// platform's to record as banked.
+  final String? carrierRef;
+
   final double amount;
   final int orders;
 
@@ -212,10 +283,13 @@ class CashHolder {
   /// in which case the screen falls back to its own rule.
   final bool? overdue;
 
-  /// What a shop owes the platform out of its till: the platform's commission. The rest of the
-  /// till is the shop's own share, which it keeps, so this — never [amount] — is the figure a
-  /// shop's payment is recorded against. Exactly as the ledger wrote it; null for riders and
-  /// companies, and when the server did not say, never a zero.
+  /// The figure a payment through the remit route is recorded against, exactly as the ledger wrote
+  /// it: what the operator confirms.
+  ///
+  /// For a shop it is what the shop owes out of its till — the platform's commission; the rest of
+  /// the till is the shop's own share, which it keeps. For a rider's line owed to the platform it is
+  /// the whole line. Null on a rider's line owed to a delivery company, which is not the platform's
+  /// to record, and when the server did not say — never a zero.
   final Money? owed;
 
   /// A delivery company rather than a rider.
@@ -223,6 +297,9 @@ class CashHolder {
 
   /// A shop holding cash its counter took for pickup orders, rather than a rider.
   bool get isShop => holderKind == 'MERCHANT';
+
+  /// A rider's cash owed to their delivery company rather than to the platform (RECON-03).
+  bool get isOwedToCompany => carrierRef != null;
 
   /// How long the oldest cash has been out.
   Duration get age => DateTime.now().difference(oldest);
@@ -235,6 +312,9 @@ class CashHolder {
         oldest: DateTime.parse(json['oldest'] as String),
         overdue: json['overdue'] is bool ? json['overdue'] as bool : null,
         owed: Money.parse(json['owed']),
+        carrierRef: json['carrierRef'] is String && (json['carrierRef'] as String).isNotEmpty
+            ? json['carrierRef'] as String
+            : null,
       );
 }
 

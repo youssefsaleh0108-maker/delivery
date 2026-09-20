@@ -55,17 +55,26 @@ public class RiderEarningsService {
     private final RiderLedgerRepository ledger;
     private final RiderCashOutRepository cashOuts;
     private final CashFloatRepository floatEntries;
+    private final com.delivery.accounting.domain.AccountingTransactionRepository transactions;
     private final RiderPayoutProviders payoutProviders;
+    private final String platformAccount;
     private final BigDecimal minimumCashOut;
     private final BigDecimal maximumTip;
     private final boolean offsetCashFloat;
     private final ZoneId defaultZone;
     private final String currency;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public RiderEarningsService(RiderLedgerRepository ledger,
                                 RiderCashOutRepository cashOuts,
                                 CashFloatRepository floatEntries,
+                                // Where a cash-out paid is written down, so that what the platform
+                                // has handed a rider reduces what its books say it owes (RECON-11).
+                                com.delivery.accounting.domain.AccountingTransactionRepository
+                                        transactions,
                                 RiderPayoutProviders payoutProviders,
+                                @Value("${delivery.accounting.platform-account:ACC-PLATFORM}")
+                                String platformAccount,
                                 // Below this a cash-out is refused. Nothing here pays automatically
                                 // — an operator does — so a queue of 40-cent requests costs more in
                                 // their time than the requests are worth.
@@ -82,15 +91,19 @@ public class RiderEarningsService {
                                 // more of the platform's.
                                 @Value("${delivery.rider-earnings.offset-cash-float:true}")
                                 boolean offsetCashFloat,
-                                // "Today" is a local-calendar question and the platform operates in
-                                // one region. UTC is the safe default rather than the right one:
-                                // see statement(), which takes a zone per request.
-                                @Value("${delivery.rider-earnings.zone:UTC}") String zone,
+                                // "Today" is a local-calendar question, answered in the platform's
+                                // one calendar (RECON-08): one key, one default, checked at
+                                // start-up by PlatformCalendar. See statement(), which takes a zone
+                                // per request.
+                                @Value("${" + PlatformCalendar.ZONE_PROPERTY + ":"
+                                        + PlatformCalendar.DEFAULT_ZONE + "}") String zone,
                                 @Value("${delivery.accounting.currency:USD}") String currency) {
         this.ledger = ledger;
         this.cashOuts = cashOuts;
         this.floatEntries = floatEntries;
+        this.transactions = transactions;
         this.payoutProviders = payoutProviders;
+        this.platformAccount = platformAccount;
         this.minimumCashOut = minimumCashOut;
         this.maximumTip = maximumTip;
         this.offsetCashFloat = offsetCashFloat;
@@ -224,6 +237,11 @@ public class RiderEarningsService {
      * <p>The result can therefore be NEGATIVE, and is returned that way rather than clamped. A
      * rider who owes the platform money should see that they do; a zero would look like having
      * earned nothing, which is a different and more alarming statement.
+     *
+     * <p><strong>Only cash owed to the platform (RECON-12).</strong> Cash from a delivery company's
+     * jobs is owed to the company, which nets it in its own pay run or takes it at its hub; netting
+     * it here too took the same notes twice. And never the shop's till the same account may hold: a
+     * shop settles its till with the platform on its own terms (V52).
      */
     @Transactional(readOnly = true)
     public BigDecimal availableFor(String riderRef) {
@@ -231,10 +249,8 @@ public class RiderEarningsService {
         if (!offsetCashFloat) {
             return balance;
         }
-        // As a rider, and never as the shop the same account may also be: a shop's till is settled
-        // with the platform on its own terms and is no part of what a rider may cash out (V52).
-        return scale(balance.subtract(floatEntries.outstandingTotalFor(riderRef,
-                com.delivery.accounting.domain.CashFloatEntry.HolderKind.RIDER)));
+        BigDecimal owed = floatEntries.riderOwesPlatform(riderRef);
+        return scale(balance.subtract(owed == null ? BigDecimal.ZERO : owed));
     }
 
     // -------------------------------------------------------------------------------- statement
@@ -493,12 +509,20 @@ public class RiderEarningsService {
      *
      * <p>A refusal is not an exception: it leaves the request open and the money still held, which
      * is the correct state for something an operator will retry.
+     *
+     * <p><strong>One decision wins (RECON-07).</strong> A pay and a refusal made at the same moment
+     * both used to succeed — the money paid out and released back to the balance. The request's
+     * version now refuses whichever commits second, and the provider is handed the request's id as
+     * its idempotency key, so a payment re-driven after that refusal is still one payment.
+     *
+     * @throws com.delivery.accounting.domain.AlreadyDecidedException the request is no longer open
      */
     @Transactional
     public RiderCashOut payCashOut(UUID id, String by, String operatorReference) {
         RiderCashOut request = load(id);
         if (!request.isOpen()) {
-            throw new IllegalStateException("Cannot pay a cash-out that is " + request.getStatus());
+            throw new com.delivery.accounting.domain.AlreadyDecidedException(
+                    "Cannot pay a cash-out that is " + request.getStatus());
         }
 
         RiderPayoutProvider provider = payoutProviders.current();
@@ -516,6 +540,14 @@ public class RiderEarningsService {
         // taking it again would charge the rider twice for one payout.
         ledger.save(RiderLedgerEntry.cashOutPaid(
                 request.getRiderRef(), request.getId(), request.getCurrency()));
+        // And on the ledger itself (RECON-11): money the platform handed over, as a debit against
+        // the rider it went to. The rider's own statement reads the row above — this is what puts
+        // the payment in the platform's books, which had no record of it at all.
+        transactions.save(com.delivery.accounting.domain.AccountingTransaction.paidOut(
+                        request.getId(), platformAccount, request.getAmount(),
+                        request.getCurrency(), null)
+                .attributedTo(com.delivery.accounting.domain.CounterpartyKind.RIDER,
+                        request.getRiderRef()));
         return request;
     }
 

@@ -97,6 +97,21 @@ spring:
           jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://localhost:8180/realms/delivery-platform/protocol/openid-connect/certs}
 
 delivery:
+  # THE PLATFORM'S CALENDAR. One zone for every day, period and report boundary (RECON-08, PT-4).
+  #
+  # A day is a local-calendar question, and the answer has to be the same one everywhere: a
+  # statement, a cash page, a rider's week and a pay run that disagree about when Tuesday started
+  # report the same money in different months. They did — statements and the carrier cash page ran
+  # on UTC while pay periods and every Order Manager dashboard ran on Asia/Beirut, so for three
+  # hours a night the cash page's "today" was yesterday, an order delivered at 00:16 in Beirut
+  # landed on the previous day's statement, and a month's statement ended at 03:00 on the 1st.
+  #
+  # Written once here and aliased below (YAML anchors, not copies), so the keys each reader has
+  # always used cannot drift apart. PlatformCalendar resolves it once and refuses to start if an
+  # override splits them.
+  calendar:
+    zone: &calendar-zone Asia/Beirut
+
   outbox:
     exchange: delivery.events
 
@@ -123,8 +138,9 @@ delivery:
     # Cash the rider is still carrying reduces what they can take out. Turning this off means the
     # platform will hand a rider money while they are holding more of the platform's.
     offset-cash-float: true
-    # "Today" is a local-calendar question. The API takes a zone per request; this is the fallback.
-    zone: UTC
+    # "Today" is a local-calendar question. The API takes a zone per request; this is the fallback,
+    # and it is the platform's calendar above.
+    zone: *calendar-zone
 
   rider-payout:
     # Which provider actually moves the money. MANUAL is the only one that exists: an operator pays
@@ -154,9 +170,10 @@ delivery:
 
   accounting:
     statements:
-      # The calendar a from/to range is interpreted in. "August" is a different 31 days depending
-      # on where you are standing, and every statement query resolves the range once, here.
-      zone: UTC
+      # The calendar a from/to range is interpreted in — and the carrier cash page's "today".
+      # "August" is a different 31 days depending on where you are standing, and every statement
+      # query resolves the range once, here: the platform's calendar above.
+      zone: *calendar-zone
       # Where the PLATFORM's own statement goes. DELIBERATELY BLANK: the platform is not a user
       # and has no address on file, and a wrong default here does not fail loudly — it sends the
       # platform's own figures to a stale inbox. Blank means the send endpoint refuses with a 409
@@ -186,7 +203,8 @@ delivery:
       # The calendar a delivery company's pay periods are in. It must be the zone order-tracking
       # judges attendance in (delivery.tracking.duty-session.day-zone): an attendance answer in any
       # other zone is refused, because its days would not be the days the deliveries were counted in.
-      zone: Asia/Beirut
+      # That is the platform's calendar above, which every other report now reads too.
+      zone: *calendar-zone
       # How long a pay run waits for attendance before computing without it.
       attendance-timeout: 10s
       # How long a pay run waits for Order Manager's count of delivered orders before counting the

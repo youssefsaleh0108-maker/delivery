@@ -10,6 +10,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 /**
  * A rider asking for their balance in money.
@@ -90,6 +91,18 @@ public class RiderCashOut {
     @Column(name = "paid_via", length = 32)
     private String paidVia;
 
+    /**
+     * Which decision this row has seen (RECON-07, V53).
+     *
+     * <p>Two operators on one queue row — one paying, one refusing — both read REQUESTED and both
+     * wrote, so the money was paid out and handed back to the balance as well. With a version the
+     * decision committed second is refused at commit, and the API answers it 409. A wrapper type so
+     * a new request reads as new (null) rather than as a row at version 0.
+     */
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
     protected RiderCashOut() {
         // for JPA
     }
@@ -139,7 +152,7 @@ public class RiderCashOut {
 
     private void requireStatus(Status required, String action) {
         if (this.status != required) {
-            throw new IllegalStateException(
+            throw new AlreadyDecidedException(
                     "Cannot " + action + " a cash-out that is " + this.status);
         }
     }

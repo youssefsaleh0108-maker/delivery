@@ -77,6 +77,19 @@ public class AccountingTransaction {
          */
         PLATFORM_SUBSIDY,
         /**
+         * What the platform absorbed on an order that was closed after pickup (RECON-10).
+         *
+         * <p>Back Office closes a picked-up order that will never arrive and pays the shop its
+         * share and the carrier its fee. Nothing was collected from the customer, so those credits
+         * have nothing behind them and the platform is out of pocket by exactly their sum — which
+         * is what this debit is, on its own account, so the order still balances.
+         *
+         * <p>Distinct from {@link #PLATFORM_SUBSIDY}, which is money the platform gives away on
+         * purpose: free delivery, a promo code. A loss on an order that went wrong is a different
+         * fact, and a report that added the two could not tell an offer from a failure.
+         */
+        PLATFORM_LOSS,
+        /**
          * Takings banked, clearing a cash holder's outstanding float.
          *
          * <p>This one <em>is</em> a real posting: handing over the day's notes genuinely moves
@@ -84,6 +97,19 @@ public class AccountingTransaction {
          * a synthetic order id — the remittance's own.
          */
         CASH_REMITTANCE,
+        /**
+         * Money the platform handed over: a points redemption paid, a rider's cash-out paid.
+         *
+         * <p>A DEBIT against the party that was paid, because that is what reduces what the
+         * platform owes them — and what their statement has to show, or it keeps asking for money
+         * that has already been sent. It belongs to no single order and carries the payout's own
+         * id, as {@link #CASH_REMITTANCE} carries the remittance's, so the unique {@code (order_id,
+         * leg)} is what stops one redemption being recorded twice.
+         *
+         * <p>Never part of an order's arithmetic: the checks that an order's debits equal its
+         * credits exclude it for the same reason they exclude a remittance.
+         */
+        PAYOUT,
         /** Compensation: money returned when a settlement could not be completed. */
         CUSTOMER_REFUND
     }
@@ -141,6 +167,22 @@ public class AccountingTransaction {
 
     @Column(name = "amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
+
+    /**
+     * What the platform charged the payee of this leg, out of what they sold or carried (V54).
+     *
+     * <p>The goods commission on a {@link Leg#MERCHANT_CREDIT}, the delivery cut on a
+     * {@link Leg#PROVIDER_CREDIT} or {@link Leg#RIDER_CREDIT}, and zero where a waiver meant
+     * nothing was charged. Null on a leg that pays nobody, and on every leg written before V54.
+     *
+     * <p><strong>Beside the arithmetic, never inside it.</strong> The legs sum to the order total
+     * on their own and this changes none of them; it exists because the platform's own leg is a
+     * RESIDUE — commission plus the express premium, less any promotion — and a statement that
+     * reads a residue cannot say what a shop was charged. Recorded at settlement, where the figure
+     * is known exactly, rather than re-derived later from a rate that may since have changed.
+     */
+    @Column(name = "commission_amount", precision = 12, scale = 2)
+    private BigDecimal commissionAmount;
 
     @Column(name = "currency", nullable = false, length = 3)
     private String currency;
@@ -218,6 +260,25 @@ public class AccountingTransaction {
     }
 
     /**
+     * Money the platform has already handed over, recorded after the fact (RECON-11).
+     *
+     * <p>Terminal as it is written, for the reason a cash collection is: nothing is waiting on a
+     * bank. An operator pays a redemption or a cash-out outside this system and records that they
+     * did — see {@code PointsService.markPaid} and {@code RiderEarningsService.payCashOut} — so by
+     * the time this row exists the money has moved, and asking a connector to move it again is the
+     * one thing that must not happen.
+     *
+     * <p>Booked against the PLATFORM's account, which is the account it left. Who received it is
+     * the counterparty on the leg, not an account number this service has never been told.
+     */
+    public static AccountingTransaction paidOut(UUID payoutId, String platformAccount,
+                                                BigDecimal amount, String currency,
+                                                String correlationId) {
+        return obligation(payoutId, Leg.PAYOUT, platformAccount, amount, currency,
+                Direction.DEBIT, correlationId);
+    }
+
+    /**
      * Turns an already-built leg into one that records the obligation and asks no bank.
      *
      * <p>What {@code LEDGER_ONLY} settlement is made of. The platform runs cash-on-delivery and
@@ -264,6 +325,26 @@ public class AccountingTransaction {
         this.counterpartyKind = kind;
         this.counterpartyRef = ref;
         return this;
+    }
+
+    /**
+     * Records what the platform charged this leg's payee (V54, RECON-05).
+     *
+     * <p>Zero is a real answer — a waived commission is "we charged nothing", which is not the same
+     * as the null that means "this leg was written before anybody wrote the figure down".
+     *
+     * @return this, so it can be chained where the leg is constructed
+     */
+    public AccountingTransaction commissionCharged(BigDecimal amount) {
+        this.commissionAmount = amount == null
+                ? null
+                : amount.setScale(2, java.math.RoundingMode.HALF_UP);
+        return this;
+    }
+
+    /** What the platform charged this leg's payee, or null when the leg does not say. */
+    public BigDecimal getCommissionAmount() {
+        return commissionAmount;
     }
 
     public CounterpartyKind getCounterpartyKind() {

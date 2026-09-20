@@ -57,6 +57,8 @@ class RiderCashOutTest {
     private RiderLedgerRepository ledger;
     @Mock
     private CashFloatRepository floatEntries;
+    @Mock
+    private com.delivery.accounting.domain.AccountingTransactionRepository transactions;
 
     /**
      * A cash-out repository that behaves like the real table's unique partial index.
@@ -135,19 +137,19 @@ class RiderCashOutTest {
     }
 
     private RiderEarningsService serviceWith(RiderCashOutRepository cashOuts) {
-        return new RiderEarningsService(ledger, cashOuts, floatEntries,
+        return new RiderEarningsService(ledger, cashOuts, floatEntries, transactions,
                 new RiderPayoutProviders(List.of(new ManualPayoutProvider()), "MANUAL"),
-                new BigDecimal("5.00"), new BigDecimal("100.00"), true, "UTC", "USD");
+                "ACC-PLATFORM", new BigDecimal("5.00"), new BigDecimal("100.00"), true, "UTC",
+                "USD");
     }
 
     private void hasEarned(String balance) {
         when(ledger.balanceOf(RIDER)).thenReturn(new BigDecimal(balance));
     }
 
+    /** Cash the rider holds that they owe the platform — what a cash-out is netted against. */
     private void isCarrying(String cash) {
-        when(floatEntries.outstandingTotalFor(RIDER,
-                com.delivery.accounting.domain.CashFloatEntry.HolderKind.RIDER))
-                .thenReturn(new BigDecimal(cash));
+        when(floatEntries.riderOwesPlatform(RIDER)).thenReturn(new BigDecimal(cash));
     }
 
     @Nested

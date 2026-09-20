@@ -52,15 +52,21 @@ public class ReconciliationController {
     private final CashFloatService cashFloat;
     private final CoreBankingSyncLogRepository syncLog;
     private final CarrierCashService carrierCash;
+    private final com.delivery.accounting.service.SettlementFailures failures;
+    private final com.delivery.accounting.service.SettlementRecovery recovery;
 
     public ReconciliationController(AccountingTransactionRepository transactions,
                                     CashFloatService cashFloat,
                                     CoreBankingSyncLogRepository syncLog,
-                                    CarrierCashService carrierCash) {
+                                    CarrierCashService carrierCash,
+                                    com.delivery.accounting.service.SettlementFailures failures,
+                                    com.delivery.accounting.service.SettlementRecovery recovery) {
         this.transactions = transactions;
         this.cashFloat = cashFloat;
         this.syncLog = syncLog;
         this.carrierCash = carrierCash;
+        this.failures = failures;
+        this.recovery = recovery;
     }
 
     /**
@@ -87,6 +93,11 @@ public class ReconciliationController {
      * <p>{@code holderKind} says which of the account's cash is being paid in. One account can be a
      * shop with a till and a rider with a bag, settled on different terms, so when it holds both and
      * the body does not say, nothing is recorded and the answer is 409 {@code HOLDER_KIND_REQUIRED}.
+     *
+     * <p><strong>Only what is owed to the platform (RECON-03).</strong> A rider's cash from a
+     * delivery company's jobs is owed to that company, which records its own hand-over, so banking a
+     * rider clears their platform-fleet cash and nothing else — and {@code expectedAmount} is checked
+     * against that figure, the {@code owed} of the rider's platform line on {@code /float}.
      */
     @PostMapping("/float/{holderRef}/remit")
     public ResponseEntity<?> remit(@PathVariable String holderRef,
@@ -219,10 +230,17 @@ public class ReconciliationController {
      * disagree about what "late" means — and the shop limit for a shop's till. See
      * {@link CarrierCashService#cashOnHand()}.
      *
-     * <p>A shop's line also carries {@code owed} and {@code retained} (V52), as two-decimal strings.
-     * A shop keeps its share of its till and pays the platform its commission, so {@code amount} is
-     * the cash it holds, {@code owed} is the figure its payment is recorded against — what
-     * {@code /float/{ref}/remit} expects — and {@code retained} is the share it keeps.
+     * <p><strong>One line per debt (RECON-03).</strong> A rider carrying cash for a delivery company
+     * as well as the platform's has a line for each: {@code carrierRef} names the company a line is
+     * owed to, and is null on a line owed to the platform. Only a line owed to the platform carries
+     * {@code owed}, the two-decimal string a payment through {@code /float/{ref}/remit} is recorded
+     * against — the Back Office confirms that figure as {@code expectedAmount}. A company's line has
+     * none, because it is not the platform's to record: the company takes that cash in at its hub,
+     * and a remittance never clears it.
+     *
+     * <p>A shop's {@code owed} is not its till (V52): a shop keeps its share of its till and pays the
+     * platform its commission, so {@code amount} is the cash it holds, {@code owed} is the platform's
+     * part, and {@code retained} is the share it keeps.
      *
      * <p>The role is checked in the method as well as on the class, as on every cash route here: this
      * list names who holds the platform's money, and a standalone test can only prove a lock it can
@@ -245,16 +263,19 @@ public class ReconciliationController {
                     Map<String, Object> out = new LinkedHashMap<String, Object>();
                     out.put("holderRef", holder.holderRef());
                     out.put("holderKind", holder.holderKind());
+                    out.put("carrierRef", holder.carrierRef());
                     out.put("amount", holder.amount());
                     out.put("orders", holder.orders());
                     out.put("oldest", holder.oldest());
                     out.put("overdue", holder.overdue());
-                    var till = holder.holderKind() == CashFloatEntry.HolderKind.MERCHANT
-                            ? tills.get(holder.holderRef())
-                            : null;
-                    if (till != null) {
-                        out.put("owed", Statement.money(till.owed()).toPlainString());
-                        out.put("retained", Statement.money(till.retained()).toPlainString());
+                    if (holder.holderKind() == CashFloatEntry.HolderKind.MERCHANT) {
+                        var till = tills.get(holder.holderRef());
+                        if (till != null) {
+                            out.put("owed", Statement.money(till.owed()).toPlainString());
+                            out.put("retained", Statement.money(till.retained()).toPlainString());
+                        }
+                    } else if (holder.owedToPlatform()) {
+                        out.put("owed", Statement.money(holder.amount()).toPlainString());
                     }
                     return out;
                 })
@@ -298,26 +319,49 @@ public class ReconciliationController {
     /**
      * The landing view: totals by status, and how much money is in an unresolved state.
      *
-     * <p>{@code atRisk} is the number that matters — value that has been debited from customers but
-     * not yet paid out, or that failed on the way. A count of rows does not convey that; an amount
-     * does.
+     * <p>{@code amountAtRisk} is the number that matters — value that has been debited from
+     * customers but not yet paid out, or that failed on the way. A count of rows does not convey
+     * that; an amount does.
+     *
+     * <p><strong>Debits are not added to credits (RECON-13).</strong> The two sides of an order are
+     * the same money described twice — invariant I1 — so the old total counted every unfinished
+     * settlement at double its worth: dev reported 331.26 at risk over two banked hand-overs worth
+     * 331.26 between them, once as the collection and once as the payment. Each status now carries
+     * its {@code debits} and {@code credits} apart, and the figure at risk is the larger of the two
+     * across PENDING and FAILED: the money involved, counted once, whichever side of it is stuck.
      */
     @GetMapping("/summary")
     public Map<String, Object> summary() {
-        Map<String, Object> byStatus = new LinkedHashMap<>();
-        BigDecimal atRisk = BigDecimal.ZERO;
+        Map<String, Map<String, Object>> byStatus = new LinkedHashMap<>();
+        BigDecimal atRiskDebits = BigDecimal.ZERO;
+        BigDecimal atRiskCredits = BigDecimal.ZERO;
         long unsettled = 0;
 
-        for (Object[] row : transactions.summariseByStatus()) {
+        for (Object[] row : transactions.summariseByStatusAndDirection()) {
             AccountingTransaction.Status status = (AccountingTransaction.Status) row[0];
-            long count = (Long) row[1];
-            BigDecimal total = (BigDecimal) row[2];
+            AccountingTransaction.Direction direction = (AccountingTransaction.Direction) row[1];
+            long count = (Long) row[2];
+            BigDecimal total = (BigDecimal) row[3];
 
-            byStatus.put(status.name(), Map.of("count", count, "amount", total));
+            Map<String, Object> figures = byStatus.computeIfAbsent(status.name(), key -> {
+                Map<String, Object> blank = new LinkedHashMap<>();
+                blank.put("count", 0L);
+                blank.put("debits", BigDecimal.ZERO);
+                blank.put("credits", BigDecimal.ZERO);
+                return blank;
+            });
+            boolean debit = direction == AccountingTransaction.Direction.DEBIT;
+            figures.put("count", (Long) figures.get("count") + count);
+            figures.put(debit ? "debits" : "credits",
+                    ((BigDecimal) figures.get(debit ? "debits" : "credits")).add(total));
 
             if (status == AccountingTransaction.Status.PENDING
                     || status == AccountingTransaction.Status.FAILED) {
-                atRisk = atRisk.add(total);
+                if (debit) {
+                    atRiskDebits = atRiskDebits.add(total);
+                } else {
+                    atRiskCredits = atRiskCredits.add(total);
+                }
                 unsettled += count;
             }
         }
@@ -325,7 +369,100 @@ public class ReconciliationController {
         return Map.of(
                 "byStatus", byStatus,
                 "unsettledCount", unsettled,
-                "amountAtRisk", atRisk);
+                "amountAtRisk", atRiskDebits.max(atRiskCredits),
+                // Both sides beside it, so nobody has to guess which one the figure above is.
+                "atRiskDebits", atRiskDebits,
+                "atRiskCredits", atRiskCredits);
+    }
+
+    /**
+     * Settlements this service could not make and will not retry (RECON-04).
+     *
+     * <p>The other half of the work list, and the half that used to be invisible: a message that
+     * cannot be settled is acknowledged, because one that comes back for ever blocks every good
+     * one behind it, and what is left is a delivered order with no legs anywhere. Now each one is a
+     * row here, with what stopped it and how many times it has arrived. The payload is deliberately
+     * not returned — it carries a customer's address — and stays in the table for whoever needs it.
+     */
+    @GetMapping("/settlement-failures")
+    public ResponseEntity<?> settlementFailures(@RequestParam(defaultValue = "50") int limit) {
+        ResponseEntity<?> refusal = Callers.requireRole("BACKOFFICE");
+        if (refusal != null) {
+            return refusal;
+        }
+        return ResponseEntity.ok(Map.of(
+                "open", failures.openCount(),
+                "failures", failures.open(limit).stream().map(failure -> {
+                    Map<String, Object> out = new LinkedHashMap<String, Object>();
+                    out.put("id", failure.getId());
+                    out.put("orderId", failure.getOrderId());
+                    out.put("eventType", failure.getEventType());
+                    out.put("reason", failure.getReason());
+                    out.put("attempts", failure.getAttempts());
+                    out.put("firstSeenAt", failure.getFirstSeenAt());
+                    out.put("lastSeenAt", failure.getLastSeenAt());
+                    return out;
+                }).toList()));
+    }
+
+    /**
+     * Delivered orders the ledger has never seen (RECON-04).
+     *
+     * <p>The check no view inside this service could make: a settlement lost on the bus leaves no
+     * legs, and every reconciliation view reads legs. So Order Manager's delivered orders are
+     * compared against the ledger, with the operator's own token — it is their right to read those
+     * orders, not this service's standing one. Read-only; settling is the next call.
+     */
+    @GetMapping("/unsettled-deliveries")
+    public ResponseEntity<?> unsettledDeliveries(@RequestParam(defaultValue = "100") int limit) {
+        ResponseEntity<?> refusal = Callers.requireRole("BACKOFFICE");
+        if (refusal != null) {
+            return refusal;
+        }
+        try {
+            return ResponseEntity.ok(recovery.unsettledDeliveries(
+                    Callers.jwt().getTokenValue(), limit));
+        } catch (com.delivery.accounting.service.OrderManagerOrdersClient.UnavailableException e) {
+            // Deliberately not an empty list: "nothing is missing" and "nobody could be asked" are
+            // different answers, and only one of them means there is nothing to do.
+            return ResponseEntity.status(503).body(Map.of(
+                    "error", "Order Manager could not be asked which orders were delivered.",
+                    "code", "ORDER_MANAGER_UNAVAILABLE"));
+        }
+    }
+
+    /**
+     * Settles one delivered order from Order Manager's record of it (RECON-04).
+     *
+     * <p>The safe way to clear a settlement that was lost: the order is read back, shaped into the
+     * event that went missing and settled through exactly the rules the listener applies — never a
+     * second implementation of them, and never figures typed by an operator. Idempotent: an order
+     * already in the ledger is left alone and answered as such.
+     */
+    @PostMapping("/orders/{orderId}/settle")
+    public ResponseEntity<?> settleFromOrderManager(@PathVariable UUID orderId) {
+        ResponseEntity<?> refusal = Callers.requireRole("BACKOFFICE");
+        if (refusal != null) {
+            return refusal;
+        }
+        try {
+            var settled = recovery.settle(Callers.jwt().getTokenValue(), orderId,
+                    Callers.jwt().getSubject());
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("orderId", settled.orderId());
+            out.put("settled", settled.settled());
+            out.put("legs", settled.legs());
+            if (settled.reason() != null) {
+                out.put("reason", settled.reason());
+            }
+            return ResponseEntity.ok(out);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (com.delivery.accounting.service.OrderManagerOrdersClient.UnavailableException e) {
+            return ResponseEntity.status(503).body(Map.of(
+                    "error", "Order Manager could not be asked about that order.",
+                    "code", "ORDER_MANAGER_UNAVAILABLE"));
+        }
     }
 
     /** Everything not in a terminal state — the work list. */
