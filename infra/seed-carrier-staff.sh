@@ -29,7 +29,7 @@ SUB=$(curl -s -H "Authorization: Bearer $ADMIN" \
 [ -n "$SUB" ] || { echo "no such user: $CARRIER_USER"; exit 1; }
 
 BO=$(curl -s -X POST "$KC_INTERNAL/realms/delivery-platform/protocol/openid-connect/token" \
-  -d client_id=delivery-portal -d grant_type=password \
+  -d client_id=mobile-app -d grant_type=password \
   -d "username=${BACKOFFICE_USERNAME:-backoffice}" -d "password=${BACKOFFICE_PASSWORD:-400004}" \
   | jq -r .access_token)
 
@@ -50,7 +50,7 @@ echo "attach $CARRIER_USER to $PROVIDER -> $CODE"
 
 # Prove it from the carrier's own side, which is the thing that was broken.
 CAR=$(curl -s -X POST "$KC_INTERNAL/realms/delivery-platform/protocol/openid-connect/token" \
-  -d client_id=delivery-portal -d grant_type=password \
+  -d client_id=mobile-app -d grant_type=password \
   -d "username=$CARRIER_USER" -d "password=${CARRIER_PASSWORD:-500005}" | jq -r .access_token)
 echo "carrier can now read its own company -> $(curl -s -o /dev/null -w '%{http_code}' \
   "$GW/api/delivery-providers/my-company" -H "Authorization: Bearer $CAR")"

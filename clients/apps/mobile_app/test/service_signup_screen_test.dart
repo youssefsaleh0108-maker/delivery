@@ -675,6 +675,9 @@ class _Keycloak implements OidcClient {
   Future<TokenSet?> completeRedirect(AuthConfig config) async => null;
 
   @override
+  Future<TokenSet?> resumeSession(AuthConfig config) async => null;
+
+  @override
   Future<TokenSet> refresh(AuthConfig config, String refreshToken) async {
     refreshes++;
     return _mint();

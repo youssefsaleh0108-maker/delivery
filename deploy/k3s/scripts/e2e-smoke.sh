@@ -104,10 +104,13 @@ elif [ "$C" = 404 ]; then bad "carrier company" "404 - demo carrier has no compa
 else bad "carrier company" "HTTP $C"; fi
 
 echo "=== $ENV : the backoffice day ==="
-BC=$(demo_password backoffice | curl -s -o /tmp/e2e_body -w "%{http_code}" -X POST "$IAM/realms/delivery-platform/protocol/openid-connect/token" -d client_id=delivery-portal -d username=backoffice --data-urlencode "password@-" -d grant_type=password)
-PTOK=$(sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p' /tmp/e2e_body)
-[ -n "$PTOK" ] && ok "backoffice signs in on the portal client" || bad "portal client sign-in" "HTTP $BC"
-C=$(code "$PTOK" GET "/api/onboarding/applications")
+# This used to sign backoffice in a second time, on delivery-portal, to prove the portal's own
+# client worked. That client has no password grant any more (PT-3) — a public client with direct
+# access grants turns a phished back-office password straight into a session, with no browser and
+# nowhere to put a second factor — and the portal signs in with Authorization Code + PKCE, which
+# no script can drive. So the token from line 61 is reused: it is the same token either way, since
+# a token's roles come from the ACCOUNT rather than from the client it was minted for.
+C=$(code "$BACK" GET "/api/onboarding/applications")
 [ "$C" = 200 ] && ok "applications list answers" || bad "onboarding applications" "HTTP $C"
 
 if [ -n "$MAIL_TO" ]; then

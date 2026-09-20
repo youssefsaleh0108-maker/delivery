@@ -124,9 +124,17 @@ delivery:
     exchange: delivery.events
 
   websocket:
-    # Same origins as the Gateway's CORS list - a browser WebSocket is subject to origin checks
-    # just like a fetch, and getting this wrong looks like a silent connection failure.
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:*,http://127.0.0.1:*}
+    # Same origins as the edge's CORS list - a browser WebSocket is subject to origin checks just
+    # like a fetch, and getting this wrong looks like a silent connection failure. Both lists come
+    # from CORS_ALLOWED_ORIGINS, set per environment in deploy/k3s/overlays/<env>/kustomization.yaml
+    # and mirrored into the platform-cors middleware in deploy/k3s/overlays/ingress.template.yaml.
+    #
+    # The default is the loopback pair a developer running the stack locally has, spelled out one
+    # port at a time rather than as `http://localhost:*`. setAllowedOriginPatterns takes the
+    # wildcard, and that is the problem: a pattern is not a list, so nobody reading the deployed
+    # value can see which origins it admits. A native app sends no Origin header and is not checked
+    # either way; every entry here exists for a browser.
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5010,http://127.0.0.1:5010,http://localhost:5012,http://127.0.0.1:5012}
 
   # Customer <-> rider chat, scoped to one order. Most of these are policy rather than tuning, which
   # is why they are gathered here instead of scattered through @Value annotations - see

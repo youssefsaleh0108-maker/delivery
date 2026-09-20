@@ -67,7 +67,7 @@ route_of() { # route_of <idempotency-key>
 }
 
 CUSTOMER=$(token customer 100001 mobile-app)
-BACKOFFICE=$(token backoffice 400004 delivery-portal)
+BACKOFFICE=$(token backoffice 400004 mobile-app)
 
 echo
 echo '=== 1. Delivery rates, the gate on a cutover ====================================='

@@ -127,10 +127,63 @@ them* below for what it creates and who reads each one.
   settings → User profile → Create attribute, name `onboardingApplicationId`, display name `Onboarding application`, not required,
   and only admins may view or edit it. (Do not run `infra/keycloak/apply-realm-updates.sh` here: it
   re-asserts the compose stack's dev client secrets.)
+- **The identity settings the realm file now carries**, and how a running environment gets them.
+  All of it is in the file for a fresh import; a live realm takes it from two idempotent steps,
+  run in this order and not together:
+
+  ```sh
+  bash scripts/rotate-secrets.sh delivery-dev edge-identity      # safe for every installed build
+  bash scripts/rotate-secrets.sh delivery-dev refresh-rotation   # LAST, and only once (see below)
+  ```
+
+  | | before | after |
+  | --- | --- | --- |
+  | `delivery-portal` password grant | on | off — the portal uses Authorization Code + PKCE, and a public client with direct access grants turns a phished password into a session |
+  | `delivery-portal` `offline_access` | granted (realm default) | removed — it is what let the back office hold a token that never expires |
+  | `delivery-portal` client session | the realm's 30 d idle / 90 d max | 8 h idle, 24 h max, which is also its refresh token's ceiling |
+  | `delivery-portal` loopback redirect URIs | on both environments | dev only |
+  | realm `sslRequired` | `none` | `external` |
+  | realm refresh tokens | 30 days, reusable | rotated on every use, no reuse |
+  | `mobile-app` web origins | `+` | `+` and `https://www.youdrop.shop`, which the site's receipt panel needs |
+
+  **`refresh-rotation` is the one that can sign somebody out**, which is why it is separate and
+  goes last. Under it a client that runs two refresh grants at once presents a token the server
+  has already replaced, and Keycloak ends the session rather than refusing the one request. The
+  client-side fix is in `delivery_core`'s `AuthService` (one grant at a time; see
+  `auth_refresh_rotation_test.dart`), so run this only once the portal build being served and the
+  APK people have installed both contain it. Realm-wide SSO stays 30 d / 90 d because it is the
+  phones' session too — which is also why a portal user reaching the 8 h idle limit gets a silent
+  PKCE round trip rather than a password prompt.
+- **The Keycloak admin console is not public.** The edge refuses `/admin` on `iam-dev` and
+  `iam-qa` (`overlays/ingress.template.yaml`, the `deny-public` middleware), which covers the
+  console and the admin REST API; `/realms` is untouched, so authorize, token, JWKS, logout and
+  the account console all still answer. `rotate-secrets.sh` reaches the admin API by
+  port-forwarding to `svc/keycloak`, so it keeps working; every other script in the repository
+  already used the in-cluster address. To use the console yourself:
+
+  ```sh
+  kubectl -n delivery-dev port-forward svc/keycloak 8080:8080   # then http://127.0.0.1:8080/admin
+  ```
 - **order-manager's image** is the one Docker Hub pull (its own repo/pipeline); everything else
   pulls public GHCR packages.
 - **The portal** serves whatever is under `/opt/delivery/sites/<env>/portal` on the node — sync a
-  Flutter Web build there (see infra/deploy-portal.sh for the shape of that build).
+  Flutter Web build there. `infra/deploy-portal.sh` has the shape of that build; the part that is
+  not optional is:
+
+  ```sh
+  cd clients/apps/delivery_portal
+  flutter build web --release --no-web-resources-cdn \
+    --dart-define=KEYCLOAK_ISSUER="https://iam-<env>.youdrop.shop/realms/delivery-platform" \
+    --dart-define=API_BASE_URL="https://api-<env>.youdrop.shop" \
+    --dart-define=OIDC_REDIRECT_URL="https://portal-<env>.youdrop.shop/"
+  ```
+
+  `--no-web-resources-cdn` keeps CanvasKit on our own origin (`web/flutter_bootstrap.js` already
+  points the loader at the local copy; this stops the build offering the gstatic one at all), and
+  Rubik is bundled as an asset. Both matter now: the portal's CSP is `script-src 'self'
+  'wasm-unsafe-eval'`, and a renderer fetched from an origin the policy does not allow leaves a
+  blank page, not a degraded one. A build that overrides `MAP_TILE_URL` must also change the tile
+  host in `overlays/ingress.template.yaml`; `scripts/verify.sh` fails if the two disagree.
 - **The public website** (youdrop.shop apex) is not deployed here yet: its static build was never
   in the repository. Routes for it can join the template when the content exists.
 - **probes are TCP**, matching what the compose stack verified; actuator-based HTTP probes are a
