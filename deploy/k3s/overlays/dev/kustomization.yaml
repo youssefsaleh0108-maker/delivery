@@ -71,7 +71,7 @@ images:
   newTag: develop
 - name: ghcr.io/youssefsaleh0108-maker/accounting-service
   newName: ghcr.io/youssefsaleh0108-maker/accounting-service
-  newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
+  newTag: sha-688b16f8a1bed411bef1f62ea0b7c32780401c03
 - name: ghcr.io/youssefsaleh0108-maker/app-notification
   newName: ghcr.io/youssefsaleh0108-maker/app-notification
   newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
