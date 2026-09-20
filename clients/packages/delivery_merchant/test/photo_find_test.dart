@@ -140,6 +140,26 @@ void main() {
         home: home,
       );
 
+  /// The Inventory tab of one particular shop, which is where a multi-shop merchant stands.
+  Future<void> pumpInventory(
+    WidgetTester tester,
+    _Gateway gateway, {
+    required String storeId,
+    ShelfPhotoSource? photos,
+  }) async {
+    tester.view.physicalSize = const Size(1200, 2200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final Dio dio = Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = gateway;
+    await tester.pumpWidget(app(InventoryScreen(
+      catalogApi: CatalogApi(dio),
+      storeId: storeId,
+      photoSource: photos,
+    )));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+
   Future<void> pumpList(
     WidgetTester tester,
     _Gateway gateway, {
@@ -327,6 +347,37 @@ void main() {
       expect(find.widgetWithText(TextFormField, '5449000000996'), findsOneWidget);
       // The photo is the new product's first image, and can be removed like any other.
       expect(find.byType(PendingProductImageTile), findsOneWidget);
+    });
+
+    /// The merchant has two shops. They are standing in the second one — its Inventory tab, whose
+    /// find was scoped to it — so the product they add from it has to be created there. Without the
+    /// shop in the request the service files it in whichever it calls their first, which is the shop
+    /// they were not looking at.
+    testWidgets('a product added from a shop is created in THAT shop, not the merchant\'s first',
+        (WidgetTester tester) async {
+      final _Gateway gateway = _Gateway(find: found(withMatch: false));
+      await pumpInventory(tester, gateway, storeId: 'shop-2', photos: _Photos(bytes: jpeg));
+
+      await findWithAPhoto(tester, t: en);
+      // The find was scoped to this shop on the way out, too — it travels in the multipart body.
+      expect(gateway.bodies.first, contains('shop-2'));
+
+      await tester.tap(find.text(en.pfindAddNew));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // Name and barcode came from the reading; a price is the merchant's to put in. Fields in
+      // order: name, description, price.
+      await tester.enterText(find.byType(TextFormField).at(2), '1.25');
+      await tester.tap(find.text(en.merchbSaveMenuItem));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // The create itself, not the image presign that follows it.
+      final String sent =
+          gateway.bodies.firstWhere((String body) => body.contains('"price":1.25'));
+      expect(sent, contains('"storeId":"shop-2"'));
+      expect(sent, contains('"name":"Pepsi 1L"'));
     });
 
     testWidgets('a sample leads to an empty form, with only the merchant\'s own photo on it',

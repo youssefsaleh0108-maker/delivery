@@ -58,6 +58,7 @@ Future<PhotoFindChoice?> findProductByPhoto(
     ),
     builder: (BuildContext _) => PhotoFindSheet(
       photo: photo,
+      storeId: storeId,
       // Started inside the sheet, so nothing can fail before there is anything to show it.
       run: () => api.findByPhoto(
           bytes: photo.bytes, contentType: photo.contentType, storeId: storeId),
@@ -68,13 +69,17 @@ Future<PhotoFindChoice?> findProductByPhoto(
 /// The answer: what the photo was read as, the merchant's own matching products, and a way to add it
 /// when they have none.
 class PhotoFindSheet extends StatefulWidget {
-  const PhotoFindSheet({super.key, required this.run, required this.photo});
+  const PhotoFindSheet({super.key, required this.run, required this.photo, this.storeId});
 
   /// Asks the server. Called once, when the sheet opens.
   final Future<PhotoFindResult> Function() run;
 
   /// The photo itself, which becomes a new product's first image.
   final PickedShelfPhoto photo;
+
+  /// The shop this find was scoped to, carried onto a new product so it is created in the shop the
+  /// merchant was looking at. Null when every goods shop of theirs was searched.
+  final String? storeId;
 
   @override
   State<PhotoFindSheet> createState() => _PhotoFindSheetState();
@@ -236,6 +241,7 @@ class _PhotoFindSheetState extends State<PhotoFindSheet> {
               label: t.pfindAddBlank,
               icon: Icons.add,
               onPressed: () => Navigator.of(context).pop(PhotoFindChoice.add(ProductPrefill(
+                storeId: widget.storeId,
                 photo: PickedImageBytes(widget.photo.bytes, widget.photo.contentType),
               ))),
             ),
@@ -252,6 +258,9 @@ class _PhotoFindSheetState extends State<PhotoFindSheet> {
                 name: result.suggestion?.name ?? read,
                 barcode: result.suggestion?.barcode,
                 categoryId: result.suggestion?.categoryId,
+                // The shop that was searched, so a merchant with two shops adds it to the one they
+                // were standing in — the section above came from that shop's own sections too.
+                storeId: widget.storeId,
                 photo: PickedImageBytes(widget.photo.bytes, widget.photo.contentType),
               ))),
             ),

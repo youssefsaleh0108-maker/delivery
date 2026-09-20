@@ -30,9 +30,19 @@ class ProductFormScreen extends StatefulWidget {
     this.storeApi,
     this.existing,
     this.prefill,
+    this.storeId,
   });
 
   final CatalogApi api;
+
+  /// Which of the merchant's shops a NEW product belongs to, when the host knows — the shop whose
+  /// shelves are on screen. Sent with the create, because a merchant with more than one shop would
+  /// otherwise have it filed in whichever the server calls their first ({@code CatalogService.create}).
+  /// Null lets the server decide, which is right for a host that is not standing in a shop.
+  ///
+  /// Ignored for an existing product: a product cannot be moved between shops by saving it, and the
+  /// service reads the shop off the product itself.
+  final String? storeId;
 
   /// Reads the product's option groups for the design's variants card.
   ///
@@ -55,11 +65,16 @@ class ProductFormScreen extends StatefulWidget {
 
 /// What a product form opens with when it comes from a photo ([ProductFormScreen.prefill]).
 class ProductPrefill {
-  const ProductPrefill({this.name, this.barcode, this.categoryId, this.photo});
+  const ProductPrefill({this.name, this.barcode, this.categoryId, this.photo, this.storeId});
 
   final String? name;
   final String? barcode;
   final String? categoryId;
+
+  /// The shop the find was scoped to, so the new product is created where the merchant was looking
+  /// rather than in whichever shop the server calls their first. Null when the find searched all of
+  /// the caller's goods shops and no one of them is the answer.
+  final String? storeId;
 
   /// The photo, as the product's first pending image — removable like any other.
   final PickedImageBytes? photo;
@@ -156,6 +171,11 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     final Product draft = Product(
       id: _product?.id ?? '',
       merchantId: '',
+      // The shop this product is in, or the one the host is standing in for a product that does not
+      // exist yet. Without it a create lands in whichever shop the service calls the merchant's
+      // first, which for a merchant with two shops is the wrong one half the time — and the shelf
+      // the merchant was looking at when they added it is the one they will look for it on.
+      storeId: _product?.storeId ?? widget.prefill?.storeId ?? widget.storeId,
       name: _name.text.trim(),
       description: _description.text.trim(),
       price: double.parse(_price.text.trim()),
@@ -166,6 +186,10 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       // really did clear the field.
       sku: _sku.text.trim(),
       barcode: _barcode.text.trim(),
+      // Carried, never built here: this is the goods form, and a service offer has its own. Sending
+      // nothing for an offer that has terms would be refused outright (an offer in a service shop
+      // needs its terms) and would drop the service block from the update event.
+      service: _product?.service,
     );
 
     try {

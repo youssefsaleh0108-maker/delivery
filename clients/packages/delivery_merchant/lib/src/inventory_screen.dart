@@ -322,6 +322,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
         builder: (_) => ProductFormScreen(
           api: widget.catalogApi,
           storeApi: widget.storeApi,
+          // These are this shop's shelves, so a product added from them belongs on them — not in
+          // whichever shop the server calls this merchant's first.
+          storeId: widget.storeId,
         ),
       ),
     );
@@ -458,6 +461,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
         storeApi: widget.storeApi,
         existing: choice.product,
         prefill: choice.prefill,
+        // The shop the find was scoped to, so a new product is created where it was looked for.
+        storeId: widget.storeId,
       ),
     ));
     if (!mounted) return;
