@@ -247,6 +247,60 @@ in `platform-common`, and the ops basic-auth hash in `gen-secrets.sh`. None of t
   them means changing the roles, the Vault seed and two Deployments together — the production
   secrets refactor. The roles nothing logs in as cannot log in at all.
 
+## One node, two environments: what happens under memory pressure
+
+The box is 8 vCPU / **23 GiB with no swap**, and it runs dev and the environment that becomes
+production side by side. Before this section existed, the two namespaces' memory *limits* added up
+to 106% of the node with nothing to separate them.
+
+Three things now decide who survives, and they act in this order:
+
+1. **Admission.** `overlays/dev/resource-safety.yaml` caps delivery-dev at **9 GiB of limits and 6
+   GiB of requests**. A pod that would take dev past either is refused when it is created, with the
+   arithmetic in its event — `kubectl -n delivery-dev describe replicaset <name>` is where that
+   shows up, not in the Deployment. There is no quota on the production namespace: a pod refused at
+   admission during an incident is worse than a node under pressure.
+2. **Scheduling.** `cluster/priority-classes.yaml` gives the production namespace `prod-critical`
+   (1000000) and dev `dev-standard` (100, `preemptionPolicy: Never`). A production pod that cannot
+   be placed will evict dev pods to make room; a dev pod that cannot be placed **waits**, visibly
+   Pending, and takes nothing from production.
+3. **Eviction.** When the kubelet crosses its memory threshold it ranks pods by QoS class, then by
+   how far each is over its *request*, then by priority. Production's Postgres now requests exactly
+   what it may use (1536Mi = 1536Mi), so it scores as a process inside its budget rather than one
+   800 MiB over it, and dev's lower priority breaks every remaining tie against dev.
+
+**dev is at 8.875 of its 9 GiB.** That is about 128 MiB of headroom — room for nothing. To fit,
+dev's fourteen Spring services run at a 416Mi limit rather than 512Mi, with `MaxRAMPercentage=60`
+instead of 70 so the space *outside* the heap grows (~166Mi, against ~154Mi today) while the heap
+ceiling falls (250Mi, from 358Mi). They idle at 160-350 MiB of RSS, so the trade is more frequent
+collection for more native headroom — the native side being what actually OOMKills a container.
+
+> **This is the one change on this branch that has not been measured against a running service.**
+> Apply it to dev, then watch for a day:
+>
+> ```sh
+> kubectl -n delivery-dev get pods --sort-by=.status.containerStatuses[0].restartCount
+> kubectl -n delivery-dev get events --field-selector reason=OOMKilling
+> ```
+>
+> If anything restarts with `OOMKilled`, the way back is three numbers, all in
+> `overlays/dev/`: `416Mi` → `512Mi` and `MaxRAMPercentage=60` → `70` in `kustomization.yaml`, and
+> `limits.memory: 9Gi` → `11Gi` in `resource-safety.yaml`. dev is then exactly as it was.
+
+When dev next needs *anything* the quota will refuse it, and that is the quota working. The answer
+is the plan's own (item 7): **dev moves to its own VPS**. Raising the 9 GiB instead takes the room
+back out of production.
+
+`base/network-policies.yaml` is the other half: a default-deny on **ingress** in both namespaces,
+with exceptions for the namespace itself, kube-system (Traefik, or every hostname answers with a
+gateway error) and monitoring (the scrapes). Egress is deliberately untouched — a default-deny
+there would also deny DNS, the M365 relay and every outbound connector call, and would look like an
+application bug. The property bought is that **delivery-dev cannot open a connection into
+delivery-qa**, which matters because every pod in both namespaces holds its own Postgres superuser
+password and the two differ only by hostname. If k3s was started with `--disable-network-policy`
+these objects are accepted and enforce nothing, silently; `scripts/rotate-secrets.sh <ns>
+netpol-proof` opens the connections they forbid and reports what actually happened.
+
 ## The connection budget
 
 Postgres allows 200 connections, three of them reserved for superusers, so **197 are usable per

@@ -51,6 +51,50 @@ patches:
         path: /spec/template/spec/volumes/1/hostPath/path
         value: /opt/delivery/sites/qa/portal
 
+  # -------------------------------------------------------------------------- resource safety
+  # This namespace becomes production in place, on a node it shares with dev. See
+  # cluster/priority-classes.yaml: `prod-critical` is what makes the scheduler preempt dev to place
+  # a pod here, and what puts this namespace last in the kubelet's eviction order. `name: .*` is a
+  # regex, so a workload added later cannot forget it, and scripts/verify.sh fails if any pod in
+  # the rendered overlay has no priorityClassName.
+  #
+  # There is deliberately no ResourceQuota here. dev gets one because dev is the half that may be
+  # squeezed; a quota on production would mean a pod refused at admission during an incident.
+  - target: { kind: Deployment, name: ".*" }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/priorityClassName
+        value: prod-critical
+  - target: { kind: StatefulSet, name: ".*" }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/priorityClassName
+        value: prod-critical
+  - target: { kind: Job, name: ".*" }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/priorityClassName
+        value: prod-critical
+
+  # Postgres asks for exactly what it is allowed to use.
+  #
+  # Base requests 512Mi against a 1536Mi limit, which is Burstable: the kubelet computes a
+  # container's OOM score from how far its usage sits above its REQUEST, so a Postgres using 1.2
+  # GiB of its legitimate 1.5 GiB scores as a process 700 MiB over budget and is a prime candidate
+  # — ahead of a dev JVM sitting quietly inside its own request. With request == limit that
+  # arithmetic disappears and Postgres becomes the last thing on the node the kernel reaches for.
+  # It also means the scheduler reserves the whole 1.5 GiB, so nothing else can be placed into
+  # memory Postgres is entitled to.
+  #
+  # CPU is deliberately left alone: platform-common's JVM flags are chosen for a node with NO CPU
+  # limits (see its comment), so adding one here would change the thing that comment warns about.
+  # The pod's QoS class therefore stays Burstable; the protection being bought is the memory one.
+  - target: { kind: StatefulSet, name: postgres }
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 1536Mi
+
 # Which build each service runs.
 #
 # PIN-1. Every line here used to be a MOVING tag: `:main` for the thirteen GHCR services and `:qa`

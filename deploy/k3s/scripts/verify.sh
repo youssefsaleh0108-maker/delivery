@@ -355,6 +355,101 @@ else
   echo "  --    kubectl not on PATH: the kustomize render is not checked here"
 fi
 
+echo "== one node, two environments: resource safety (PS-3) =="
+# Every container that base declares must carry its own memory limit. dev's ResourceQuota makes a
+# limit compulsory, and its LimitRange exists so that a missing one does not REFUSE the pod — but
+# leaning on that default is how a namespace quietly goes over budget, so the default should never
+# have anything to do. (The `mc` bootstrap container is the one exception: its Job has Completed,
+# and a Job's pod spec is immutable, so giving it limits means renaming the Job.)
+for f in base/data-layer.yaml base/identity.yaml base/services.yaml base/portal.yaml; do
+  missing=$(awk '
+    /^ *- name: [a-z0-9-]+$/ && match($0, /^ {8}- name: /) { if (c != "") { if (!seen) print c }; c = $NF; seen = 0 }
+    /^ *limits: *\{? *memory/ { seen = 1 }
+    /^ *limits: *$/ { inlim = 1; next }
+    inlim && /memory:/ { seen = 1; inlim = 0 }
+    END { if (c != "" && !seen) print c }
+  ' "$f" | grep -v -e '^realm$' -e '^theme$' -e '^bootstrap$' -e '^policies$' -e '^conf$' -e '^web$' -e '^init$' -e '^data$' -e '^mc$' | tr '\n' ' ')
+  [ -z "$missing" ] \
+    && ok "$f: every container declares a memory limit" \
+    || fail "$f: container(s) with no memory limit: $missing"
+done
+
+for env in dev qa; do
+  [ -s "$tmp/render-$env.yaml" ] || continue
+  want=prod-critical; [ "$env" = dev ] && want=dev-standard
+  # Count pod templates (every Deployment, StatefulSet and Job has exactly one) against the number
+  # that name a priority. A workload added later without one is what this catches.
+  templates=$(grep -c '^      priorityClassName:\|^          priorityClassName:' "$tmp/render-$env.yaml" || true)
+  workloads=$(grep -c '^kind: \(Deployment\|StatefulSet\|Job\)$' "$tmp/render-$env.yaml" || true)
+  [ "$templates" = "$workloads" ] && [ "$workloads" -gt 0 ] \
+    && ok "$env: all $workloads workloads carry a priorityClassName" \
+    || fail "$env: $workloads workloads but $templates priorityClassName(s)"
+  wrong=$(grep 'priorityClassName:' "$tmp/render-$env.yaml" | awk '{print $2}' | sort -u | grep -v "^$want$" | tr '\n' ' ')
+  [ -z "$wrong" ] \
+    && ok "$env: the priority is $want" \
+    || fail "$env: unexpected priority class(es): $wrong (expected $want)"
+  # The two policies that make the wall, and the mistake that silently removes it.
+  for pol in default-deny-ingress allow-same-namespace allow-edge allow-monitoring; do
+    grep -q "name: $pol" "$tmp/render-$env.yaml" \
+      && ok "$env: NetworkPolicy $pol" \
+      || fail "$env: no NetworkPolicy $pol — the two environments can reach each other"
+  done
+done
+# `namespaceSelector: {}` inside allow-same-namespace means "every namespace", which is the exact
+# opposite of what the policy is named for and is invisible in a diff that only reads the name.
+awk 'BEGIN{RS="\n---"} /name: allow-same-namespace/ {print}' base/network-policies.yaml \
+  | sed 's/#.*//' | grep -q 'namespaceSelector: *{}' \
+  && fail "allow-same-namespace uses an empty namespaceSelector: that admits EVERY namespace" \
+  || ok "allow-same-namespace admits only its own namespace"
+
+# Two things no manifest can assert, so the live steps that do are checked for instead: a PV's
+# reclaim policy (the PV does not exist until the PVC binds) and whether k3s enforces
+# NetworkPolicies at all (a cluster started with --disable-network-policy accepts them and does
+# nothing).
+for step in pv-retain netpol-proof; do
+  grep -q "^  $step)" scripts/rotate-secrets.sh \
+    && ok "rotate-secrets.sh has the $step step" \
+    || fail "rotate-secrets.sh has no $step step, and $step is not something a manifest can do"
+done
+grep -q 'persistentVolumeReclaimPolicy' scripts/rotate-secrets.sh \
+  && ok "pv-retain patches the reclaim policy" \
+  || fail "nothing sets persistentVolumeReclaimPolicy: deleting a PVC would delete the database"
+
+# dev's rendered limits against dev's own quota, from the same two files the cluster reads.
+if [ -s "$tmp/render-dev.yaml" ]; then
+  quota=$(awk '/^ *limits\.memory:/ { print $2; exit }' overlays/dev/resource-safety.yaml)
+  used=$(awk '
+    /^ *limits: *$/ { inlim = 1; next }
+    inlim && /^ *memory: / {
+      v = $2; n = v + 0
+      if (v ~ /Mi$/) n *= 1048576; else if (v ~ /Gi$/) n *= 1073741824; else if (v ~ /Ki$/) n *= 1024
+      total += n; inlim = 0; next
+    }
+    inlim && /^ *(cpu|ephemeral-storage): / { next }
+    { inlim = 0 }
+    END { printf "%d", total }
+  ' "$tmp/render-dev.yaml")
+  cap=$(printf '%s' "$quota" | awk '{ v = $0; n = v + 0; if (v ~ /Mi$/) n *= 1048576; else if (v ~ /Gi$/) n *= 1073741824; printf "%d", n }')
+  if [ "$used" -le "$cap" ]; then
+    ok "dev fits its own quota: $((used / 1048576))Mi of $quota ($(( (cap - used) / 1048576 ))Mi spare)"
+  else
+    fail "dev's rendered limits are $((used / 1048576))Mi, over its $quota ResourceQuota by $(( (used - cap) / 1048576 ))Mi: every pod in delivery-dev would be refused at admission"
+  fi
+fi
+
+# Production's Postgres asks for what it is allowed to use, so the kubelet's OOM score for it is
+# the lowest a container can have without a CPU limit.
+if [ -s "$tmp/render-qa.yaml" ]; then
+  # The StatefulSet's own document: the Service is also called postgres, and it has no resources.
+  # `^` anchors to the RECORD here, not the line, so both matches spell out the newline.
+  pg=$(awk 'BEGIN{RS="\n---\n"} /(^|\n)kind: StatefulSet\n/ && /(^|\n)  name: postgres\n/ {print}' "$tmp/render-qa.yaml")
+  pg_req=$(printf '%s\n' "$pg" | awk '/^ *requests: *$/ {inr=1;next} inr && /memory:/ {print $2; exit}')
+  pg_lim=$(printf '%s\n' "$pg" | awk '/^ *limits: *$/ {inl=1;next} inl && /memory:/ {print $2; exit}')
+  [ -n "$pg_req" ] && [ "$pg_req" = "$pg_lim" ] \
+    && ok "qa postgres requests what it may use ($pg_req = $pg_lim)" \
+    || fail "qa postgres requests $pg_req against a $pg_lim limit: it is evicted as if it were over budget"
+fi
+
 echo "== every YAML alias resolves =="
 # A ConfigMap's `data:` values are strings to Kubernetes, so a dangling `*alias` inside one is
 # waved through by kubectl and by kustomize and only fails when Prometheus or Grafana parses it —

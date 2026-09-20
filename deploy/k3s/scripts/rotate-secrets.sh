@@ -25,6 +25,15 @@
 #                         scripts created with passcodes printed in those scripts
 #   user-profile-stamp    declare the admin-only onboardingApplicationId attribute in the live
 #                         realm's user profile (the rider sign-up needs it; idempotent)
+#   pv-retain             set every PersistentVolume bound to this namespace to reclaimPolicy
+#                         Retain, so deleting a PVC (or the namespace) no longer deletes the data
+#                         with it. k3s's provisioner creates them as Delete and a manifest cannot
+#                         say otherwise, because the PV does not exist until the PVC binds.
+#                         Idempotent; changes no running pod.
+#   netpol-proof          open, from inside this namespace, the cross-namespace connections
+#                         base/network-policies.yaml forbids, and report what actually happened —
+#                         k3s started with --disable-network-policy accepts those objects and
+#                         enforces nothing, silently. Read-only.
 #   edge-identity         bring a LIVE realm to what the realm file says for PT-3 and PT-7: the
 #                         delivery-portal client loses the password grant and offline_access and
 #                         gains an 8 h / 24 h client session, its loopback redirect URIs are kept on
@@ -770,6 +779,93 @@ PY
   done < "$WORK/test-ids"
 }
 
+step_pv_retain() {
+  # k3s's local-path provisioner creates every PersistentVolume with reclaimPolicy DELETE, and a
+  # PV's reclaim policy is not something a manifest can set — the PV does not exist until the PVC
+  # binds, and nothing in this repository ever authors one. So it is patched here, per environment,
+  # once each PV exists.
+  #
+  # What Delete means in practice: `kubectl delete pvc` — or `kubectl delete namespace`, or an Argo
+  # CD sync with prune on that happens to remove a StatefulSet's claim — deletes the directory
+  # under /var/lib/rancher/k3s/storage as well, with no confirmation and nothing to undo it. That
+  # is the whole database, the whole object store and the broker's queues. Retain leaves the
+  # directory on disk and the PV in state Released, where an operator can look at it.
+  #
+  # Idempotent: a PV already on Retain is counted and left alone.
+  local pvc pv policy changed=0 kept=0
+  for pvc in $(k get pvc -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'); do
+    pv=$(k get pvc "$pvc" -o jsonpath='{.spec.volumeName}')
+    if [ -z "$pv" ]; then
+      bad "PVC $pvc is not bound to a PersistentVolume yet, so nothing can be patched"
+      continue
+    fi
+    policy=$(kubectl get pv "$pv" -o jsonpath='{.spec.persistentVolumeReclaimPolicy}')
+    if [ "$policy" = Retain ]; then
+      kept=$((kept + 1))
+      ok "$pvc -> $pv is already Retain"
+    else
+      kubectl patch pv "$pv" -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}' >/dev/null \
+        || die "could not patch PV $pv (was $policy)"
+      changed=$((changed + 1))
+      check "$pvc -> $pv is now Retain (was $policy)" Retain \
+        "$(kubectl get pv "$pv" -o jsonpath='{.spec.persistentVolumeReclaimPolicy}')"
+    fi
+  done
+  echo "$NS: $changed PersistentVolume(s) changed to Retain, $kept already were."
+  # Every claim in the namespace, not just the four StatefulSets' — a PVC added later that nobody
+  # patched is exactly the one that gets deleted.
+  local still
+  still=$(kubectl get pv -o json | jq -r --arg ns "$NS" '.items[]
+            | select(.spec.claimRef.namespace == $ns)
+            | select(.spec.persistentVolumeReclaimPolicy != "Retain")
+            | .metadata.name' | tr '\n' ' ')
+  check "no PersistentVolume in $NS is still on Delete" none "${still:-none}"
+  echo "Retain does NOT protect against 'rm -rf' on the node, and a Released PV is not reattached"
+  echo "automatically: recovering one means editing its claimRef out. See the restore runbook."
+}
+
+step_netpol_proof() {
+  # base/network-policies.yaml default-denies ingress in both namespaces. k3s only ENFORCES that if
+  # it was started with its NetworkPolicy controller, and if it was not, the objects are accepted
+  # and do nothing — silently, which is the only reason this step exists. It opens, from inside
+  # this namespace, the connections the policy is supposed to forbid, and reports what happened.
+  #
+  # Nothing here writes anything. The probe runs in the postgres pod because the postgis image has
+  # a bash with /dev/tcp and a coreutils timeout, so no extra pod and no extra image are needed.
+  local other other_ns code
+  other=qa; [ "$ENV_NAME" = qa ] && other=dev
+  other_ns="delivery-$other"
+  if ! kubectl get ns "$other_ns" >/dev/null 2>&1; then
+    skip "$other_ns does not exist on this cluster, so there is nothing to be walled off from"
+    return 0
+  fi
+  k get pod postgres-0 >/dev/null 2>&1 || die "postgres-0 is not running in $NS; run this with the environment up"
+
+  # tcp_probe <host> <port>: connected | blocked. A policy drop shows as the timeout firing.
+  tcp_probe() {
+    k exec postgres-0 -- bash -c \
+      "timeout 6 bash -c 'exec 3<>/dev/tcp/$1/$2' >/dev/null 2>&1 && echo connected || echo blocked"
+  }
+
+  echo "== from $NS, across the wall"
+  for target in postgres:5432 redis:6379 minio:9000 keycloak:8080; do
+    check "$NS -> $other_ns ${target%%:*} is refused" blocked \
+      "$(tcp_probe "${target%%:*}.$other_ns.svc.cluster.local" "${target##*:}")"
+  done
+
+  echo "== and the connections this environment needs still work"
+  for target in postgres:5432 redis:6379 minio:9000 keycloak:8080 rabbitmq:5672; do
+    check "$NS -> its own ${target%%:*}" connected \
+      "$(tcp_probe "${target%%:*}.$NS.svc.cluster.local" "${target##*:}")"
+  done
+  # The edge is in kube-system and is allowed in by allow-edge; if that rule were missing every
+  # public hostname on this environment would answer 502 and nothing in the namespace would log it.
+  code=$(curl -s -o /dev/null -w '%{http_code}' "$API/api/banners")
+  check "the edge still reaches this environment (401 = it got through to the API)" 401 "$code"
+  echo "A 'connected' in the first block means k3s is not enforcing NetworkPolicies at all"
+  echo "(--disable-network-policy). Nothing in these manifests can fix that; the flag must change."
+}
+
 step_verify() {
   local c key u client p notready r
   echo "== $NS"
@@ -850,6 +946,8 @@ case "$STEP" in
   lock-unused-db-roles) step_lock_unused_db_roles ;;
   test-accounts) step_test_accounts "$@" ;;
   user-profile-stamp) step_user_profile_stamp ;;
+  pv-retain) step_pv_retain ;;
+  netpol-proof) step_netpol_proof ;;
   edge-identity) step_edge_identity ;;
   refresh-rotation) step_refresh_rotation ;;
   verify) step_verify ;;
