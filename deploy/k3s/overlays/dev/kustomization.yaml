@@ -22,15 +22,15 @@ resources:
   # A value set from the portal's auto-approval screen wins over this one; dev has none for riders.
   # Dev only: accept rider positions from anywhere. Emulators report Mountain View, and dev's
   # riders are mostly emulators. Overrides platform-common's "true"; qa keeps it on.
+  # PT-9. The same list as the platform-cors middleware in overlays/ingress.template.yaml, which is
+  # what a browser actually meets; this one is app-notification's WebSocket origin check. Exact
+  # origins, no `http://localhost:*` wildcard, and no app-dev.youdrop.shop — that name has had no
+  # route since the compose stack (infra/traefik/dynamic/routes.yml) and resolves to nothing.
 configMapGenerator:
 - literals:
   - KEYCLOAK_PUBLIC_URL=https://iam-dev.youdrop.shop
   - KEYCLOAK_ISSUER_URI=https://iam-dev.youdrop.shop/realms/delivery-platform
   - MINIO_PUBLIC_ENDPOINT=https://api-dev.youdrop.shop
-  # PT-9. The same list as the platform-cors middleware in overlays/ingress.template.yaml, which is
-  # what a browser actually meets; this one is app-notification's WebSocket origin check. Exact
-  # origins, no `http://localhost:*` wildcard, and no app-dev.youdrop.shop — that name has had no
-  # route since the compose stack (infra/traefik/dynamic/routes.yml) and resolves to nothing.
   - CORS_ALLOWED_ORIGINS=https://portal-dev.youdrop.shop,https://www.youdrop.shop,http://localhost:5010,http://127.0.0.1:5010,http://localhost:5012,http://127.0.0.1:5012
   - SMTP_HOST=smtp.office365.com
   - SMTP_PORT=587
@@ -78,7 +78,7 @@ images:
   newTag: sha-688b16f8a1bed411bef1f62ea0b7c32780401c03
 - name: ghcr.io/youssefsaleh0108-maker/app-notification
   newName: ghcr.io/youssefsaleh0108-maker/app-notification
-  newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
+  newTag: sha-f5186817fbe33238b089847f9121b603b648c6cc
 - name: ghcr.io/youssefsaleh0108-maker/config-server
   newName: ghcr.io/youssefsaleh0108-maker/config-server
   newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
