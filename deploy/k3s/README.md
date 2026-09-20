@@ -156,6 +156,7 @@ them* below for what it creates and who reads each one.
   | realm `sslRequired` | `none` | `external` |
   | realm refresh tokens | 30 days, reusable | rotated on every use, no reuse |
   | `mobile-app` web origins | `+` | `+` and `https://www.youdrop.shop`, which the site's receipt panel needs |
+  | `mobile-app` client session | the realm's 30 d idle / 90 d max | **14 d idle, 30 d max** |
 
   **`refresh-rotation` is the one that can sign somebody out**, which is why it is separate and
   goes last. Under it a client that runs two refresh grants at once presents a token the server
@@ -165,6 +166,39 @@ them* below for what it creates and who reads each one.
   APK people have installed both contain it. Realm-wide SSO stays 30 d / 90 d because it is the
   phones' session too — which is also why a portal user reaching the 8 h idle limit gets a silent
   PKCE round trip rather than a password prompt.
+
+  **What rotation does and does not stop.** Measured on dev after the step ran, with
+  `revokeRefreshToken` true, `refreshTokenMaxReuse` 0 and no client override:
+
+  | | |
+  | --- | --- |
+  | Replay the token that was **just** spent | refused (`invalid_grant`), **and the session is revoked** — the live token dies with it |
+  | Replay a token from **two rotations earlier** | **accepted.** It mints a new token, and the token the client is holding keeps working |
+
+  So Keycloak guards the CURRENT token, not the chain. A refresh token copied out of a browser or
+  a backup is still usable for as long as its session lives, unless the thief is unlucky enough to
+  race the real client's very next refresh. **The client session window is the real bound**, and
+  both clients now have one: `delivery-portal` 8 h idle / 24 h max, `mobile-app` 14 d idle /
+  30 d max. Note which number does the work — idle only expires a token nobody is using, and a
+  thief spending a stolen one keeps resetting that clock, so the MAXIMUM is what bounds an
+  actively abused token. `mobile-app` inherited the realm's 90 days; it is now 30.
+
+  **What that means for a rider or a customer.** They sign in again after 14 days without opening
+  the app, and after 30 days however often they use it. Biometric "Continue as" is not an
+  exception: the stash behind it IS a refresh token (`AuthService.signOut(keepForBiometrics:
+  true)`), so it dies with the session it belongs to, and the next sign-in asks for a passcode
+  before the fingerprint is offered again. A rider can meet the 30-day bound mid-shift; nothing in
+  the app defers it. Raising either number is one client attribute, applied by re-running
+  `edge-identity` after changing it here and in the realm file.
+
+  When the window is first narrowed, every session already older than the new maximum ends at
+  once. That was accepted deliberately in 2026-09, while the platform had no real user base — the
+  cost of this change grows every week it is deferred.
+
+  `refresh-rotation` proves both halves of the first row, and it needs **two sign-ins** to do it:
+  the replay is what revokes the session, so a proof that replays first and then checks the
+  rotated token is measuring its own side effect. It did exactly that on the first run and failed;
+  `scripts/verify.sh` now pins the shape so it cannot come back.
 - **The Keycloak admin console is not public.** The edge refuses `/admin` on `iam-dev` and
   `iam-qa` (`overlays/ingress.template.yaml`, the `deny-public` middleware), which covers the
   console and the admin REST API; `/realms` is untouched, so authorize, token, JWKS, logout and

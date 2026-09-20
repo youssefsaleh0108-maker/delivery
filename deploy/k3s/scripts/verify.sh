@@ -286,6 +286,19 @@ case "$mobile" in
   *'"directAccessGrantsEnabled": true'*) ok "mobile-app keeps the password grant the apps need" ;;
   *) fail "mobile-app lost the password grant: the phone sign-in and every smoke script use it" ;;
 esac
+# 14 days idle, 30 days maximum. Rotation guards only the current refresh token, and a thief
+# spending a stolen one keeps resetting the idle clock — so the MAXIMUM is what bounds an actively
+# abused token, and without these this client inherits the realm's 90 days.
+for pair in 'client.session.idle.timeout": "1209600' 'client.session.max.lifespan": "2592000'; do
+  case "$mobile" in
+    *"$pair"*) ok "mobile-app ${pair%%\"*}" ;;
+    *) fail "mobile-app is missing $pair: it would inherit the realm's 30 d / 90 d" ;;
+  esac
+done
+case "$mobile" in
+  *'https://www.youdrop.shop'*) ok "mobile-app allows the public site's origin" ;;
+  *) fail "mobile-app has no web origin for www: the site's receipt panel is refused by CORS" ;;
+esac
 # ...and no script may ask delivery-portal for one, because it will be refused. The three files
 # excluded here name the client in order to ASSERT on it rather than to sign in with it: this
 # script, scripts/test/, and rotate-secrets.sh — which proves the refusal against the live realm
@@ -302,6 +315,20 @@ grep -q 'port-forward svc/keycloak' scripts/rotate-secrets.sh \
 grep -q '^ADMIN="\$IAM' scripts/rotate-secrets.sh \
   && fail "rotate-secrets.sh builds the admin API URL from the public hostname again" \
   || ok "no admin API URL is built from the public iam hostname"
+# refresh-rotation's first version signed in ONCE: it replayed the spent token and then checked
+# that the rotated one still worked. It failed on dev, and it was right to — replaying a spent
+# token is what makes Keycloak revoke the session, so the last assertion was killed by the one
+# before it. This script has neither jq nor a Keycloak to re-run it against, so it pins the SHAPE
+# that made the mistake possible: one session, and a success expected after the replay.
+step=$(awk '/^step_refresh_rotation/ {on=1} on {print} on && /^}/ {exit}' scripts/rotate-secrets.sh)
+signins=$(printf '%s\n' "$step" | grep -c 'sign_in "\$WORK/' || true)
+[ "${signins:-0}" -ge 2 ] \
+  && ok "refresh-rotation signs in twice, so its two proofs cannot share a session" \
+  || fail "refresh-rotation signs in ${signins:-0} time(s): the replay proof and the chain proof need a session each"
+after=$(printf '%s\n' "$step" | awk '/the token it replaced is refused/ {on = 1; next} on && /check .* 200 /' | wc -l | tr -d ' ')
+[ "${after:-0}" = 0 ] \
+  && ok "nothing expects a token to be accepted after the replay" \
+  || fail "$after assertion(s) expect a 200 after the replay, which has already revoked the session"
 
 echo "== every YAML alias resolves =="
 # A ConfigMap's `data:` values are strings to Kubernetes, so a dangling `*alias` inside one is
