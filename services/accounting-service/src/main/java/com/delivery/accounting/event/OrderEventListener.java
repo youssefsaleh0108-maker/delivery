@@ -91,7 +91,8 @@ public class OrderEventListener {
                              @Header(name = "amqp_correlationId", required = false) String correlationId) {
 
         String eventType = headerEventType != null ? headerEventType : routingKey;
-        if (!"order.delivered".equals(eventType) && !"order.tipped".equals(eventType)) {
+        if (!"order.delivered".equals(eventType) && !"order.tipped".equals(eventType)
+                && !"order.cancelled".equals(eventType)) {
             return;
         }
 
@@ -104,6 +105,11 @@ public class OrderEventListener {
 
             if ("order.tipped".equals(eventType)) {
                 onOrderTipped(event);
+                return;
+            }
+
+            if ("order.cancelled".equals(eventType)) {
+                onOrderCancelled(event, correlationId);
                 return;
             }
 
@@ -330,6 +336,65 @@ public class OrderEventListener {
         }
 
         return Outcome.ok();
+    }
+
+    /**
+     * An order closed after the rider had picked it up (RECON-10).
+     *
+     * <p>A cancellation has never been this service's business: nothing was collected before
+     * delivery, so there was nothing to unwind. Closing a PICKED_UP order is the one case where
+     * that is not true — the goods are gone and somebody carried them — so Back Office decides,
+     * per order, whether the platform makes the shop and the carrier whole, and says so on the
+     * event.
+     *
+     * <p><strong>Every other cancellation still does nothing at all.</strong> An event with no
+     * {@code stage}, one cancelled before pickup, or one where the decision was to pay nobody, is
+     * ignored exactly as every cancellation was before this existed — which is also what an event
+     * from an Order Manager that has not been deployed yet looks like.
+     */
+    private void onOrderCancelled(JsonNode event, String correlationId) {
+        String stage = event.path("stage").asText(null);
+        boolean compensateMerchant = event.path("compensateMerchant").asBoolean(false);
+        boolean compensateCarrier = event.path("compensateCarrier").asBoolean(false);
+        if (!"AFTER_PICKUP".equals(stage) || (!compensateMerchant && !compensateCarrier)) {
+            return;
+        }
+
+        UUID orderId = UUID.fromString(event.path("orderId").asText());
+        String merchantId = event.path("merchantId").asText(null);
+        String riderId = event.path("riderId").asText(null);
+        String carrierAccount = event.path("deliveryProviderAccount").asText(null);
+
+        JsonNode subtotal = event.path("subtotal");
+        JsonNode fee = event.path("deliveryFee");
+        JsonNode wrap = event.path("giftWrapFee");
+
+        SettlementService.Rider rider = riderId == null ? null : new SettlementService.Rider(
+                riderId,
+                accounts.forUser(riderId),
+                carrierAccount == null ? null : event.path("deliveryProviderId").asText(null),
+                event.path("customerId").asText(null));
+
+        settlements.compensateAfterPickup(
+                orderId,
+                subtotal.isNumber() ? subtotal.decimalValue() : null,
+                merchantId == null ? null : accounts.forUser(merchantId),
+                carrierAccount,
+                compensateMerchant, compensateCarrier,
+                // The waivers the order was placed under still hold: a shop whose commission was
+                // waived is made whole on the whole basket, and a carrier whose cut was waived
+                // keeps the whole fee.
+                new SettlementService.Waivers(
+                        fee.isNumber() ? fee.decimalValue() : null,
+                        event.path("deliveryFeeWaived").asBoolean(false),
+                        event.path("merchantFeeWaived").asBoolean(false),
+                        event.path("carrierFeeWaived").asBoolean(false),
+                        null),
+                rider, timestampOf(event),
+                new SettlementService.Parties(
+                        merchantId, event.path("deliveryProviderId").asText(null)),
+                wrap.isNumber() ? wrap.decimalValue() : null,
+                correlationId);
     }
 
     /** The order a message is about, or null when it does not name one this service can read. */

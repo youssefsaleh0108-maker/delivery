@@ -100,6 +100,7 @@ public class BankPostingPublisher {
             // the statement months later, not disguised as a negative commission that an accountant
             // has to reverse-engineer.
             case PLATFORM_SUBSIDY -> "Promotion funded on order #" + shortOrder;
+            case PLATFORM_LOSS -> "Absorbed on order #" + shortOrder + ", closed after pickup";
             case CUSTOMER_REFUND -> "Refund for order #" + shortOrder;
         };
     }

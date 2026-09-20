@@ -77,6 +77,19 @@ public class AccountingTransaction {
          */
         PLATFORM_SUBSIDY,
         /**
+         * What the platform absorbed on an order that was closed after pickup (RECON-10).
+         *
+         * <p>Back Office closes a picked-up order that will never arrive and pays the shop its
+         * share and the carrier its fee. Nothing was collected from the customer, so those credits
+         * have nothing behind them and the platform is out of pocket by exactly their sum — which
+         * is what this debit is, on its own account, so the order still balances.
+         *
+         * <p>Distinct from {@link #PLATFORM_SUBSIDY}, which is money the platform gives away on
+         * purpose: free delivery, a promo code. A loss on an order that went wrong is a different
+         * fact, and a report that added the two could not tell an offer from a failure.
+         */
+        PLATFORM_LOSS,
+        /**
          * Takings banked, clearing a cash holder's outstanding float.
          *
          * <p>This one <em>is</em> a real posting: handing over the day's notes genuinely moves

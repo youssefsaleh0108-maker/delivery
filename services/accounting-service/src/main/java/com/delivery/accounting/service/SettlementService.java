@@ -77,8 +77,10 @@ public class SettlementService {
     private final BigDecimal deliveryCommissionPercentage;
     private final BigDecimal riderFeeSharePercentage;
     private final String platformAccount;
+    private final String lossAccount;
     private final String currency;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public SettlementService(AccountingTransactionRepository transactions,
                              CashFloatRepository floatEntries,
                              RiderLedgerRepository riderLedger,
@@ -108,6 +110,12 @@ public class SettlementService {
                              String riderFeeSharePercentage,
                              @Value("${delivery.accounting.platform-account:ACC-PLATFORM}")
                              String platformAccount,
+                             // Where what the platform absorbs on an order closed after pickup is
+                             // booked (RECON-10). Its own account, and not the platform's ordinary
+                             // one, because "we lost this" and "we earned this" must not add up
+                             // into one figure nobody can read.
+                             @Value("${delivery.accounting.loss-account:ACC-PLATFORM-LOSS}")
+                             String lossAccount,
                              @Value("${delivery.accounting.currency:USD}") String currency,
                              // LEDGER_ONLY by default, and deliberately so: a default that waits
                              // for a bank nobody deployed leaves every credit PENDING and pays no
@@ -126,7 +134,27 @@ public class SettlementService {
                         ? null
                         : new BigDecimal(riderFeeSharePercentage.trim());
         this.platformAccount = platformAccount;
+        this.lossAccount = lossAccount;
         this.currency = currency;
+    }
+
+    /**
+     * Without a loss account named: the shape before an order could be closed after pickup, and
+     * what every caller that never closes one still reads as.
+     */
+    public SettlementService(AccountingTransactionRepository transactions,
+                             CashFloatRepository floatEntries,
+                             RiderLedgerRepository riderLedger,
+                             BankPostingPublisher postings,
+                             BigDecimal commissionPercentage,
+                             BigDecimal deliveryCommissionPercentage,
+                             String riderFeeSharePercentage,
+                             String platformAccount,
+                             String currency,
+                             SettlementMode settlementMode) {
+        this(transactions, floatEntries, riderLedger, postings, commissionPercentage,
+                deliveryCommissionPercentage, riderFeeSharePercentage, platformAccount,
+                "ACC-PLATFORM-LOSS", currency, settlementMode);
     }
 
     /**
@@ -574,6 +602,124 @@ public class SettlementService {
         // The debit is asked for now; the credits wait until it has actually posted. Sequencing
         // them means the platform never credits a merchant for money it failed to collect — the
         // one ordering mistake in a settlement saga that costs real money rather than time.
+        openWithTheBank(legs);
+        return legs;
+    }
+
+    /**
+     * Pays what the platform promised on an order closed after pickup (RECON-10).
+     *
+     * <p>Back Office closes a PICKED_UP order that will never arrive: the goods are gone, somebody
+     * carried them, and the customer pays nothing. Order Manager says on the event which of the two
+     * the platform is making whole, and this writes exactly that:
+     *
+     * <ul>
+     *   <li>the shop its normal share — the goods less the commission it would have been charged,
+     *       and its wrapping in full — when {@code compensateMerchant};</li>
+     *   <li>whoever carried it their fee, less the platform's usual cut, when
+     *       {@code compensateCarrier}: the company on a company's job, the rider on the platform's
+     *       own fleet, decided by the same carrier account the delivery split turns on;</li>
+     *   <li>and a {@link Leg#PLATFORM_LOSS} for the sum of those, on the loss account, because
+     *       there is no collection behind them and the platform is what is left.</li>
+     * </ul>
+     *
+     * <p><strong>No collection leg, ever.</strong> Nothing was taken from the customer and no cash
+     * changed hands, so there is no debit to record and no float row to write; a rider carrying this
+     * order's notes is a contradiction, not a case to handle.
+     *
+     * <p>Idempotent on the same {@code existsByOrderId} guard as a settlement: a redelivered
+     * cancellation writes nothing, and an order that somehow settled first is left exactly as it is
+     * rather than compensated on top of being paid.
+     *
+     * @return the legs created; empty when there is nothing to compensate
+     */
+    @Transactional
+    public List<AccountingTransaction> compensateAfterPickup(
+            UUID orderId, BigDecimal merchantBase, String merchantAccount, String carrierAccount,
+            boolean compensateMerchant, boolean compensateCarrier, Waivers waivers, Rider rider,
+            java.time.Instant occurredAt, Parties parties, BigDecimal giftWrapFee,
+            String correlationId) {
+
+        if (transactions.existsByOrderId(orderId)) {
+            log.debug("Order {} already has legs; not compensating it as well", orderId);
+            return List.of();
+        }
+        if (!compensateMerchant && !compensateCarrier) {
+            // The decision was to pay nobody. Nothing happened in the books, which is the truth.
+            return List.of();
+        }
+
+        BigDecimal goods = (merchantBase == null ? BigDecimal.ZERO : merchantBase)
+                .setScale(2, RoundingMode.HALF_UP).max(BigDecimal.ZERO);
+        BigDecimal commission = waivers.merchantWaived()
+                ? BigDecimal.ZERO
+                : goods.multiply(commissionPercentage)
+                        .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        BigDecimal merchantShare = compensateMerchant ? goods.subtract(commission) : BigDecimal.ZERO;
+        BigDecimal wrapShare = compensateMerchant && giftWrapFee != null
+                && giftWrapFee.signum() > 0
+                ? giftWrapFee.setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        BigDecimal deliveryFee = waivers.deliveryFee() == null
+                ? BigDecimal.ZERO.setScale(2)
+                : waivers.deliveryFee().setScale(2, RoundingMode.HALF_UP).max(BigDecimal.ZERO);
+        BigDecimal carried = compensateCarrier && deliveryFee.signum() > 0
+                ? deliveryFee.subtract(deliveryCut(deliveryFee, waivers.carrierWaived()))
+                : BigDecimal.ZERO;
+        boolean onCarrierFleet = carrierAccount != null;
+        BigDecimal carrierShare = onCarrierFleet ? carried : BigDecimal.ZERO;
+        BigDecimal riderShare = BigDecimal.ZERO;
+        if (!onCarrierFleet && carried.signum() > 0 && rider != null && rider.accountRef() != null) {
+            riderShare = riderShareOf(deliveryFee, waivers.carrierWaived());
+        }
+
+        List<AccountingTransaction> legs = new ArrayList<>();
+        if (merchantShare.signum() > 0) {
+            legs.add(new AccountingTransaction(orderId, Leg.MERCHANT_CREDIT, merchantAccount,
+                    merchantShare, currency, Direction.CREDIT, correlationId)
+                    .attributedTo(CounterpartyKind.MERCHANT, parties.merchantRef())
+                    .commissionCharged(commission));
+        }
+        if (wrapShare.signum() > 0) {
+            legs.add(new AccountingTransaction(orderId, Leg.GIFT_WRAP_CREDIT, merchantAccount,
+                    wrapShare, currency, Direction.CREDIT, correlationId)
+                    .attributedTo(CounterpartyKind.MERCHANT, parties.merchantRef())
+                    .commissionCharged(BigDecimal.ZERO));
+        }
+        if (carrierShare.signum() > 0) {
+            legs.add(new AccountingTransaction(orderId, Leg.PROVIDER_CREDIT, carrierAccount,
+                    carrierShare, currency, Direction.CREDIT, correlationId)
+                    .attributedTo(CounterpartyKind.CARRIER, parties.carrierRef())
+                    .commissionCharged(deliveryFee.subtract(carrierShare)));
+        }
+        if (riderShare.signum() > 0) {
+            legs.add(new AccountingTransaction(orderId, Leg.RIDER_CREDIT, rider.accountRef(),
+                    riderShare, currency, Direction.CREDIT, correlationId)
+                    .attributedTo(CounterpartyKind.RIDER, rider.riderRef())
+                    .commissionCharged(deliveryFee.subtract(riderShare).max(BigDecimal.ZERO)));
+        }
+        if (legs.isEmpty()) {
+            // Nothing to pay: a decision to compensate a shop that sold nothing, or a carrier on a
+            // free delivery. No legs rather than a row of zeroes.
+            log.info("Order {} was closed after pickup with nothing to compensate", orderId);
+            return List.of();
+        }
+
+        BigDecimal loss = merchantShare.add(wrapShare).add(carrierShare).add(riderShare);
+        legs.add(new AccountingTransaction(orderId, Leg.PLATFORM_LOSS, lossAccount,
+                loss, currency, Direction.DEBIT, correlationId)
+                .attributedTo(CounterpartyKind.PLATFORM, CounterpartyKind.PLATFORM_REF));
+
+        transactions.saveAll(legs);
+        log.info("Order {} closed after pickup: merchant {} + wrapping {} + carrier {} + rider {} "
+                        + "= {} borne by the platform",
+                orderId, merchantShare, wrapShare, carrierShare, riderShare, loss);
+
+        // The rider's own record of a job they did, exactly as a delivery writes it: they picked the
+        // order up and rode it, and what the platform paid for that is what it paid for that.
+        creditRider(orderId, rider, carrierAccount, carrierShare, riderShare, occurredAt);
+
         openWithTheBank(legs);
         return legs;
     }

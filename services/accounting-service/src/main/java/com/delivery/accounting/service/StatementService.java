@@ -569,6 +569,10 @@ public class StatementService {
                                         Ledger ledger) {
         BigDecimal commission = ledger.sumOf(Leg.PLATFORM_COMMISSION);
         BigDecimal subsidy = ledger.sumOf(Leg.PLATFORM_SUBSIDY);
+        // What it absorbed on orders closed after pickup (RECON-10). Its own line, not added into
+        // subsidies: an offer the platform chose to fund and an order that went wrong are different
+        // facts, and a figure that mixed them could not tell one from the other.
+        BigDecimal loss = ledger.sumOf(Leg.PLATFORM_LOSS);
 
         // Everything the platform handed out in the period, to everybody (RECON-11). Read across
         // counterparties rather than off the platform's own legs: a payout is attributed to
@@ -583,12 +587,15 @@ public class StatementService {
                 "free delivery and promotions the platform absorbed"));
         addIfAny(lines, Statement.Line.credit("Paid out", paidOut,
                 "points redeemed and riders' cash-outs the platform paid"));
+        addIfAny(lines, Statement.Line.credit("Absorbed on orders closed after pickup", loss,
+                "the shop's share and the delivery fee on orders that never arrived"));
 
-        BigDecimal control = subsidy.add(paidOut).subtract(commission);
+        BigDecimal control = subsidy.add(paidOut).add(loss).subtract(commission);
 
         List<Statement.Entry> entries = ledger.own().stream()
                 .filter(t -> t.getLeg() == Leg.PLATFORM_COMMISSION
-                        || t.getLeg() == Leg.PLATFORM_SUBSIDY)
+                        || t.getLeg() == Leg.PLATFORM_SUBSIDY
+                        || t.getLeg() == Leg.PLATFORM_LOSS)
                 .limit(MAX_ENTRIES)
                 .map(t -> {
                     BigDecimal kept = t.getLeg() == Leg.PLATFORM_COMMISSION
