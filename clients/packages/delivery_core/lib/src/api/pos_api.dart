@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../models/catalog_models.dart';
 import '../models/pos_models.dart';
 import '../models/statement_models.dart';
+import '../network/service_reach.dart';
 
 /// Typed client for pos-service (`/api/pos`) — the till.
 ///
@@ -365,13 +366,18 @@ class PosApi {
 
   /// A GET whose 404 is an answer rather than a failure. Everything else still throws — a 500
   /// silently read as "no shift" would hide an outage behind an empty screen.
+  ///
+  /// The edge's own 404 for a path it routes nowhere is not pos-service saying "no shift": it is
+  /// pos-service not being there. That one throws, so a caller can tell the two apart — see
+  /// [isServiceNotRouted]. Reading it as "no shift" is how a till drew itself as working on an
+  /// environment with no pos-service behind it.
   Future<Map<String, dynamic>?> _maybe(String path) async {
     try {
       final Response<dynamic> response = await _dio.get<dynamic>(path);
       final Object? body = response.data;
       return body is Map<dynamic, dynamic> ? body.cast<String, dynamic>() : null;
     } on DioException catch (e) {
-      if (e.response?.statusCode == 404) {
+      if (e.response?.statusCode == 404 && !isServiceNotRouted(e)) {
         return null;
       }
       rethrow;

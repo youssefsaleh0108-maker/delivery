@@ -483,15 +483,24 @@ class _InventoryScreenState extends State<InventoryScreen> {
             YdChip(
               label: filter.labelIn(t),
               selected: _filter == filter,
-              onTap: widget.api == null ? null : () => _selectFilter(filter),
+              onTap: _unreachable ? null : () => _selectFilter(filter),
             ),
         ],
       ),
     );
   }
 
+  /// Whether there is an inventory-service to reach: no client at all, or a gateway that routes
+  /// nothing at `/api/inventory` because the service is not deployed on this environment.
+  ///
+  /// The second one used to read as an ordinary load failure, so the page offered a Try again over
+  /// a service that does not exist — see [isServiceNotRouted]. A client is not evidence that a
+  /// service is there, and the portal always passes one.
+  bool get _unreachable =>
+      widget.api == null || (_items?.error != null && isServiceNotRouted(_items!.error!));
+
   Widget _body(DeliveryStrings t, {required bool narrow}) {
-    if (widget.api == null) {
+    if (_unreachable) {
       return _unavailable(t);
     }
     final PagedList<InventoryItem> list = _items!;
@@ -635,12 +644,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
   /// inventory-service is not reachable — or this host was given no client at all.
   ///
   /// Stated plainly rather than dressed as an error: nothing the merchant did caused it, and there
-  /// is nothing here for them to retry into existence.
+  /// is nothing here for them to retry into existence. So no Try again, and copy that says the
+  /// shelf is not switched on rather than that loading it failed.
   Widget _unavailable(DeliveryStrings t) => _capped(
         YdEmptyState(
           icon: Icons.inventory_2_outlined,
-          title: t.invCouldNotLoad,
-          message: t.invEmptyHint,
+          title: t.invUnavailable,
+          message: t.invUnavailableHint,
         ),
       );
 

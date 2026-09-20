@@ -493,6 +493,88 @@ class MerchantActionButton extends StatelessWidget {
 String merchantActionLabel(OrderAction action, DeliveryStrings t) =>
     action == OrderAction.cancel ? t.merchReject : action.labelIn(t);
 
+/// The marker a merchant's Reject writes on the order.
+///
+/// Not translated: the reason is stored against the order and read by Backoffice staff and support
+/// (Backoffice's order list shows it as it is written), not shown back to the merchant who
+/// triggered it, nor to the customer.
+const String merchantCancelReason = 'Cancelled by merchant';
+
+/// Asks before a Reject cancels a customer's order.
+///
+/// Returns the reason to send, or null when the merchant keeps the order. Reject sits beside Accept
+/// and reads like its opposite, but the two are not opposites: accepting starts work the shop can
+/// still stop, while rejecting cancels a stranger's order for good, and it used to go on one tap of
+/// a button a sleeve could brush. So it is asked for, and the merchant may say why — the words go
+/// after [merchantCancelReason] for whoever reads the order later, and leaving them out sends the
+/// marker alone.
+Future<String?> confirmMerchantReject(BuildContext context) async {
+  final String? note = await showDialog<String>(
+    context: context,
+    builder: (BuildContext context) => const _RejectOrderDialog(),
+  );
+  return note == null ? null : OrderApi.cancelReasonWith(merchantCancelReason, note);
+}
+
+class _RejectOrderDialog extends StatefulWidget {
+  const _RejectOrderDialog();
+
+  @override
+  State<_RejectOrderDialog> createState() => _RejectOrderDialogState();
+}
+
+class _RejectOrderDialogState extends State<_RejectOrderDialog> {
+  final TextEditingController _reason = TextEditingController();
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    return AlertDialog(
+      title: Text(t.merchRejectConfirmTitle),
+      content: SingleChildScrollView(
+        child: ConstrainedBox(
+          // The portal opens this over a 1400px window, where an unconstrained dialog stretches its
+          // one sentence across the screen; a 320dp phone gets less than this and keeps its margins.
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Text(t.merchRejectConfirmBody),
+              const SizedBox(height: DeliverySpacing.md),
+              TextField(
+                controller: _reason,
+                maxLength: OrderApi.noteMaxLengthAfter(merchantCancelReason),
+                maxLines: 3,
+                minLines: 1,
+                decoration: InputDecoration(labelText: t.merchRejectReason),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          // Popping nothing is the safe answer, and it is also what the barrier and the back
+          // button give — so every way out of this dialog except the last button keeps the order.
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(t.svcKeepOrder),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(_reason.text.trim()),
+          child: Text(t.merchReject),
+        ),
+      ],
+    );
+  }
+}
+
 /// The 1px hairline the receipt card rules between its blocks.
 class MerchantDivider extends StatelessWidget {
   const MerchantDivider({super.key});
@@ -558,15 +640,21 @@ class _MerchantOrderDetailScreenState extends State<MerchantOrderDetailScreen> {
   }
 
   Future<void> _act(OrderAction action) async {
+    // Rejecting cancels the customer's order for good, so it is asked for first — here as well as
+    // in the queue, because the same tap is available from both and only one of them being guarded
+    // is how a merchant learns that one screen is safe and the other is not.
+    String? reason;
+    if (action == OrderAction.cancel) {
+      reason = await confirmMerchantReject(context);
+      if (reason == null || !mounted) return;
+    }
     setState(() => _busy = true);
     final DeliveryStrings t = DeliveryStrings.of(context);
     try {
       final DeliveryOrder updated = await widget.api.act(
         _order.id,
         action,
-        // Not translated: the reason is stored against the order and read by Backoffice staff and
-        // support, not shown back to the merchant who triggered it.
-        reason: action == OrderAction.cancel ? 'Cancelled by merchant' : null,
+        reason: reason,
       );
       if (!mounted) return;
       setState(() => _order = updated);

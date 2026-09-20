@@ -139,7 +139,16 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
   /// removes the entire class of bug.
   Future<void> _queue = Future<void>.value();
 
-  bool get _live => widget.api != null && widget.storeId != null;
+  /// Whether pos-service is behind the gateway, as [_probe] found it.
+  ///
+  /// A client is not evidence that a service exists. Both hosts hand this screen a live [PosApi] —
+  /// the null contract below was never exercised — so on dev and qa, where pos-service is not
+  /// deployed and the edge answers every `/api/pos` path with its own 404, the till drew itself as
+  /// working and a cashier met "could not load the sale" on every single tap.
+  ServiceReach _reach = ServiceReach.unknown;
+
+  bool get _live =>
+      widget.api != null && widget.storeId != null && !_reach.isAbsent;
 
   @override
   void initState() {
@@ -155,22 +164,31 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
     super.dispose();
   }
 
-  /// Asks — never opens. Both calls are reads, both are allowed to fail in silence: pos-service is
-  /// not deployed yet, and a till that shouts on every launch about a service the merchant has not
-  /// been given would be noise, not information.
+  /// Asks — never opens. Both calls are reads, and both are allowed to fail in silence: a till that
+  /// shouts on every launch about a shift nobody opened would be noise, not information.
+  ///
+  /// The first read doubles as the reachability probe, so nothing is spent on asking. Its answer is
+  /// what the band at the top is drawn from: a shift or a refusal both mean pos-service is there,
+  /// and only the edge's own "nothing is routed here" means it is not.
   Future<void> _probe() async {
     final PosApi? api = widget.api;
     final String? storeId = widget.storeId;
     if (api == null || storeId == null) {
       return;
     }
-    try {
-      final PosShift? shift = await api.currentShift(storeId);
-      if (mounted && shift != null) {
-        setState(() => _shift = shift);
+    PosShift? shift;
+    final ServiceReach reach =
+        await probeServiceReach(() async => shift = await api.currentShift(storeId));
+    if (!mounted) return;
+    setState(() {
+      _reach = reach;
+      if (shift != null) {
+        _shift = shift;
       }
-    } catch (_) {
-      // No drawer until a later call says otherwise.
+    });
+    if (reach.isAbsent) {
+      // Nothing there to resume, and a second 404 would say the same thing twice.
+      return;
     }
     try {
       final PosSale? resumed = await api.resumeOpen(storeId);
