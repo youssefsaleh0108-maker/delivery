@@ -5,6 +5,8 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
+import 'split_labels.dart';
+
 /// The host's collection screen (Figma `split-invite-sent` 83:548, with the Remind pills of
 /// `split-payment-status` 83:210): the countdown, the payment progress, one row per share, Cover
 /// the Rest, and — the one honest deviation — a "Continue to Checkout" button once every share is
@@ -87,10 +89,8 @@ class _SplitStatusScreenState extends State<SplitStatusScreen> {
     return '$m:${s.toString().padLeft(2, '0')}';
   }
 
-  String _lbp(double usd) {
-    final int thousands = (usd * _plan.rateUsed / 1000).round();
-    return '${_group(thousands * 1000)} LBP';
-  }
+  /// At the plan's locked rate, by the ledger's rule: the figure the rider will ask for (RECON-14).
+  String _lbp(double usd) => '${_group(lbpFaceOf(usd, _plan.rateUsed))} LBP';
 
   static String _group(int amount) {
     final String digits = amount.toString();
@@ -196,8 +196,9 @@ class _SplitStatusScreenState extends State<SplitStatusScreen> {
                         ),
                       ),
                     ),
+                    // Confirmed, not paid: a share is a promise until the door (RECON-01).
                     Text(
-                      t.custNPaid(_plan.paidCount, _plan.shares.length),
+                      t.splitNConfirmed(_plan.paidCount, _plan.shares.length),
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -222,7 +223,7 @@ class _SplitStatusScreenState extends State<SplitStatusScreen> {
                 ),
                 const SizedBox(height: DeliverySpacing.sm),
                 Text(
-                  t.custCollectedOf('\$${_plan.collectedUsd.toStringAsFixed(2)}',
+                  t.splitAmountConfirmedOf('\$${_plan.collectedUsd.toStringAsFixed(2)}',
                       '\$${_plan.totalUsd.toStringAsFixed(2)}'),
                   style: const TextStyle(
                       fontSize: 12, color: DeliveryColors.muted, height: 1.3),
@@ -284,10 +285,19 @@ class _SplitStatusScreenState extends State<SplitStatusScreen> {
     final (String label, Color color, Color bg) = switch (share.status) {
       'PAID' => (t.custPaidChip, DeliveryAccent.positive.color,
           DeliveryAccent.positive.color.withValues(alpha: 0.12)),
+      // A promise: in, so the plan can be placed, and no money has moved. A simulated wallet is
+      // greyed like a cover rather than green like money.
+      'COMMITTED' when share.simulated =>
+        (t.splitSimulatedChip, DeliveryColors.muted, DeliveryColors.border),
+      'COMMITTED' => (t.splitConfirmedChip, DeliveryAccent.positive.color,
+          DeliveryAccent.positive.color.withValues(alpha: 0.12)),
       'COVERED' => (t.custCoveredChip, DeliveryColors.muted, DeliveryColors.border),
       'DECLINED' => (t.custDeclinedChip, DeliveryColors.brand, DeliveryColors.brandSoft),
       _ => (t.custPendingChip, const Color(0xFFB8860B), const Color(0xFFFDF3D7)),
     };
+    final String? caption = share.status == 'PAID' || share.status == 'COMMITTED'
+        ? splitShareCaption(t, share)
+        : null;
 
     return YdCard.bordered(
       child: Row(
@@ -315,9 +325,9 @@ class _SplitStatusScreenState extends State<SplitStatusScreen> {
                   style: const TextStyle(
                       fontSize: 12, color: DeliveryColors.muted, height: 1.3),
                 ),
-                if (share.method != null && share.status == 'PAID')
+                if (caption != null)
                   Text(
-                    t.custPaidVia(share.method!),
+                    caption,
                     style: const TextStyle(
                         fontSize: 11, color: DeliveryColors.faint, height: 1.3),
                   ),

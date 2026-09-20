@@ -2,6 +2,8 @@ package com.delivery.transfer.service;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -66,6 +68,42 @@ public class TransferService {
         return registry.availableMethods();
     }
 
+    /**
+     * What an order still owes: its whole total while its payment is open, and nothing once the
+     * money has been taken, refunded, or the order died with it. An intent is how the customer
+     * proposes to settle the bill, so an order with no bill left takes none.
+     */
+    private static BigDecimal amountDue(OrderManagerClient.OrderSummary order) {
+        BigDecimal total = Money.usd(order.totalAmount());
+        if (total == null) {
+            // Order Manager answered without the one figure this check rests on.
+            throw new OrderManagerClient.OrderUnavailableException(
+                    "The order could not be confirmed; please try again");
+        }
+        return order.paymentStatus() == null || OPEN_PAYMENTS.contains(order.paymentStatus())
+                ? total
+                : BigDecimal.ZERO;
+    }
+
+    /** Payment states in which the bill is still standing. */
+    private static final Set<String> OPEN_PAYMENTS =
+            Set.of("DUE", "AUTHORIZATION_PENDING", "AUTHORIZED");
+
+    /** The ready connector that would carry {@code method}, if any — the same one a POST would use. */
+    public Optional<MoneyTransferConnector> connectorFor(TransferMethod method) {
+        return registry.forMethod(method);
+    }
+
+    /**
+     * Order Manager's answer about an order, asked with the caller's own token, so its visibility
+     * rule decides: a stranger's order and one that was never placed are both
+     * {@link OrderManagerClient.OrderUnavailableException}. The split manager needs the same fact
+     * this service does before it records money against an order.
+     */
+    public OrderManagerClient.OrderSummary order(UUID orderId) {
+        return orders.fetch(orderId);
+    }
+
     /** A priced split: what the customer is asked to approve, and what initiate will store. */
     public record Quote(BigDecimal amountUsd, BigDecimal splitUsd, BigDecimal splitLbpInUsd,
                         BigDecimal lbpPerUsd, BigDecimal splitLbpFace) {
@@ -117,6 +155,20 @@ public class TransferService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your order");
         }
 
+        // The obligation is the ORDER's, not the client's. Taken from the request, it recorded a
+        // 0.01 intent against a 9.75 order (RECON-14) — and the rider collects at the door from a
+        // plan, while the ledger books the order's total, so an intent for anything else is a
+        // second, contradictory account of the same money.
+        BigDecimal due = amountDue(order);
+        if (due.signum() == 0) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "That order has nothing left to pay");
+        }
+        if (quote.amountUsd().compareTo(due) != 0) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "amountUsd must be the order's amount due, " + due);
+        }
+
         // One payment intent per order: re-choosing a method before the rider leaves replaces the
         // old intent rather than stacking a second obligation on the same order.
         transfers.findByOrderId(orderId).ifPresent(existing -> {
@@ -134,15 +186,17 @@ public class TransferService {
         return transfers.save(transfer);
     }
 
+    /**
+     * The caller's own intent for an order. Somebody else's reads as none at all: a 403 here told
+     * any customer holding an order id — and riders see every id on the job board — that the order
+     * had a payment intent behind it.
+     */
     @Transactional(readOnly = true)
     public MoneyTransfer mineForOrder(UUID orderId, String payerRef) {
-        MoneyTransfer transfer = transfers.findByOrderId(orderId)
+        return transfers.findByOrderId(orderId)
+                .filter(transfer -> transfer.getPayerRef().equals(payerRef))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "No transfer for that order"));
-        if (!transfer.getPayerRef().equals(payerRef)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your order");
-        }
-        return transfer;
     }
 
     @Transactional(readOnly = true)

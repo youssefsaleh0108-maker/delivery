@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.delivery.platform.security.CurrentUser;
 import com.delivery.transfer.domain.Money;
 import com.delivery.transfer.domain.SplitPlan;
 import com.delivery.transfer.domain.SplitShare;
@@ -30,7 +31,8 @@ import jakarta.validation.constraints.NotNull;
  *
  * <p>Invitees are addressed by USERNAME — the {@code preferred_username} in their own token is
  * what matches them to their shares, so an order id or plan id in a request buys nothing without
- * being the host or an invitee.
+ * being the host or an invitee (or, for the plan behind an order, its rider or back office). A plan
+ * the caller may not read answers 404, exactly like one that does not exist.
  */
 @RestController
 @RequestMapping("/api/transfers/splits")
@@ -74,6 +76,23 @@ public class SplitController {
     @PreAuthorize("hasRole('CUSTOMER')")
     public List<Map<String, Object>> mine(@AuthenticationPrincipal Jwt jwt) {
         return service.mine(jwt.getSubject()).stream().map(SplitController::payload).toList();
+    }
+
+    /**
+     * How an invitee may answer a share right now: cash at the door, plus a wallet only where the
+     * dev simulator stands in for it, flagged {@code simulated} so the app can say so. Not the
+     * checkout's {@code /api/transfers/methods}: a connector that carries an order's payment cannot
+     * take a share's money.
+     */
+    @GetMapping("/methods")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public List<Map<String, Object>> methods() {
+        return service.shareMethods().stream().map(m -> {
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("method", m.method());
+            out.put("simulated", m.simulated());
+            return out;
+        }).toList();
     }
 
     /** The invitations waiting on the calling user — what the home banner polls. */
@@ -131,13 +150,21 @@ public class SplitController {
     }
 
     /**
-     * The rider's cash checklist for a split order. DELIVERY reads it to collect; the customer
-     * roles read it for the completion summary.
+     * The plan behind an order: the rider's cash checklist, the members' summary, support's view.
+     *
+     * <p>Only the host, an invitee, back office and the order's own rider are answered; anybody
+     * else gets the 404 an order with no plan gets (RECON-02). The rider is shown
+     * {@link #riderPayload the amounts only}.
      */
     @GetMapping("/for-order/{orderId}")
-    @PreAuthorize("hasAnyRole('DELIVERY', 'CUSTOMER')")
-    public Map<String, Object> forOrder(@PathVariable UUID orderId) {
-        return payload(service.forOrder(orderId));
+    @PreAuthorize("hasAnyRole('DELIVERY', 'CUSTOMER', 'BACKOFFICE')")
+    public Map<String, Object> forOrder(@AuthenticationPrincipal Jwt jwt,
+                                        @PathVariable UUID orderId) {
+        SplitService.OrderPlan read = service.forOrder(orderId, jwt.getSubject(), username(jwt),
+                CurrentUser.hasRole("BACKOFFICE"));
+        return read.reader() == SplitService.Reader.RIDER
+                ? riderPayload(read.plan(), read.cashOrder())
+                : payload(read.plan());
     }
 
     private static String username(Jwt jwt) {
@@ -148,6 +175,46 @@ public class SplitController {
     private static String displayName(Jwt jwt) {
         String name = jwt.getClaimAsString("name");
         return name != null && !name.isBlank() ? name : username(jwt);
+    }
+
+    /**
+     * What the order's rider is shown: each share's amount and the name to call at the door, and
+     * nothing that identifies an account — no usernames, no host, no store, nothing of the plan's
+     * life before the order.
+     *
+     * <p>Each share's {@code method} is how THIS door receives it. On a cash order every share is
+     * handed over here — the host's own slice and a simulated wallet share included, since neither
+     * moved any money — so each reads CASH_AT_DOOR, and a rider app from before RECON-01, which
+     * added up only the CASH_AT_DOOR shares, asks for the order's whole total too. On a card or
+     * wallet order the order's own payment carried everything, so each reads HOST_ORDER and the
+     * door owes nothing. {@code simulated} stays, with the wallet it stood in for as
+     * {@code simulatedMethod}, so a stand-in payment is still called one, by name.
+     */
+    private static Map<String, Object> riderPayload(SplitPlan plan, boolean cashOrder) {
+        SplitShare.Method atTheDoor = cashOrder
+                ? SplitShare.Method.CASH_AT_DOOR
+                : SplitShare.Method.HOST_ORDER;
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", plan.getId());
+        out.put("orderId", plan.getOrderId());
+        out.put("mode", plan.getMode());
+        out.put("status", plan.getStatus());
+        out.put("totalUsd", Money.usd(plan.getTotalUsd()));
+        out.put("rateUsed", Money.lbp(plan.getRateUsed()));
+        out.put("shares", plan.getShares().stream().map(s -> {
+            Map<String, Object> share = new LinkedHashMap<>();
+            share.put("id", s.getId());
+            share.put("name", s.getPayeeName());
+            share.put("amountUsd", Money.usd(s.getAmountUsd()));
+            share.put("status", s.getStatus());
+            share.put("method", atTheDoor);
+            share.put("simulated", s.isSimulated());
+            if (s.isSimulated()) {
+                share.put("simulatedMethod", s.getMethod());
+            }
+            return share;
+        }).toList());
+        return out;
     }
 
     private static Map<String, Object> payload(SplitPlan plan) {
@@ -172,6 +239,7 @@ public class SplitController {
             share.put("itemsCount", s.getItemsCount());
             share.put("status", s.getStatus());
             share.put("method", s.getMethod());
+            share.put("simulated", s.isSimulated());
             share.put("paidAt", s.getPaidAt());
             return share;
         }).toList());

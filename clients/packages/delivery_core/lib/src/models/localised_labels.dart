@@ -45,6 +45,7 @@ extension OrderActionLabel on OrderAction {
         OrderAction.pickUp => t.actionPickedUp,
         OrderAction.deliver => t.actionDelivered,
         OrderAction.cancel => t.actionCancel,
+        OrderAction.closeNotDelivered => t.actionCloseNotDelivered,
       };
 }
 

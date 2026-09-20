@@ -66,6 +66,21 @@ public class PresenceService {
     private static final Logger log = LoggerFactory.getLogger(PresenceService.class);
     private static final String KEY_PREFIX = "delivery:tracking:presence:";
 
+    /** Where {@link LatestFix} lives: the rider's last accepted fix and the order it went on. */
+    private static final String LATEST_FIX_PREFIX = "delivery:tracking:rider-latest-fix:";
+
+    /**
+     * How long the rider's last accepted fix, and the order it went on, is remembered.
+     *
+     * <p>Far longer than the presence window on purpose. A rider who switches to a navigation app
+     * stops reporting (the app shares only in the foreground), and a customer whose order is in
+     * their hands must still be shown the last position that was attached to it, with its time,
+     * rather than nothing. Overwritten by every accepted fix, so the length only matters for a
+     * rider who has gone quiet; and when the key is gone the order-scoped reads show nothing to
+     * anybody but the rider and the back office — they fail closed, never open.
+     */
+    static final Duration LATEST_FIX_TTL = Duration.ofHours(12);
+
     private final RiderPresenceRepository presence;
     private final RiderDutyEventRepository dutyEvents;
     private final DutySessionRepository dutySessions;
@@ -79,6 +94,8 @@ public class PresenceService {
     private final Duration persistInterval;
     /** Confirms with Order Manager that a rider the local linkage nominates is on the fleet NOW. */
     private final FleetMembershipGuard fleetGuard;
+    /** Whether a reported position is believable enough to record — see {@link #recordFix}. */
+    private final FixPolicy fixPolicy;
 
     public PresenceService(RiderPresenceRepository presence,
                            RiderDutyEventRepository dutyEvents,
@@ -90,7 +107,8 @@ public class PresenceService {
                            ObjectMapper objectMapper,
                            @Value("${delivery.tracking.presence.ttl:120s}") Duration presenceWindow,
                            @Value("${delivery.tracking.presence.persist-interval:30s}") Duration persistInterval,
-                           FleetMembershipGuard fleetGuard) {
+                           FleetMembershipGuard fleetGuard,
+                           FixPolicy fixPolicy) {
         this.presence = presence;
         this.dutyEvents = dutyEvents;
         this.dutySessions = dutySessions;
@@ -102,6 +120,7 @@ public class PresenceService {
         this.presenceWindow = presenceWindow;
         this.persistInterval = persistInterval;
         this.fleetGuard = fleetGuard;
+        this.fixPolicy = fixPolicy;
     }
 
     // -----------------------------------------------------------------------------------------
@@ -176,33 +195,138 @@ public class PresenceService {
     /**
      * Records a fix for a rider, whether or not they are carrying anything.
      *
-     * <p>Called from the off-order ping endpoint and from {@link TrackingService#ping} — an order
-     * ping is evidence of life too, and a rider mid-delivery who did not count as present would
-     * drop off the roster the moment they picked something up.
+     * <p>Called from {@link TrackingService#ping} — an order ping is evidence of life too, and a
+     * rider mid-delivery who did not count as present would drop off the roster the moment they
+     * picked something up — and, behind the duty check, from {@link #recordOffOrderFix}. Whoever
+     * calls it has already decided the rider may report at all.
      *
      * <p>Never changes duty state. A location is evidence that a phone is alive, not consent to be
      * given work.
+     *
+     * <p>The fix is judged by {@link FixPolicy} against the last one accepted for this rider before
+     * anything is written, so a refused fix leaves no trace in either store — and in particular
+     * does not become the anchor the next fix is compared with. A fix that adds nothing new (not
+     * newer than the last one, or too soon after it) is not written either, and is not refused.
+     *
+     * <p>Also remembers which order the fix went on ({@link #latestFix}). That is what decides, for
+     * everyone but the back office, whose map may show the rider: the customer of the delivery the
+     * rider's latest fix was attached to, and nobody else's (see
+     * {@link TrackingService#sightingFor}).
+     *
+     * @param orderId the order the fix was reported on, or null for a fix reported on none
+     * @return the instant the fix is recorded at — the phone's fix time, never later than now — or
+     *         empty when it was not new enough to record
+     * @throws FixPolicy.FixRejectedException when the fix is not believable
      */
     @Transactional
-    public void recordFix(String riderId, double lat, double lng, Float accuracyM) {
+    public Optional<Instant> recordFix(String riderId, Fix fix, UUID orderId) {
+        return record(riderId, fix, readCache(riderId), orderId);
+    }
+
+    /**
+     * The off-order ping: a rider reporting where they are while no order names them.
+     *
+     * <p>Only a rider who is working may do this — declared on duty, or holding a live order. The
+     * rule used to be "anyone with the rider role", which let a rider who had gone home keep
+     * feeding a position into the fleet's roster, and let an app that never checked duty report a
+     * location nobody had asked for. Declared duty rather than effective: a rider who is on duty
+     * and has gone STALE is exactly the one whose next fix must be let in.
+     *
+     * <p>The order-scoped ping does not come through here; it has its own and narrower rule, that
+     * the caller is the rider assigned to that order ({@link TrackingService#ping}).
+     *
+     * @return as {@link #recordFix}: when the fix is recorded at, or empty when it was not new
+     * @throws OffDutyException when the rider is neither on duty nor carrying anything
+     */
+    @Transactional
+    public Optional<Instant> recordOffOrderFix(String riderId, Fix fix) {
+        PresenceSnapshot cached = readCache(riderId);
+        boolean onDuty = cached != null
+                ? cached.dutyState() == DutyState.ON_DUTY
+                : presence.findById(riderId)
+                        .map(row -> row.getDutyState() == DutyState.ON_DUTY)
+                        .orElse(false);
+        if (!onDuty && !participants.riderHasLiveOrder(riderId)) {
+            throw new OffDutyException();
+        }
+        // Attached to no order, so from here on no customer's or shop's map shows the rider until
+        // a fix goes on one of theirs again.
+        return record(riderId, fix, cached, null);
+    }
+
+    private Optional<Instant> record(String riderId, Fix fix, PresenceSnapshot cached,
+                                     UUID orderId) {
         Instant now = Instant.now();
 
-        PresenceSnapshot cached = readCache(riderId);
         if (cached == null) {
             // Cold: either this rider is new, or Redis has forgotten them (eviction, restart, or
             // Redis being down entirely). Settle it against the record and write through.
             RiderPresence row = presence.findById(riderId)
                     .orElseGet(() -> RiderPresence.firstSeen(riderId, now));
-            row.sighted(lat, lng, accuracyM, now);
+            FixPolicy.Admission admission = fixPolicy.admit(fix, FixPolicy.Previous.of(
+                    row.getLastLat(), row.getLastLng(), row.getLastAccuracyM(),
+                    row.getLastSeenAt()), now);
+            if (!admission.recorded()) {
+                return Optional.empty();
+            }
+            row.sighted(fix.lat(), fix.lng(), fix.accuracyM(), admission.at());
             presence.save(row);
             cache(PresenceSnapshot.of(row));
-            return;
+            rememberLatest(new LatestFix(riderId, orderId, fix.lat(), fix.lng(), fix.accuracyM(),
+                    admission.at()));
+            return Optional.of(admission.at());
         }
 
-        // Warm: a cached snapshot exists, so the durable row does too. Move it only if the throttle
-        // is due — see RiderPresenceRepository#touchIfDue for what this trades away and why.
-        presence.touchIfDue(riderId, lat, lng, accuracyM, now, now.minus(persistInterval));
-        cache(cached.withFix(lat, lng, accuracyM, now));
+        // Warm: judged against the cached snapshot, which carries the exact last fix — the durable
+        // row lags it by up to the persist interval, so comparing with the row would measure a
+        // jump from somewhere the rider was half a minute ago.
+        FixPolicy.Admission admission = fixPolicy.admit(fix, FixPolicy.Previous.of(cached.lat(),
+                cached.lng(), cached.accuracyM(), cached.lastSeenAt()), now);
+        if (!admission.recorded()) {
+            return Optional.empty();
+        }
+        Instant at = admission.at();
+        // A cached snapshot exists, so the durable row does too. Move it only if the throttle is
+        // due — see RiderPresenceRepository#touchIfDue for what this trades away and why.
+        presence.touchIfDue(riderId, fix.lat(), fix.lng(), fix.accuracyM(), at,
+                at.minus(persistInterval));
+        cache(cached.withFix(fix.lat(), fix.lng(), fix.accuracyM(), at));
+        rememberLatest(new LatestFix(riderId, orderId, fix.lat(), fix.lng(), fix.accuracyM(), at));
+        return Optional.of(at);
+    }
+
+    /**
+     * The rider's last accepted fix, and the order it was reported on.
+     *
+     * <p>Held in Redis only, under {@link #LATEST_FIX_TTL}: there is no column for the order
+     * without a migration. Empty when the rider has not reported since, or when Redis has lost it
+     * or cannot be reached — and everything that reads it treats empty as "show nobody", so losing
+     * it costs customers the rider's dot until the next fix, and never shows it to the wrong one.
+     */
+    public Optional<LatestFix> latestFix(String riderId) {
+        if (riderId == null) {
+            return Optional.empty();
+        }
+        try {
+            String raw = redis.opsForValue().get(LATEST_FIX_PREFIX + riderId);
+            return raw == null
+                    ? Optional.empty()
+                    : Optional.of(objectMapper.readValue(raw, LatestFix.class));
+        } catch (Exception e) {
+            log.warn("Could not read a rider's latest fix; their position is shown to nobody "
+                    + "outside the back office until the next one", e);
+            return Optional.empty();
+        }
+    }
+
+    private void rememberLatest(LatestFix latest) {
+        try {
+            redis.opsForValue().set(LATEST_FIX_PREFIX + latest.riderId(),
+                    objectMapper.writeValueAsString(latest), LATEST_FIX_TTL);
+        } catch (Exception e) {
+            // Never fails the fix. The reads that need this fail closed without it.
+            log.warn("Could not remember a rider's latest fix", e);
+        }
     }
 
     /**
@@ -250,20 +374,24 @@ public class PresenceService {
     /**
      * Where a rider is, for someone who is not that rider.
      *
-     * <p>Four callers may ask, and the list is deliberately short, because a rider's live position
-     * is personal data about a worker rather than a property of an order:
+     * <p>Three callers may ask, and the list is deliberately short, because a rider's position is
+     * personal data about a worker rather than a property of an order:
      *
      * <ul>
      *   <li>the rider themselves;</li>
-     *   <li>backoffice, which is what the support role is for;</li>
-     *   <li>the fleet that employs them — their own dispatcher, and nobody else's;</li>
-     *   <li>a customer with a live order in that rider's hands, and only while it is live.</li>
+     *   <li>backoffice, which is what the support role is for — the last known position, with the
+     *       time it was taken ({@code lastSeenAt}), on duty or not;</li>
+     *   <li>the fleet that employs them — their own dispatcher, and nobody else's — and the
+     *       position only while the rider is declared on duty. Off duty, the fleet still sees the
+     *       duty state and when the phone last reported, but not where: a last fix outlives the
+     *       shift, and is often near home.</li>
      * </ul>
      *
-     * <p>The merchant is <em>not</em> on that list, although they can see the same rider through
-     * {@code GET /api/tracking/orders/{id}}. The difference is the scope: the order-scoped read is
-     * bounded by one delivery, while this one follows a person, and a shop has no business
-     * following a courier once the bag has left the counter.
+     * <p>Customers and shops are <em>not</em> on that list. They see a rider through their order
+     * ({@code GET /api/tracking/orders/{id}}), where one rule decides what each may see and when
+     * (TrackingService#sightingFor): a person-scoped read beside it would be a second door with a
+     * different rule — it used to show a customer the rider for as long as any order of theirs was
+     * in the rider's hands, wherever the rider was going.
      *
      * <p>A caller who is none of these gets the same {@code not found} as a caller asking about a
      * rider id that does not exist. 403 would confirm the rider is real, which is enough to let
@@ -271,16 +399,16 @@ public class PresenceService {
      */
     @Transactional(readOnly = true)
     public RiderPresenceView locationOf(String riderId, String callerId, boolean isBackoffice) {
-        if (!mayRead(riderId, callerId, isBackoffice)) {
+        boolean unrestricted = callerId.equals(riderId) || isBackoffice;
+        if (!unrestricted && !employsRider(callerId, riderId)) {
             throw new PresenceNotFoundException(riderId);
         }
-        return ownPresence(riderId).orElseThrow(() -> new PresenceNotFoundException(riderId));
+        RiderPresenceView view = ownPresence(riderId)
+                .orElseThrow(() -> new PresenceNotFoundException(riderId));
+        return unrestricted ? view : view.asSeenByFleet();
     }
 
-    private boolean mayRead(String riderId, String callerId, boolean isBackoffice) {
-        if (callerId.equals(riderId) || isBackoffice) {
-            return true;
-        }
+    private boolean employsRider(String callerId, String riderId) {
         // Resolved rather than merely looked up: a dispatcher asking where their own rider is has
         // no row here until somebody asks Order Manager for one. The RIDER's fleet is only ever
         // read — we hold no token for them, and an order event is how a rider's row appears.
@@ -290,11 +418,8 @@ public class PresenceService {
         // the rider is on that fleet NOW, so a company that let the rider go stops seeing where
         // they are, and an Order Manager that cannot be reached refuses rather than trusting the
         // linkage. Asked last, so a customer or a stranger never costs a cross-service call.
-        if (callerCarrier.isPresent() && callerCarrier.equals(carrierOf(riderId))
-                && fleetGuard.isOnCallersFleet(callerId, riderId)) {
-            return true;
-        }
-        return participants.customerHasLiveOrderWith(callerId, riderId);
+        return callerCarrier.isPresent() && callerCarrier.equals(carrierOf(riderId))
+                && fleetGuard.isOnCallersFleet(callerId, riderId);
     }
 
     /**
@@ -309,6 +434,10 @@ public class PresenceService {
      * sorted query over the whole fleet, which is what a relational index is for; doing it in Redis
      * would mean a key scan, and a key scan on the hot instance is how a cache becomes an outage.
      * The cost is that {@code last_seen_at} here lags the true value by up to the persist interval.
+     *
+     * <p>Positions as {@link #locationOf} gives them: the back office sees every rider's last known
+     * position with its time; a carrier sees a rider's position only while the rider is declared on
+     * duty — {@code onDutyOnly=false} lists the off-duty riders too, without where they are.
      */
     @Transactional(readOnly = true)
     public List<RiderPresenceView> roster(String callerId, boolean isBackoffice,
@@ -343,6 +472,7 @@ public class PresenceService {
 
         return rows.stream()
                 .map(row -> RiderPresenceView.of(row, now, presenceWindow))
+                .map(view -> isBackoffice ? view : view.asSeenByFleet())
                 // Re-sorted here rather than trusting the SQL order: Postgres sorts NULLs first on
                 // a DESC ordering, so a rider who declared duty and never pinged would otherwise
                 // head the roster — the least present rider at the top of the presence list.
@@ -434,8 +564,13 @@ public class PresenceService {
     /**
      * A rider's presence as anyone reading it sees it.
      *
-     * @param dutyState what the rider declared
-     * @param state     what that means now, having checked when we last heard from them
+     * <p>A position never travels without its time: {@code lat}, {@code lng} and
+     * {@code accuracyM} are present only together with {@code lastSeenAt}, which is when that
+     * fix was taken. A last known position read without its age reads as "here now".
+     *
+     * @param dutyState  what the rider declared
+     * @param state      what that means now, having checked when we last heard from them
+     * @param lastSeenAt when the last fix was taken — the time of {@code lat}/{@code lng}
      */
     public record RiderPresenceView(
             String riderId,
@@ -448,11 +583,43 @@ public class PresenceService {
             Double lng,
             Float accuracyM) {
 
+        public RiderPresenceView {
+            if (lastSeenAt == null) {
+                lat = null;
+                lng = null;
+                accuracyM = null;
+            }
+        }
+
         static RiderPresenceView of(RiderPresence row, Instant now, Duration presenceWindow) {
             return new RiderPresenceView(row.getRiderId(), row.getCarrierId(), row.getDutyState(),
                     row.effectiveState(now, presenceWindow), row.getDutyChangedAt(),
                     row.getLastSeenAt(), row.getLastLat(), row.getLastLng(), row.getLastAccuracyM());
         }
+
+        /**
+         * As the rider's fleet sees it: everything, but the position only while the rider is
+         * declared on duty. A rider's last fix outlives their shift — it is often near home — and
+         * nobody but the back office keeps sight of it once they have gone off duty.
+         */
+        public RiderPresenceView asSeenByFleet() {
+            if (dutyState == DutyState.ON_DUTY) {
+                return this;
+            }
+            return new RiderPresenceView(riderId, carrierId, dutyState, state, dutyChangedAt,
+                    lastSeenAt, null, null, null);
+        }
+    }
+
+    /**
+     * A rider's last accepted fix and the order it was reported on.
+     *
+     * @param orderId the order the fix went on, or null when it was reported on none (between
+     *                jobs, or with no single delivery the app could attach it to)
+     * @param at      when it was taken, as recorded
+     */
+    public record LatestFix(String riderId, UUID orderId, double lat, double lng,
+                            Float accuracyM, Instant at) {
     }
 
     /** Thrown when a rider is unknown, or when the caller has no business knowing they exist. */
@@ -462,6 +629,19 @@ public class PresenceService {
             // came from the request path must not be reflected back where something might render
             // it. The correlation id is how a support engineer finds the request.
             super("No presence information for that rider");
+        }
+    }
+
+    /**
+     * Thrown when a rider reports a position while neither on duty nor carrying an order.
+     *
+     * <p>A 409 at the edge rather than a 404 or a 403: the rider is who they say they are and may
+     * use the endpoint — just not in their current state, and going on duty changes the answer.
+     */
+    public static class OffDutyException extends RuntimeException {
+        public OffDutyException() {
+            super("You are off duty with no delivery in hand, so your location is not recorded. "
+                    + "Go on duty to share it.");
         }
     }
 

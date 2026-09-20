@@ -43,6 +43,19 @@ class SplitApi {
         .toList();
   }
 
+  /// How an invitee may answer a share right now: cash at the door, plus a wallet only where the
+  /// dev simulator stands in for it — each wallet flagged [SplitShareMethod.simulated].
+  ///
+  /// Not the checkout's `/api/transfers/methods`: a connector that carries an order's payment cannot
+  /// take a share's money, and a wallet offered for a share would ask a friend to pay by a route
+  /// that ends in nothing.
+  Future<List<SplitShareMethod>> methods() async {
+    final Response<dynamic> response = await _dio.get<dynamic>('/api/transfers/splits/methods');
+    return (response.data as List<dynamic>)
+        .map((dynamic e) => SplitShareMethod.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<SplitPlan> read(String id) async {
     final Response<dynamic> response =
         await _dio.get<dynamic>('/api/transfers/splits/$id');
@@ -102,6 +115,23 @@ class SplitShareDraft {
   final int? itemsCount;
 }
 
+/// One way to answer a share, as the server offers it.
+class SplitShareMethod {
+  const SplitShareMethod({required this.method, this.simulated = false});
+
+  /// WHISH / OMT / BOB / CASH_AT_DOOR.
+  final String method;
+
+  /// The dev simulator stands in for it: choosing it moves no money, and the rider still collects
+  /// the share at the door.
+  final bool simulated;
+
+  factory SplitShareMethod.fromJson(Map<String, dynamic> json) => SplitShareMethod(
+        method: json['method'] as String? ?? 'CASH_AT_DOOR',
+        simulated: json['simulated'] as bool? ?? false,
+      );
+}
+
 /// One person's slice, as the server tells it.
 class SplitShare {
   const SplitShare({
@@ -112,6 +142,8 @@ class SplitShare {
     this.itemsCount,
     required this.status,
     this.method,
+    this.simulated = false,
+    this.simulatedMethod,
   });
 
   final String id;
@@ -120,11 +152,23 @@ class SplitShare {
   final double amountUsd;
   final int? itemsCount;
 
-  /// PENDING / PAID / DECLINED / COVERED.
+  /// PENDING / COMMITTED / PAID / DECLINED / COVERED.
+  ///
+  /// COMMITTED is a promise — cash at the door, the host's own slice travelling with the order, or
+  /// a simulated wallet — and no money has moved. PAID means a real provider carried the money,
+  /// which no share has yet. (A server from before RECON-01 sends PAID for promises too.)
   final String status;
 
   /// CASH_ON_DELIVERY / WHISH / OMT / BOB / CASH_AT_DOOR / HOST_ORDER; null while pending.
   final String? method;
+
+  /// The wallet [method] was the dev simulator's stand-in: nothing took the money.
+  final bool simulated;
+
+  /// The wallet a simulated share stood in for, when [method] says something else: the order's
+  /// rider is told how the door receives each share (cash, on a cash order), and this keeps the
+  /// wallet's name for the label.
+  final String? simulatedMethod;
 
   bool get settled => status != 'PENDING';
 
@@ -136,6 +180,8 @@ class SplitShare {
         itemsCount: (json['itemsCount'] as num?)?.toInt(),
         status: json['status'] as String? ?? 'PENDING',
         method: json['method'] as String?,
+        simulated: json['simulated'] as bool? ?? false,
+        simulatedMethod: json['simulatedMethod'] as String?,
       );
 }
 

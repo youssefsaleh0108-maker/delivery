@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import 'rider_chat_screen.dart';
 import 'rider_job_card.dart';
+import 'split_labels.dart';
 
 /// Everything about one job, on one screen — Figma `rider-order-detail` (3:1344).
 ///
@@ -25,6 +26,7 @@ class RiderOrderDetailScreen extends StatefulWidget {
     super.key,
     required this.order,
     required this.onAction,
+    this.onNavigate,
     this.trackingApi,
     this.chatApi,
     this.socket,
@@ -36,6 +38,11 @@ class RiderOrderDetailScreen extends StatefulWidget {
   /// Completes when the action has been sent and the board refreshed.
   final Future<void> Function(OrderAction) onAction;
 
+  /// The rider tapped Start navigation: this order's next stop is where they are heading. The
+  /// rider screen puts their location on this order from here on — see
+  /// `RiderLocationReporter.headingTo`. Null changes nothing but that.
+  final VoidCallback? onNavigate;
+
   /// The ETA half of the tracking service. Null draws the route card exactly as before — no panel
   /// at all, never a fabricated number.
   final TrackingApi? trackingApi;
@@ -45,10 +52,10 @@ class RiderOrderDetailScreen extends StatefulWidget {
   final ChatApi? chatApi;
   final UserQueueSocket? socket;
 
-  /// The group-split ledger. When this order is a split, the cash-collection checklist
-  /// (Figma `rider-cash-checklist` 83:769) draws under the items: who already paid digitally,
-  /// and exactly whose cash — and how much of it — the door owes. Null, or an order with no
-  /// split behind it, draws nothing.
+  /// The group-split ledger. When a cash order is a split, the cash-collection checklist
+  /// (Figma `rider-cash-checklist` 83:769) draws under the items: whose cash — and how much of it —
+  /// the door owes, adding up to the order's total. Null, a card or wallet order, or an order with
+  /// no split behind it, draws nothing.
   final SplitApi? splitApi;
 
   @override
@@ -81,19 +88,29 @@ class _RiderOrderDetailScreenState extends State<RiderOrderDetailScreen> {
     }
   }
 
-  /// The frame's cash-collection checklist: digitally-paid shares listed as settled, and the
-  /// cash shares — the ones the door owes — summed into one figure to collect.
-  Widget _splitChecklist(DeliveryStrings t) {
+  static int _cents(double amount) => (amount * 100).round();
+
+  static String _usd(int cents) => '\$${(cents.abs() / 100).toStringAsFixed(2)}';
+
+  /// The frame's cash-collection checklist, drawn for a cash order with a split behind it.
+  ///
+  /// The total is the ORDER's cash, not a sum of chosen shares. The ledger books the whole of a
+  /// cash order as collected at this door (CASH_COLLECTED = the order's total), however the group
+  /// divided it, so that is what the rider must bring back. The checklist used to add up only the
+  /// CASH_AT_DOOR shares: on a 19.50 order split with one guest it asked for 5.00, while the host's
+  /// 14.50 — which travels with the order, so on a cash order it is cash at this door too — sat
+  /// under "Already paid digitally", and so did every wallet share, though nothing had taken that
+  /// money (RECON-01). No share of a cash order is paid anywhere else, so every one is listed here
+  /// as what the door owes: the host's own slice, cash promises, a simulated wallet (labelled as
+  /// one), and a share nobody answered or somebody declined, which the host now carries.
+  Widget _splitChecklist(DeliveryStrings t, DeliveryOrder order) {
     final SplitPlan plan = _split!;
-    final List<SplitShare> cash = plan.shares
-        .where((SplitShare s) => s.method == 'CASH_AT_DOOR')
-        .toList();
-    final List<SplitShare> digital = plan.shares
-        .where((SplitShare s) =>
-            s.method != 'CASH_AT_DOOR' && s.status != 'PENDING' && s.status != 'DECLINED')
-        .toList();
-    final double cashTotal =
-        cash.fold(0, (double sum, SplitShare s) => sum + s.amountUsd);
+    final int totalCents = _cents(order.totalAmount);
+    final int sharesCents =
+        plan.shares.fold(0, (int sum, SplitShare s) => sum + _cents(s.amountUsd));
+    // A plan made before the order was priced can differ from it (EXPRESS, a zone fee, a code):
+    // the order's total still governs, and the gap is shown rather than silently absorbed.
+    final int differenceCents = totalCents - sharesCents;
 
     return YdCard.bordered(
       child: Column(
@@ -133,83 +150,17 @@ class _RiderOrderDetailScreenState extends State<RiderOrderDetailScreen> {
             ],
           ),
           const SizedBox(height: DeliverySpacing.sm),
-          for (final SplitShare share in cash)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(
-                children: <Widget>[
-                  const Icon(Icons.payments_outlined,
-                      size: 16, color: DeliveryColors.brand),
-                  const SizedBox(width: DeliverySpacing.sm),
-                  Expanded(
-                    child: Text(
-                      share.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: DeliveryColors.ink,
-                        height: 1.3,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    '\$${share.amountUsd.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: DeliveryColors.brand,
-                      height: 1.2,
-                    ),
-                  ),
-                ],
-              ),
+          for (final SplitShare share in plan.shares)
+            _checklistLine(
+              name: share.name,
+              caption: _checklistCaption(t, share),
+              amount: _usd(_cents(share.amountUsd)),
             ),
-          if (digital.isNotEmpty) ...<Widget>[
-            const SizedBox(height: DeliverySpacing.xs),
-            Text(
-              t.riderAlreadyPaid.toUpperCase(),
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: DeliveryColors.faint,
-                letterSpacing: 0.5,
-                height: 1.2,
-              ),
+          if (differenceCents != 0)
+            _checklistLine(
+              name: t.riderSplitOrderDifference,
+              amount: '${differenceCents < 0 ? '−' : '+'}${_usd(differenceCents)}',
             ),
-            const SizedBox(height: 4),
-            for (final SplitShare share in digital)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 2),
-                child: Row(
-                  children: <Widget>[
-                    Icon(Icons.check_rounded,
-                        size: 14, color: DeliveryAccent.positive.color),
-                    const SizedBox(width: DeliverySpacing.sm),
-                    Expanded(
-                      child: Text(
-                        '${share.name} · ${share.method ?? ''}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 12,
-                            color: DeliveryColors.muted,
-                            height: 1.3),
-                      ),
-                    ),
-                    Text(
-                      '\$${share.amountUsd.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: DeliveryColors.muted,
-                          height: 1.2),
-                    ),
-                  ],
-                ),
-              ),
-          ],
           const Divider(
               height: DeliverySpacing.md * 1.5, color: DeliveryColors.borderFaint),
           Row(
@@ -226,7 +177,7 @@ class _RiderOrderDetailScreenState extends State<RiderOrderDetailScreen> {
                 ),
               ),
               Text(
-                '\$${cashTotal.toStringAsFixed(2)}',
+                _usd(totalCents),
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
@@ -240,6 +191,74 @@ class _RiderOrderDetailScreenState extends State<RiderOrderDetailScreen> {
       ),
     );
   }
+
+  /// What the rider should know about one share at the door, beyond its name and amount: that a
+  /// wallet "payment" was only simulated, or that nobody has answered, somebody declined, or the
+  /// host took the share on. How a promise travels is not said — at this door it is all cash.
+  static String? _checklistCaption(DeliveryStrings t, SplitShare share) {
+    // The rider's own view says how this door receives each share (cash) and names the wallet a
+    // simulated one stood in for separately; a member's view has the wallet as the method itself.
+    final String? wallet = share.simulatedMethod ?? share.method;
+    if (share.simulated && wallet != null) {
+      return t.splitSimulatedPayment(splitMethodLabel(t, wallet));
+    }
+    return switch (share.status) {
+      'PENDING' => t.custPendingChip,
+      'DECLINED' => t.custDeclinedChip,
+      'COVERED' => t.custCoveredChip,
+      _ => null,
+    };
+  }
+
+  Widget _checklistLine({required String name, String? caption, required String amount}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: <Widget>[
+          const Icon(Icons.payments_outlined, size: 16, color: DeliveryColors.brand),
+          const SizedBox(width: DeliverySpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.ink,
+                    height: 1.3,
+                  ),
+                ),
+                if (caption != null)
+                  Text(
+                    caption,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 11.5, color: DeliveryColors.muted, height: 1.3),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: DeliverySpacing.sm),
+          Text(
+            amount,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: DeliveryColors.brand,
+              height: 1.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Timer? _etaTimer;
 
   /// The conversation behind the chat button, and its badge. Null while the server has not
@@ -385,8 +404,11 @@ class _RiderOrderDetailScreenState extends State<RiderOrderDetailScreen> {
                   const SizedBox(height: DeliverySpacing.md),
                   _itemsCard(t, order),
                   const SizedBox(height: DeliverySpacing.md),
-                  if (_split != null) ...<Widget>[
-                    _splitChecklist(t),
+                  // Only where this door collects cash. On a card or wallet order the ledger books
+                  // the whole total as paid by the customer, the payout card says so, and how the
+                  // group settles up among themselves is nothing the rider collects.
+                  if (_split != null && order.collectsCashOnDelivery) ...<Widget>[
+                    _splitChecklist(t, order),
                     const SizedBox(height: DeliverySpacing.md),
                   ],
                   for (final OrderAction action in forward) ...<Widget>[
@@ -421,7 +443,12 @@ class _RiderOrderDetailScreenState extends State<RiderOrderDetailScreen> {
                       verticalPadding: 14,
                       onPressed: _navigationTarget(order).isEmpty
                           ? null
-                          : () => riderNavigateTo(context, _navigationTarget(order)),
+                          : () {
+                              // Said before the maps app takes the screen: this is the order the
+                              // rider is heading for, and the one their location now goes on.
+                              widget.onNavigate?.call();
+                              riderNavigateTo(context, _navigationTarget(order));
+                            },
                     ),
                   ),
                   // Not in the design, and kept anyway: cancel is a real transition the server

@@ -43,6 +43,10 @@ enum EtaUnavailableReason {
   /// Delivered or cancelled. Nothing is on its way.
   orderComplete('ORDER_COMPLETE', 'Nothing is on its way'),
 
+  /// The rider is finishing another customer's delivery first. No distance or time is given,
+  /// since either would point at that other stop.
+  riderOnAnotherDelivery('RIDER_ON_ANOTHER_DELIVERY', 'Your rider is finishing another delivery'),
+
   /// A reason this client does not know yet. Shown as unavailable, never as a number.
   unknown('UNKNOWN', 'No estimate available');
 

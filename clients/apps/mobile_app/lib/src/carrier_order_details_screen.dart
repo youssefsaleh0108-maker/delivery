@@ -177,7 +177,9 @@ class CarrierOrderDetailsScreen extends StatelessWidget {
                 if (lbpPerUsd > 0)
                   _moneyRow(
                     t.carrLbpRate(_thousands(lbpPerUsd)),
-                    '${_thousands(fee * lbpPerUsd)} LBP',
+                    // One lira rule across the apps: the note the fee is handed over in, not a
+                    // product with a remainder nobody can pay (RECON-14).
+                    '${_thousands(lbpFaceOf(fee, lbpPerUsd).toDouble())} LBP',
                   ),
                 _moneyRow(
                   t.carrPlatformFee(cutPercentage.round()),

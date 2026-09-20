@@ -29,6 +29,9 @@ configMapGenerator:
       # @youdrop.test addresses (a reserved domain nobody can own). A test environment's switch:
       # when this overlay is copied to make production, this line must not come with it.
       - TEST_CODE_SINK_ENABLED=true
+      # Rider positions from outside Lebanon (+~15 km) are refused, as in platform-common. Stated
+      # here as well because qa is becoming production: turning it off must be a visible edit.
+      - TRACKING_SERVICE_AREA_ENABLED=true
 
 generatorOptions:
   disableNameSuffixHash: true

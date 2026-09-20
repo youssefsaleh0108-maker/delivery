@@ -4,6 +4,7 @@ import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'address_sheet.dart';
 import 'basket_quote.dart';
@@ -445,6 +446,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             await Navigator.of(context).push<void>(MaterialPageRoute<void>(
               builder: (BuildContext ctx) => SplitCompleteScreen(
                 plan: plan,
+                cashOrder: _payment == PaymentMethod.cash,
                 onTrack: () => Navigator.of(ctx).pop(),
               ),
             ));
@@ -1193,12 +1195,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   static int _cents(double amount) => (amount * 100).round();
 
-  /// The USD half of the cash split: what was typed, clamped into [0, total]. Blank = all USD.
-  double get _splitUsdValue {
-    final double total = _displayTotal ?? _orderTotal;
-    final double typed = double.tryParse(_splitUsd.text.trim()) ?? total;
-    return typed.clamp(0, total).toDouble();
+  /// The USD half of the cash split, in cents: what was typed, clamped into [0, total]. Blank =
+  /// all USD.
+  ///
+  /// Cents, because the lira half is the rest of the order and the server holds both to the cent:
+  /// subtracting two doubles first put the lira figure a whole note away from the one the transfer
+  /// ledger records (RECON-14).
+  int get _splitUsdCents {
+    final int total = _cents(_displayTotal ?? _orderTotal);
+    final double? typed = double.tryParse(_splitUsd.text.trim());
+    return typed == null ? total : _cents(typed).clamp(0, total);
   }
+
+  /// The same figure as dollars, which is what the intent carries.
+  double get _splitUsdValue => _splitUsdCents / 100;
 
   /// The frame's Lebanese Split Payment card, drawn for cash only — a wallet transfer has no
   /// notes to mix. USD side is typed; the lira side is COMPUTED at the locked rate, because two
@@ -1207,10 +1217,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final double total = _displayTotal ?? _orderTotal;
     final double rate = _lbpRate;
     if (total <= 0 || rate <= 0) return const SizedBox.shrink();
-    final double usdPart = _splitUsdValue;
-    final double lbpInUsd = total - usdPart;
-    final double lbpFace = (lbpInUsd * rate / 1000).round() * 1000;
-    final int pctUsd = total == 0 ? 100 : ((usdPart / total) * 100).round();
+    final int totalCents = _cents(total);
+    final int usdCentsPart = _splitUsdCents;
+    final int lbpInUsdCents = totalCents - usdCentsPart;
+    // The rule the transfer ledger uses, to the note, in integers.
+    final int lbpFace = lbpFaceOfCents(lbpInUsdCents, rate);
+    final int pctUsd = totalCents == 0 ? 100 : (usdCentsPart * 100 / totalCents).round();
 
     return YdCard.bordered(
       child: Column(
@@ -1252,6 +1264,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     TextField(
                       controller: _splitUsd,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      // Cents and no further: a third decimal is rounded away where the intent is
+                      // stored, and the lira half of this card would then be a note off what the
+                      // rider is told to collect.
+                      inputFormatters: <TextInputFormatter>[
+                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                      ],
                       onChanged: (_) => setState(() {}),
                       decoration: InputDecoration(
                         prefixText: '\$ ',
@@ -1283,19 +1301,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           horizontal: 12, vertical: 12),
                       decoration: BoxDecoration(
                         border: Border.all(
-                            color: lbpInUsd > 0
+                            color: lbpInUsdCents > 0
                                 ? DeliveryColors.brand
                                 : DeliveryColors.border),
                         borderRadius: BorderRadius.circular(DeliveryRadius.sm),
                       ),
                       child: Text(
-                        'LBP ${_groupLbp(lbpFace)}',
+                        'LBP ${_groupLbp(lbpFace.toDouble())}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: lbpInUsd > 0
+                          color: lbpInUsdCents > 0
                               ? DeliveryColors.brand
                               : DeliveryColors.faint,
                           height: 1.2,
@@ -1327,7 +1345,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
-              value: total == 0 ? 1 : usdPart / total,
+              value: totalCents == 0 ? 1 : usdCentsPart / totalCents,
               minHeight: 6,
               backgroundColor: DeliveryColors.brandSoft,
               valueColor:

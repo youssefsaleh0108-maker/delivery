@@ -47,13 +47,27 @@ public class TrackingEvent {
     }
 
     public TrackingEvent(UUID orderId, String riderId, double lat, double lng, Float accuracyM) {
+        this(orderId, riderId, lat, lng, accuracyM, Instant.now());
+    }
+
+    /**
+     * A point on the trail at the moment the phone took it.
+     *
+     * <p>{@code recordedAt} is the admitted fix time (see {@code FixPolicy}), not the moment the
+     * request landed: the trail and the ETA's staleness are both about where the rider was when,
+     * and a fix that spent twenty seconds in a mobile network's queue was twenty seconds old when
+     * it arrived. It is never in the future and never older than the policy's age limit, so it
+     * always lands in a partition that exists.
+     */
+    public TrackingEvent(UUID orderId, String riderId, double lat, double lng, Float accuracyM,
+                         Instant recordedAt) {
         this.id = UUID.randomUUID();
         this.orderId = orderId;
         this.riderId = riderId;
         this.lat = lat;
         this.lng = lng;
         this.accuracyM = accuracyM;
-        this.recordedAt = Instant.now();
+        this.recordedAt = recordedAt;
     }
 
     public UUID getId() {

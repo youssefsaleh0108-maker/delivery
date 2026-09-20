@@ -422,11 +422,44 @@ class OrderApi {
   /// Driven by [OrderAction] rather than a free-text path so a screen cannot invent a transition
   /// the service never advertised.
   Future<DeliveryOrder> act(String orderId, OrderAction action, {String? reason}) async {
+    if (action == OrderAction.closeNotDelivered) {
+      // It decides who is paid for an order that never arrived, and the server requires both
+      // answers. Sending it from here would leave them out and be refused — so the screen is sent
+      // to the call that asks for them.
+      throw ArgumentError.value(action, 'action',
+          'Closing an order as not delivered needs its two decisions: call closeNotDelivered');
+    }
     final Response<dynamic> response = await _dio.post<dynamic>(
       '/api/orders/$orderId/${action.path}',
       data: action == OrderAction.cancel
           ? <String, dynamic>{'reason': reason ?? ''}
           : null,
+    );
+    return DeliveryOrder.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Closes an order a rider already has as not delivered — `POST /api/orders/{id}/close-not-delivered`.
+  ///
+  /// Back office only, and only while the order is on the road: the server offers
+  /// [OrderAction.closeNotDelivered] on exactly those orders. It becomes a cancellation that
+  /// collected nothing, and the two decisions say who is still paid for what they already did —
+  /// the shop its share of the goods, the delivery its fee. Both are sent every time; the server
+  /// refuses a request that leaves either out rather than paying by default.
+  ///
+  /// [reason] is required and kept on the order as its cancel reason.
+  Future<DeliveryOrder> closeNotDelivered(
+    String orderId, {
+    required String reason,
+    required bool compensateMerchant,
+    required bool compensateCarrier,
+  }) async {
+    final Response<dynamic> response = await _dio.post<dynamic>(
+      '/api/orders/$orderId/${OrderAction.closeNotDelivered.path}',
+      data: <String, dynamic>{
+        'reason': reason,
+        'compensateMerchant': compensateMerchant,
+        'compensateCarrier': compensateCarrier,
+      },
     );
     return DeliveryOrder.fromJson(response.data as Map<String, dynamic>);
   }
@@ -448,14 +481,32 @@ class OrderApi {
     return RiderPosition.fromJson(response.data as Map<String, dynamic>);
   }
 
-  /// Reports this rider's position. Fire-and-forget: a dropped ping is replaced by the next one.
-  Future<void> ping(String orderId, double lat, double lng, {double? accuracyM}) async {
+  /// What this caller may know of where the order's rider is, and why when it is not a position:
+  /// still far from the shop, on another customer's delivery, collected (for the shop), and so on.
+  /// The live position is [RiderSighting.position]; 404 as for [currentPosition].
+  Future<RiderSighting> riderSighting(String orderId) async {
+    final Response<dynamic> response =
+        await _dio.get<dynamic>('/api/tracking/orders/$orderId/rider');
+    return RiderSighting.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Reports this rider's position on one of their orders. Fire-and-forget: a dropped ping is
+  /// replaced by the next one.
+  ///
+  /// [recordedAt] is when the phone took the fix, and the server requires it (422
+  /// `FIX_TIME_MISSING` without it). It also refuses a fix dated in the future or more than a
+  /// minute old, one outside the service area, and one that is too imprecise or too far from the
+  /// last — a 422 whose body names the `reason`. One that adds nothing new is answered 202 like any
+  /// other. Sent in UTC so the server never has to guess the phone's offset.
+  Future<void> ping(String orderId, double lat, double lng,
+      {double? accuracyM, DateTime? recordedAt}) async {
     await _dio.post<dynamic>(
       '/api/tracking/orders/$orderId/ping',
       data: <String, dynamic>{
         'lat': lat,
         'lng': lng,
         if (accuracyM != null) 'accuracyM': accuracyM,
+        if (recordedAt != null) 'recordedAt': recordedAt.toUtc().toIso8601String(),
       },
     );
   }

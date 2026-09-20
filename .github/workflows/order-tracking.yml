@@ -28,7 +28,79 @@ on:
       - 'pom.xml'
 
 jobs:
+  # The queries and migrations that only exist against a database, run against the one they are
+  # written for.
+  #
+  # The rest of this module's suite needs no database, so both Postgres tests skip themselves
+  # unless TRACKING_IT_DB_URL names one — and nothing set it, so a green build proved nothing
+  # about the SQL. They are the queries the checkout map's privacy rests on: whether a rider has a
+  # delivery that is not this checkout's (an order placed alone has a null checkout, and `<>` is
+  # never true of a null), which other customers' doors the hand-over buffer measures against, and
+  # the retention job's rollup. This job gives them a throwaway PostGIS on the image every
+  # environment runs, and fails if they skipped anyway: a skipped proof is exactly the green build
+  # it is here to stop. `ci` waits for it, so an image whose SQL no longer holds is never built.
+  database-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          # Throwaway, and reachable only from this job. The tests' user and password default to
+          # postgres, so only the URL has to be passed below.
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        # Checked over TCP, so the steps start once the server the tests connect to is up, not
+        # while the image's init scripts are still running against a socket-only one.
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 24
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+
+      # -am builds the platform libraries this module depends on, as the build job does. The test
+      # filter matches nothing in them, which failIfNoSpecifiedTests=false allows.
+      - name: Tracking queries and migrations against PostGIS
+        env:
+          TRACKING_IT_DB_URL: jdbc:postgresql://localhost:5432/postgres
+        run: >-
+          mvn -B -U -pl services/order-tracking -am test
+          -Dtest=OrderParticipantsPostgresTest,TrackingRetentionPostgresTest
+          -Dsurefire.failIfNoSpecifiedTests=false
+
+      # Summed across the reports rather than read from one: JUnit's nested classes get a report
+      # each, and which of them a test is filed under is surefire's business, not this check's.
+      - name: Fail if the database tests did not run
+        run: |
+          reports=$(ls services/order-tracking/target/surefire-reports/TEST-com.delivery.tracking.domain.OrderParticipantsPostgresTest*.xml \
+                       services/order-tracking/target/surefire-reports/TEST-com.delivery.tracking.service.TrackingRetentionPostgresTest*.xml 2>/dev/null)
+          if [ -z "$reports" ]; then
+            echo "::error::No surefire reports for the database tests, so they did not run."
+            exit 1
+          fi
+          count() { grep -ho "$1=\"[0-9]*\"" $reports | tr -dc '0-9\n' | awk '{ s += $1 } END { print s + 0 }'; }
+          ran=$(count tests)
+          skipped=$(count skipped)
+          echo "Database tests: $ran run, $skipped skipped."
+          if [ "$ran" -lt 1 ] || [ "$skipped" -gt 0 ]; then
+            echo "::error::The database tests were skipped. Is TRACKING_IT_DB_URL set?"
+            exit 1
+          fi
+
   ci:
+    needs: database-tests
     uses: ./.github/workflows/reusable-service-ci.yml
     with:
       service-name: order-tracking
