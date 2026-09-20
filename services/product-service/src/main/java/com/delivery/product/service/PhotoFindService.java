@@ -1,12 +1,16 @@
 package com.delivery.product.service;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.delivery.product.domain.CategoryRepository;
 import com.delivery.product.domain.PhotoSearchUse.Kind;
@@ -41,12 +45,25 @@ import com.delivery.product.vision.VisionProviders;
  * <p>The quota is the merchant's own ({@code MERCHANT_FIND}: {@code merchant-per-day},
  * {@code per-account-per-minute}), counted just before the paid call, and the photo is dropped as soon
  * as the answer comes back ({@link PhotoReader}).
+ *
+ * <p><strong>The match is time-bounded</strong>, as the customer's search is
+ * ({@link ItemSearchService#search}). It runs after the reader slot has been given back, so nothing
+ * limits how many of these run at once but the request threads; and it reads every product of the
+ * merchant's shops with no index to serve the words. A shop with tens of thousands of products would
+ * hold one of the ten pooled connections for as long as that took, which is a storefront's connection
+ * as much as it is this merchant's. So the read runs in a short read-only transaction of its own whose
+ * statements are bounded by {@code photo-search.statement-timeout}, and a cancelled one is answered
+ * 503 {@link ItemSearchService#SEARCH_TIMED_OUT} rather than waited out.
  */
 @Service
 public class PhotoFindService {
 
     /** The most matches offered. More than a handful is a list to scroll, not an answer. */
     static final int MAX_MATCHES = 5;
+
+    /** The shortest and the longest the match may be given, whatever the configuration says. */
+    static final Duration MIN_STATEMENT_TIMEOUT = Duration.ofMillis(250);
+    static final Duration MAX_STATEMENT_TIMEOUT = Duration.ofSeconds(10);
 
     /** How a match was found, for the client to say so. */
     public static final String BY_BARCODE = "BARCODE";
@@ -84,10 +101,15 @@ public class PhotoFindService {
     private final ProductFindRepository finder;
     private final ProductRepository products;
     private final CategoryRepository categories;
+    private final TransactionTemplate matching;
+    private final Duration statementTimeout;
 
     public PhotoFindService(VisionProviders providers, PhotoReader reader, PhotoQuota quota,
                             StoreService stores, ProductFindRepository finder,
-                            ProductRepository products, CategoryRepository categories) {
+                            ProductRepository products, CategoryRepository categories,
+                            PlatformTransactionManager transactionManager,
+                            @Value("${delivery.catalog.photo-search.statement-timeout:2s}")
+                            Duration statementTimeout) {
         this.providers = providers;
         this.reader = reader;
         this.quota = quota;
@@ -95,6 +117,16 @@ public class PhotoFindService {
         this.finder = finder;
         this.products = products;
         this.categories = categories;
+        // A transaction of its own rather than an annotation, because find() must NOT be in one: it
+        // makes a call to the provider that can take 25 seconds, and a pooled connection held across
+        // that is one taken from every storefront.
+        this.matching = new TransactionTemplate(transactionManager);
+        this.matching.setReadOnly(true);
+        // Clamped rather than trusted, so a configuration mistake can neither cancel every match nor
+        // let one hold a connection for minutes.
+        Duration timeout = statementTimeout == null ? MAX_STATEMENT_TIMEOUT : statementTimeout;
+        this.statementTimeout = timeout.compareTo(MIN_STATEMENT_TIMEOUT) < 0 ? MIN_STATEMENT_TIMEOUT
+                : timeout.compareTo(MAX_STATEMENT_TIMEOUT) > 0 ? MAX_STATEMENT_TIMEOUT : timeout;
     }
 
     /**
@@ -172,11 +204,11 @@ public class PhotoFindService {
             return List.of();
         }
 
-        List<Found> found = finder.findInStores(shopIds,
+        List<Found> found = withinTimeout(() -> finder.findInStores(shopIds,
                 slots.get(0).phrase(), slots.get(0).wordsForQuery(),
                 slots.get(1).phrase(), slots.get(1).wordsForQuery(),
                 slots.get(2).phrase(), slots.get(2).wordsForQuery(),
-                barcode, MAX_MATCHES);
+                barcode, MAX_MATCHES));
         if (found.isEmpty()) {
             return List.of();
         }
@@ -196,6 +228,32 @@ public class PhotoFindService {
             matches.add(new Match(product, row.tier() == 0 ? BY_BARCODE : BY_NAME));
         }
         return matches;
+    }
+
+    /**
+     * Runs {@code read} in a short read-only transaction whose statements the database itself cuts off
+     * at {@code statementTimeout}.
+     *
+     * @throws ItemSearchService.SearchTimedOutException when it did cut one off: a 503 with
+     *                                                   {@link ItemSearchService#SEARCH_TIMED_OUT} and
+     *                                                   a Retry-After, since a cancelled statement
+     *                                                   returns no rows at all and a partial answer
+     *                                                   would read as "you do not have this yet"
+     */
+    private <T> T withinTimeout(java.util.function.Supplier<T> read) {
+        try {
+            return matching.execute(status -> {
+                // Before the read, inside the same transaction, so SET LOCAL applies to it and is
+                // undone on the way back to the pool.
+                finder.limitStatementTime(Long.toString(statementTimeout.toMillis()));
+                return read.get();
+            });
+        } catch (RuntimeException e) {
+            if (ItemSearchService.cancelledByTheDatabase(e)) {
+                throw new ItemSearchService.SearchTimedOutException(e);
+            }
+            throw e;
+        }
     }
 
     /**

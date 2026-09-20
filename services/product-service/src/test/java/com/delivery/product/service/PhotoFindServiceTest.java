@@ -1,6 +1,8 @@
 package com.delivery.product.service;
 
 import java.math.BigDecimal;
+import java.sql.SQLException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -63,6 +65,12 @@ class PhotoFindServiceTest {
     private VisionProvider.ProductDescription answer;
     private String providerName = "CLAUDE";
 
+    /** Real transaction boundaries with nothing behind them, so a test can see which side a call is on. */
+    private final TransactionsWithoutADatabase transactions = new TransactionsWithoutADatabase();
+
+    /** Where each call the service made to the database happened, in order. */
+    private final List<String> reads = new ArrayList<>();
+
     private final VisionProvider reader = new VisionProvider() {
         @Override
         public String name() {
@@ -77,6 +85,7 @@ class PhotoFindServiceTest {
         @Override
         public ProductDescription describe(ProductPhoto photo) {
             described.incrementAndGet();
+            reads.add(TransactionsWithoutADatabase.where("describe"));
             return answer;
         }
     };
@@ -113,14 +122,21 @@ class PhotoFindServiceTest {
             return catalogue.stream().filter(p -> ids.contains(p.getId())).toList();
         });
         when(finder.findInStores(anyList(), anyString(), anyString(), anyString(), anyString(),
-                anyString(), anyString(), anyString(), anyInt())).thenReturn(List.of());
+                anyString(), anyString(), anyString(), anyInt())).thenAnswer(call -> {
+                    reads.add(TransactionsWithoutADatabase.where("findInStores"));
+                    return List.of();
+                });
+        when(finder.limitStatementTime(anyString())).thenAnswer(call -> {
+            reads.add(TransactionsWithoutADatabase.where("statement_timeout " + call.getArgument(0)));
+            return call.getArgument(0);
+        });
         when(finder.barcodeTaken(anyList(), anyString())).thenReturn(false);
         answer = new VisionProvider.ProductDescription(true, "Pepsi 1L", "بيبسي", "Pepsi", "1 L",
                 List.of("cola", "soft drink"), EAN, 0.9);
 
         service = new PhotoFindService(providers,
                 new PhotoReader(new Thumbnailer(40_000_000L), 4, 1568, 16_000_000L), quota, stores,
-                finder, products, categories);
+                finder, products, categories, transactions, Duration.ofSeconds(2));
     }
 
     private Product product(Store store, String name, Product.Status status) {
@@ -138,7 +154,20 @@ class PhotoFindServiceTest {
 
     private void answering(List<Found> rows) {
         when(finder.findInStores(anyList(), anyString(), anyString(), anyString(), anyString(),
-                anyString(), anyString(), anyString(), anyInt())).thenReturn(rows);
+                anyString(), anyString(), anyString(), anyInt())).thenAnswer(call -> {
+                    reads.add(TransactionsWithoutADatabase.where("findInStores"));
+                    return rows;
+                });
+    }
+
+    /** The match is cancelled by the database at its statement timeout, as PostgreSQL cancels one. */
+    private void theMatchIsCancelled() {
+        when(finder.findInStores(anyList(), anyString(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), anyString(), anyInt()))
+                .thenThrow(new org.springframework.dao.DataAccessResourceFailureException(
+                        "could not extract ResultSet",
+                        new SQLException("ERROR: canceling statement due to statement timeout",
+                                "57014")));
     }
 
     private static byte[] photo() {
@@ -188,6 +217,60 @@ class PhotoFindServiceTest {
                 anyString(), anyString(), anyString(), anyString(), anyString(), anyString(),
                 anyString(), anyInt());
         verify(quota).take(MERCHANT, Kind.MERCHANT_FIND);
+    }
+
+    // ------------------------------------------------------------------- how long the match may take
+
+    /**
+     * The read of the merchant's own catalogue measures words against every product of their shops,
+     * with no index to serve it, and it runs after the reader slot was handed back — so nothing else
+     * bounds it. It goes in a transaction of its own that tells the database to cut it off, and the
+     * paid call stays outside any transaction, where a connection is not held across it.
+     */
+    @Test
+    @DisplayName("the match is bounded by SET LOCAL statement_timeout, and the paid call is not in it")
+    void the_match_is_time_bounded() {
+        service.find(MERCHANT, photo(), grocer.getId());
+
+        assertThat(reads).containsExactly(
+                "describe outside a transaction",
+                "statement_timeout 2000 inside a transaction",
+                "findInStores inside a transaction");
+        assertThat(transactions.begun()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("a cancelled match is 503 SEARCH_TIMED_OUT, not a partial answer and not a 500")
+    void a_cancelled_match_is_a_coded_503() {
+        theMatchIsCancelled();
+
+        assertThatThrownBy(() -> service.find(MERCHANT, photo(), grocer.getId()))
+                .isInstanceOfSatisfying(ItemSearchService.SearchTimedOutException.class, e -> {
+                    assertThat(e.getCode()).isEqualTo(ItemSearchService.SEARCH_TIMED_OUT);
+                    assertThat(e.getRetryAfterSeconds()).isPositive();
+                });
+        // No half-answer: "not in your catalogue yet" over a cancelled read would invite a merchant to
+        // add a second copy of something they already have.
+        assertThat(described).hasValue(1);
+    }
+
+    @Test
+    @DisplayName("a configured timeout outside the clamp is brought back inside it")
+    void the_timeout_is_clamped() {
+        new PhotoFindService(providers,
+                new PhotoReader(new Thumbnailer(40_000_000L), 4, 1568, 16_000_000L), quota, stores,
+                finder, products, categories, transactions, Duration.ofMinutes(5))
+                .find(MERCHANT, photo(), grocer.getId());
+        assertThat(reads).contains("statement_timeout "
+                + PhotoFindService.MAX_STATEMENT_TIMEOUT.toMillis() + " inside a transaction");
+
+        reads.clear();
+        new PhotoFindService(providers,
+                new PhotoReader(new Thumbnailer(40_000_000L), 4, 1568, 16_000_000L), quota, stores,
+                finder, products, categories, transactions, Duration.ZERO)
+                .find(MERCHANT, photo(), grocer.getId());
+        assertThat(reads).contains("statement_timeout "
+                + PhotoFindService.MIN_STATEMENT_TIMEOUT.toMillis() + " inside a transaction");
     }
 
     // ---------------------------------------------------------------------------- what matches

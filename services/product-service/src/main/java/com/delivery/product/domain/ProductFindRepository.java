@@ -167,4 +167,21 @@ public interface ProductFindRepository extends Repository<Product, UUID> {
             + "AND p.barcode = CAST(:barcode AS varchar))", nativeQuery = true)
     boolean barcodeTaken(@Param("storeIds") Collection<UUID> storeIds,
                          @Param("barcode") String barcode);
+
+    /**
+     * Bounds how long each statement of the current transaction may run, from the next one on, exactly
+     * as {@link ItemSearchRepository#limitStatementTime} does for the customer's search — and for the
+     * same reason: {@link #findInStoresRows} reads every product of the merchant's shops and measures
+     * words against each, with no index to serve it, and a merchant with a large catalogue would
+     * otherwise hold one of the ten pooled connections for as long as that took, after the reader slot
+     * this request held was already given back.
+     *
+     * <p>SET LOCAL, which PostgreSQL undoes at commit or rollback, so the connection returns to the
+     * pool with the server's own setting. A statement that runs past it is cancelled with SQLSTATE
+     * 57014, which {@code PhotoFindService} answers as a 503.
+     *
+     * @param millis whole milliseconds, as text, which is what {@code set_config} takes
+     */
+    @Query(value = "SELECT set_config('statement_timeout', CAST(:millis AS text), true)", nativeQuery = true)
+    String limitStatementTime(@Param("millis") String millis);
 }
