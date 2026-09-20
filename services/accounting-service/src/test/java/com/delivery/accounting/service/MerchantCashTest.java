@@ -79,8 +79,12 @@ class MerchantCashTest {
     }
 
     private CashFloatService cashFloat() {
-        CashFloatService service =
-                new CashFloatService(floats, transactions, postings, "ACC-PLATFORM", "USD");
+        return cashFloat(SettlementService.SettlementMode.LEDGER_ONLY);
+    }
+
+    private CashFloatService cashFloat(SettlementService.SettlementMode mode) {
+        CashFloatService service = new CashFloatService(floats, transactions, postings,
+                "ACC-PLATFORM", "USD", mode);
         // save() returns what it is given, as a real repository does for a new row.
         lenient().when(floats.save(any(CashFloatEntry.class))).thenAnswer(i -> i.getArgument(0));
         lenient().when(transactions.save(any(AccountingTransaction.class)))
@@ -252,13 +256,33 @@ class MerchantCashTest {
             // The float balances: every note the till held is paid or kept, and none twice.
             assertThat(payment.getAmount().add(share.getAmount())).isEqualByComparingTo("40.00");
 
-            // Only what reached the platform is posted.
+            // Only what reached the platform is recorded on the ledger, and with no bank deployed
+            // it is settled as it is written rather than left waiting for one (RECON-06).
             ArgumentCaptor<AccountingTransaction> posting =
                     ArgumentCaptor.forClass(AccountingTransaction.class);
             verify(transactions).save(posting.capture());
             assertThat(posting.getValue().getLeg())
                     .isEqualTo(AccountingTransaction.Leg.CASH_REMITTANCE);
             assertThat(posting.getValue().getAmount()).isEqualByComparingTo("5.00");
+            assertThat(posting.getValue().getStatus())
+                    .isEqualTo(AccountingTransaction.Status.SETTLED_IN_CASH);
+            verifyNoInteractions(postings);
+        }
+
+        @Test
+        @DisplayName("with a bank configured, the commission the shop paid is asked of it")
+        void withABankThePaymentIsPosted() {
+            List<CashFloatEntry> till = tillHolds(pickup("40.00", "35.00", "5.00"));
+            assertThat(till).isNotEmpty();
+
+            cashFloat(SettlementService.SettlementMode.BANK).remit(SHOP, "corr-1",
+                    new BigDecimal("5.00"), BY_THE_OPERATOR, HolderKind.MERCHANT).orElseThrow();
+
+            ArgumentCaptor<AccountingTransaction> posting =
+                    ArgumentCaptor.forClass(AccountingTransaction.class);
+            verify(transactions).save(posting.capture());
+            assertThat(posting.getValue().getStatus())
+                    .isEqualTo(AccountingTransaction.Status.PENDING);
             verify(postings).request(posting.getValue());
         }
 

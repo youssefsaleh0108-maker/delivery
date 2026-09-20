@@ -114,6 +114,10 @@ public interface AccountingTransactionRepository extends JpaRepository<Accountin
     List<AccountingTransaction> findByStatusOrderByCreatedAtDesc(
             AccountingTransaction.Status status, Pageable pageable);
 
+    /** Every leg of one kind in one state: the remittances a ledger-only start-up settles. */
+    List<AccountingTransaction> findByLegAndStatus(AccountingTransaction.Leg leg,
+                                                   AccountingTransaction.Status status);
+
     @Query("select t.status, count(t), coalesce(sum(t.amount), 0) from AccountingTransaction t "
             + "group by t.status")
     List<Object[]> summariseByStatus();
