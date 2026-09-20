@@ -166,6 +166,17 @@ them* below for what it creates and who reads each one.
   ```
 - **order-manager's image** is the one Docker Hub pull (its own repo/pipeline); everything else
   pulls public GHCR packages.
+- **Every image is pinned, and `scripts/verify.sh` fails if one comes unpinned.** Two shapes are
+  allowed: a digest (`repo:tag@sha256:…`) for infrastructure, and our own CI's immutable
+  `sha-<40 hex>` tag for a service. Nothing may pull `:main`, `:latest`, `:qa`, `:develop` or a
+  minor-version stream like `:3-management` — a pod restarting for an unrelated reason would come
+  back on a build nobody chose, at an hour nobody picked, with no diff anywhere saying so. That is
+  exactly how `minio:latest` turned into an outage when Docker Hub stopped serving the repository.
+  Upgrading an infrastructure image is a deliberate edit of its digest; take a backup first if it
+  has state behind it (Postgres, RabbitMQ and Keycloak all migrate their own data on start).
+  **`overlays/qa` pins by digest, and those digests are a freeze, not a promotion** — they are what
+  `:main` and `:qa` resolved to on 2026-09-20, so applying them does not change which build qa
+  runs. Choosing the launch build means replacing them with the dev `sha-` tags, in a PR of its own.
 - **The portal** serves whatever is under `/opt/delivery/sites/<env>/portal` on the node — sync a
   Flutter Web build there. `infra/deploy-portal.sh` has the shape of that build; the part that is
   not optional is:

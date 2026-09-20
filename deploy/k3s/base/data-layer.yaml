@@ -19,7 +19,12 @@ spec:
     spec:
       containers:
         - name: postgres
-          image: postgis/postgis:17-3.5
+          # postgis/postgis:17-3.5, pinned by digest (PIN-1). A floating tag on a StatefulSet is
+          # the sharpest edge on this box: the pod restarts for any ordinary reason, pulls a newer
+          # 17-3.5 build, and the first thing it does with the data directory is whatever that
+          # build's entrypoint decides. Upgrade deliberately, by changing the digest — and take a
+          # backup first (scripts/restore.sh documents the way back).
+          image: postgis/postgis:17-3.5@sha256:01a6a70e41e6c4467c8f55f6063555ed72db2d6662cd0d571040d42eadaeb6f6
           args:
             # The compose box starved this at 384m; the upgraded node can afford a real buffer
             # pool. Still modest — two environments share the machine.
@@ -102,7 +107,8 @@ spec:
     spec:
       containers:
         - name: redis
-          image: redis:7-alpine
+          # redis:7-alpine, pinned by digest (PIN-1).
+          image: redis:7-alpine@sha256:520775a41a63e77e06c73e35d2fd9cc15921a609516818796b4ecbb813078bc7
           command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$REDIS_PASSWORD\""]
           env:
             - name: REDIS_PASSWORD
@@ -161,7 +167,10 @@ spec:
     spec:
       containers:
         - name: rabbitmq
-          image: rabbitmq:3-management
+          # rabbitmq:3-management, pinned by digest (PIN-1). `3-management` moves across minor
+          # versions, and a broker that comes back on a different minor with an existing Mnesia
+          # directory is not a restart, it is a migration.
+          image: rabbitmq:3-management@sha256:e582c0bc7766f3342496d8485efb5a1df782b5ce3886ad017e2eaae442311f69
           env:
             - name: RABBITMQ_DEFAULT_USER
               valueFrom: { secretKeyRef: { name: platform-secrets, key: RABBITMQ_USER } }
@@ -354,7 +363,9 @@ spec:
     spec:
       containers:
         - name: mailpit
-          image: axllent/mailpit:latest
+          # Was `:latest`, which is how the MinIO outage began: a restart re-pulls, and whatever
+          # the tag points at that day is what runs. v1.31.2, pinned by digest (PIN-1).
+          image: axllent/mailpit:v1.31.2@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d
           env:
             # Served under /mailpit on the monitoring hostname, and it has to KNOW that — the
             # proxy must not strip the prefix (see the ingress notes).

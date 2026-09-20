@@ -303,6 +303,58 @@ grep -q '^ADMIN="\$IAM' scripts/rotate-secrets.sh \
   && fail "rotate-secrets.sh builds the admin API URL from the public hostname again" \
   || ok "no admin API URL is built from the public iam hostname"
 
+echo "== every image is pinned (PIN-1) =="
+# A moving tag is a deployment nobody performed. The pod restarts for an unrelated reason, re-pulls
+# `:main` / `:latest` / `:qa` / `:develop` / `:3-management`, and comes back on a build nobody chose
+# at an hour nobody picked — with nothing in git to say it happened. That is how `minio:latest`
+# became an outage when Docker Hub stopped serving the repository.
+#
+# Two shapes are allowed and nothing else: a digest (`@sha256:<64 hex>`), which is the content
+# itself, or one of our own CI's `sha-<40 hex>` tags, which that CI never re-points.
+pinned() {   # pinned <image reference>
+  printf '%s' "$1" | grep -Eq '@sha256:[0-9a-f]{64}$|:sha-[0-9a-f]{40}$'
+}
+for f in base/data-layer.yaml base/identity.yaml base/services.yaml base/portal.yaml \
+         cluster/monitoring.yaml cluster/logging.yaml cluster/website.yaml cluster/traefik-config.yaml; do
+  sed -n 's/^ *image: *//p' "$f" | while read -r img; do
+    [ -n "$img" ] || continue
+    if pinned "$img"; then
+      ok "$f ${img##*/}"
+    else
+      echo "FAIL: $f pulls a moving tag: $img"
+      echo fail >> "$tmp/failed"
+    fi
+  done
+done
+# The overlays override those defaults, so an overlay may not reintroduce a moving tag either.
+for env in dev qa; do
+  bad_tags=$(sed -n 's/^ *newTag: *//p' "overlays/$env/kustomization.yaml" | grep -Ev '^sha-[0-9a-f]{40}$' | tr '\n' ' ')
+  [ -z "$bad_tags" ] \
+    && ok "$env overlay pins every newTag" \
+    || fail "$env overlay carries moving tag(s): $bad_tags"
+  bad_digests=$(sed -n 's/^ *digest: *//p' "overlays/$env/kustomization.yaml" | grep -Ev '^sha256:[0-9a-f]{64}$' | tr '\n' ' ')
+  [ -z "$bad_digests" ] \
+    && ok "$env overlay's digests are well formed" \
+    || fail "$env overlay has malformed digest(s): $bad_digests"
+done
+[ ! -f "$tmp/failed" ] || { fails=$((fails + $(wc -l < "$tmp/failed" | tr -d ' '))); rm -f "$tmp/failed"; }
+
+echo "== both overlays render (kubectl kustomize) =="
+# The one check that proves the whole document set parses AND that every patch still finds its
+# target. Skipped rather than failed where kubectl is absent, so this script still runs on a
+# machine that has no cluster tooling at all — but it is never silently skipped.
+if command -v kubectl >/dev/null 2>&1; then
+  for env in dev qa; do
+    if kubectl kustomize "overlays/$env" > "$tmp/render-$env.yaml" 2>"$tmp/render-$env.err"; then
+      ok "overlays/$env renders ($(grep -c '^kind:' "$tmp/render-$env.yaml") objects)"
+    else
+      fail "overlays/$env does not render: $(head -n3 "$tmp/render-$env.err" | tr '\n' ' ')"
+    fi
+  done
+else
+  echo "  --    kubectl not on PATH: the kustomize render is not checked here"
+fi
+
 echo "== every YAML alias resolves =="
 # A ConfigMap's `data:` values are strings to Kubernetes, so a dangling `*alias` inside one is
 # waved through by kubectl and by kustomize and only fails when Prometheus or Grafana parses it —

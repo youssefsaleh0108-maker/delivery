@@ -47,10 +47,12 @@ configMapGenerator:
 generatorOptions:
   disableNameSuffixHash: true
 
-# order-manager lives in its own repository, and dev runs its moving `:develop` tag, so a new
-# order-manager build changes nothing Argo CD can see. Changing this value rolls the pods, and
-# imagePullPolicy: Always makes them pull the new build. Set it to the order-manager commit that
-# should be running.
+# order-manager lives in its own repository and nothing bumps this overlay when it builds, so this
+# annotation was the only record of which build dev was meant to run — while the image tag was the
+# moving `:develop`, with imagePullPolicy: Always. The two had already come apart: this said
+# `429ce9e` while `:develop` pointed at build `044d1b8b` (2026-09-20). The image below is now
+# pinned to that same build's immutable `sha-` tag, so the annotation and the image cannot disagree
+# again; keep them in step when you promote a new order-manager build.
 patches:
 - patch: |-
     - op: replace
@@ -62,7 +64,7 @@ patches:
 - patch: |-
     - op: add
       path: /spec/template/metadata/annotations/youdrop.shop~1order-manager-build
-      value: "429ce9e"
+      value: "044d1b8b"
   target:
     kind: Deployment
     name: order-manager
@@ -72,7 +74,9 @@ patches:
 # deploys the result — edit by merge, not by hand.
 images:
 - name: docker.io/youssefsaleh0108/delivery-order-manager
-  newTag: develop
+  # Was `develop`, which moves on every order-manager merge (PIN-1). This is the build `develop`
+  # pointed at on 2026-09-20, by its own immutable tag.
+  newTag: sha-044d1b8b2a5b22d6143bbfa05ec8b688f35d564f
 - name: ghcr.io/youssefsaleh0108-maker/accounting-service
   newName: ghcr.io/youssefsaleh0108-maker/accounting-service
   newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7

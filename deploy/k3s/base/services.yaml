@@ -3,6 +3,13 @@
 # comes from platform-common + platform-env + platform-secrets; only what is service-specific
 # is spelled out per Deployment. The prometheus.io annotations are what the monitoring stack
 # discovers scrape targets by.
+#
+# PIN-1: the tags here are DEFAULTS, and every overlay replaces them through its `images:` block —
+# but a default is what runs if an overlay ever forgets a service, so it may not float either.
+# These were `:main`, a tag that moves on every merge: a pod restarting for an unrelated reason
+# would come back on a build nobody chose, and nothing in git would show it had. They now name the
+# same immutable `sha-` build the dev overlay pins. Edit by merge (CI rewrites the overlays), not
+# by hand.
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -26,7 +33,7 @@ spec:
       terminationGracePeriodSeconds: 40
       containers:
         - name: product-service
-          image: ghcr.io/youssefsaleh0108-maker/product-service:main
+          image: ghcr.io/youssefsaleh0108-maker/product-service:sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
           envFrom:
             - configMapRef: { name: platform-common }
             - configMapRef: { name: platform-env }
@@ -112,7 +119,7 @@ spec:
       terminationGracePeriodSeconds: 40
       containers:
         - name: order-manager
-          image: docker.io/youssefsaleh0108/delivery-order-manager:main
+          image: docker.io/youssefsaleh0108/delivery-order-manager:sha-044d1b8b2a5b22d6143bbfa05ec8b688f35d564f
           # The one service on a MUTABLE branch tag (its own repo cannot bump our overlays
           # without a cross-repo token), so every pull must really pull.
           imagePullPolicy: Always
@@ -191,7 +198,7 @@ spec:
       terminationGracePeriodSeconds: 40
       containers:
         - name: order-tracking
-          image: ghcr.io/youssefsaleh0108-maker/order-tracking:main
+          image: ghcr.io/youssefsaleh0108-maker/order-tracking:sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
           envFrom:
             - configMapRef: { name: platform-common }
             - configMapRef: { name: platform-env }
@@ -260,7 +267,7 @@ spec:
       terminationGracePeriodSeconds: 40
       containers:
         - name: transfer-service
-          image: ghcr.io/youssefsaleh0108-maker/transfer-service:main
+          image: ghcr.io/youssefsaleh0108-maker/transfer-service:sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
           envFrom:
             - configMapRef: { name: platform-common }
             - configMapRef: { name: platform-env }
@@ -329,7 +336,7 @@ spec:
       terminationGracePeriodSeconds: 40
       containers:
         - name: connector-settings
-          image: ghcr.io/youssefsaleh0108-maker/connector-settings:main
+          image: ghcr.io/youssefsaleh0108-maker/connector-settings:sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
           envFrom:
             - configMapRef: { name: platform-common }
             - configMapRef: { name: platform-env }
@@ -398,7 +405,7 @@ spec:
       terminationGracePeriodSeconds: 40
       containers:
         - name: notifications-manager
-          image: ghcr.io/youssefsaleh0108-maker/notifications-manager:main
+          image: ghcr.io/youssefsaleh0108-maker/notifications-manager:sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
           envFrom:
             - configMapRef: { name: platform-common }
             - configMapRef: { name: platform-env }
@@ -475,7 +482,7 @@ spec:
       terminationGracePeriodSeconds: 40
       containers:
         - name: app-notification
-          image: ghcr.io/youssefsaleh0108-maker/app-notification:main
+          image: ghcr.io/youssefsaleh0108-maker/app-notification:sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
           envFrom:
             - configMapRef: { name: platform-common }
             - configMapRef: { name: platform-env }
@@ -544,7 +551,7 @@ spec:
       terminationGracePeriodSeconds: 40
       containers:
         - name: email-connector
-          image: ghcr.io/youssefsaleh0108-maker/email-connector:main
+          image: ghcr.io/youssefsaleh0108-maker/email-connector:sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
           envFrom:
             - configMapRef: { name: platform-common }
             - configMapRef: { name: platform-env }
@@ -613,7 +620,7 @@ spec:
       terminationGracePeriodSeconds: 40
       containers:
         - name: push-connector
-          image: ghcr.io/youssefsaleh0108-maker/push-connector:main
+          image: ghcr.io/youssefsaleh0108-maker/push-connector:sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
           envFrom:
             - configMapRef: { name: platform-common }
             - configMapRef: { name: platform-env }
@@ -682,7 +689,7 @@ spec:
       terminationGracePeriodSeconds: 40
       containers:
         - name: sms-connector
-          image: ghcr.io/youssefsaleh0108-maker/sms-connector:main
+          image: ghcr.io/youssefsaleh0108-maker/sms-connector:sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
           envFrom:
             - configMapRef: { name: platform-common }
             - configMapRef: { name: platform-env }
@@ -757,7 +764,7 @@ spec:
       terminationGracePeriodSeconds: 40
       containers:
         - name: accounting-service
-          image: ghcr.io/youssefsaleh0108-maker/accounting-service:main
+          image: ghcr.io/youssefsaleh0108-maker/accounting-service:sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
           envFrom:
             - configMapRef: { name: platform-common }
             - configMapRef: { name: platform-env }
@@ -830,7 +837,7 @@ spec:
       terminationGracePeriodSeconds: 40
       containers:
         - name: whatsapp-service
-          image: ghcr.io/youssefsaleh0108-maker/whatsapp-service:main
+          image: ghcr.io/youssefsaleh0108-maker/whatsapp-service:sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
           envFrom:
             - configMapRef: { name: platform-common }
             - configMapRef: { name: platform-env }
@@ -908,7 +915,7 @@ spec:
       terminationGracePeriodSeconds: 40
       containers:
         - name: onboarding-service
-          image: ghcr.io/youssefsaleh0108-maker/onboarding-service:main
+          image: ghcr.io/youssefsaleh0108-maker/onboarding-service:sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
           envFrom:
             - configMapRef: { name: platform-common }
             - configMapRef: { name: platform-env }
