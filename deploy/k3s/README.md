@@ -58,8 +58,9 @@ them* below for what it creates and who reads each one.
 - **Mail goes to mailpit** (monitoring-<env>/mailpit, behind the ops basic-auth). Real SMTP means
   putting relay credentials in `platform-secrets` and pointing `SMTP_*` in `platform-common` at
   the relay — a deliberate act, since test data then reaches real inboxes.
-- **Merchant Blitz reads shelf photos with sample data** until two deliberate acts, both per
-  environment. (1) Give product-service the Claude API key in its own Secret, `anthropic-api` —
+- **Every photo the platform reads runs on sample data** until two deliberate acts, both per
+  environment. One switch covers all three: Merchant Blitz's shelf scans, a merchant finding a
+  product in their own catalogue by photo, and a customer searching the shops by photo. (1) Give product-service the Claude API key in its own Secret, `anthropic-api` —
   never `platform-secrets`: every service imports that one whole, so a key there would sit in every
   pod on the platform. Only product-service references `anthropic-api` (an optional `secretKeyRef`
   in `base/services.yaml`), and `gen-secrets.sh` deliberately does not create it. Type the key in on
@@ -78,6 +79,16 @@ them* below for what it creates and who reads each one.
   changes nothing a merchant can see: CLAUDE without a key still answers with labelled samples, and
   a key without CLAUDE is never used. Each scan is a paid call once both are done; the per-merchant
   caps live under `delivery.catalog.scan` in product-service's `application.yml`.
+
+  **What each of the three does before and after.** Blitz and a merchant's find by photo answer with
+  labelled sample lines until both acts are done, and with real readings after. Customer photo search
+  does neither: while the key or the provider is missing, `GET /api/products/search/capabilities`
+  answers `photoSearch: false`, the customer app draws no camera, and the endpoint refuses — a
+  customer is never shown sample products. Both acts done turns it on for customers too, at 10 photos
+  per customer a day and 1,000 a day across the platform (about $40 a day at most); the caps and the
+  per-photo cost are under `delivery.catalog.photo-search` in `application.yml`. To keep customers off
+  while merchants use the reader, add `CUSTOMER_PHOTO_SEARCH_ENABLED=false` beside the provider.
+  Photos sent for reading are never stored: only a row per read, per account, for the daily caps.
 - **Service-order attachments need their bucket once per environment.** The files customers attach
   to service orders live in the private `order-attachments` bucket, which `minio/bootstrap.sh`
   creates. A finished Job never runs again, whether Argo CD or `kubectl apply` applies it (the

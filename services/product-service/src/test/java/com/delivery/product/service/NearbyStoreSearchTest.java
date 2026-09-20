@@ -28,6 +28,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.delivery.product.domain.TestPin;
 import com.delivery.product.domain.CategoryRepository;
 import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.domain.ProductRepository;
@@ -102,7 +103,7 @@ class NearbyStoreSearchTest {
         service = new StoreService(stores, offers, favorites, products, categories,
                 new ServiceCategories(environment),
                 org.mockito.Mockito.mock(OnboardingApplicationClient.class),
-                Clock.fixed(NOW, ZoneOffset.UTC), FRESH_FOR);
+                Clock.fixed(NOW, ZoneOffset.UTC), FRESH_FOR, "Asia/Beirut");
         world.clear();
         betweenTheQueries = () -> { };
 
@@ -183,6 +184,7 @@ class NearbyStoreSearchTest {
     private Store listedAt(String name, double latitude, double longitude, Instant listed) {
         Store store = draftAt(name, latitude, longitude);
         store.replaceHours(everyDay(LocalTime.MIDNIGHT, LocalTime.of(23, 59, 59)));
+        TestPin.pinned(store);
         store.publish(listed);
         return store;
     }
@@ -517,6 +519,7 @@ class NearbyStoreSearchTest {
                     NOW.minus(Duration.ofDays(400)));
             ReflectionTestUtils.setField(relisted, "createdAt", NOW.minus(Duration.ofDays(401)));
             relisted.suspend();
+            TestPin.pinned(relisted);
             relisted.publish(NOW.minus(Duration.ofDays(2)));
 
             assertThat(namesNear(newWithin(30))).containsExactly("Set Up For Months");
@@ -699,6 +702,7 @@ class NearbyStoreSearchTest {
             Store store = new Store("merchant-2", name, Store.Vertical.SERVICES, category);
             store.pinAt(GeoPoint.of(latitude, longitude));
             store.replaceHours(everyDay(LocalTime.MIDNIGHT, LocalTime.of(23, 59, 59)));
+            TestPin.pinned(store);
             store.publish(LONG_AGO);
             world.put(store.getId(), store);
             return store;

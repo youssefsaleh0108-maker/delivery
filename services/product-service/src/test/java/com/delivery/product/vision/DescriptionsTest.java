@@ -1,0 +1,121 @@
+package com.delivery.product.vision;
+
+import java.util.List;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+import com.delivery.product.vision.VisionProvider.ProductDescription;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * What survives of a provider's description of a product photo.
+ *
+ * <p>The barcode rule matters most: a barcode is matched exactly, so a misread digit would find somebody
+ * else's product for a customer, or file a wrong code in a merchant's catalogue. Only a GTIN whose check
+ * digit is right is kept.
+ */
+@DisplayName("sanitising a product description")
+class DescriptionsTest {
+
+    private static ProductDescription described(String name, String barcode) {
+        return new ProductDescription(true, name, "بيبسي", "Pepsi", "1 L", List.of("cola"), barcode, 0.9);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "96385074",        // EAN-8
+            "036000291452",    // UPC-A
+            "5449000000996",   // EAN-13
+            "15449000000993"}) // GTIN-14
+    @DisplayName("a GTIN of 8, 12, 13 or 14 digits with a right check digit is kept")
+    void a_gtin_with_its_check_digit_is_kept(String gtin) {
+        assertThat(Descriptions.sanitize(described("Pepsi 1L", gtin)).barcode()).isEqualTo(gtin);
+    }
+
+    @Test
+    @DisplayName("a barcode whose check digit is wrong becomes null")
+    void a_bad_check_digit_is_dropped() {
+        assertThat(Descriptions.sanitize(described("Pepsi 1L", "5449000000997")).barcode()).isNull();
+        assertThat(Descriptions.sanitize(described("Pepsi 1L", "96385075")).barcode()).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"544900000", "5449000000", "54490000009", "544900000099612", "", "54490000009A6"})
+    @DisplayName("a barcode of another length, or with a letter in it, becomes null")
+    void another_length_or_a_letter_is_dropped(String raw) {
+        assertThat(Descriptions.sanitize(described("Pepsi 1L", raw)).barcode()).isNull();
+    }
+
+    @Test
+    @DisplayName("spaces and hyphens copied off the print are dropped before the check")
+    void spaces_and_hyphens_are_ignored() {
+        assertThat(Descriptions.sanitize(described("Pepsi 1L", "5 449000 00099-6")).barcode())
+                .isEqualTo("5449000000996");
+    }
+
+    @Test
+    @DisplayName("text is stripped of control characters and capped as Blitz's lines are")
+    void text_is_cleaned_and_capped() {
+        String longName = "P".repeat(Detections.MAX_NAME + 50);
+        Descriptions.Clean clean = Descriptions.sanitize(new ProductDescription(true,
+                // The invisible characters are written as escapes, never as raw bytes: one literal NUL in a
+                // source file is enough for git to call the whole file binary, and a review of this test is
+                // then one line saying the files differ. The name carries a NUL and a newline, the brand a
+                // zero-width space.
+                "Pepsi\0\n  1L", longName, "Pep\u200Bsi", " ", List.of(), null, 1.7));
+
+        assertThat(clean.name()).isEqualTo("Pepsi 1L");
+        assertThat(clean.nameAr()).hasSize(Detections.MAX_NAME);
+        assertThat(clean.brand()).isEqualTo("Pep si");
+        assertThat(clean.size()).isNull();
+        assertThat(clean.confidence()).isEqualByComparingTo("1.000");
+    }
+
+    @Test
+    @DisplayName("at most five keywords, each once whatever its case, none blank, each capped")
+    void keywords_are_capped_and_distinct() {
+        Descriptions.Clean clean = Descriptions.sanitize(new ProductDescription(true, "Pepsi 1L", null,
+                null, null, List.of("Cola", "cola", " ", "soft drink", "كولا", "مشروب غازي", "soda",
+                        "fizzy"), null, 0.8));
+
+        assertThat(clean.keywords()).containsExactly("Cola", "soft drink", "كولا", "مشروب غازي", "soda");
+        assertThat(Descriptions.sanitize(new ProductDescription(true, "Pepsi", null, null, null,
+                List.of("x".repeat(200)), null, 0.8)).keywords().get(0)).hasSize(Descriptions.MAX_KEYWORD);
+    }
+
+    @Test
+    @DisplayName("a photo of no product keeps nothing, whatever else the provider wrote")
+    void not_a_product_keeps_nothing() {
+        Descriptions.Clean clean = Descriptions.sanitize(new ProductDescription(false, "A person",
+                "شخص", "Brand", "1 L", List.of("person"), "5449000000996", 0.9));
+
+        assertThat(clean.isProduct()).isFalse();
+        assertThat(clean.name()).isNull();
+        assertThat(clean.barcode()).isNull();
+        assertThat(clean.keywords()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a product nobody could name in either language, with no legible code, is not searchable")
+    void a_product_with_nothing_to_search_by_is_not_a_product() {
+        Descriptions.Clean clean = Descriptions.sanitize(new ProductDescription(true, " ", "", "Pepsi",
+                "1 L", List.of("cola"), "123", 0.4));
+
+        assertThat(clean.isProduct()).isFalse();
+    }
+
+    @Test
+    @DisplayName("a legible barcode alone is enough to search by")
+    void a_barcode_alone_is_searchable() {
+        Descriptions.Clean clean = Descriptions.sanitize(new ProductDescription(true, "", null, null, null,
+                null, "5449000000996", 0.4));
+
+        assertThat(clean.isProduct()).isTrue();
+        assertThat(clean.barcode()).isEqualTo("5449000000996");
+        assertThat(clean.keywords()).isEmpty();
+    }
+}

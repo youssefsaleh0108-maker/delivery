@@ -11,6 +11,12 @@ import 'tokens.dart';
 ///
 /// Set [readOnly] with [onTap] for the frames where the "search bar" is really a button that
 /// opens a search screen — the field then still looks identical but never raises a keyboard.
+///
+/// With [onCameraTap] and [cameraSemanticLabel] both set, a camera sits at the trailing end, after the
+/// filter glyph: search by photo. It is a full 48 dp touch target, so the field is 48 dp tall while it
+/// shows (the design's 12 px padding runs into the target rather than adding to it); without it the
+/// field is exactly as drawn. A caller sets it only when a photo search can actually run — never a
+/// camera that cannot work.
 class YdSearchField extends StatelessWidget {
   const YdSearchField({
     super.key,
@@ -28,7 +34,12 @@ class YdSearchField extends StatelessWidget {
     this.filterSemanticLabel,
     this.searchSemanticLabel,
     this.animatedHint,
+    this.onCameraTap,
+    this.cameraSemanticLabel,
   });
+
+  /// The touch target of the camera action: Material's minimum.
+  static const double cameraTarget = 48;
 
   /// Placeholder text, already localised by the caller.
   final String hintText;
@@ -59,6 +70,14 @@ class YdSearchField extends StatelessWidget {
   final String? filterSemanticLabel;
   final String? searchSemanticLabel;
 
+  /// Search by photo. Drawn only when this and [cameraSemanticLabel] are both set.
+  final VoidCallback? onCameraTap;
+
+  /// What a screen reader says for the camera, localised by the caller.
+  final String? cameraSemanticLabel;
+
+  bool get _hasCamera => onCameraTap != null && cameraSemanticLabel != null;
+
   /// Stand-in listenable when [animatedHint] is used without a [controller]; the field then has
   /// no way to gain text we could observe, so a permanently-empty value is the truth.
   static final TextEditingController _emptyController = TextEditingController();
@@ -70,7 +89,11 @@ class YdSearchField extends StatelessWidget {
         color: DeliveryColors.background,
         borderRadius: BorderRadius.circular(DeliveryRadius.md),
       ),
-      padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - DeliverySpacing.xs),
+      // With the camera, its 48 dp target stands in for the padding at the trailing end and sets the
+      // height, and the rest of the row centres on it.
+      padding: _hasCamera
+          ? const EdgeInsetsDirectional.only(start: DeliverySpacing.md - DeliverySpacing.xs)
+          : const EdgeInsetsDirectional.all(DeliverySpacing.md - DeliverySpacing.xs),
       child: Row(
         children: <Widget>[
           Icon(
@@ -151,6 +174,22 @@ class YdSearchField extends StatelessWidget {
               ),
             ),
           ],
+          if (_hasCamera)
+            Semantics(
+              button: true,
+              label: cameraSemanticLabel,
+              excludeSemantics: true,
+              child: InkResponse(
+                onTap: onCameraTap,
+                radius: cameraTarget / 2,
+                child: const SizedBox.square(
+                  dimension: cameraTarget,
+                  child: Center(
+                    child: Icon(Icons.photo_camera_outlined, size: 20, color: DeliveryColors.brand),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

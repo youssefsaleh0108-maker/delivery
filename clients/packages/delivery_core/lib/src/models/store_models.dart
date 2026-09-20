@@ -1152,3 +1152,33 @@ class StoreReview {
     );
   }
 }
+
+/// A shop the server would not list, with the one thing that is missing.
+///
+/// A 422 whose `code` is one of the constants below. It is a refusal rather than a failure: the
+/// same request sent again gets the same answer, so a screen says what to fix and where, instead of
+/// offering to retry.
+///
+/// The code is what a screen branches on. Before this existed, both Publish buttons scraped the
+/// RFC-7807 `detail` out of the stringified exception with a regular expression and showed the
+/// server's raw English — untranslated, and with no way to tell "set your hours" apart from "drop
+/// your pin" and so no way to offer the right fix.
+class StoreNotListable implements Exception {
+  const StoreNotListable(this.code, this.detail);
+
+  /// The server's `code`: one of the constants below, or a newer one this app does not know yet.
+  final String code;
+
+  /// The server's own sentence. A fallback for a code this app has no wording for, never the thing
+  /// it branches on.
+  final String detail;
+
+  /// The shop has no opening hours, so it could never be open.
+  static const String hoursRequired = 'STORE_HOURS_REQUIRED';
+
+  /// The shop has no pin, so no map, no distance and no delivery circle can place it.
+  static const String pinRequired = 'STORE_PIN_REQUIRED';
+
+  @override
+  String toString() => 'StoreNotListable($code)';
+}

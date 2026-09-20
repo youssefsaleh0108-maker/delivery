@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
+import 'package:delivery_merchant/delivery_merchant.dart'
+    show DeviceShelfPhotoSource, PickedShelfPhoto, ShelfPhotoSource, pickPhotoToRead;
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
@@ -10,6 +12,7 @@ import 'address_sheet.dart';
 import 'cart.dart';
 import 'category_strip.dart';
 import 'delivery_address.dart';
+import 'item_search_screen.dart';
 import 'notification_inbox.dart';
 import 'notifications_screen.dart';
 import 'product_detail_screen.dart' show CoverCard, CustomerPhoto;
@@ -51,6 +54,7 @@ class StoreHomeScreen extends StatefulWidget {
     required this.onOpenBasket,
     this.onOpenGiftHub,
     this.connectivity,
+    this.photoSource,
   });
 
   final StoreApi storeApi;
@@ -105,6 +109,10 @@ class StoreHomeScreen extends StatefulWidget {
   /// search box is not drawn. Null is always online.
   final ValueListenable<bool>? connectivity;
 
+  /// Where a photo to search by comes from. Null is the device's own camera and gallery, asked for a
+  /// photo no larger than the server's reader reads; a test stands in for them here.
+  final ShelfPhotoSource? photoSource;
+
   @override
   State<StoreHomeScreen> createState() => _StoreHomeScreenState();
 }
@@ -151,6 +159,15 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
 
   bool _loadingRails = true;
   Object? _error;
+
+  /// What the server says this account may do with a photo. Nothing until it answers, and nothing
+  /// again if the answer fails: the camera is drawn only on a plain yes, so a customer never meets a
+  /// camera that cannot work — and never sample results, which a real reader alone can avoid.
+  PhotoSearchCapabilities _photo = PhotoSearchCapabilities.none;
+
+  /// Set when a search came back with "there is no photo search": the endpoint has just answered
+  /// where the capabilities only promised, so it is believed over them until Home loads again.
+  bool _photoSearchRefused = false;
 
   /// Debounces the search box. Typing "pizza" is five keystrokes and should not be five round
   /// trips, and the results of the first four are all stale by the time they land.
@@ -222,6 +239,9 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
       _loadingRails = true;
       _error = null;
     });
+    // Beside the rails, never inside them: whether a camera may be drawn is not worth failing the
+    // whole screen over, so its own failure only means no camera.
+    unawaited(_loadPhotoCapabilities(afresh: true));
     try {
       // The grid and the two rails are independent reads, so they go together rather than one
       // after another. Each asks for one page — nothing here fetches a whole collection.
@@ -248,6 +268,60 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
         _loadingRails = false;
       });
     }
+  }
+
+  Future<void> _loadPhotoCapabilities({bool afresh = false}) async {
+    PhotoSearchCapabilities offered = PhotoSearchCapabilities.none;
+    try {
+      offered = await widget.storeApi.photoCapabilities();
+    } catch (_) {
+      // A server that cannot say is a server that offers nothing.
+    }
+    if (!mounted) return;
+    setState(() {
+      _photo = offered;
+      if (afresh) _photoSearchRefused = false;
+    });
+  }
+
+  /// Whether to draw the camera: the server offers photo search to this account, and has not since
+  /// refused a photo because there is none.
+  bool get _maySearchByPhoto => _photo.photoSearch && !_photoSearchRefused;
+
+  /// The camera: where the photo comes from, then the results screen, which sends it.
+  Future<void> _searchByPhoto() async {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final PickedShelfPhoto? photo = await pickPhotoToRead(
+      context,
+      source: widget.photoSource ??
+          const DeviceShelfPhotoSource(cameraMaxEdge: StoreApi.photoSearchMaxEdge),
+      title: t.psrchSheetTitle,
+      message: t.psrchSheetBody,
+      // What the server says is left, before one is spent rather than after.
+      photosLeft: _photo.photosLeftToday,
+    );
+    if (photo == null || !mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (BuildContext _) => ItemSearchScreen(
+        storeApi: widget.storeApi,
+        orderApi: widget.orderApi,
+        cart: widget.cart,
+        addresses: widget.addresses,
+        photo: photo,
+        // The largest photo the server says it will take, so this build never sends one it would
+        // refuse — and never spends a photo of the day on a 413.
+        maxPhotoBytes: _photo.maxPhotoBytes,
+        onOpenBasket: widget.onOpenBasket,
+        onFavoriteChanged: _applyFavorite,
+        // The server has just said there is no photo search after all; stop offering it.
+        onPhotoSearchUnavailable: () {
+          if (mounted) setState(() => _photoSearchRefused = true);
+        },
+      ),
+    ));
+    // A search spends one of the day's photos, so what is left is asked again — unless the endpoint
+    // has just said there is no photo search, which the capabilities would only contradict.
+    if (!_photoSearchRefused) unawaited(_loadPhotoCapabilities());
   }
 
   /// Re-runs only the grid, for a filter or search change. The rails do not depend on the filters.
@@ -767,6 +841,9 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
         filterSemanticLabel: t.custFilters,
         filterIcon: Icons.tune,
         onFilterTap: () => setState(() => _filtersOpen = !_filtersOpen),
+        // Drawn only while the server offers photo search to this account.
+        onCameraTap: _maySearchByPhoto ? _searchByPhoto : null,
+        cameraSemanticLabel: _maySearchByPhoto ? t.psrchCamera : null,
       ),
     );
   }

@@ -13038,4 +13038,205 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get reconStatusAbandoned => 'Abandoned';
+
+  @override
+  String get psrchCamera => 'Search by photo';
+
+  @override
+  String get psrchSheetTitle => 'Search by photo';
+
+  @override
+  String get psrchSheetBody =>
+      'Take or choose a photo of a product to see the shops near you that sell it.';
+
+  @override
+  String get psrchTakePhoto => 'Take photo';
+
+  @override
+  String get psrchChoosePhoto => 'Choose photo';
+
+  @override
+  String get psrchConsent =>
+      'Your photo is sent to Anthropic, our AI provider, to recognise the product. We don\'t keep it.';
+
+  @override
+  String get psrchLooking => 'Looking at your photo…';
+
+  @override
+  String psrchLooksLike(String name) {
+    return 'Looks like: $name';
+  }
+
+  @override
+  String get psrchLooksLikeHint => 'Search these words instead';
+
+  @override
+  String get psrchSimilar => 'No exact match — similar items';
+
+  @override
+  String get psrchNotAProduct =>
+      'We couldn\'t find a product in this photo. Try a closer photo of the pack.';
+
+  @override
+  String psrchLimitDay(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'You can search by photo $count times a day, and you\'ve used them all today. Search by name, or try again tomorrow.',
+      one:
+          'You can search by photo once a day, and you\'ve done that today. Search by name, or try again tomorrow.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get psrchLimitMinute =>
+      'That\'s a lot of photos at once. Wait a minute, then try again.';
+
+  @override
+  String get psrchLimitPlatform =>
+      'Search by photo is very busy today. Search by name, or try again later.';
+
+  @override
+  String get psrchBusy =>
+      'Lots of people are searching by photo right now. Try again in a moment.';
+
+  @override
+  String get psrchUnavailable =>
+      'Search by photo isn\'t available right now. Search by name instead.';
+
+  @override
+  String get psrchFailed => 'We couldn\'t read your photo just now. Try again.';
+
+  @override
+  String get psrchRefused =>
+      'We can\'t search with this photo. Try another photo.';
+
+  @override
+  String get psrchUnreadable =>
+      'We couldn\'t open this photo. Try another photo.';
+
+  @override
+  String get psrchTooLarge => 'This photo is too large. Try another photo.';
+
+  @override
+  String get psrchWrongType =>
+      'This photo can\'t be used. Choose a JPEG or PNG photo.';
+
+  @override
+  String get pfindCamera => 'Find by photo';
+
+  @override
+  String get pfindSheetTitle => 'Find in your catalogue';
+
+  @override
+  String get pfindSheetBody =>
+      'Photograph a product to see whether your shop already has it.';
+
+  @override
+  String get pfindInCatalogue => 'In your catalogue';
+
+  @override
+  String get pfindMatchedByBarcode => 'Same barcode';
+
+  @override
+  String get pfindAddNew => 'Add as a new product';
+
+  @override
+  String get pfindNoMatch => 'Not in your catalogue yet';
+
+  @override
+  String pfindLimitDay(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'You can look up $count photos a day, and you\'ve used them all. Try again tomorrow.',
+      one:
+          'You can look up 1 photo a day, and you\'ve used it. Try again tomorrow.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get pfindSkuLabel => 'SKU';
+
+  @override
+  String get pfindSkuHint => 'Your own code';
+
+  @override
+  String get pfindBarcodeLabel => 'Barcode';
+
+  @override
+  String get pfindBarcodeHint => 'Scanned at the till';
+
+  @override
+  String get pfindBlitzConsent =>
+      'Your photos are sent to Anthropic, our AI provider, to recognise the products. We delete them within two days.';
+
+  @override
+  String get pfindAddBlank => 'Add a product';
+
+  @override
+  String get pfindSampleNoPrefill =>
+      'This reading is an example, so nothing is filled in for you. Only your own photo comes along.';
+
+  @override
+  String get pfindLimitPlatform =>
+      'Finding products by photo is very busy today. Search your catalogue by name, or try again later.';
+
+  @override
+  String psrchLeftToday(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count photo searches left today',
+      one: '1 photo search left today',
+      zero: 'No photo searches left today',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get merchPublishNeedsPin =>
+      'Drop your shop\'s pin first — without it, nobody nearby can find you';
+
+  @override
+  String get merchPublishNeedsHours =>
+      'Set your opening hours first — without them, your shop is never open';
+
+  @override
+  String get merchPublishNotReady => 'Not ready to publish yet';
+
+  @override
+  String get merchPublishRefused => 'Your shop is not ready to be listed yet';
+
+  @override
+  String get boShopPinColumn => 'On the map';
+
+  @override
+  String get boShopPinned => 'Pinned';
+
+  @override
+  String get boShopNoPin => 'No pin';
+
+  @override
+  String get boShopSetPin => 'Set the pin';
+
+  @override
+  String get boShopMovePin => 'Move the pin';
+
+  @override
+  String get boShopPinSaved => 'Pin saved';
+
+  @override
+  String get boShopPinFailed => 'The pin could not be saved';
+
+  @override
+  String get boShopPinGone => 'That shop is no longer there';
+
+  @override
+  String get boShopPinWhy =>
+      'A shop with no pin has no distance, no delivery circle and no place in \"near you\".';
 }

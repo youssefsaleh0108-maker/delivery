@@ -22034,6 +22034,312 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Abandoned'**
   String get reconStatusAbandoned;
+
+  /// No description provided for @psrchCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by photo'**
+  String get psrchCamera;
+
+  /// No description provided for @psrchSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by photo'**
+  String get psrchSheetTitle;
+
+  /// No description provided for @psrchSheetBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Take or choose a photo of a product to see the shops near you that sell it.'**
+  String get psrchSheetBody;
+
+  /// No description provided for @psrchTakePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Take photo'**
+  String get psrchTakePhoto;
+
+  /// No description provided for @psrchChoosePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose photo'**
+  String get psrchChoosePhoto;
+
+  /// No description provided for @psrchConsent.
+  ///
+  /// In en, this message translates to:
+  /// **'Your photo is sent to Anthropic, our AI provider, to recognise the product. We don\'t keep it.'**
+  String get psrchConsent;
+
+  /// No description provided for @psrchLooking.
+  ///
+  /// In en, this message translates to:
+  /// **'Looking at your photo…'**
+  String get psrchLooking;
+
+  /// No description provided for @psrchLooksLike.
+  ///
+  /// In en, this message translates to:
+  /// **'Looks like: {name}'**
+  String psrchLooksLike(String name);
+
+  /// No description provided for @psrchLooksLikeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search these words instead'**
+  String get psrchLooksLikeHint;
+
+  /// No description provided for @psrchSimilar.
+  ///
+  /// In en, this message translates to:
+  /// **'No exact match — similar items'**
+  String get psrchSimilar;
+
+  /// No description provided for @psrchNotAProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t find a product in this photo. Try a closer photo of the pack.'**
+  String get psrchNotAProduct;
+
+  /// No description provided for @psrchLimitDay.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{You can search by photo once a day, and you\'ve done that today. Search by name, or try again tomorrow.} other{You can search by photo {count} times a day, and you\'ve used them all today. Search by name, or try again tomorrow.}}'**
+  String psrchLimitDay(int count);
+
+  /// No description provided for @psrchLimitMinute.
+  ///
+  /// In en, this message translates to:
+  /// **'That\'s a lot of photos at once. Wait a minute, then try again.'**
+  String get psrchLimitMinute;
+
+  /// No description provided for @psrchLimitPlatform.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by photo is very busy today. Search by name, or try again later.'**
+  String get psrchLimitPlatform;
+
+  /// No description provided for @psrchBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'Lots of people are searching by photo right now. Try again in a moment.'**
+  String get psrchBusy;
+
+  /// No description provided for @psrchUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by photo isn\'t available right now. Search by name instead.'**
+  String get psrchUnavailable;
+
+  /// No description provided for @psrchFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t read your photo just now. Try again.'**
+  String get psrchFailed;
+
+  /// No description provided for @psrchRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'We can\'t search with this photo. Try another photo.'**
+  String get psrchRefused;
+
+  /// No description provided for @psrchUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t open this photo. Try another photo.'**
+  String get psrchUnreadable;
+
+  /// No description provided for @psrchTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'This photo is too large. Try another photo.'**
+  String get psrchTooLarge;
+
+  /// No description provided for @psrchWrongType.
+  ///
+  /// In en, this message translates to:
+  /// **'This photo can\'t be used. Choose a JPEG or PNG photo.'**
+  String get psrchWrongType;
+
+  /// No description provided for @pfindCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Find by photo'**
+  String get pfindCamera;
+
+  /// No description provided for @pfindSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Find in your catalogue'**
+  String get pfindSheetTitle;
+
+  /// No description provided for @pfindSheetBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Photograph a product to see whether your shop already has it.'**
+  String get pfindSheetBody;
+
+  /// No description provided for @pfindInCatalogue.
+  ///
+  /// In en, this message translates to:
+  /// **'In your catalogue'**
+  String get pfindInCatalogue;
+
+  /// No description provided for @pfindMatchedByBarcode.
+  ///
+  /// In en, this message translates to:
+  /// **'Same barcode'**
+  String get pfindMatchedByBarcode;
+
+  /// No description provided for @pfindAddNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Add as a new product'**
+  String get pfindAddNew;
+
+  /// No description provided for @pfindNoMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Not in your catalogue yet'**
+  String get pfindNoMatch;
+
+  /// No description provided for @pfindLimitDay.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{You can look up 1 photo a day, and you\'ve used it. Try again tomorrow.} other{You can look up {count} photos a day, and you\'ve used them all. Try again tomorrow.}}'**
+  String pfindLimitDay(int count);
+
+  /// No description provided for @pfindSkuLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'SKU'**
+  String get pfindSkuLabel;
+
+  /// No description provided for @pfindSkuHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Your own code'**
+  String get pfindSkuHint;
+
+  /// No description provided for @pfindBarcodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Barcode'**
+  String get pfindBarcodeLabel;
+
+  /// No description provided for @pfindBarcodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Scanned at the till'**
+  String get pfindBarcodeHint;
+
+  /// No description provided for @pfindBlitzConsent.
+  ///
+  /// In en, this message translates to:
+  /// **'Your photos are sent to Anthropic, our AI provider, to recognise the products. We delete them within two days.'**
+  String get pfindBlitzConsent;
+
+  /// No description provided for @pfindAddBlank.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a product'**
+  String get pfindAddBlank;
+
+  /// No description provided for @pfindSampleNoPrefill.
+  ///
+  /// In en, this message translates to:
+  /// **'This reading is an example, so nothing is filled in for you. Only your own photo comes along.'**
+  String get pfindSampleNoPrefill;
+
+  /// No description provided for @pfindLimitPlatform.
+  ///
+  /// In en, this message translates to:
+  /// **'Finding products by photo is very busy today. Search your catalogue by name, or try again later.'**
+  String get pfindLimitPlatform;
+
+  /// No description provided for @psrchLeftToday.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No photo searches left today} =1{1 photo search left today} other{{count} photo searches left today}}'**
+  String psrchLeftToday(int count);
+
+  /// No description provided for @merchPublishNeedsPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Drop your shop\'s pin first — without it, nobody nearby can find you'**
+  String get merchPublishNeedsPin;
+
+  /// No description provided for @merchPublishNeedsHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Set your opening hours first — without them, your shop is never open'**
+  String get merchPublishNeedsHours;
+
+  /// No description provided for @merchPublishNotReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Not ready to publish yet'**
+  String get merchPublishNotReady;
+
+  /// No description provided for @merchPublishRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'Your shop is not ready to be listed yet'**
+  String get merchPublishRefused;
+
+  /// No description provided for @boShopPinColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'On the map'**
+  String get boShopPinColumn;
+
+  /// No description provided for @boShopPinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned'**
+  String get boShopPinned;
+
+  /// No description provided for @boShopNoPin.
+  ///
+  /// In en, this message translates to:
+  /// **'No pin'**
+  String get boShopNoPin;
+
+  /// No description provided for @boShopSetPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the pin'**
+  String get boShopSetPin;
+
+  /// No description provided for @boShopMovePin.
+  ///
+  /// In en, this message translates to:
+  /// **'Move the pin'**
+  String get boShopMovePin;
+
+  /// No description provided for @boShopPinSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin saved'**
+  String get boShopPinSaved;
+
+  /// No description provided for @boShopPinFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The pin could not be saved'**
+  String get boShopPinFailed;
+
+  /// No description provided for @boShopPinGone.
+  ///
+  /// In en, this message translates to:
+  /// **'That shop is no longer there'**
+  String get boShopPinGone;
+
+  /// No description provided for @boShopPinWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'A shop with no pin has no distance, no delivery circle and no place in \"near you\".'**
+  String get boShopPinWhy;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

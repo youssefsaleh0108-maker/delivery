@@ -13194,4 +13194,215 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get reconStatusAbandoned => 'متروك';
+
+  @override
+  String get psrchCamera => 'البحث بالصورة';
+
+  @override
+  String get psrchSheetTitle => 'البحث بالصورة';
+
+  @override
+  String get psrchSheetBody =>
+      'التقط أو اختر صورة لمنتج لترى المتاجر القريبة منك التي تبيعه.';
+
+  @override
+  String get psrchTakePhoto => 'التقط صورة';
+
+  @override
+  String get psrchChoosePhoto => 'اختر صورة';
+
+  @override
+  String get psrchConsent =>
+      'تُرسَل صورتك إلى Anthropic، مزوّد الذكاء الاصطناعي لدينا، للتعرّف على المنتج، ولا نحتفظ بها.';
+
+  @override
+  String get psrchLooking => 'نتعرّف على صورتك…';
+
+  @override
+  String psrchLooksLike(String name) {
+    return 'يبدو أنه: $name';
+  }
+
+  @override
+  String get psrchLooksLikeHint => 'ابحث بهذه الكلمات بدلًا من الصورة';
+
+  @override
+  String get psrchSimilar => 'لا تطابق تامًا — أصناف مشابهة';
+
+  @override
+  String get psrchNotAProduct =>
+      'لم نجد منتجًا في هذه الصورة. جرّب صورة أقرب للعبوة.';
+
+  @override
+  String psrchLimitDay(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'يمكنك البحث بالصورة $count مرة في اليوم، وقد استخدمتها كلها اليوم. ابحث بالاسم، أو حاول غدًا.',
+      many:
+          'يمكنك البحث بالصورة $count مرة في اليوم، وقد استخدمتها كلها اليوم. ابحث بالاسم، أو حاول غدًا.',
+      few:
+          'يمكنك البحث بالصورة $count مرات في اليوم، وقد استخدمتها كلها اليوم. ابحث بالاسم، أو حاول غدًا.',
+      two:
+          'يمكنك البحث بالصورة مرتين في اليوم، وقد استخدمتهما اليوم. ابحث بالاسم، أو حاول غدًا.',
+      one:
+          'يمكنك البحث بالصورة مرة واحدة في اليوم، وقد فعلت ذلك اليوم. ابحث بالاسم، أو حاول غدًا.',
+      zero: 'لا يمكنك البحث بالصورة اليوم. ابحث بالاسم، أو حاول غدًا.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get psrchLimitMinute =>
+      'صور كثيرة دفعة واحدة. انتظر دقيقة ثم حاول مجددًا.';
+
+  @override
+  String get psrchLimitPlatform =>
+      'البحث بالصورة مزدحم جدًا اليوم. ابحث بالاسم، أو حاول لاحقًا.';
+
+  @override
+  String get psrchBusy => 'كثيرون يبحثون بالصور الآن. حاول مجددًا بعد قليل.';
+
+  @override
+  String get psrchUnavailable =>
+      'البحث بالصورة غير متاح الآن. ابحث بالاسم بدلًا من ذلك.';
+
+  @override
+  String get psrchFailed => 'تعذّرت قراءة صورتك الآن. حاول مجددًا.';
+
+  @override
+  String get psrchRefused => 'لا يمكن البحث بهذه الصورة. جرّب صورة أخرى.';
+
+  @override
+  String get psrchUnreadable => 'تعذّر فتح هذه الصورة. جرّب صورة أخرى.';
+
+  @override
+  String get psrchTooLarge => 'هذه الصورة كبيرة جدًا. جرّب صورة أخرى.';
+
+  @override
+  String get psrchWrongType =>
+      'لا يمكن استخدام هذه الصورة. اختر صورة بصيغة JPEG أو PNG.';
+
+  @override
+  String get pfindCamera => 'البحث بالصورة';
+
+  @override
+  String get pfindSheetTitle => 'ابحث في كتالوجك';
+
+  @override
+  String get pfindSheetBody => 'صوّر منتجًا لترى إن كان موجودًا في متجرك.';
+
+  @override
+  String get pfindInCatalogue => 'في كتالوجك';
+
+  @override
+  String get pfindMatchedByBarcode => 'الباركود نفسه';
+
+  @override
+  String get pfindAddNew => 'أضفه كمنتج جديد';
+
+  @override
+  String get pfindNoMatch => 'غير موجود في كتالوجك بعد';
+
+  @override
+  String pfindLimitDay(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'يمكنك البحث بـ$count صورة في اليوم، وقد استخدمتها كلها. حاول غدًا.',
+      many:
+          'يمكنك البحث بـ$count صورة في اليوم، وقد استخدمتها كلها. حاول غدًا.',
+      few: 'يمكنك البحث بـ$count صور في اليوم، وقد استخدمتها كلها. حاول غدًا.',
+      two: 'يمكنك البحث بصورتين في اليوم، وقد استخدمتهما. حاول غدًا.',
+      one: 'يمكنك البحث بصورة واحدة في اليوم، وقد استخدمتها. حاول غدًا.',
+      zero: 'لا يمكنك البحث بالصورة اليوم. حاول غدًا.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get pfindSkuLabel => 'رمز المنتج (SKU)';
+
+  @override
+  String get pfindSkuHint => 'رمزك الخاص';
+
+  @override
+  String get pfindBarcodeLabel => 'الباركود';
+
+  @override
+  String get pfindBarcodeHint => 'يُمسح عند الصندوق';
+
+  @override
+  String get pfindBlitzConsent =>
+      'تُرسَل صورك إلى Anthropic، مزوّد الذكاء الاصطناعي لدينا، للتعرّف على المنتجات، ونحذفها خلال يومين.';
+
+  @override
+  String get pfindAddBlank => 'إضافة منتج';
+
+  @override
+  String get pfindSampleNoPrefill =>
+      'هذه القراءة مجرّد مثال، لذلك لا يُملأ لك أي حقل. تأتي معك صورتك وحدها.';
+
+  @override
+  String get pfindLimitPlatform =>
+      'البحث عن المنتجات بالصورة مزدحم جدًا اليوم. ابحث في كتالوجك بالاسم، أو حاول لاحقًا.';
+
+  @override
+  String psrchLeftToday(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'بقيت $count عملية بحث بالصورة اليوم',
+      many: 'بقيت $count عملية بحث بالصورة اليوم',
+      few: 'بقيت $count عمليات بحث بالصورة اليوم',
+      two: 'بقي بحثان بالصورة اليوم',
+      one: 'بقي بحث واحد بالصورة اليوم',
+      zero: 'لم يتبقَّ بحث بالصورة اليوم',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get merchPublishNeedsPin =>
+      'حدِّد موقع متجرك على الخريطة أولاً — بدونه لن يعثر عليك أحد من القريبين';
+
+  @override
+  String get merchPublishNeedsHours =>
+      'حدِّد ساعات العمل أولاً — بدونها لن يكون متجرك مفتوحاً أبداً';
+
+  @override
+  String get merchPublishNotReady => 'المتجر غير جاهز للنشر بعد';
+
+  @override
+  String get merchPublishRefused => 'متجرك غير جاهز لعرضه في المتجر بعد';
+
+  @override
+  String get boShopPinColumn => 'على الخريطة';
+
+  @override
+  String get boShopPinned => 'محدَّد';
+
+  @override
+  String get boShopNoPin => 'بلا موقع';
+
+  @override
+  String get boShopSetPin => 'تحديد الموقع';
+
+  @override
+  String get boShopMovePin => 'تغيير الموقع';
+
+  @override
+  String get boShopPinSaved => 'تم حفظ الموقع';
+
+  @override
+  String get boShopPinFailed => 'تعذَّر حفظ الموقع';
+
+  @override
+  String get boShopPinGone => 'لم يعد هذا المتجر موجوداً';
+
+  @override
+  String get boShopPinWhy =>
+      'المتجر بلا موقع على الخريطة ليست له مسافة ولا نطاق توصيل ولا مكان في «القريب منك».';
 }

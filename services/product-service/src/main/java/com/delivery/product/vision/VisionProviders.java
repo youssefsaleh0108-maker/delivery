@@ -4,6 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,5 +76,25 @@ public class VisionProviders {
             return byName.get(DEFAULT);
         }
         return provider;
+    }
+
+    /**
+     * The configured provider when it actually reads photos: selected, not {@value #DEFAULT}, and
+     * ready. Empty otherwise — and never the fake in its place, which is {@link #active}'s fallback.
+     *
+     * <p>For customer photo search, where a sample answer would be a lie with no label to carry it: a
+     * shopper who photographs a jar of tahini must not be shown shops selling Pepsi because nobody
+     * has provisioned a key. So until the owner switches real recognition on, the customer app is told
+     * there is no photo search at all ({@code GET /api/products/search/capabilities}) and the endpoint
+     * refuses. A name that matches no provider is empty here too: {@link #active} is the place that
+     * complains about it, once per scan, and this is asked every time Home opens.
+     */
+    public Optional<VisionProvider> real() {
+        String configured = environment.getProperty(PROPERTY, DEFAULT).trim().toUpperCase(Locale.ROOT);
+        VisionProvider provider = byName.get(configured);
+        if (provider == null || DEFAULT.equals(configured) || !provider.isReady()) {
+            return Optional.empty();
+        }
+        return Optional.of(provider);
     }
 }

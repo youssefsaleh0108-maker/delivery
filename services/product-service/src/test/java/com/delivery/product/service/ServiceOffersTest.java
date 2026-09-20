@@ -25,6 +25,7 @@ import org.springframework.mock.env.MockEnvironment;
 import com.delivery.platform.outbox.OutboxRecorder;
 import com.delivery.product.api.dto.CatalogDtos.ProductRequest;
 import com.delivery.product.api.dto.CatalogDtos.ServiceTermsRequest;
+import com.delivery.product.domain.TestPin;
 import com.delivery.product.domain.CategoryRepository;
 import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.domain.Product;
@@ -628,6 +629,7 @@ class ServiceOffersTest {
             store.replaceHours(java.util.Arrays.stream(DayOfWeek.values())
                     .map(day -> new StoreHours(day, LocalTime.MIDNIGHT, LocalTime.of(23, 59, 59)))
                     .toList());
+            TestPin.pinned(store);
             store.publish(Instant.parse("2026-09-01T09:00:00Z"));
             return shop(store);
         }

@@ -29,6 +29,12 @@ export 'src/stock_count_screen.dart';
 // seam is exported so a host (or a test) can stand in for the camera.
 export 'src/catalog_scan_review_screen.dart';
 export 'src/merchant_blitz_screen.dart';
+// Where every photo comes from — Blitz's shelves, a customer's search by photo, a merchant's find by
+// photo — so a host, or a test, can stand in for the camera and the gallery; and the sheet that asks
+// for one photo to read and says where it goes, shared by the customer's search and the merchant's find.
+export 'src/photo_find_sheet.dart';
+export 'src/photo_pick_sheet.dart';
+export 'src/photo_source.dart';
 // The shop's own daily series as a page. Exported as well as reachable from settings, so a host
 // with room for it in a rail can mount it directly instead of hiding it one tap into a menu.
 export 'src/merchant_analytics_screen.dart';

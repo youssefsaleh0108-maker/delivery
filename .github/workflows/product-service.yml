@@ -44,6 +44,10 @@ jobs:
   # ItemSearchDatabaseTest runs here too, for the same reason: the customer item search matches words
   # in SQL (V37's fold, pg_trgm and the trigram index), which no mock can check, and its Arabic matching
   # depends on this image's locale.
+  #
+  # PhotoSearchDatabaseTest too: the photo quota (V38) caps a paid vision call per account and across
+  # the platform under PostgreSQL advisory locks, and only a real database shows two photos sent at once
+  # cannot both take an account's last use.
   database-tests:
     runs-on: ubuntu-latest
     permissions:
@@ -77,17 +81,17 @@ jobs:
 
       # -am builds the platform libraries this module depends on, as the build job does. The test
       # filter matches nothing in them, which failIfNoSpecifiedTests=false allows.
-      - name: Storefront isolation, item search and delivery areas against PostGIS
+      - name: Storefront isolation, item search, delivery areas and the photo quota against PostGIS
         env:
           PRODUCT_TEST_DB_URL: jdbc:postgresql://localhost:5432/postgres
         run: >-
           mvn -B -U -pl services/product-service -am test
-          -Dtest=ServicesVerticalDatabaseTest,ItemSearchDatabaseTest,DeliveryAreaDatabaseTest
+          -Dtest=ServicesVerticalDatabaseTest,ItemSearchDatabaseTest,DeliveryAreaDatabaseTest,PhotoSearchDatabaseTest
           -Dsurefire.failIfNoSpecifiedTests=false
 
       - name: Fail if the database tests did not run
         run: |
-          for test in ServicesVerticalDatabaseTest ItemSearchDatabaseTest DeliveryAreaDatabaseTest; do
+          for test in ServicesVerticalDatabaseTest ItemSearchDatabaseTest DeliveryAreaDatabaseTest PhotoSearchDatabaseTest; do
             report=services/product-service/target/surefire-reports/TEST-com.delivery.product.domain.$test.xml
             if [ ! -f "$report" ]; then
               echo "::error::No report at $report, so the database tests did not run."

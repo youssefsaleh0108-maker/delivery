@@ -43,6 +43,7 @@ class MerchantShell extends StatefulWidget {
     super.key,
     required this.orderApi,
     required this.storeApi,
+    this.geocodingApi,
     required this.catalogApi,
     this.aggregatesApi,
     this.documentsApi,
@@ -141,6 +142,10 @@ class MerchantShell extends StatefulWidget {
   /// entry ([ServicesShopBootstrap]). Null skips that, which is where every shell stood before
   /// services existed.
   final OnboardingApi? onboardingApi;
+
+  /// Turns a typed address into a point for the shop pin picker. Optional: without it the picker
+  /// still works, the merchant just pans to their shop instead of typing where it is.
+  final GeocodingApi? geocodingApi;
 
   /// What the app already learned this session about the account's application, so a goods merchant
   /// is not asked about again on every entry ([ServicesProviderMemory]). Owned by the app rather than
@@ -480,6 +485,11 @@ class _MerchantShellState extends State<MerchantShell> {
           storeId: _storeId,
           onOpenAlerts: _openStockAlerts,
           catalogScanApi: _mayScan ? widget.catalogScanApi : null,
+          // The same rule as the scan: MERCHANT-only on the server, so an employee never meets a
+          // camera that would answer 403.
+          photoSource: _mayScan
+              ? const DeviceShelfPhotoSource(cameraMaxEdge: CatalogApi.photoFindMaxEdge)
+              : null,
         );
       case MerchantTab.orders:
         if (services) {
@@ -597,7 +607,11 @@ class _MerchantShellState extends State<MerchantShell> {
   void _openShopProfile() {
     final NavigatorState navigator = Navigator.of(context);
     navigator.push(MaterialPageRoute<void>(
-      builder: (_) => StoreScreen(api: widget.storeApi, onBack: navigator.pop),
+      builder: (_) => StoreScreen(
+        api: widget.storeApi,
+        geocoding: widget.geocodingApi,
+        onBack: navigator.pop,
+      ),
     ));
   }
 

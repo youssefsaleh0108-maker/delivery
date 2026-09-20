@@ -7,6 +7,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import 'merchant_blitz_screen.dart';
+import 'photo_find_sheet.dart';
+import 'photo_source.dart';
 import 'order_detail_screen.dart';
 import 'product_form_screen.dart';
 
@@ -44,6 +46,7 @@ class InventoryScreen extends StatefulWidget {
     this.onOpenAlerts,
     this.onOpenItem,
     this.catalogScanApi,
+    this.photoSource,
   });
 
   /// inventory-service. Null until the service ships, or wherever a host has none to hand — the
@@ -76,6 +79,12 @@ class InventoryScreen extends StatefulWidget {
   /// button that would answer 403. Here, rather than on the catalogue list, because this is the tab
   /// the phone's nav calls the shelves.
   final CatalogScanApi? catalogScanApi;
+
+  /// Find a product in this shop's catalogue by photo. Non-null draws a camera in the search box,
+  /// which opens the photo sheet; null draws none. Handed over by the host on the same rule as
+  /// [catalogScanApi]: the find is MERCHANT-only on the server, so an employee never sees a camera
+  /// that would answer 403.
+  final ShelfPhotoSource? photoSource;
 
   @override
   State<InventoryScreen> createState() => _InventoryScreenState();
@@ -313,6 +322,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
         builder: (_) => ProductFormScreen(
           api: widget.catalogApi,
           storeApi: widget.storeApi,
+          // These are this shop's shelves, so a product added from them belongs on them — not in
+          // whichever shop the server calls this merchant's first.
+          storeId: widget.storeId,
         ),
       ),
     );
@@ -431,6 +443,33 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
+  /// The camera beside the search box: a photo of a pack, then either the product the shop already
+  /// has or a new one started from what the reader read.
+  Future<void> _findByPhoto() async {
+    final ShelfPhotoSource? source = widget.photoSource;
+    if (source == null) return;
+    final PhotoFindChoice? choice = await findProductByPhoto(
+      context,
+      api: widget.catalogApi,
+      source: source,
+      storeId: widget.storeId,
+    );
+    if (choice == null || !mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (BuildContext _) => ProductFormScreen(
+        api: widget.catalogApi,
+        storeApi: widget.storeApi,
+        existing: choice.product,
+        prefill: choice.prefill,
+        // The shop the find was scoped to, so a new product is created where it was looked for.
+        storeId: widget.storeId,
+      ),
+    ));
+    if (!mounted) return;
+    // A product added or edited behind the sheet changes the shelf under it.
+    _startList();
+  }
+
   Widget _searchBand(DeliveryStrings t) {
     return Container(
       width: double.infinity,
@@ -442,6 +481,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
       child: YdSearchField(
         controller: _search,
         hintText: t.invSearch,
+        onCameraTap: widget.photoSource == null ? null : _findByPhoto,
+        cameraSemanticLabel: widget.photoSource == null ? null : t.pfindCamera,
         // Server-side: the query goes into the request, so it searches every page rather than the
         // twenty rows that happen to be loaded — which is the only way a SKU search is useful.
         onChanged: _onSearchChanged,

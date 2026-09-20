@@ -46,8 +46,48 @@ public interface VisionProvider {
      */
     List<Detection> detect(List<ShelfPhoto> photos, List<String> categoryNames);
 
+    /**
+     * One photo of one product in, what the product is out: photo search.
+     *
+     * <p>A different question from {@link #detect}. A shelf reading lists everything on a shelf and
+     * nothing on a photo that is not of shelves, so a product held in someone's hand comes back empty
+     * from it. This asks about the one product a shopper — or a shopkeeper finding it in their own
+     * catalogue — pointed the camera at, and for the words to search for it by, in English and Arabic.
+     *
+     * <p>A photo of no product at all is an answer ({@code isProduct} false), not a failure. A provider
+     * that could not be reached, or that declined, throws {@link VisionException}, as {@link #detect}
+     * does. Whatever comes back is untrusted: {@link Descriptions#sanitize} cleans it before anything
+     * reads it.
+     *
+     * @param photo the photo, already upright, shrunk and re-encoded as JPEG
+     */
+    ProductDescription describe(ProductPhoto photo);
+
     /** One shelf photo, as JPEG bytes. */
     record ShelfPhoto(byte[] jpeg) {
+    }
+
+    /**
+     * One photo of one product, as JPEG bytes. Held only for the length of one {@link #describe}
+     * call: nothing keeps it afterwards.
+     */
+    record ProductPhoto(byte[] jpeg) {
+    }
+
+    /**
+     * What a provider says a product photo shows, exactly as reported — before sanitising.
+     *
+     * @param isProduct  whether the photo shows a product a shop sells at all
+     * @param name       the product as a shopper would search for it, spelled as on the pack
+     * @param nameAr     its Arabic name, as printed or as a Lebanese shop would list it
+     * @param brand      as printed
+     * @param size       the pack size as printed, e.g. "1 L"
+     * @param keywords   generic words for what it is, in English and Arabic, most specific first
+     * @param barcode    the digits under the barcode, only when every one was legible
+     * @param confidence 0 to 1, the provider's own certainty about the name
+     */
+    record ProductDescription(boolean isProduct, String name, String nameAr, String brand, String size,
+                              List<String> keywords, String barcode, double confidence) {
     }
 
     /**

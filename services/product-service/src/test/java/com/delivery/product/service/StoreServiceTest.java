@@ -83,7 +83,7 @@ class StoreServiceTest {
                 mock(StoreFavoriteRepository.class), mock(ProductRepository.class),
                 mock(CategoryRepository.class), new ServiceCategories(new MockEnvironment()),
                 applications, Clock.fixed(Instant.parse("2026-09-13T10:00:00Z"), ZoneOffset.UTC),
-                Duration.ofHours(4));
+                Duration.ofHours(4), "Asia/Beirut");
         when(stores.save(any(Store.class))).thenAnswer(call -> call.getArgument(0));
         when(stores.findByMerchantIdOrderByCreatedAtDesc(MERCHANT)).thenReturn(List.of());
     }
@@ -193,13 +193,42 @@ class StoreServiceTest {
         }
 
         @Test
-        @DisplayName("for anybody else still opens the published restaurant it always did")
+        @DisplayName("for anybody else still opens the restaurant it always did")
         void a_shop_still_gets_its_restaurant() {
             Store provisioned = service.requireStoreFor(MERCHANT, FirstShop.RESTAURANT);
 
             assertThat(provisioned.getVertical()).isEqualTo(RESTAURANT);
             assertThat(provisioned.getName()).isEqualTo("My Store");
             verify(stores).save(provisioned);
+        }
+
+        /**
+         * It is no longer LISTED on the spot, and that is the price of the pin rule.
+         *
+         * <p>Nothing on this path has coordinates to give it: onboarding collects none for a
+         * merchant, and approval creates nothing in this service at all. It used to publish anyway,
+         * which is how dev ended up with live shops that no "near you" can find. The shop is opened
+         * with its week of hours and waits for one tap on My Shop, where the map picker and a
+         * Publish button that says what is missing now sit side by side.
+         */
+        @Test
+        @DisplayName("waits for a pin rather than listing a shop no map can find")
+        void the_provisioned_shop_is_not_listed_without_a_pin() {
+            Store provisioned = service.requireStoreFor(MERCHANT, FirstShop.RESTAURANT);
+
+            assertThat(provisioned.getStatus()).isEqualTo(Store.Status.DRAFT);
+            assertThat(provisioned.location()).isNull();
+            assertThat(provisioned.whyNotListable()).isEqualTo(Store.NotListable.NO_PIN);
+            // The hours are there, so the one thing between it and the storefront is the pin.
+            assertThat(provisioned.getHours()).hasSize(7);
+        }
+
+        @Test
+        @DisplayName("opens it in the platform's zone, not in UTC")
+        void the_provisioned_shop_is_in_the_platform_zone() {
+            Store provisioned = service.requireStoreFor(MERCHANT, FirstShop.RESTAURANT);
+
+            assertThat(provisioned.getTimezone()).isEqualTo("Asia/Beirut");
         }
 
         @ParameterizedTest
@@ -336,6 +365,67 @@ class StoreServiceTest {
             assertThat(service.open(MERCHANT, grill).created()).isTrue();
             verify(stores, times(2)).save(any(Store.class));
             verify(stores, never()).lockMerchantStores(anyString());
+        }
+    }
+
+    /**
+     * The calendar a shop is opened in.
+     *
+     * <p>{@code Store.timezone} was "UTC" because that is its field initialiser, not because anyone
+     * chose it, and no client sends a timezone — not the services bootstrap, not the merchant
+     * profile form. So every shop on the platform declared its hours in a zone three hours behind
+     * the one its shutters open in, and item search, the storefront lists and every other "hide what
+     * is closed" answer read them there.
+     */
+    @Nested
+    @DisplayName("the zone a new shop is opened in")
+    class PlatformZone {
+
+        @Test
+        @DisplayName("is the platform's own when the client sends none, which is every client today")
+        void a_shop_opens_in_the_platform_zone() {
+            StoreRequest grill = new StoreRequest("Beirut Grill", RESTAURANT, null, null, List.of(),
+                    null, null, null, null);
+
+            assertThat(service.open(MERCHANT, grill).view().store().getTimezone())
+                    .isEqualTo("Asia/Beirut");
+        }
+
+        @Test
+        @DisplayName("is the platform's own for a services shop the provider's app opens")
+        void a_services_shop_opens_in_the_platform_zone() {
+            StoreService.Opened opened =
+                    service.open(MERCHANT, servicesShop("Al Fakhry Press", PRINTING, "Mar Mikhael"));
+
+            assertThat(opened.view().store().getTimezone()).isEqualTo("Asia/Beirut");
+        }
+
+        /** A default, not a rule: a merchant who names a zone gets the zone they named. */
+        @Test
+        @DisplayName("gives way to a zone the merchant asked for")
+        void the_merchants_own_zone_wins() {
+            StoreRequest abroad = new StoreRequest("Dubai Grill", RESTAURANT, null, null, List.of(),
+                    "Asia/Dubai", null, null, null);
+
+            assertThat(service.open(MERCHANT, abroad).view().store().getTimezone())
+                    .isEqualTo("Asia/Dubai");
+        }
+
+        /**
+         * A typo in the setting fails at startup, naming the property. Left to degrade, it would
+         * land in {@code Store.zone()}'s fallback and open every shop in UTC again — silently, and
+         * with nothing anywhere saying why.
+         */
+        @Test
+        @DisplayName("a setting that is not a zone refuses to start, naming the property")
+        void a_bad_setting_fails_fast() {
+            assertThatThrownBy(() -> new StoreService(stores, mock(StoreOfferRepository.class),
+                    mock(StoreFavoriteRepository.class), mock(ProductRepository.class),
+                    mock(CategoryRepository.class), new ServiceCategories(new MockEnvironment()),
+                    applications, Clock.fixed(Instant.parse("2026-09-13T10:00:00Z"), ZoneOffset.UTC),
+                    Duration.ofHours(4), "Beirut/Lebanon"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("delivery.platform.zone");
         }
     }
 }

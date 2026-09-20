@@ -509,6 +509,31 @@ void main() {
     // On the scan already started for it, not a new one that would spend another of the day's.
     expect(api.calls, <String>['addPhoto image/jpeg']);
     expect(find.text(t.blitzPhotoCount(1, 6)), findsOneWidget);
+    // And a photo sent with no sheet in between is still a photo going to Anthropic, so the line
+    // that says so is on the screen the merchant comes back to.
+    expect(find.text(t.pfindBlitzConsent), findsOneWidget);
+  });
+
+  testWidgets('where a photo goes is said above the buttons on every pass, not only the first',
+      (WidgetTester tester) async {
+    final _FakeScanApi api = _FakeScanApi();
+    final DeliveryStrings t = await _pump(tester, _blitz(api));
+
+    expect(find.byType(PhotoConsentLine), findsOneWidget);
+    expect(find.text(t.pfindBlitzConsent), findsOneWidget);
+
+    await _choose(tester, t);
+
+    // One photo up, so the intro is gone and the buttons have moved — and the consent line is still
+    // there, above the two that would add a second photo. Photos 2..6 go to the same reader as the
+    // first, and this is the merchant's only chance to read that before they do.
+    expect(find.text(t.blitzPhotoCount(1, 6)), findsOneWidget);
+    expect(find.text(t.blitzIntroTitle), findsNothing);
+    expect(find.text(t.pfindBlitzConsent), findsOneWidget);
+    final double consent = tester.getBottomLeft(find.byType(PhotoConsentLine)).dy;
+    expect(consent, lessThanOrEqualTo(tester.getTopLeft(find.text(t.blitzTakePhoto)).dy));
+    expect(consent, lessThanOrEqualTo(tester.getTopLeft(find.text(t.blitzChoosePhotos)).dy));
+    expect(consent, lessThanOrEqualTo(tester.getTopLeft(find.text(t.blitzScanPhotos(1))).dy));
   });
 
   testWidgets('a camera photo tagged to be turned is drawn upright: the frame its tags are measured in',
