@@ -104,7 +104,7 @@ images:
   newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
 - name: ghcr.io/youssefsaleh0108-maker/transfer-service
   newName: ghcr.io/youssefsaleh0108-maker/transfer-service
-  newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
+  newTag: sha-dea77d63d7a82ea9dab60e6d437cc688164211ff
 - name: ghcr.io/youssefsaleh0108-maker/whatsapp-service
   newName: ghcr.io/youssefsaleh0108-maker/whatsapp-service
   newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
