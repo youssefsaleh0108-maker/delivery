@@ -348,6 +348,20 @@ final class ShopPageHtml {
      * <p>Five characters, including both quote marks, because these values go into attributes as
      * well as into text — {@code og:title} is an attribute, and a shop called {@code " onerror="}
      * would otherwise write its own markup into the head of a page the platform advertises.
+     *
+     * <p><strong>And the invisible characters are dropped, not escaped.</strong> Escaping keeps
+     * them: {@code &#x202E;} is still a right-to-left override when the browser draws it, and the
+     * attack it makes possible is not markup at all — a shop that puts one in its name reverses the
+     * text after it, so a price, an opening time or the name of another shop can be made to read
+     * backwards on a page the platform publishes under its own domain, and in the preview card of
+     * every chat it is pasted into. The same goes for a stray {@code  } or {@code },
+     * which nothing on a page means and which only confuse whatever reads it next. So the explicit
+     * bidi formatting characters go, the C0 controls and DEL go, and the three that are ordinary
+     * whitespace become a space — HTML would have collapsed them anyway.
+     *
+     * <p>Arabic is untouched by this: an Arabic name renders right-to-left from its own letters and
+     * the {@code dir} this page sets, never from a control character in the middle of a value.
+     * {@code U+200C} and {@code U+200D}, which Arabic and Persian spelling genuinely use, stay.
      */
     static String esc(String raw) {
         if (raw == null) {
@@ -362,9 +376,35 @@ final class ShopPageHtml {
                 case '>' -> out.append("&gt;");
                 case '"' -> out.append("&quot;");
                 case '\'' -> out.append("&#39;");
-                default -> out.append(c);
+                case '\t', '\n', '\r' -> out.append(' ');
+                default -> {
+                    if (!invisible(c)) {
+                        out.append(c);
+                    }
+                }
             }
         }
         return out.toString();
+    }
+
+    /**
+     * Characters a merchant's text is not allowed to carry onto the page.
+     *
+     * <ul>
+     *   <li>The C0 controls and DEL. Tab, newline and carriage return are handled above as the
+     *       whitespace they are; the rest are not text.
+     *   <li>{@code U+061C}, {@code U+200E}, {@code U+200F} — the bidi marks.
+     *   <li>{@code U+202A}–{@code U+202E} — embeddings and overrides, the Trojan Source ones.
+     *   <li>{@code U+2066}–{@code U+2069} — the isolates, which do the same thing with a scope.
+     *   <li>{@code U+FEFF} — a byte-order mark that wandered into a value, invisible and useless
+     *       in the middle of a name.
+     * </ul>
+     */
+    private static boolean invisible(char c) {
+        return c < 0x20 || c == 0x7F
+                || c == '؜' || c == '‎' || c == '‏'
+                || (c >= '‪' && c <= '‮')
+                || (c >= '⁦' && c <= '⁩')
+                || c == '﻿';
     }
 }
