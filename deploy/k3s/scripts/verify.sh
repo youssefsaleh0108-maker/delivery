@@ -245,6 +245,48 @@ grep -q 'add_header Cache-Control "no-cache"' ../../clients/website/nginx.conf \
   && ok "the site revalidates its unhashed HTML, JS and config.js (PT-11)" \
   || fail "clients/website/nginx.conf has no server-level Cache-Control: the site goes stale again"
 
+echo "== the realm a fresh import would build (PT-3, PT-7) =="
+# Greps rather than jq: jq is not assumed anywhere in this script, and every value below is alone
+# on its line in the realm file. These assert the FILE, which is what a fresh database imports; a
+# running environment is brought to the same place by `rotate-secrets.sh <ns> edge-identity`, and
+# that step re-checks every one of them against Keycloak itself.
+realm=base/assets/keycloak/realm-delivery-platform.json
+grep -q '"sslRequired": "external"' "$realm" \
+  && ok "sslRequired: external" \
+  || fail "sslRequired is not external: Keycloak would accept a plain-HTTP sign-in from outside"
+grep -q '"revokeRefreshToken": true' "$realm" && grep -q '"refreshTokenMaxReuse": 0' "$realm" \
+  && ok "refresh tokens rotate and cannot be reused" \
+  || fail "the realm does not rotate refresh tokens (revokeRefreshToken true, refreshTokenMaxReuse 0)"
+# The delivery-portal client, from its clientId line to the end of its object.
+portal=$(awk '/"clientId": "delivery-portal"/ {on=1} on {print} on && /^    },?$/ {exit}' "$realm")
+case "$portal" in
+  *'"directAccessGrantsEnabled": false'*) ok "delivery-portal has no password grant" ;;
+  *) fail "delivery-portal still allows the password grant: a phished password is a back-office session" ;;
+esac
+# Both lists have to be DECLARED. Leaving them out is not neutral — Keycloak then applies the
+# realm defaults, and offline_access is one of them, which is how the back office got a token
+# that never expires.
+case "$portal" in
+  *'"defaultClientScopes"'*'"optionalClientScopes"'*) ok "delivery-portal declares its own client scopes" ;;
+  *) fail "delivery-portal declares no client scopes, so the realm defaults apply and offline_access comes back" ;;
+esac
+case "$portal" in
+  *offline_access*) fail "delivery-portal still has the offline_access scope" ;;
+  *) ok "delivery-portal cannot ask for offline_access" ;;
+esac
+for pair in 'client.session.idle.timeout": "28800' 'client.session.max.lifespan": "86400'; do
+  case "$portal" in
+    *"$pair"*) ok "delivery-portal ${pair%%\"*}" ;;
+    *) fail "delivery-portal is missing $pair" ;;
+  esac
+done
+# The one client the scripts and the phones still sign in on directly.
+mobile=$(awk '/"clientId": "mobile-app"/ {on=1} on {print} on && /^    },?$/ {exit}' "$realm")
+case "$mobile" in
+  *'"directAccessGrantsEnabled": true'*) ok "mobile-app keeps the password grant the apps need" ;;
+  *) fail "mobile-app lost the password grant: the phone sign-in and every smoke script use it" ;;
+esac
+
 echo "== every YAML alias resolves =="
 # A ConfigMap's `data:` values are strings to Kubernetes, so a dangling `*alias` inside one is
 # waved through by kubectl and by kustomize and only fails when Prometheus or Grafana parses it —
