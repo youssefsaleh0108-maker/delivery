@@ -125,8 +125,14 @@ public class PhotoSearchService {
         Optional<ItemQuery> loose = queryOf(understood.keywords(), null);
         if (loose.isPresent()) {
             ItemSearchResult similar = itemSearch.search(loose.get(), centre, 0, size);
-            if (similar.page().getTotalElements() > 0 || found == null) {
-                return new PhotoSearchResult(understood, similar, true, loose.get(), reading.left());
+            boolean anySimilar = similar.page().getTotalElements() > 0;
+            if (anySimilar || found == null) {
+                // "No exact match, but here are similar items" only when there ARE items: over an
+                // empty page that line promises something the page does not have. An empty keyword
+                // answer, reached because the reading gave nothing exact to search for, is just an
+                // empty answer.
+                return new PhotoSearchResult(understood, similar, anySimilar, loose.get(),
+                        reading.left());
             }
         }
         return found == null

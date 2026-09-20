@@ -203,6 +203,26 @@ class PhotoSearchServiceTest {
         assertThat(found.nextQuery().barcode()).isEqualTo("5449000000996");
     }
 
+    /**
+     * A reading whose name, Arabic name and brand are all unsearchable — a one-letter name off a torn
+     * label — leaves only the keywords, and they find nothing either. The answer is empty, so it is not
+     * "no exact match, but here are similar items": that line promises items the page does not have.
+     */
+    @Test
+    @DisplayName("an empty keyword answer with nothing exact to fall back from is not called similar")
+    void an_empty_keyword_answer_is_not_similar() {
+        answer = new VisionProvider.ProductDescription(true, "P", "", "", "1 L",
+                List.of("cola", "soft drink"), "", 0.6);
+        when(itemSearch.search(any(), any(), anyInt(), anyInt())).thenReturn(result(0));
+
+        PhotoSearchResult found = service.search("customer-1", photo(), HAMRA, 10);
+
+        assertThat(found.result().page().getContent()).isEmpty();
+        assertThat(found.similar()).isFalse();
+        // The keywords are still what a next page would ask for, so paging is unchanged.
+        assertThat(found.nextQuery().terms()).containsExactly("cola", "soft drink");
+    }
+
     @Test
     @DisplayName("a photo of no product is an empty answer, still counted, and nothing is searched")
     void not_a_product_searches_nothing() {
