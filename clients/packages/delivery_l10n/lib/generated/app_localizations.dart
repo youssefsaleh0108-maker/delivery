@@ -22346,6 +22346,78 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Nothing has been paid yet — the rider collects each share at the door.'**
   String get custSharesAgreedAtDoor;
+
+  /// No description provided for @heatmapUnmetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What your neighbours could not find'**
+  String get heatmapUnmetTitle;
+
+  /// No description provided for @heatmapUnmetBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Words people searched for near your shop that came back with nothing, or only with shops far away.'**
+  String get heatmapUnmetBlurb;
+
+  /// No description provided for @heatmapUnmetThisWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'This week'**
+  String get heatmapUnmetThisWeek;
+
+  /// No description provided for @heatmapUnmetLastWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Last week'**
+  String get heatmapUnmetLastWeek;
+
+  /// Roughly how many searches asked for a word. Rounded by the server; never the exact number.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, other{about {count} searches}}'**
+  String heatmapUnmetAbout(int count);
+
+  /// No description provided for @heatmapUnmetNothingNearby.
+  ///
+  /// In en, this message translates to:
+  /// **'Nobody nearby sells it'**
+  String get heatmapUnmetNothingNearby;
+
+  /// The word was found, but only in shops further than the platform calls nearby.
+  ///
+  /// In en, this message translates to:
+  /// **'Nearest is over {km} km away'**
+  String heatmapUnmetOnlyFar(String km);
+
+  /// No description provided for @heatmapUnmetYouSell.
+  ///
+  /// In en, this message translates to:
+  /// **'You sell this already'**
+  String get heatmapUnmetYouSell;
+
+  /// No description provided for @heatmapUnmetQuietTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to report this week'**
+  String get heatmapUnmetQuietTitle;
+
+  /// The privacy floor: how many different searches a word needs before it is shown.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, other{A word appears once {count} different searches have asked for it around here in one week, so no single customer can be picked out.}}'**
+  String heatmapUnmetQuietMessage(int count);
+
+  /// No description provided for @heatmapUnmetCouldNotLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load searches right now'**
+  String get heatmapUnmetCouldNotLoad;
+
+  /// No description provided for @heatmapUnmetPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Counts are rounded, and nothing here says who searched.'**
+  String get heatmapUnmetPrivacy;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

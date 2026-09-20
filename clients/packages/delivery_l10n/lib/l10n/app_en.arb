@@ -6306,5 +6306,41 @@
   "boShopPinGone": "That shop is no longer there",
   "boShopPinWhy": "A shop with no pin has no distance, no delivery circle and no place in \"near you\".",
   "custAllSharesAgreed": "All Shares Agreed!",
-  "custSharesAgreedAtDoor": "Nothing has been paid yet — the rider collects each share at the door."
+  "custSharesAgreedAtDoor": "Nothing has been paid yet — the rider collects each share at the door.",
+  "heatmapUnmetTitle": "What your neighbours could not find",
+  "heatmapUnmetBlurb": "Words people searched for near your shop that came back with nothing, or only with shops far away.",
+  "heatmapUnmetThisWeek": "This week",
+  "heatmapUnmetLastWeek": "Last week",
+  "heatmapUnmetAbout": "{count, plural, other{about {count} searches}}",
+  "@heatmapUnmetAbout": {
+    "description": "Roughly how many searches asked for a word. Rounded by the server; never the exact number.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "heatmapUnmetNothingNearby": "Nobody nearby sells it",
+  "heatmapUnmetOnlyFar": "Nearest is over {km} km away",
+  "@heatmapUnmetOnlyFar": {
+    "description": "The word was found, but only in shops further than the platform calls nearby.",
+    "placeholders": {
+      "km": {
+        "type": "String"
+      }
+    }
+  },
+  "heatmapUnmetYouSell": "You sell this already",
+  "heatmapUnmetQuietTitle": "Nothing to report this week",
+  "heatmapUnmetQuietMessage": "{count, plural, other{A word appears once {count} different searches have asked for it around here in one week, so no single customer can be picked out.}}",
+  "@heatmapUnmetQuietMessage": {
+    "description": "The privacy floor: how many different searches a word needs before it is shown.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "heatmapUnmetCouldNotLoad": "Couldn't load searches right now",
+  "heatmapUnmetPrivacy": "Counts are rounded, and nothing here says who searched."
 }
