@@ -3978,5 +3978,8 @@
   "checkoutMapUnnamedShop": "متجر",
   "checkoutMapYourRider": "سائقك",
   "checkoutMapRiderMarkerLastSeen": "سائقك، آخر ظهور {ago}",
-  "checkoutMapShopPinStop": "{shop}، المحطة {number}"
+  "checkoutMapShopPinStop": "{shop}، المحطة {number}",
+  "merchRejectConfirmTitle": "رفض هذا الطلب؟",
+  "merchRejectConfirmBody": "سيُلغى طلب الزبون، ولا يمكن التراجع عن ذلك.",
+  "merchRejectReason": "السبب، لفريق الدعم (اختياري)"
 }

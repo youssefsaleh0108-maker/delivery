@@ -124,13 +124,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   Future<void> _act(DeliveryOrder order, OrderAction action) async {
+    // Reject sits beside Accept in this queue and cancels a customer's order for good, so it is
+    // asked for before anything is sent. Asked before the busy state, so a merchant who changes
+    // their mind leaves the row exactly as they found it.
+    String? reason;
+    if (action == OrderAction.cancel) {
+      reason = await confirmMerchantReject(context);
+      if (reason == null || !mounted) return;
+    }
     setState(() => _busyOrderId = order.id);
     final DeliveryStrings t = DeliveryStrings.of(context);
     try {
-      // Not translated: the reason is stored against the order and read by Backoffice staff and
-      // support, not shown back to the merchant who triggered it.
-      await widget.api.act(order.id, action,
-          reason: action == OrderAction.cancel ? 'Cancelled by merchant' : null);
+      await widget.api.act(order.id, action, reason: reason);
       await _refresh(silent: true);
     } on DioException catch (e) {
       if (!mounted) return;

@@ -12890,4 +12890,14 @@ class DeliveryStringsEn extends DeliveryStrings {
   String checkoutMapShopPinStop(String shop, int number) {
     return '$shop, stop $number';
   }
+
+  @override
+  String get merchRejectConfirmTitle => 'Reject this order?';
+
+  @override
+  String get merchRejectConfirmBody =>
+      'The customer\'s order is cancelled, and this can\'t be undone.';
+
+  @override
+  String get merchRejectReason => 'Why, for support (optional)';
 }

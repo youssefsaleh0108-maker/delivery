@@ -6202,5 +6202,8 @@
   "checkoutMapRiderMarkerLastSeen": "Your rider, last seen {ago}",
   "@checkoutMapRiderMarkerLastSeen": {"placeholders":{"ago":{"type":"String"}}},
   "checkoutMapShopPinStop": "{shop}, stop {number}",
-  "@checkoutMapShopPinStop": {"placeholders":{"shop":{"type":"String"},"number":{"type":"int"}}}
+  "@checkoutMapShopPinStop": {"placeholders":{"shop":{"type":"String"},"number":{"type":"int"}}},
+  "merchRejectConfirmTitle": "Reject this order?",
+  "merchRejectConfirmBody": "The customer's order is cancelled, and this can't be undone.",
+  "merchRejectReason": "Why, for support (optional)"
 }

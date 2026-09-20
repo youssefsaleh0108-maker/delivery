@@ -21776,6 +21776,24 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'{shop}, stop {number}'**
   String checkoutMapShopPinStop(String shop, int number);
+
+  /// No description provided for @merchRejectConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject this order?'**
+  String get merchRejectConfirmTitle;
+
+  /// No description provided for @merchRejectConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The customer\'s order is cancelled, and this can\'t be undone.'**
+  String get merchRejectConfirmBody;
+
+  /// No description provided for @merchRejectReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Why, for support (optional)'**
+  String get merchRejectReason;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

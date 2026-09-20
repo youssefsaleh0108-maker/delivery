@@ -296,35 +296,47 @@ class OrderApi {
   /// characters a reader sees, while the server counts UTF-16 code units, two or more for an emoji. A
   /// cut note loses its end; a refused one would lose the cancel. The cut never splits an emoji.
   Future<ServiceOrderActionResult> cancelNotCollected(String orderId, {String? note}) {
-    final String words = _fitNote(note?.trim() ?? '');
     return _serviceStep(() => _dio.post<dynamic>(
           '/api/orders/$orderId/cancel',
           data: <String, dynamic>{
-            'reason': words.isEmpty
-                ? DeliveryOrder.notCollectedCancelReason
-                : '${DeliveryOrder.notCollectedCancelReason}: $words',
+            'reason': cancelReasonWith(DeliveryOrder.notCollectedCancelReason, note),
           },
         ));
   }
 
-  /// The most of a shop's own words [cancelNotCollected] sends: the 500 characters Order Manager
-  /// takes for a cancel reason (`CancelRequest`), less the `NOT_COLLECTED: ` before them. A note
-  /// field's limit, so the shop sees where its words stop.
+  /// A cancel [marker] with the shop's own [note] after it, as Order Manager will take it.
+  ///
+  /// The marker alone when the shop wrote nothing, `MARKER: words` when it did, with the words cut
+  /// to what is left of a cancel reason after the marker — see [cancelNotCollected] for why the cut
+  /// happens here rather than at a text field's limit. Whoever reads the reason (Backoffice's order
+  /// list, support) sees the marker first either way, so a shop's words can never hide what kind of
+  /// cancel this was.
+  static String cancelReasonWith(String marker, String? note) {
+    final String words = _fitNote(note?.trim() ?? '', noteMaxLengthAfter(marker));
+    return words.isEmpty ? marker : '$marker: $words';
+  }
+
+  /// The most of a shop's own words [cancelReasonWith] keeps after [marker]: the 500 characters
+  /// Order Manager takes for a cancel reason, less the marker and its separator. A note field's
+  /// limit, so the shop sees where its words stop.
+  static int noteMaxLengthAfter(String marker) => cancelReasonMaxLength - '$marker: '.length;
+
+  /// The most of a shop's own words [cancelNotCollected] sends.
   static const int notCollectedNoteMaxLength =
-      _cancelReasonMaxLength - '${DeliveryOrder.notCollectedCancelReason}: '.length;
+      cancelReasonMaxLength - '${DeliveryOrder.notCollectedCancelReason}: '.length;
 
   /// The longest cancel reason Order Manager takes, in UTF-16 code units: `String.length`, in Dart
   /// and in Java alike.
-  static const int _cancelReasonMaxLength = 500;
+  static const int cancelReasonMaxLength = 500;
 
-  /// [words] as they fit after `NOT_COLLECTED: `: unchanged when they do, otherwise cut and ended
-  /// with an ellipsis — never between the two code units of one character.
-  static String _fitNote(String words) {
-    if (words.length <= notCollectedNoteMaxLength) {
+  /// [words] as they fit in [max] code units: unchanged when they do, otherwise cut and ended with
+  /// an ellipsis — never between the two code units of one character.
+  static String _fitNote(String words, int max) {
+    if (words.length <= max) {
       return words;
     }
     // One unit is the ellipsis's.
-    int end = notCollectedNoteMaxLength - 1;
+    int end = max - 1;
     final int last = words.codeUnitAt(end - 1);
     if (last >= 0xD800 && last <= 0xDBFF) {
       // The first half of a pair whose second half is past the cut: it goes with it.

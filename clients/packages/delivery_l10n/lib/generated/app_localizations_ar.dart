@@ -13048,4 +13048,14 @@ class DeliveryStringsAr extends DeliveryStrings {
   String checkoutMapShopPinStop(String shop, int number) {
     return '$shop، المحطة $number';
   }
+
+  @override
+  String get merchRejectConfirmTitle => 'رفض هذا الطلب؟';
+
+  @override
+  String get merchRejectConfirmBody =>
+      'سيُلغى طلب الزبون، ولا يمكن التراجع عن ذلك.';
+
+  @override
+  String get merchRejectReason => 'السبب، لفريق الدعم (اختياري)';
 }
