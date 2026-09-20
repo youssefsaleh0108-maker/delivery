@@ -83,8 +83,11 @@ DEST=$(cat /etc/rclone/dest)
 # a CI job this platform does not have yet (see README, "Backups"). Installed here from Alpine's
 # own repositories, pinned only by the image's Alpine version. If this fails the Job fails loudly,
 # which is the right outcome: no ping is sent and the dead-man alert fires.
-say "installing age and rclone"
-apk add --no-cache age rclone >/dev/null
+say "installing age, rclone and curl"
+# curl rather than BusyBox's wget for the dead-man ping below: BusyBox only speaks HTTPS through
+# ssl_client, and a dead-man switch that silently cannot reach its own URL is worse than not having
+# one — it is the alert that is supposed to fire when everything else is unreachable.
+apk add --no-cache age rclone curl >/dev/null
 
 mkdir -p "$WORK"
 cd "$WORK"
@@ -169,7 +172,9 @@ publish 1 "$(date -u +%s)" "$SIZE"
 # on the ABSENCE of this request. Optional, and silently skipped when unset — but then the only
 # thing watching backups is Prometheus, which is on the same box.
 if [ -s /etc/deadman/url ]; then
-  if wget -q -T 15 -O /dev/null "$(cat /etc/deadman/url)"; then
+  # The URL itself is a capability — anyone who has it can keep the switch alive — so it comes out
+  # of a file into curl's argument and is never echoed.
+  if curl -fsS -m 20 -o /dev/null "$(cat /etc/deadman/url)"; then
     say "dead-man ping sent"
   else
     # Deliberately not fatal: the backup IS uploaded and verified. A failed ping is a monitoring

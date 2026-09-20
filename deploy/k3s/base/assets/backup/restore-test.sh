@@ -78,9 +78,22 @@ if [ -s /etc/rclone/rclone.conf ] && [ -s /etc/rclone/dest ]; then
       || bad "the downloaded object is not an age file: the destination may be serving something else"
     # How old is the newest backup? An archive from six hours ago means the hourly job has been
     # failing for six hours and nothing said so.
-    age_h=$(( ( $(date -u +%s) - $(date -u -d "$(echo "$ARCHIVE" | sed -n 's/bundle-\(........\)T\(..\)\(..\)\(..\)Z.tar.age/\1 \2:\3:\4/p')" +%s 2>/dev/null || echo 0) ) / 3600 ))
-    if [ "$age_h" -ge 0 ] && [ "$age_h" -le 3 ]; then ok "it is ${age_h}h old"
-    else bad "the newest archive is ${age_h}h old; the hourly backup is not running"; fi
+    #
+    # The timestamp is in the name, and reading it back is the fiddly part: this image's `date` is
+    # BusyBox's, which parses a stamp with `-D <format>`, while GNU's uses `-d` and does not know
+    # `-D` at all. Both are tried, and a stamp neither can read is REPORTED AS A SKIP rather than
+    # as a failed backup — a date-parsing difference must not look like a missing archive.
+    stamp=$(printf '%s' "$ARCHIVE" | sed -n 's/^bundle-\(.*\)\.tar\.age$/\1/p')
+    taken=$(date -u -D '%Y%m%dT%H%M%SZ' -d "$stamp" +%s 2>/dev/null \
+            || date -u -d "$(printf '%s' "$stamp" | sed -n 's/^\(........\)T\(..\)\(..\)\(..\)Z$/\1 \2:\3:\4/p')" +%s 2>/dev/null \
+            || true)
+    if [ -n "$taken" ] && [ "$taken" -gt 0 ] 2>/dev/null; then
+      age_h=$(( ( $(date -u +%s) - taken ) / 3600 ))
+      if [ "$age_h" -ge 0 ] && [ "$age_h" -le 3 ]; then ok "it is ${age_h}h old"
+      else bad "the newest archive is ${age_h}h old; the hourly backup is not running"; fi
+    else
+      say "  (could not read a timestamp out of '$ARCHIVE'; its age is not checked)"
+    fi
     if [ -s /etc/age/restore-test.key ]; then
       if age -d -i /etc/age/restore-test.key bundle.tar.age > bundle.tar 2>/dev/null; then
         tar xf bundle.tar && MODE=full && ok "it decrypts and unpacks"

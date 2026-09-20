@@ -45,8 +45,8 @@ if [ -n "$missing" ]; then
 fi
 DEST=$(cat /etc/rclone/dest)
 
-say "installing rclone"
-apk add --no-cache rclone >/dev/null
+say "installing rclone and curl"
+apk add --no-cache rclone curl >/dev/null
 
 # The source remote is built entirely from environment variables, so MinIO's root credentials never
 # reach a file. rclone reads RCLONE_CONFIG_<REMOTE>_<OPTION> for a remote it was never told about.
@@ -83,7 +83,7 @@ rclone size "$DEST/$NS/minio" --json
 publish 1 "$(date -u +%s)"
 
 if [ -s /etc/deadman/minio-url ]; then
-  wget -q -T 15 -O /dev/null "$(cat /etc/deadman/minio-url)" \
+  curl -fsS -m 20 -o /dev/null "$(cat /etc/deadman/minio-url)" \
     && say "dead-man ping sent" \
     || say "WARNING: the dead-man ping did not go through; the sync itself completed"
 fi
