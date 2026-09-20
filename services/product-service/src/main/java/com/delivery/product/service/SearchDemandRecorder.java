@@ -48,6 +48,10 @@ import com.delivery.product.domain.SearchDemandSeenRepository;
  * customer has already had their answer. A demand feature is worth exactly nothing if it can slow or
  * break the search it watches, so it is built so that it cannot.
  *
+ * <p><strong>But a dropped row is said out loud</strong>, at WARN and with the running totals
+ * ({@link #warnAboutLoss}). This is the data the whole feature rests on, and losing a third of a
+ * week's searches looks exactly like a quiet week — which is the one thing nobody investigates.
+ *
  * <p><strong>Its own small pool, deliberately not a Spring {@code Executor} bean</strong>, for the
  * reason {@link CatalogScanAnalyzer} gives: declaring one would make Spring Boot's auto-configured
  * application task executor back off for the whole service. One thread — the work is an insert —
@@ -151,6 +155,10 @@ public class SearchDemandRecorder implements DisposableBean {
     /** How long a clean shutdown waits for the last flush before giving up on it. */
     private static final Duration SHUTDOWN_GRACE = Duration.ofSeconds(5);
 
+    /** How often loss is said out loud. Every line carries the totals, so one of them is enough. */
+    static final int WARN_EVERY_SECONDS = 60;
+    private static final Duration WARN_EVERY = Duration.ofSeconds(WARN_EVERY_SECONDS);
+
     private final SearchDemandLogRepository logs;
     private final SearchDemandSeenRepository seen;
     private final SeenKeys keys;
@@ -169,6 +177,9 @@ public class SearchDemandRecorder implements DisposableBean {
     private final AtomicLong failed = new AtomicLong();
     private final AtomicLong written = new AtomicLong();
     private final AtomicLong repeats = new AtomicLong();
+
+    /** When loss was last said out loud, so a database outage is one line a minute, not thousands. */
+    private final AtomicLong lastWarnedAt = new AtomicLong();
 
     /**
      * Rows waiting for a flush, and when the oldest of them arrived.
@@ -307,11 +318,13 @@ public class SearchDemandRecorder implements DisposableBean {
         } catch (RejectedExecutionException e) {
             // The queue is full, which means the database is behind. A dropped demand row costs a
             // fraction of one week's count; a blocked request thread costs a customer their search.
+            // Dropped, then — but said out loud, because this is the data the feature is built on.
             refused.incrementAndGet();
+            warnAboutLoss("the recorder's queue is full", 1, null);
         } catch (RuntimeException e) {
             // Nothing here may reach the caller. Whatever it was, the search has already answered.
             refused.incrementAndGet();
-            log.debug("Could not hand a search to the demand recorder", e);
+            warnAboutLoss("a search could not be handed to the recorder", 1, e);
         }
     }
 
@@ -337,7 +350,7 @@ public class SearchDemandRecorder implements DisposableBean {
             // Including Errors: this thread is the platform's, and letting one die would stop every
             // later recording without a word. The search it describes was answered long ago.
             failed.incrementAndGet();
-            log.debug("Could not record a search for the demand digest", e);
+            warnAboutLoss("a search could not be turned into a row", 1, e);
         }
     }
 
@@ -416,7 +429,33 @@ public class SearchDemandRecorder implements DisposableBean {
             written.addAndGet(rows.size());
         } catch (Throwable e) {
             failed.addAndGet(rows.size());
-            log.debug("Could not write {} buffered searches for the demand digest", rows.size(), e);
+            warnAboutLoss("a flush could not be written", rows.size(), e);
+        }
+    }
+
+    /**
+     * Says that demand rows were lost, at WARN, at most once a {@value #WARN_EVERY_SECONDS} seconds.
+     *
+     * <p>WARN because silent loss of the data this feature is built on is not acceptable: a week's
+     * numbers quietly missing a third of their searches looks exactly like a quiet week, and nobody
+     * would ever find out. Throttled because the ways rows are lost are the ways that lose many of
+     * them — a database down, a queue full — and a line per dropped search would bury the log at the
+     * moment somebody most needs to read it. Every line carries the running totals, so one of them
+     * is enough to see the size of what went.
+     */
+    private void warnAboutLoss(String why, long rows, Throwable cause) {
+        long now = clock.millis();
+        long last = lastWarnedAt.get();
+        if (now - last < WARN_EVERY.toMillis() || !lastWarnedAt.compareAndSet(last, now)) {
+            return;
+        }
+        String message = "Demand rows are being lost: {} ({}). Since start-up: {} written, "
+                + "{} dropped for a full queue, {} lost to failures. The weekly digest is built on "
+                + "these rows.";
+        if (cause == null) {
+            log.warn(message, rows, why, written.get(), refused.get(), failed.get());
+        } else {
+            log.warn(message, rows, why, written.get(), refused.get(), failed.get(), cause);
         }
     }
 
@@ -481,12 +520,16 @@ public class SearchDemandRecorder implements DisposableBean {
             // one flush, which is the price of not writing the sequence down.
             pool.execute(this::flush);
         } catch (RejectedExecutionException e) {
-            log.debug("The demand recorder could not be asked for a last flush");
+            log.warn("The demand recorder could not be asked for a last flush; {} buffered searches "
+                    + "are lost", counts().waiting());
         }
         pool.shutdown();
         try {
             if (!pool.awaitTermination(SHUTDOWN_GRACE.toSeconds(), TimeUnit.SECONDS)) {
                 pool.shutdownNow();
+                log.warn("The demand recorder did not finish its last flush within {}s; up to {} "
+                        + "buffered searches are lost", SHUTDOWN_GRACE.toSeconds(),
+                        counts().waiting());
             }
         } catch (InterruptedException e) {
             pool.shutdownNow();

@@ -15,6 +15,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -22,6 +23,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.util.unit.DataSize;
+
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 
 import com.delivery.product.api.dto.ItemSearchDtos.ItemSearchRequest;
 import com.delivery.product.domain.GeoPoint;
@@ -80,6 +86,7 @@ class SearchDemandRecordingTest {
     private ItemSearchController items;
     private PhotoSearchController photos;
     private Store shop;
+    private ListAppender<ILoggingEvent> recorderLog;
 
     @BeforeEach
     void setUp() {
@@ -112,6 +119,26 @@ class SearchDemandRecordingTest {
     @AfterEach
     void signOut() {
         SecurityContextHolder.clearContext();
+        if (recorderLog != null) {
+            ((Logger) LoggerFactory.getLogger(SearchDemandRecorder.class)).detachAppender(recorderLog);
+            recorderLog = null;
+        }
+    }
+
+    /** Starts listening to the recorder's own logger, and hands back what it says. */
+    private List<ILoggingEvent> capturingTheRecorder() {
+        recorderLog = new ListAppender<>();
+        recorderLog.start();
+        ((Logger) LoggerFactory.getLogger(SearchDemandRecorder.class)).addAppender(recorderLog);
+        return recorderLog.list;
+    }
+
+    /** The warnings that say rows went missing, if any did. */
+    private static List<ILoggingEvent> lostRowsWarning(List<ILoggingEvent> logged) {
+        return logged.stream()
+                .filter(event -> event.getLevel() == Level.WARN)
+                .filter(event -> event.getFormattedMessage().contains("Demand rows are being lost"))
+                .toList();
     }
 
     // ------------------------------------------------------------------- what is and is not recorded
@@ -244,30 +271,37 @@ class SearchDemandRecordingTest {
     }
 
     @Test
-    @DisplayName("a recorder with nowhere to put the work drops it, and the search never hears about it")
+    @DisplayName("a recorder with nowhere to put the work drops it, says so at WARN, and the search "
+            + "never hears about it")
     void a_full_queue_is_dropped_not_thrown() {
         Executor full = runnable -> {
             throw new RejectedExecutionException("queue full");
         };
         SearchDemandRecorder real = new SearchDemandRecorder(null, null, new com.delivery.product.service.SeenKeys(""), null,
                 null, java.time.Clock.systemUTC(), null, full, Duration.ZERO, 1, Duration.ZERO);
+        List<ILoggingEvent> logged = capturingTheRecorder();
 
         real.record(new Recording("a", "rice", null, 0, null, List.of(), null));
 
         assertThat(real.counts().refused()).isEqualTo(1);
         assertThat(real.counts().written()).isZero();
+        // At WARN, not DEBUG: losing the rows this feature is built on looks exactly like a quiet
+        // week, and a quiet week is what nobody investigates.
+        assertThat(lostRowsWarning(logged)).isNotEmpty();
     }
 
     @Test
-    @DisplayName("a write that fails is swallowed: the search it describes answered long ago")
+    @DisplayName("a write that fails is swallowed, and counted and said out loud")
     void a_failed_write_is_swallowed() {
         // No repository and no transaction manager: every write fails as hard as it can.
         SearchDemandRecorder real = new SearchDemandRecorder(null, null, new com.delivery.product.service.SeenKeys(""), null,
                 null, java.time.Clock.systemUTC(), null, Runnable::run, Duration.ZERO, 1, Duration.ZERO);
+        List<ILoggingEvent> logged = capturingTheRecorder();
 
         real.record(new Recording("a", "rice", null, 0, null, List.of(), null));
 
         assertThat(real.counts().failed()).isEqualTo(1);
+        assertThat(lostRowsWarning(logged)).isNotEmpty();
     }
 
     @Test
