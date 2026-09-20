@@ -36,7 +36,7 @@ import com.delivery.product.domain.StoreRepository;
  * answered with nothing or only with something far away, and a rounded count. No time finer than a
  * week, no distance, no direction, no customer, no session, and no way to ask for one term rather
  * than the list. Every row it serves has already cleared the floor of
- * {@value UnmetDemand#MIN_SEARCHES} distinct searches, because rows under the floor were never
+ * {@value UnmetDemand#MIN_PEOPLE} distinct people, because rows under the floor were never
  * written.
  *
  * <p>Terms the merchant already sells are marked rather than dropped. "You stock this and people
@@ -82,10 +82,11 @@ public class MerchantUnmetDemand {
      * @param areasAround     how many areas the shop's neighbourhood has at all. Zero means the
      *                        platform does not know where the shop is yet — a different thing to say
      *                        than "nothing went unanswered"
-     * @param minimumSearches the floor, so the screen can say why a quiet week is empty
+     * @param minimumPeople   the floor — different people, not searches — so the screen can say why
+     *                        a quiet week is empty
      * @param farMetres       what "too far" meant this week
      */
-    public record Report(UUID storeId, String region, int areasAround, int minimumSearches,
+    public record Report(UUID storeId, String region, int areasAround, int minimumPeople,
                          int farMetres, Week thisWeek, Week lastWeek) {
     }
 
@@ -100,7 +101,7 @@ public class MerchantUnmetDemand {
         Instant thisWeek = calendar.weekOf(clock.instant());
         Instant lastWeek = calendar.weekBefore(thisWeek);
         if (around.zones().isEmpty()) {
-            return new Report(store.getId(), around.region(), 0, UnmetDemand.MIN_SEARCHES,
+            return new Report(store.getId(), around.region(), 0, UnmetDemand.MIN_PEOPLE,
                     unmet.farMetres(), new Week(thisWeek, List.of()), new Week(lastWeek, List.of()));
         }
 
@@ -123,7 +124,7 @@ public class MerchantUnmetDemand {
         now.sort(BEST_FIRST);
         before.sort(BEST_FIRST);
         return new Report(store.getId(), around.region(), around.zones().size(),
-                UnmetDemand.MIN_SEARCHES, unmet.farMetres(),
+                UnmetDemand.MIN_PEOPLE, unmet.farMetres(),
                 new Week(thisWeek, List.copyOf(now)), new Week(lastWeek, List.copyOf(before)));
     }
 

@@ -93,7 +93,7 @@ Map<String, dynamic> _unmet({
       'storeId': 'store-1',
       'region': 'Beirut',
       'areasAround': areasAround,
-      'minimumSearches': 5,
+      'minimumPeople': 5,
       'farMetres': 2000,
       'thisWeek': <String, dynamic>{'weekStart': '2026-09-14T21:00:00Z', 'terms': thisWeek},
       'lastWeek': <String, dynamic>{'weekStart': '2026-09-07T21:00:00Z', 'terms': lastWeek},

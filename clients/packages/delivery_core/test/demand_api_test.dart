@@ -147,7 +147,7 @@ void main() {
         'storeId': 'store-1',
         'region': 'Beirut',
         'areasAround': 2,
-        'minimumSearches': 5,
+        'minimumPeople': 5,
         'farMetres': 2000,
         'thisWeek': <String, dynamic>{
           'weekStart': '2026-09-14T21:00:00Z',
@@ -176,7 +176,7 @@ void main() {
       expect(adapter.calls.single.queryParameters, isEmpty);
 
       expect(unmet.hasNeighbourhood, isTrue);
-      expect(unmet.minimumSearches, 5);
+      expect(unmet.minimumPeople, 5);
       expect(unmet.thisWeek.terms.single.term, 'حفاضات');
       expect(unmet.thisWeek.terms.single.kind, UnmetKind.none);
       expect(unmet.thisWeek.terms.single.about, 10);
@@ -202,7 +202,7 @@ void main() {
       expect(term.term, 'rice');
       // The floor and the distance fall back to what the server would have said, so a screen
       // built on an older response never explains the rule wrongly.
-      expect(unmet.minimumSearches, 5);
+      expect(unmet.minimumPeople, 5);
       expect(unmet.farMetres, 2000);
       expect(unmet.lastWeek.isEmpty, isTrue);
     });

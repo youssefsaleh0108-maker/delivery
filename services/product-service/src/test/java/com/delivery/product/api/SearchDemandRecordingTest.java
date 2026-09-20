@@ -227,8 +227,8 @@ class SearchDemandRecordingTest {
             thread.setDaemon(true);
             thread.start();
         };
-        SearchDemandRecorder real = new SearchDemandRecorder(null, null, java.time.Clock.systemUTC(),
-                null, slow, Duration.ZERO, 1, Duration.ZERO);
+        SearchDemandRecorder real = new SearchDemandRecorder(null, null, new com.delivery.product.service.SeenKeys(""), null,
+                null, java.time.Clock.systemUTC(), null, slow, Duration.ZERO, 1, Duration.ZERO);
         ItemSearchController controller = new ItemSearchController(itemSearch, storeService, catalog,
                 mock(ProductImageService.class), new ItemSearchThrottle(100, 1000), real);
         answering(new Searched("pepsi", 0, null, List.of()));
@@ -249,8 +249,8 @@ class SearchDemandRecordingTest {
         Executor full = runnable -> {
             throw new RejectedExecutionException("queue full");
         };
-        SearchDemandRecorder real = new SearchDemandRecorder(null, null, java.time.Clock.systemUTC(),
-                null, full, Duration.ZERO, 1, Duration.ZERO);
+        SearchDemandRecorder real = new SearchDemandRecorder(null, null, new com.delivery.product.service.SeenKeys(""), null,
+                null, java.time.Clock.systemUTC(), null, full, Duration.ZERO, 1, Duration.ZERO);
 
         real.record(new Recording("a", "rice", null, 0, null, List.of(), null));
 
@@ -262,8 +262,8 @@ class SearchDemandRecordingTest {
     @DisplayName("a write that fails is swallowed: the search it describes answered long ago")
     void a_failed_write_is_swallowed() {
         // No repository and no transaction manager: every write fails as hard as it can.
-        SearchDemandRecorder real = new SearchDemandRecorder(null, null, java.time.Clock.systemUTC(),
-                null, Runnable::run, Duration.ZERO, 1, Duration.ZERO);
+        SearchDemandRecorder real = new SearchDemandRecorder(null, null, new com.delivery.product.service.SeenKeys(""), null,
+                null, java.time.Clock.systemUTC(), null, Runnable::run, Duration.ZERO, 1, Duration.ZERO);
 
         real.record(new Recording("a", "rice", null, 0, null, List.of(), null));
 
@@ -273,8 +273,8 @@ class SearchDemandRecordingTest {
     @Test
     @DisplayName("a search with no words — a barcode on its own — has nothing to record")
     void a_wordless_search_is_not_recorded() {
-        SearchDemandRecorder real = new SearchDemandRecorder(null, null, java.time.Clock.systemUTC(),
-                null, Runnable::run, Duration.ZERO, 1, Duration.ZERO);
+        SearchDemandRecorder real = new SearchDemandRecorder(null, null, new com.delivery.product.service.SeenKeys(""), null,
+                null, java.time.Clock.systemUTC(), null, Runnable::run, Duration.ZERO, 1, Duration.ZERO);
 
         real.record(new Recording("a", "", null, 0, null, List.of(), null));
 

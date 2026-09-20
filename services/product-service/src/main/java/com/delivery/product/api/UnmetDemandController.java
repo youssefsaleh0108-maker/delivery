@@ -53,8 +53,8 @@ public class UnmetDemandController {
      *
      * <p>Empty lists are the ordinary answer for a quiet week, and the response says why: it carries
      * {@code areasAround} (zero when the platform does not know where the shop is) and
-     * {@code minimumSearches} (the floor a term must clear before anybody is told about it), so the
-     * screen can tell a merchant which of the two silences they are looking at.
+     * {@code minimumPeople} (the floor of distinct people a term must clear before anybody is
+     * told about it), so the screen can tell a merchant which of the two silences they are in.
      */
     @GetMapping("/unmet/{storeId}")
     @PreAuthorize("hasAnyRole('MERCHANT','BACKOFFICE')")

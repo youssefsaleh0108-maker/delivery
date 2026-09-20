@@ -41,6 +41,7 @@ import com.delivery.product.service.CoarseAreas;
 import com.delivery.product.service.DemandWeeks;
 import com.delivery.product.service.SearchDemandRecorder;
 import com.delivery.product.service.SearchDemandRecorder.Recording;
+import com.delivery.product.service.SeenKeys;
 import com.delivery.product.service.UnmetDemand;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -92,6 +93,7 @@ class SearchDemandDatabaseTest {
     private EntityManagerFactory entityManagerFactory;
     private TransactionTemplate tx;
     private SearchDemandLogRepository logs;
+    private SearchDemandSeenRepository seen;
     private SearchDemandWeekRepository weeks;
     private SearchDemandDigestRepository digests;
     private DeliveryZoneRepository zones;
@@ -100,6 +102,9 @@ class SearchDemandDatabaseTest {
     private UnmetDemand unmet;
     private CoarseAreas areas;
     private final DemandWeeks calendar = new DemandWeeks(BEIRUT);
+
+    /** A secret as the environment hands one over. Nothing like it is ever in the repository. */
+    private final SeenKeys keys = new SeenKeys("database-test-secret-not-a-real-one");
 
     private UUID hamra;
     private UUID achrafieh;
@@ -136,6 +141,7 @@ class SearchDemandDatabaseTest {
         EntityManager shared = SharedEntityManagerCreator.createSharedEntityManager(entityManagerFactory);
         JpaRepositoryFactory repositories = new JpaRepositoryFactory(shared);
         logs = repositories.getRepository(SearchDemandLogRepository.class);
+        seen = repositories.getRepository(SearchDemandSeenRepository.class);
         weeks = repositories.getRepository(SearchDemandWeekRepository.class);
         digests = repositories.getRepository(SearchDemandDigestRepository.class);
         zones = repositories.getRepository(DeliveryZoneRepository.class);
@@ -149,14 +155,15 @@ class SearchDemandDatabaseTest {
         });
 
         areas = new CoarseAreas(zones, Clock.fixed(NOW, ZoneOffset.UTC), 3_000);
-        unmet = new UnmetDemand(logs, weeks, digests, calendar, Clock.fixed(NOW, ZoneOffset.UTC),
-                2_000, 10, 90);
+        unmet = new UnmetDemand(logs, seen, weeks, digests, keys, calendar,
+                Clock.fixed(NOW, ZoneOffset.UTC), 2_000, 10, 90);
     }
 
     @BeforeEach
     void emptyTheTables() {
         tx.executeWithoutResult(status -> {
             logs.deleteAllInBatch();
+            seen.deleteAllInBatch();
             weeks.deleteAllInBatch();
             digests.deleteAllInBatch();
         });
@@ -382,6 +389,142 @@ class SearchDemandDatabaseTest {
         assertThat(weeks.count()).isEqualTo(1);
     }
 
+    // ----------------------------------------------------------------- the floor counts people
+
+    /**
+     * The hole the review found, as a test. The in-memory repeat window collapses a burst, not a
+     * week, so one household looking for the same thing on five evenings was five rows — and a floor
+     * of five rows is a floor one household clears alone. Five searches, five days, one account:
+     * nothing is published.
+     */
+    @Test
+    @DisplayName("one account searching five times across five days publishes nothing")
+    void one_household_cannot_clear_the_floor_alone() {
+        Instant week = calendar.weekOf(NOW);
+        Instant monday = Instant.parse("2026-09-14T09:00:00Z");
+        for (int day = 0; day < 5; day++) {
+            Instant when = monday.plus(Duration.ofDays(day));
+            // A different day each time, so the recorder's repeat window collapses none of them.
+            recorder(Duration.ofMinutes(30), 1, when, keys)
+                    .record(new Recording("one-account", "insulin glargine", HAMRA, 0, null,
+                            List.of(), null));
+        }
+
+        // Five searches really were recorded: it is the floor that refuses them, not the log.
+        assertThat(logs.count()).isEqualTo(5);
+        assertThat(seen.count()).isEqualTo(1);
+
+        tx.executeWithoutResult(status -> unmet.rollUp(week));
+        assertThat(weeks.findAll()).isEmpty();
+    }
+
+    /** And the other half: five different people asking once each is a market signal. */
+    @Test
+    @DisplayName("five accounts asking once each publishes the term")
+    void five_people_clear_the_floor() {
+        Instant week = calendar.weekOf(NOW);
+        Instant monday = Instant.parse("2026-09-14T09:00:00Z");
+        for (int person = 0; person < 5; person++) {
+            recorder(Duration.ofMinutes(30), 1, monday, keys)
+                    .record(new Recording("account-" + person, "insulin glargine", HAMRA, 0, null,
+                            List.of(), null));
+        }
+
+        assertThat(seen.count()).isEqualTo(5);
+
+        tx.executeWithoutResult(status -> unmet.rollUp(week));
+        assertThat(weeks.findAll()).singleElement().satisfies(row -> {
+            assertThat(row.getTerm()).isEqualTo("insulin glargine");
+            assertThat(row.getSearches()).isEqualTo(5);
+        });
+    }
+
+    /**
+     * A merchant's four searches of their own no longer buy them a neighbour's fifth: four people is
+     * four people whoever they are, and the fifth term stays unpublished.
+     */
+    @Test
+    @DisplayName("four searches of a merchant's own do not publish a neighbour's search")
+    void a_merchant_cannot_buy_a_neighbours_term() {
+        Instant week = calendar.weekOf(NOW);
+        Instant monday = Instant.parse("2026-09-14T09:00:00Z");
+        for (int i = 0; i < 4; i++) {
+            recorder(Duration.ZERO, 1, monday.plus(Duration.ofHours(i)), keys)
+                    .record(new Recording("the-merchant", "methadone", HAMRA, 0, null, List.of(),
+                            null));
+        }
+        recorder(Duration.ZERO, 1, monday.plus(Duration.ofHours(5)), keys)
+                .record(new Recording("the-neighbour", "methadone", HAMRA, 0, null, List.of(), null));
+
+        assertThat(logs.count()).isEqualTo(5);
+        assertThat(seen.count()).isEqualTo(2);
+
+        tx.executeWithoutResult(status -> unmet.rollUp(week));
+        assertThat(weeks.findAll()).isEmpty();
+    }
+
+    /**
+     * What the marker is, and what it is not. It is not the account, it is not the same value for
+     * the same person's next term, and it is the same value when that person asks again — which is
+     * the only property the count needs.
+     */
+    @Test
+    @DisplayName("a seen marker is not an account, and does not follow a person from term to term")
+    void the_marker_says_nothing_about_who() throws SQLException {
+        assertThat(columnsOf("search_demand_seen")).containsExactlyInAnyOrder(
+                "seen_key", "key_id", "week_start", "area_id", "term", "created_at");
+        assertThat(columnsOf("search_demand_seen"))
+                .doesNotContain("account_id", "customer_id", "user_id", "session_id", "device_id");
+
+        Instant week = calendar.weekOf(NOW);
+        String nappies = keys.keyFor("account-1", hamra, "حفاضات", week).orElseThrow();
+        String rice = keys.keyFor("account-1", hamra, "رز", week).orElseThrow();
+        String elsewhere = keys.keyFor("account-1", achrafieh, "حفاضات", week).orElseThrow();
+        String lastWeek = keys.keyFor("account-1", hamra, "حفاضات", calendar.weekBefore(week))
+                .orElseThrow();
+        String somebodyElse = keys.keyFor("account-2", hamra, "حفاضات", week).orElseThrow();
+
+        // The same question asked twice is the same marker: that is what makes five rows five people.
+        assertThat(keys.keyFor("account-1", hamra, "حفاضات", week)).contains(nappies);
+        // Everything else about it differs, so nothing here can be joined into "this person's week".
+        assertThat(List.of(rice, elsewhere, lastWeek, somebodyElse)).doesNotContain(nappies);
+        assertThat(nappies).doesNotContain("account-1").hasSize(64);
+    }
+
+    /** With no secret there is nothing to count people by, so nothing is computed at all. */
+    @Test
+    @DisplayName("with no secret, a week is not rolled up rather than rolled up on a weak floor")
+    void no_secret_means_no_roll_up() {
+        Instant week = calendar.weekOf(NOW);
+        searches(hamra, "حفاضات", 9, 0, null);
+        UnmetDemand unkeyed = new UnmetDemand(logs, seen, weeks, digests, new SeenKeys(""), calendar,
+                Clock.fixed(NOW, ZoneOffset.UTC), 2_000, 10, 90);
+
+        int rolledWithoutASecret = tx.execute(status -> unkeyed.rollUp(week));
+        assertThat(rolledWithoutASecret).isZero();
+        assertThat(weeks.findAll()).isEmpty();
+
+        // The same week, with the secret in place, is published — so it was the secret that decided.
+        tx.executeWithoutResult(status -> unmet.rollUp(week));
+        assertThat(weeks.findAll()).hasSize(1);
+    }
+
+    /** A rotated secret starts the count again rather than counting the same person twice. */
+    @Test
+    @DisplayName("a rotated secret reads as nobody having asked yet")
+    void a_rotated_secret_does_not_double_count() {
+        Instant week = calendar.weekOf(NOW);
+        searches(hamra, "حفاضات", 9, 0, null);
+        SeenKeys rotated = new SeenKeys("database-test-secret-AFTER-the-rotation");
+        UnmetDemand afterRotation = new UnmetDemand(logs, seen, weeks, digests, rotated, calendar,
+                Clock.fixed(NOW, ZoneOffset.UTC), 2_000, 10, 90);
+
+        assertThat(rotated.keyId()).isNotEqualTo(keys.keyId());
+        int rolledAfterRotation = tx.execute(status -> afterRotation.rollUp(week));
+        assertThat(rolledAfterRotation).isZero();
+        assertThat(weeks.findAll()).isEmpty();
+    }
+
     // --------------------------------------------------------------------------------- retention
 
     @Test
@@ -392,10 +535,34 @@ class SearchDemandDatabaseTest {
         searches(hamra, "قديم", 3, 0, null, old);
         searches(hamra, "جديد", 3, 0, null, justInside);
 
-        int gone = tx.execute(status -> unmet.forgetOldSearches());
+        tx.executeWithoutResult(status -> unmet.forgetOldSearches());
 
-        assertThat(gone).isEqualTo(3);
         assertThat(logs.findAll()).extracting(SearchDemandLog::getTerm).containsOnly("جديد");
+    }
+
+    /**
+     * The seen markers are the only rows in this feature with a per-person value in them, even an
+     * unreadable one, so they go first: they bound one week's floor, and the roll-up never looks
+     * further back than last week.
+     */
+    @Test
+    @DisplayName("seen markers are kept for this week and last, and no longer")
+    void seen_markers_do_not_outlive_the_week_they_bound() {
+        Instant thisWeek = calendar.weekOf(NOW);
+        Instant lastWeek = calendar.weekBefore(thisWeek);
+        Instant theWeekBefore = calendar.weekBefore(lastWeek);
+        searches(hamra, "هذا-الأسبوع", 3, 0, null, NOW);
+        searches(hamra, "الأسبوع-الماضي", 3, 0, null, lastWeek.plus(Duration.ofDays(1)));
+        searches(hamra, "قبل-ذلك", 3, 0, null, theWeekBefore.plus(Duration.ofDays(1)));
+        assertThat(seen.count()).isEqualTo(9);
+
+        tx.executeWithoutResult(status -> unmet.forgetOldSearches());
+
+        // The searches themselves are all inside ninety days and stay; only the markers expire.
+        assertThat(logs.count()).isEqualTo(9);
+        assertThat(seen.count()).isEqualTo(6);
+        assertThat(seen.findAll()).extracting(SearchDemandSeen::getWeekStart)
+                .containsOnly(thisWeek, lastWeek);
     }
 
     // ------------------------------------------------------------------- what the merchant sells
@@ -455,17 +622,31 @@ class SearchDemandDatabaseTest {
     }
 
     private SearchDemandRecorder recorder(Duration repeatWindow, int flushRows) {
-        // Inline, so the assertion that follows sees the row. The pool is the production path and is
-        // covered where it matters: that record() returns before the write happens.
-        return new SearchDemandRecorder(logs, areas, Clock.fixed(NOW, ZoneOffset.UTC),
-                transactionManager(), Runnable::run, repeatWindow, flushRows, Duration.ofMinutes(10));
+        return recorder(repeatWindow, flushRows, NOW, keys);
+    }
+
+    /**
+     * Inline, so the assertion that follows sees the row. The pool is the production path and is
+     * covered where it matters: that record() returns before the write happens.
+     */
+    private SearchDemandRecorder recorder(Duration repeatWindow, int flushRows, Instant now,
+                                          SeenKeys secret) {
+        return new SearchDemandRecorder(logs, seen, secret, calendar, areas,
+                Clock.fixed(now, ZoneOffset.UTC), transactionManager(), Runnable::run, repeatWindow,
+                flushRows, Duration.ofMinutes(10));
     }
 
     private void searches(UUID area, String term, int howMany, int results, Integer nearest) {
         searches(area, term, howMany, results, nearest, NOW);
     }
 
-    /** Rows written straight, so the test says how many distinct searches there were. */
+    /**
+     * One search each from {@code howMany} different people: the rows a week's count is made of, and
+     * the markers its floor is counted from.
+     *
+     * <p>Written straight rather than through the recorder, so a test can say exactly how many
+     * people and how many searches there were — which is the distinction the floor turns on.
+     */
     private void searches(UUID area, String term, int howMany, int results, Integer nearest,
                           Instant at) {
         tx.executeWithoutResult(status -> {
@@ -475,7 +656,17 @@ class SearchDemandDatabaseTest {
                         nearest == null ? null : nearest.doubleValue(), null));
             }
             logs.saveAll(rows);
+            for (int i = 0; i < howMany; i++) {
+                asked("person-" + i, area, term, at);
+            }
         });
+    }
+
+    /** "This person asked for this term, in this area, in this week" — the row the floor counts. */
+    private void asked(String accountId, UUID area, String term, Instant at) {
+        Instant week = calendar.weekOf(SearchDemandLog.at(at));
+        keys.keyFor(accountId, area, term, week)
+                .ifPresent(key -> seen.remember(key, keys.keyId(), week, area, term, at));
     }
 
     private SearchDemandWeek row(Instant week, String term) {

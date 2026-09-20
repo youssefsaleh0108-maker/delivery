@@ -22401,10 +22401,10 @@ abstract class DeliveryStrings {
   /// **'Nothing to report this week'**
   String get heatmapUnmetQuietTitle;
 
-  /// The privacy floor: how many different searches a word needs before it is shown.
+  /// The privacy floor: how many different people must ask for a word before it is shown.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, other{A word appears once {count} different searches have asked for it around here in one week, so no single customer can be picked out.}}'**
+  /// **'{count, plural, other{A word appears once {count} different people have asked for it around here in one week, so no single household can be picked out.}}'**
   String heatmapUnmetQuietMessage(int count);
 
   /// No description provided for @heatmapUnmetCouldNotLoad.

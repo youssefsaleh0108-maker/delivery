@@ -58,6 +58,12 @@ class DemandDigestTest {
     private static final Instant NOW = Instant.parse("2026-09-21T09:00:00Z");
     private static final Instant WEEK = new DemandWeeks(ZoneId.of("Asia/Beirut")).weekOf(NOW);
 
+    /** A secret as an environment would hand one over. Never a value from the repository in real life. */
+    private static final SeenKeys SECRET = new SeenKeys("digest-test-secret-not-a-real-one");
+
+    /** What an environment that has not been given the secret yet has. */
+    private static final SeenKeys NO_SECRET = new SeenKeys("");
+
     private StoreRepository stores;
     private MerchantUnmetDemand unmet;
     private SearchDemandDigestRepository digests;
@@ -86,7 +92,7 @@ class DemandDigestTest {
             return true;
         });
 
-        service = new DemandDigestService(stores, unmet, digests, claim,
+        service = new DemandDigestService(stores, unmet, digests, claim, SECRET,
                 new DemandWeeks(ZoneId.of("Asia/Beirut")), Clock.fixed(NOW, ZoneOffset.UTC), true);
     }
 
@@ -156,13 +162,32 @@ class DemandDigestTest {
     @Test
     @DisplayName("switched off, nothing is claimed and nothing is sent")
     void switched_off_sends_nothing() {
-        DemandDigestService off = new DemandDigestService(stores, unmet, digests, claim,
+        DemandDigestService off = new DemandDigestService(stores, unmet, digests, claim, SECRET,
                 new DemandWeeks(ZoneId.of("Asia/Beirut")), Clock.fixed(NOW, ZoneOffset.UTC), false);
         live("merchant-a", 1);
         wanted("merchant-a", terms("حفاضات"));
 
         assertThat(off.sendFor(WEEK)).isZero();
         verify(claim, never()).claimAndRaise(any(), anyString(), any(), anyList());
+    }
+
+    /**
+     * The floor counts distinct people, and without the secret there is nothing to count them with.
+     * Fail closed: no message, rather than a message resting on a floor that is not being applied.
+     */
+    @Test
+    @DisplayName("with no secret to count people by, nothing is claimed and nothing is sent")
+    void no_secret_sends_nothing() {
+        DemandDigestService unkeyed = new DemandDigestService(stores, unmet, digests, claim,
+                NO_SECRET, new DemandWeeks(ZoneId.of("Asia/Beirut")),
+                Clock.fixed(NOW, ZoneOffset.UTC), true);
+        live("merchant-a", 1);
+        wanted("merchant-a", terms("حفاضات"));
+
+        assertThat(unkeyed.sendFor(WEEK)).isZero();
+        verify(claim, never()).claimAndRaise(any(), anyString(), any(), anyList());
+        // And nothing was even worked out for them: the run stops before the shops are walked.
+        verify(unmet, never()).topFor(anyString(), anyList(), any(), anyInt());
     }
 
     @Test

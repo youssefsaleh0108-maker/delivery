@@ -47,7 +47,7 @@ const double _areaZoom = 14;
 /// need to be told what is selling; they need to be told what people wanted and nobody had.
 ///
 /// It answers the way the density half does. A word appears only once at least
-/// [UnmetDemand.minimumSearches] different searches asked for it in a week — one person's shopping
+/// [UnmetDemand.minimumPeople] different people asked for it in a week — one household's shopping
 /// list is not a market signal, and the floor is what keeps this from being surveillance — and the
 /// number beside it is rounded ("about 10"), never the count. Weekly, because the floor needs a week
 /// to be reached honestly; this week and last, so a merchant can see a word arrive.
@@ -482,7 +482,7 @@ class _DemandRadarScreenState extends State<DemandRadarScreen> with WidgetsBindi
           child: _CardNotice(
             icon: Icons.search_off_rounded,
             title: t.heatmapUnmetQuietTitle,
-            message: t.heatmapUnmetQuietMessage(unmet.minimumSearches),
+            message: t.heatmapUnmetQuietMessage(unmet.minimumPeople),
           ),
         )
       else ...<Widget>[

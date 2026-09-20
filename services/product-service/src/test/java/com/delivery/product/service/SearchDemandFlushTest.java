@@ -17,6 +17,7 @@ import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import com.delivery.product.domain.SearchDemandLog;
 import com.delivery.product.domain.SearchDemandLogRepository;
+import com.delivery.product.domain.SearchDemandSeenRepository;
 import com.delivery.product.service.SearchDemandRecorder.Recording;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -138,10 +139,18 @@ class SearchDemandFlushTest {
 
     // ------------------------------------------------------------------------------------ helpers
 
-    /** A recorder writing into {@code recorded}, inline, with no area register to ask. */
+    /**
+     * A recorder writing into {@code recorded}, inline, with no area register to ask.
+     *
+     * <p>No area means no "somebody asked" row either, which is what this test wants: the order rows
+     * are written in is the whole subject here, and {@code SearchDemandDatabaseTest} is where the
+     * floor's own table is exercised.
+     */
     private static SearchDemandRecorder recorder(Recorded recorded, Clock clock, int flushRows,
                                                  Duration flushAfter) {
-        return new SearchDemandRecorder(recorded.repository(), mock(CoarseAreas.class), clock,
+        return new SearchDemandRecorder(recorded.repository(),
+                mock(SearchDemandSeenRepository.class), new SeenKeys("flush-test-secret-not-a-real-one"),
+                new DemandWeeks(ZoneOffset.UTC), mock(CoarseAreas.class), clock,
                 Recorded.noTransaction(), Runnable::run, Duration.ZERO, flushRows, flushAfter);
     }
 

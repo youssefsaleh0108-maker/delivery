@@ -34,6 +34,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.domain.SearchDemandLog;
 import com.delivery.product.domain.SearchDemandLogRepository;
+import com.delivery.product.domain.SearchDemandSeen;
+import com.delivery.product.domain.SearchDemandSeenRepository;
 
 /**
  * Writes down what a street looked for, without ever writing down who looked.
@@ -52,13 +54,15 @@ import com.delivery.product.domain.SearchDemandLogRepository;
  * and a bounded queue, so a slow database makes the log lossy rather than making the service a
  * queue of pending writes.
  *
- * <p><strong>The account id stops here.</strong> It is taken only to answer one question — "has this
- * person already asked for this, in this neighbourhood, in the last
- * {@code delivery.demand.search-log.repeat-window}" — so that one shopper typing a word letter by
- * letter, or searching again after changing their mind, is one signal rather than nine. That question
- * is answered in memory, in a bounded map this process alone holds and a restart empties, and the
- * answer is a yes or a no. No account id is passed to {@link SearchDemandLog}, and there is no column
- * on it that could hold one.
+ * <p><strong>The account id stops here.</strong> It is taken to answer two questions and is stored
+ * for neither. The first — "has this person already asked for this, in this neighbourhood, in the
+ * last {@code delivery.demand.search-log.repeat-window}" — is answered in memory, in a bounded map
+ * this process alone holds and a restart empties, so that one shopper typing a word letter by letter
+ * is one signal rather than nine. The second is the digest's floor: {@link SeenKeys} turns
+ * (account, area, term, week) into an HMAC under a server-side secret, and that value — which cannot
+ * be reversed into an account, and which is different for the same person's next term — is what
+ * {@link SearchDemandSeen} holds, so five rows mean five people rather than five searches. No account
+ * id is passed to {@link SearchDemandLog}, and there is no column on it that could hold one.
  *
  * <p><strong>Rows are buffered and each flush is written in a shuffled order.</strong> A random
  * primary key does not hide the order rows were written in: this is an insert-only table, so
@@ -148,6 +152,9 @@ public class SearchDemandRecorder implements DisposableBean {
     private static final Duration SHUTDOWN_GRACE = Duration.ofSeconds(5);
 
     private final SearchDemandLogRepository logs;
+    private final SearchDemandSeenRepository seen;
+    private final SeenKeys keys;
+    private final DemandWeeks calendar;
     private final CoarseAreas areas;
     private final Clock clock;
     private final Executor executor;
@@ -173,6 +180,15 @@ public class SearchDemandRecorder implements DisposableBean {
     private final List<SearchDemandLog> buffer = new ArrayList<>();
     private Instant bufferedSince;
 
+    /**
+     * The "somebody asked" rows the same flush writes, shuffled separately from the log rows.
+     *
+     * <p>Separately on purpose: one permutation for both lists would let a reader line the two tables
+     * up by physical position and put a keyed pseudonym next to a search. Two permutations make the
+     * position of a row in one table say nothing about the other.
+     */
+    private final List<SearchDemandSeen> seenBuffer = new ArrayList<>();
+
     /** The shuffle itself. Seeded by the platform, so the permutation is not one anybody can replay. */
     private final SecureRandom shuffle = new SecureRandom();
 
@@ -189,15 +205,16 @@ public class SearchDemandRecorder implements DisposableBean {
             });
 
     @Autowired
-    public SearchDemandRecorder(SearchDemandLogRepository logs, CoarseAreas areas, Clock clock,
+    public SearchDemandRecorder(SearchDemandLogRepository logs, SearchDemandSeenRepository seen,
+                                SeenKeys keys, DemandWeeks calendar, CoarseAreas areas, Clock clock,
                                 PlatformTransactionManager transactionManager,
                                 @Value("${delivery.demand.search-log.repeat-window:30m}")
                                 Duration repeatWindow,
                                 @Value("${delivery.demand.search-log.flush-rows:50}") int flushRows,
                                 @Value("${delivery.demand.search-log.flush-after:10m}")
                                 Duration flushAfter) {
-        this(logs, areas, clock, transactionManager, newPool(), newTicker(), repeatWindow, flushRows,
-                flushAfter);
+        this(logs, seen, keys, calendar, areas, clock, transactionManager, newPool(), newTicker(),
+                repeatWindow, flushRows, flushAfter);
         // Started here rather than in the shared constructor, so nothing schedules a task that reads
         // a half-built object. Its own ticker rather than @Scheduled: scheduling reaches this service
         // through the outbox library's configuration, and a buffer that only emptied when somebody
@@ -216,18 +233,23 @@ public class SearchDemandRecorder implements DisposableBean {
      *
      * <p>No ticker: a test moves its own clock and calls {@link #flushIfDue} when it means to.
      */
-    public SearchDemandRecorder(SearchDemandLogRepository logs, CoarseAreas areas, Clock clock,
+    public SearchDemandRecorder(SearchDemandLogRepository logs, SearchDemandSeenRepository seen,
+                                SeenKeys keys, DemandWeeks calendar, CoarseAreas areas, Clock clock,
                                 PlatformTransactionManager transactionManager, Executor executor,
                                 Duration repeatWindow, int flushRows, Duration flushAfter) {
-        this(logs, areas, clock, transactionManager, executor, null, repeatWindow, flushRows,
-                flushAfter);
+        this(logs, seen, keys, calendar, areas, clock, transactionManager, executor, null,
+                repeatWindow, flushRows, flushAfter);
     }
 
-    private SearchDemandRecorder(SearchDemandLogRepository logs, CoarseAreas areas, Clock clock,
+    private SearchDemandRecorder(SearchDemandLogRepository logs, SearchDemandSeenRepository seen,
+                                 SeenKeys keys, DemandWeeks calendar, CoarseAreas areas, Clock clock,
                                  PlatformTransactionManager transactionManager, Executor executor,
                                  ScheduledExecutorService ticker, Duration repeatWindow,
                                  int flushRows, Duration flushAfter) {
         this.logs = logs;
+        this.seen = seen;
+        this.keys = keys;
+        this.calendar = calendar;
         this.areas = areas;
         this.clock = clock;
         this.executor = executor;
@@ -304,6 +326,7 @@ public class SearchDemandRecorder implements DisposableBean {
             SearchDemandLog row = new SearchDemandLog(now, area, recording.term(),
                     recording.shops(), inOwnArea, recording.nearest(), recording.vertical());
             buffer.add(row);
+            rememberWhoAsked(recording.accountId(), area, row);
             if (bufferedSince == null) {
                 bufferedSince = now;
             }
@@ -316,6 +339,25 @@ public class SearchDemandRecorder implements DisposableBean {
             failed.incrementAndGet();
             log.debug("Could not record a search for the demand digest", e);
         }
+    }
+
+    /**
+     * Queues "somebody asked for this here, this week" beside the row, as a value that is not a
+     * person.
+     *
+     * <p>The week is taken from the row rather than from the clock, so the count is bounded by
+     * exactly the week the search is filed under. Nothing is queued when there is no secret (the
+     * digest then publishes nothing at all, by design), when the search belongs to no area (such a
+     * search is never reported to anybody), or when there is no caller to count.
+     */
+    private void rememberWhoAsked(String accountId, UUID area, SearchDemandLog row) {
+        if (!keys.available() || area == null) {
+            return;
+        }
+        Instant week = calendar.weekOf(row.getSearchedAt());
+        keys.keyFor(accountId, area, row.getTerm(), week)
+                .ifPresent(key -> seenBuffer.add(new SearchDemandSeen(key, keys.keyId(), week, area,
+                        row.getTerm(), row.getSearchedAt())));
     }
 
     /**
@@ -352,15 +394,25 @@ public class SearchDemandRecorder implements DisposableBean {
      * emptied, and a database that refused fifty rows will refuse them again.
      */
     private void flush() {
-        if (buffer.isEmpty()) {
+        if (buffer.isEmpty() && seenBuffer.isEmpty()) {
             return;
         }
         List<SearchDemandLog> rows = new ArrayList<>(buffer);
+        List<SearchDemandSeen> people = new ArrayList<>(seenBuffer);
         buffer.clear();
+        seenBuffer.clear();
         bufferedSince = null;
         Collections.shuffle(rows, shuffle);
+        // Its own permutation, so a row's place in one table says nothing about the other.
+        Collections.shuffle(people, shuffle);
         try {
-            transaction.executeWithoutResult(status -> logs.saveAll(rows));
+            transaction.executeWithoutResult(status -> {
+                logs.saveAll(rows);
+                for (SearchDemandSeen person : people) {
+                    seen.remember(person.getSeenKey(), person.getKeyId(), person.getWeekStart(),
+                            person.getAreaId(), person.getTerm(), person.getCreatedAt());
+                }
+            });
             written.addAndGet(rows.size());
         } catch (Throwable e) {
             failed.addAndGet(rows.size());

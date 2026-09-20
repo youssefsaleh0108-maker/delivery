@@ -52,18 +52,20 @@ public class DemandDigestService {
     private final MerchantUnmetDemand unmet;
     private final SearchDemandDigestRepository digests;
     private final DemandDigestClaim claim;
+    private final SeenKeys keys;
     private final DemandWeeks calendar;
     private final Clock clock;
     private final boolean enabled;
 
     public DemandDigestService(StoreRepository stores, MerchantUnmetDemand unmet,
                                SearchDemandDigestRepository digests, DemandDigestClaim claim,
-                               DemandWeeks calendar, Clock clock,
+                               SeenKeys keys, DemandWeeks calendar, Clock clock,
                                @Value("${delivery.demand.digest.enabled:true}") boolean enabled) {
         this.stores = stores;
         this.unmet = unmet;
         this.digests = digests;
         this.claim = claim;
+        this.keys = keys;
         this.calendar = calendar;
         this.clock = clock;
         this.enabled = enabled;
@@ -82,6 +84,14 @@ public class DemandDigestService {
     public int sendFor(Instant weekStart) {
         if (!enabled) {
             log.debug("The weekly demand digest is switched off");
+            return 0;
+        }
+        if (!keys.available()) {
+            // The same fail-closed rule as the roll-up: without the secret the floor counts nobody,
+            // so anything left in the week's table was computed under a floor that no longer holds.
+            // Say it loudly — a digest that silently stops is a feature nobody notices is broken.
+            log.warn("No weekly demand digest was sent for the week of {}: no demand-seen secret is "
+                    + "set (DEMAND_SEEN_SECRET), and the floor counts distinct people", weekStart);
             return 0;
         }
         Map<String, List<Store>> byMerchant = new LinkedHashMap<>();

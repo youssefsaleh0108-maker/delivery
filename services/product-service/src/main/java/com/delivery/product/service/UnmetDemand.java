@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.delivery.product.domain.SearchDemandDigestRepository;
 import com.delivery.product.domain.SearchDemandLogRepository;
+import com.delivery.product.domain.SearchDemandSeenRepository;
 import com.delivery.product.domain.SearchDemandWeek;
 import com.delivery.product.domain.SearchDemandWeekRepository;
 
@@ -30,18 +31,28 @@ import com.delivery.product.domain.SearchDemandWeekRepository;
  *       {@code delivery.demand.digest.far-metres}. "Somebody sells it, two kilometres away".
  * </ul>
  *
- * <p><strong>The floor is {@value #MIN_SEARCHES} distinct searches, and it is a constant.</strong>
- * Not a setting, for the reason Order Manager's demand radar gives about its own floor: a number that
+ * <p><strong>The floor is {@value #MIN_PEOPLE} distinct people, and it is a constant.</strong> Not a
+ * setting, for the reason Order Manager's demand radar gives about its own floor: a number that
  * decides whether a handful of people's searches can be shown to their neighbours must not be
- * lowerable by a typo in a values file. Under the floor a term is one person's shopping list — and
- * reporting it would be telling a shop what somebody on their street wants, which is the difference
- * between a market signal and surveillance. A term under the floor is not written, so no reader can
- * be built that forgets it.
+ * lowerable by a typo in a values file. Under the floor a term is one household's shopping list —
+ * and reporting it would be telling a shop what somebody on their street wants, which is the
+ * difference between a market signal and surveillance. A term under the floor is not written, so no
+ * reader can be built that forgets it.
  *
- * <p>Distinct searches, not repeats: the log already holds one row per search, because one person
- * typing a word letter by letter or paging through shops is collapsed before a row exists
- * ({@link SearchDemandRecorder}). So the count here is a plain {@code COUNT(*)} over rows, and every
- * row it counts is a separate search.
+ * <p><strong>People, not searches.</strong> Counting rows counted the wrong thing: one household
+ * searching for the same word on five evenings is five rows — the in-memory repeat window collapses
+ * a burst, not a week — so a floor of five searches was a floor one household cleared alone, and a
+ * merchant could publish a neighbour's search by contributing four of their own. The count comes
+ * instead from {@code search_demand_seen}, which holds one row per (person, area, term, week) as an
+ * HMAC under a server-side secret ({@link SeenKeys}): unreadable as an account, unlinkable across
+ * terms, and countable, which is all this needs.
+ *
+ * <p><strong>With no secret, no roll-up.</strong> {@link #rollUp} refuses rather than falling back to
+ * counting searches: a weak floor that looks like a working one is worse than an empty week, and the
+ * merchant's screen says why a week is empty.
+ *
+ * <p>The count the merchant is shown is still searches — that is the market size — but only for
+ * terms whose people floor has been cleared, and it is always rounded to a band ({@link #band}).
  *
  * <p>Computed rather than queried on demand, and the reason is the merchant's screen: the Demand
  * Radar polls, and an aggregate over a quarter of a million searches on every poll would be the
@@ -55,10 +66,10 @@ public class UnmetDemand {
     private static final Logger log = LoggerFactory.getLogger(UnmetDemand.class);
 
     /**
-     * The fewest distinct searches a term needs in one area in one week before anybody is told about
-     * it. A constant on purpose — see the class comment.
+     * The fewest distinct people who must have asked for a term, in one area in one week, before
+     * anybody is told about it. A constant on purpose — see the class comment.
      */
-    public static final int MIN_SEARCHES = 5;
+    public static final int MIN_PEOPLE = 5;
 
     /** The widest and narrowest "too far" may be set to. */
     static final int MIN_FAR_METRES = 500;
@@ -69,16 +80,19 @@ public class UnmetDemand {
     static final int MAX_RETENTION_DAYS = 400;
 
     private final SearchDemandLogRepository logs;
+    private final SearchDemandSeenRepository seen;
     private final SearchDemandWeekRepository weeks;
     private final SearchDemandDigestRepository digests;
+    private final SeenKeys keys;
     private final DemandWeeks calendar;
     private final Clock clock;
     private final int farMetres;
     private final int termsPerArea;
     private final int retentionDays;
 
-    public UnmetDemand(SearchDemandLogRepository logs, SearchDemandWeekRepository weeks,
-                       SearchDemandDigestRepository digests, DemandWeeks calendar, Clock clock,
+    public UnmetDemand(SearchDemandLogRepository logs, SearchDemandSeenRepository seen,
+                       SearchDemandWeekRepository weeks, SearchDemandDigestRepository digests,
+                       SeenKeys keys, DemandWeeks calendar, Clock clock,
                        @Value("${delivery.demand.digest.far-metres:2000}") int farMetres,
                        @Value("${delivery.demand.digest.terms-per-area:10}") int termsPerArea,
                        @Value("${delivery.demand.search-log.retention-days:90}") int retentionDays) {
@@ -94,8 +108,10 @@ public class UnmetDemand {
                     + retentionDays);
         }
         this.logs = logs;
+        this.seen = seen;
         this.weeks = weeks;
         this.digests = digests;
+        this.keys = keys;
         this.calendar = calendar;
         this.clock = clock;
         this.farMetres = farMetres;
@@ -124,6 +140,14 @@ public class UnmetDemand {
      */
     @Transactional
     public int rollUp(Instant weekStart) {
+        if (!keys.available()) {
+            // Fail closed, and leave what is already there alone: without the secret the floor cannot
+            // be applied at all, and the only alternative — counting searches — is the floor one
+            // household clears on its own. Nothing new is published until somebody sets the secret.
+            log.warn("The week of {} was not rolled up: no demand-seen secret is set "
+                    + "(DEMAND_SEEN_SECRET), and the floor counts distinct people", weekStart);
+            return 0;
+        }
         Instant until = calendar.weekAfter(weekStart);
         Instant now = clock.instant();
         weeks.deleteWeek(weekStart);
@@ -136,7 +160,8 @@ public class UnmetDemand {
     }
 
     private int rollUp(Instant weekStart, Instant until, SearchDemandWeek.Kind kind, Instant now) {
-        List<Object[]> rows = logs.unmetRows(weekStart, until, kind.name(), farMetres, MIN_SEARCHES);
+        List<Object[]> rows = logs.unmetRows(weekStart, until, kind.name(), farMetres, MIN_PEOPLE,
+                keys.keyId());
         List<SearchDemandWeek> batch = new ArrayList<>();
         UUID area = null;
         int rank = 0;
@@ -177,39 +202,48 @@ public class UnmetDemand {
      * service's clock and bound as a parameter, never written as SQL interval arithmetic, so a test
      * with a fixed clock deletes exactly what it means to.
      *
-     * <p>The roll-up and the digest ledger are kept one retention longer than the log they came from:
-     * they are aggregates over a floor of five and hold nothing about anybody, but keeping them
-     * for ever would be keeping a derivative of deleted data with no reason to.
+     * <p>The roll-up and the digest ledger go at the same cutoff as the log they came from: they are
+     * aggregates over a floor of five people and hold nothing about anybody, but keeping a derivative
+     * of deleted data for longer than the data needs a reason, and there is none.
      *
-     * @return how many rows went, from all three tables
+     * <p>The "somebody asked" rows go much sooner, and by week rather than by age: they exist only to
+     * bound one week's floor, so they are kept for the week they belong to and the week after — as
+     * far back as the roll-up ever recomputes — and are deleted the moment they are of no further
+     * use. They are the only table in this feature with a per-person value in it, even an unreadable
+     * one, which is the reason they are the first to go.
+     *
+     * @return how many rows went, from all four tables
      */
     @Transactional
     public int forgetOldSearches() {
-        Instant cutoff = clock.instant().minus(retention());
+        Instant now = clock.instant();
+        Instant cutoff = now.minus(retention());
         int searches = logs.deleteOlderThan(cutoff);
         int rolled = weeks.deleteOlderThan(cutoff);
         int sent = digests.deleteOlderThan(cutoff);
-        if (searches + rolled + sent > 0) {
-            log.info("Forgot {} searches, {} rolled-up terms and {} digest records older than {}",
-                    searches, rolled, sent, cutoff);
+        // This week and last week survive; everything older has nothing left to bound.
+        int people = seen.deleteOlderThan(calendar.weekBefore(calendar.weekOf(now)));
+        if (searches + rolled + sent + people > 0) {
+            log.info("Forgot {} searches, {} rolled-up terms, {} digest records older than {}, "
+                            + "and {} week-old seen markers", searches, rolled, sent, cutoff, people);
         }
-        return searches + rolled + sent;
+        return searches + rolled + sent + people;
     }
 
     /**
      * How a count is said out loud: rounded down to a round number, never the number itself.
      *
-     * <p>"About ten people looked for this" is everything a shop needs to decide whether to stock it.
-     * The exact figure is not, and it invites arithmetic — a merchant watching a term week by week
-     * could otherwise read changes small enough to be one household. Rounded <em>down</em>, so the
-     * platform never says more people wanted something than really did.
+     * <p>"About ten searches asked for this" is everything a shop needs to decide whether to stock
+     * it. The exact figure is not, and it invites arithmetic — a merchant watching a term week by
+     * week could otherwise read changes small enough to be one household. Rounded <em>down</em>, so
+     * the platform never says more than really happened.
      *
      * <p>Five is the smallest band there is, because five is the floor: a term that reached this
-     * function was asked for at least that many times.
+     * function was asked for by at least that many people, so by at least that many searches.
      */
     public static int band(int searches) {
-        if (searches < MIN_SEARCHES) {
-            return MIN_SEARCHES;
+        if (searches < MIN_PEOPLE) {
+            return MIN_PEOPLE;
         }
         if (searches < 20) {
             return searches / 5 * 5;

@@ -6332,9 +6332,9 @@
   },
   "heatmapUnmetYouSell": "You sell this already",
   "heatmapUnmetQuietTitle": "Nothing to report this week",
-  "heatmapUnmetQuietMessage": "{count, plural, other{A word appears once {count} different searches have asked for it around here in one week, so no single customer can be picked out.}}",
+  "heatmapUnmetQuietMessage": "{count, plural, other{A word appears once {count} different people have asked for it around here in one week, so no single household can be picked out.}}",
   "@heatmapUnmetQuietMessage": {
-    "description": "The privacy floor: how many different searches a word needs before it is shown.",
+    "description": "The privacy floor: how many different people must ask for a word before it is shown.",
     "placeholders": {
       "count": {
         "type": "int"

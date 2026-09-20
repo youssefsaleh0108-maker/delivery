@@ -4108,9 +4108,9 @@
   },
   "heatmapUnmetYouSell": "أنت تبيع هذا أصلاً",
   "heatmapUnmetQuietTitle": "لا جديد هذا الأسبوع",
-  "heatmapUnmetQuietMessage": "{count, plural, other{تظهر الكلمة بعد أن يبحث عنها {count} عمليات بحث مختلفة في المنطقة خلال أسبوع واحد، حتى لا يمكن تمييز أي زبون بمفرده.}}",
+  "heatmapUnmetQuietMessage": "{count, plural, other{تظهر الكلمة بعد أن يبحث عنها {count} أشخاص مختلفون في المنطقة خلال أسبوع واحد، حتى لا يمكن تمييز منزل بعينه.}}",
   "@heatmapUnmetQuietMessage": {
-    "description": "The privacy floor: how many different searches a word needs before it is shown.",
+    "description": "The privacy floor: how many different people must ask for a word before it is shown.",
     "placeholders": {
       "count": {
         "type": "int"

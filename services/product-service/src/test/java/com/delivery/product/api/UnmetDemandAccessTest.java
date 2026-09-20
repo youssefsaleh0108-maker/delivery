@@ -201,7 +201,7 @@ class UnmetDemandAccessTest {
 
         assertThat(answer.areasAround()).isZero();
         assertThat(answer.thisWeek().terms()).isEmpty();
-        assertThat(answer.minimumSearches()).isEqualTo(UnmetDemand.MIN_SEARCHES);
+        assertThat(answer.minimumPeople()).isEqualTo(UnmetDemand.MIN_PEOPLE);
     }
 
     @Test

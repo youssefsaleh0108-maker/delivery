@@ -13287,7 +13287,7 @@ class DeliveryStringsEn extends DeliveryStrings {
       count,
       locale: localeName,
       other:
-          'A word appears once $count different searches have asked for it around here in one week, so no single customer can be picked out.',
+          'A word appears once $count different people have asked for it around here in one week, so no single household can be picked out.',
     );
     return '$_temp0';
   }

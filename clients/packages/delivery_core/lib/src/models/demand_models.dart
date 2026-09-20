@@ -9,7 +9,7 @@
 ///
 /// The unmet half ([UnmetDemand]) answers the same way. Product Service records each customer item
 /// search against a neighbourhood — never an account, a session or a pin — shows a word only once at
-/// least [UnmetDemand.minimumSearches] different searches asked for it in a week, and says roughly
+/// least [UnmetDemand.minimumPeople] different people asked for it in a week, and says roughly
 /// how many rather than exactly ([UnmetTerm.about]). So there is no exact figure on a term to
 /// display either, and for the same reason.
 library;
@@ -226,7 +226,7 @@ class UnmetDemand {
   const UnmetDemand({
     required this.storeId,
     required this.areasAround,
-    required this.minimumSearches,
+    required this.minimumPeople,
     required this.farMetres,
     required this.thisWeek,
     required this.lastWeek,
@@ -242,8 +242,8 @@ class UnmetDemand {
   /// where the shop is yet — a different thing to say than "nothing went unanswered".
   final int areasAround;
 
-  /// How many different searches a word needs in a week before anybody is told about it.
-  final int minimumSearches;
+  /// How many different people must have asked for a word in a week before anybody is told about it.
+  final int minimumPeople;
 
   /// What "the nearest shop was far away" meant, in metres.
   final int farMetres;
@@ -261,7 +261,7 @@ class UnmetDemand {
       storeId: json['storeId'] as String? ?? '',
       region: region.isEmpty ? null : region,
       areasAround: (json['areasAround'] as num?)?.toInt() ?? 0,
-      minimumSearches: (json['minimumSearches'] as num?)?.toInt() ?? 5,
+      minimumPeople: (json['minimumPeople'] as num?)?.toInt() ?? 5,
       farMetres: (json['farMetres'] as num?)?.toInt() ?? 2000,
       thisWeek: UnmetWeek.fromJson(json['thisWeek'] as Map<String, dynamic>?),
       lastWeek: UnmetWeek.fromJson(json['lastWeek'] as Map<String, dynamic>?),

@@ -92,6 +92,79 @@ CREATE INDEX idx_search_demand_log_area_time ON search_demand_log (area_id, sear
 CREATE INDEX idx_search_demand_log_time ON search_demand_log (searched_at);
 
 -- ============================================================================================
+-- Who has already asked, without knowing who they are
+-- ============================================================================================
+--
+-- The floor that decides whether a term may be spoken of has to count PEOPLE. Counting rows does
+-- not: one household searching for the same thing on five evenings is five rows, and a merchant who
+-- wanted to read a neighbour's search could clear a floor of five by contributing four of their own.
+-- A floor that one person can clear alone is not a floor.
+--
+-- So each (account, area, term, week) leaves at most one row here, and the roll-up counts these
+-- rows instead of log rows. What is stored is not the account and cannot be turned back into it:
+--
+--   seen_key = HMAC-SHA256(secret, "v1" | account | area | term | week)
+--
+-- The secret is read from the environment (DEMAND_SEEN_SECRET) and is never in this repository, in
+-- this database, or in any event. Three properties follow, and they are the reason for this shape
+-- rather than a hash of the account:
+--
+--   * not reversible, and not guessable. Without the secret, an account id cannot be turned into a
+--     key or a key into an account id, so holding this whole table — a dump, a backup, a restored
+--     snapshot — yields nothing about anybody;
+--   * not joinable across terms. The term is inside the HMAC, so the same person searching for two
+--     things leaves two unrelated values. "Everything this person looked for" cannot be assembled
+--     here any more than it can in search_demand_log;
+--   * countable, which is all the roll-up needs: rows with the same (week, area, term) are distinct
+--     people, and how many there are is the only question asked of them.
+--
+-- WITH NO SECRET, NOTHING IS PUBLISHED. No key can be computed, so no row is written, so no term
+-- reaches the floor and the roll-up refuses to run at all (UnmetDemand). Failing closed is the only
+-- safe direction: the alternative — falling back to counting rows — is the weak floor this table
+-- exists to replace, and it would fail silently.
+--
+-- ON ROTATION, THE COUNT RESTARTS. key_id is a fingerprint of the secret that computed the row (not
+-- the secret), and the roll-up counts only rows under the current one. A new secret therefore reads
+-- as "nobody has asked yet" rather than counting the same person twice under two keys, so a rotation
+-- can only under-publish, never over-publish. Rotate just after a Monday digest: the week in
+-- progress starts counting again, and the finished week is already sent.
+--
+-- These rows are kept only as long as the week they bound — the current week and the one before it,
+-- which is as far back as the roll-up ever recomputes — and are deleted by the same retention job as
+-- the log (UnmetDemand.forgetOldSearches).
+CREATE TABLE search_demand_seen (
+    -- Hex of the HMAC above, 64 characters of SHA-256. Never an account, and never a pseudonym that
+    -- survives the term or the week.
+    seen_key varchar(64) PRIMARY KEY,
+
+    -- Which secret computed this row. A fingerprint derived from the secret, not the secret itself.
+    key_id varchar(32) NOT NULL,
+
+    -- The week the search fell in, Monday 00:00 in the platform's zone.
+    week_start timestamptz NOT NULL,
+
+    -- The neighbourhood, as search_demand_log holds it. A search with no area is never reported to
+    -- anybody, so it needs no row here.
+    area_id uuid NOT NULL REFERENCES delivery_zones (id) ON DELETE CASCADE,
+
+    -- The folded term, as search_demand_log holds it.
+    term text NOT NULL,
+
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE search_demand_seen IS
+    'One row per person per area per term per week, as an HMAC under a server-side secret. Counted '
+    'by the roll-up so the floor counts people; holds no account and cannot be joined across terms.';
+
+-- The one question asked of this table: how many people asked for this term, in this area, that week.
+CREATE INDEX idx_search_demand_seen_count
+    ON search_demand_seen (week_start, area_id, term, key_id);
+
+-- Retention deletes by week.
+CREATE INDEX idx_search_demand_seen_week ON search_demand_seen (week_start);
+
+-- ============================================================================================
 -- The week, as a merchant is shown it
 -- ============================================================================================
 --
@@ -99,9 +172,9 @@ CREATE INDEX idx_search_demand_log_time ON search_demand_log (searched_at);
 -- refreshing must not run an aggregate over a quarter's worth of searches. It also means the
 -- five-search floor is applied once, in one place, and the log is never read by a request thread.
 --
--- A term reaches this table only when at least the floor's worth of DISTINCT searches asked for it
--- in that week and that area. Under the floor it is one person's shopping list, not a market signal,
--- and it is simply not written.
+-- A term reaches this table only when at least the floor's worth of DISTINCT PEOPLE asked for it in
+-- that week and that area, counted through search_demand_seen above. Under the floor it is one
+-- household's shopping list, not a market signal, and it is simply not written.
 CREATE TABLE search_demand_week (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 
@@ -117,9 +190,10 @@ CREATE TABLE search_demand_week (
     -- FAR: searches answered, but the nearest shop was further than the far-threshold (2 km).
     kind varchar(16) NOT NULL,
 
-    -- How many distinct searches asked for it. Kept exact here because this table is never served to
-    -- a merchant as-is: the API rounds it to a band ("about 10"). An exact count per area per week
-    -- over a floor of five is a market size, not a person, but it is still not a number a shop needs.
+    -- How many searches asked for it — rows in the log, once the people floor has been cleared. Kept
+    -- exact here because this table is never served to a merchant as-is: the API rounds it to a band
+    -- ("about 10"). An exact count per area per week over a floor of five people is a market size,
+    -- not a person, but it is still not a number a shop needs.
     searches integer NOT NULL,
 
     -- 1 is the term the most searches asked for in this area, this week, of this kind.

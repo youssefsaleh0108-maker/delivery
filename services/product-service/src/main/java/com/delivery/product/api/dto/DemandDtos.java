@@ -55,17 +55,18 @@ public final class DemandDtos {
      * @param areasAround     how many areas the shop's neighbourhood has at all. Zero means the
      *                        platform does not know where the shop is — a different thing to tell a
      *                        merchant than "nothing went unanswered near you"
-     * @param minimumSearches the floor a term must clear before it is shown to anybody, so the screen
-     *                        can explain an empty week rather than implying a quiet one
+     * @param minimumPeople   how many different people must have asked for a term before it is shown
+     *                        to anybody, so the screen can explain an empty week rather than
+     *                        implying a quiet one
      * @param farMetres       what "the nearest shop is far away" meant
      */
     public record UnmetDemandResponse(UUID storeId, String region, int areasAround,
-                                      int minimumSearches, int farMetres,
+                                      int minimumPeople, int farMetres,
                                       UnmetWeekResponse thisWeek, UnmetWeekResponse lastWeek) {
 
         public static UnmetDemandResponse of(MerchantUnmetDemand.Report report) {
             return new UnmetDemandResponse(report.storeId(), report.region(), report.areasAround(),
-                    report.minimumSearches(), report.farMetres(),
+                    report.minimumPeople(), report.farMetres(),
                     UnmetWeekResponse.of(report.thisWeek()), UnmetWeekResponse.of(report.lastWeek()));
         }
     }
