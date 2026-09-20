@@ -47,6 +47,11 @@ class _AppAuthOidcClient implements OidcClient {
   @override
   Future<TokenSet?> completeRedirect(AuthConfig config) async => null;
 
+  /// Nor a browser SSO session to resume: a phone keeps its refresh token in the platform's own
+  /// secure storage, which survives being closed, so there is nothing for this to recover.
+  @override
+  Future<TokenSet?> resumeSession(AuthConfig config) async => null;
+
   @override
   Future<TokenSet> refresh(AuthConfig config, String refreshToken) async {
     final TokenResponse response = await _appAuth.token(
