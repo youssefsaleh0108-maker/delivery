@@ -67,33 +67,53 @@ public class OrderManagerOrdersClient {
     }
 
     /**
-     * The most recently delivered orders, newest first, as Order Manager has them.
+     * Every delivered order Order Manager has, as far as {@code maxOrders}.
      *
-     * <p>Paged until {@code limit} is reached or the pages run out. Newest first because a
-     * settlement that went missing is found by looking back from now, and an operator working a
-     * list wants this week before last year.
+     * <p><strong>All of them, not a recent window.</strong> The first version asked for the newest
+     * hundred, which is a sensible list to read and the wrong set to reconcile against: a
+     * settlement that went missing in September is not in this week's hundred, and the check
+     * answered "nothing missing" — which is the one answer it must never give by accident. It now
+     * pages until Order Manager runs out, or until the cap, and says which of the two happened.
+     *
+     * @return the orders and whether the scan reached the end. A scan that stopped at the cap is
+     *         NOT a clean answer, and its caller must not present it as one
      */
-    public List<JsonNode> recentlyDelivered(String bearerToken, int limit) {
+    public Delivered delivered(String bearerToken, int maxOrders) {
         List<JsonNode> found = new ArrayList<>();
-        for (int page = 0; found.size() < limit; page++) {
+        for (int page = 0; found.size() < maxOrders; page++) {
             final int number = page;
             JsonNode body = get(bearerToken, uri -> uri.path("/api/orders")
                     .queryParam("status", "DELIVERED")
                     .queryParam("page", number)
-                    .queryParam("size", Math.min(PAGE, limit))
-                    .queryParam("sort", "placedAt,desc")
+                    .queryParam("size", PAGE)
                     .build());
-            JsonNode content = body == null ? null : body.path("content");
-            if (content == null || !content.isArray() || content.isEmpty()) {
-                break;
+            // An answer this cannot read is a failure, never an empty page. Read as "no delivered
+            // orders" it would report a platform with money stuck in it as having nothing to fix.
+            JsonNode content = body == null ? null : body.get("content");
+            if (content == null || !content.isArray()) {
+                throw new UnavailableException(
+                        "Order Manager did not answer with a page of orders", null);
+            }
+            if (content.isEmpty()) {
+                return new Delivered(found, true);
             }
             content.forEach(found::add);
             int totalPages = body.path("totalPages").asInt(0);
             if (number + 1 >= totalPages) {
-                break;
+                return new Delivered(found, true);
             }
         }
-        return found.size() > limit ? found.subList(0, limit) : found;
+        log.warn("Stopped scanning delivered orders at the cap of {}", maxOrders);
+        return new Delivered(found, false);
+    }
+
+    /**
+     * Delivered orders as Order Manager has them.
+     *
+     * @param complete whether the scan reached the end of them; false when it stopped at the cap,
+     *                 in which case an order it never looked at cannot be called settled
+     */
+    public record Delivered(List<JsonNode> orders, boolean complete) {
     }
 
     /** One order as Order Manager has it, or null when it does not have it. */
