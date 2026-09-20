@@ -53,6 +53,12 @@ data:
       evaluation_interval: 30s
     rule_files:
       - /etc/prometheus/rules/*.yaml
+    # Where a firing rule GOES. Without this block Prometheus evaluates every rule below, marks it
+    # firing, and tells nobody — which is what it did for the whole life of both environments.
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets: ["alertmanager:9093"]
     scrape_configs:
       # Anything, in any namespace, that carries the prometheus.io annotations. The environment
       # is readable on every series as the `namespace` label — delivery-dev vs delivery-qa.
@@ -136,32 +142,54 @@ data:
           - role: pod
             namespaces: { names: [delivery-qa] }
         relabel_configs: *config-server-relabel
+      # Traefik, which is the only thing that sees a request before it becomes an application's
+      # problem: the 5xx rate, the 429 rate the rate limiter produces, and the expiry date of every
+      # certificate it holds. It lives in kube-system, which the annotation-based job above does
+      # not reach because the chart does not set those annotations and this file cannot add them.
+      #
+      # Port 9000 is the chart's own `traefik` entrypoint — the one already serving /ping for the
+      # liveness probe. Prometheus metrics default to that entrypoint when they are switched on
+      # (cluster/traefik-config.yaml), so nothing new binds and there is no chance of an entrypoint
+      # name colliding with one the chart defines and taking the whole edge down.
+      - job_name: traefik
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces: { names: [kube-system] }
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+            action: keep
+            regex: traefik
+          - source_labels: [__address__]
+            action: replace
+            regex: ([^:]+)(?::\d+)?
+            replacement: $1:9000
+            target_label: __address__
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: pod
       - job_name: prometheus
         static_configs:
           - targets: ["localhost:9090"]
 ---
-# Alerting rules. There is no Alertmanager on this box, so nothing pages: a firing alert is
-# visible in the Prometheus UI and as the `ALERTS` series in Grafana, which is what an operator
-# looking at either will see. Adding a notification path means adding Alertmanager and a relay
-# credential, and is a deliberate next step rather than something to imply here.
+# Alerting rules. These now REACH somebody: the `alerting:` block above sends everything that fires
+# to the Alertmanager in cluster/alerting.yaml, which emails it through the M365 relay. Before that
+# existed, a firing alert was a red line in a UI nobody had open.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: prometheus-rules
   namespace: monitoring
 data:
-  # Two groups, and the split is the point: "money is in the wrong place" and "an event is
-  # permanently lost" are states that do not resolve on their own and that nothing else announces,
-  # while the platform group below is ordinary operational noise worth seeing in daylight.
+  # Three files, and the split is the point: "money is in the wrong place" and "an event is
+  # permanently lost" are states that do not resolve on their own and that nothing else announces;
+  # the platform group is ordinary operational noise worth seeing in daylight; and
+  # infrastructure.yaml is the box, the cluster, the edge and the backups.
   #
   # These were authored in infra/prometheus/alerts.yml and never reached a cluster — the manifest
   # that actually runs had scrape_configs and no rule_files, so /api/v1/rules answered with an
   # empty list for the whole life of both environments. The metrics were being collected the
-  # entire time.
-  #
-  # There is still no Alertmanager, so nothing pages: a firing rule shows in the Prometheus UI and
-  # as the ALERTS series in Grafana. That is a real limitation and it is written down in
-  # deploy/k3s/README.md rather than implied by the presence of these rules.
+  # entire time. Every rule here also needs something that emits its metric: scripts/verify.sh
+  # resolves each one back to whatever produces it and fails on a rule that can never fire.
   settlement.yaml: |
     groups:
       - name: settlement
@@ -262,6 +290,265 @@ data:
             labels: { severity: warning }
             annotations:
               summary: "{{ $labels.job }} target {{ $labels.instance }} has been unscrapable for 15m"
+
+  # The node, the cluster, the edge and the backups. Everything in this file needs something that
+  # did not exist before cluster/alerting.yaml: node-exporter for the box, kube-state-metrics for
+  # the API server's view, Traefik's own metrics for the edge, and node-exporter's textfile
+  # collector for the CronJobs, which are gone by the time anything could scrape them.
+  infrastructure.yaml: |
+    groups:
+      - name: node
+        rules:
+          # 23 GiB and NO SWAP. When this box runs out of memory the kernel starts killing
+          # processes, and which ones is not a decision anybody made. 10% of 23 GiB is 2.3 GiB,
+          # which at these pod sizes is three or four services' worth of room.
+          - alert: NodeMemoryCritical
+            expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.10
+            for: 5m
+            labels: { severity: page }
+            annotations:
+              summary: "{{ $labels.instance }} has {{ $value | humanizePercentage }} of its memory available"
+              description: >-
+                There is no swap on this node, so the next allocation that does not fit is an
+                OOMKill. Check `kubectl top pods -A --sort-by=memory`; dev is the half that is
+                meant to give way (it has a ResourceQuota and the lower PriorityClass).
+          - alert: NodeMemoryLow
+            expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.20
+            for: 30m
+            labels: { severity: warning }
+            annotations:
+              summary: "{{ $labels.instance }} has been under 20% free memory for half an hour"
+
+          # 290 GB of disk, 33 used at the last survey. It fills from three directions: Postgres,
+          # MinIO objects and container images. A full disk stops Postgres writing, which stops
+          # everything, and it does it without warning.
+          - alert: NodeDiskFilling
+            expr: >-
+              (node_filesystem_size_bytes{fstype!~"tmpfs|ramfs"} - node_filesystem_avail_bytes{fstype!~"tmpfs|ramfs"})
+                / node_filesystem_size_bytes{fstype!~"tmpfs|ramfs"} > 0.80
+            for: 15m
+            labels: { severity: warning }
+            annotations:
+              summary: "{{ $labels.mountpoint }} on {{ $labels.instance }} is {{ $value | humanizePercentage }} full"
+              description: >-
+                `k3s crictl rmi --prune` reclaims unused images; Loki and Prometheus retention are
+                in cluster/logging.yaml and cluster/monitoring.yaml. PVCs cannot grow on
+                local-path, so a full postgres volume means moving it, not resizing it.
+          - alert: NodeDiskCritical
+            expr: >-
+              (node_filesystem_size_bytes{fstype!~"tmpfs|ramfs"} - node_filesystem_avail_bytes{fstype!~"tmpfs|ramfs"})
+                / node_filesystem_size_bytes{fstype!~"tmpfs|ramfs"} > 0.92
+            for: 5m
+            labels: { severity: page }
+            annotations:
+              summary: "{{ $labels.mountpoint }} on {{ $labels.instance }} is {{ $value | humanizePercentage }} full"
+
+      - name: workloads
+        rules:
+          # A pod that keeps restarting is usually a pod that starts, fails a health check or runs
+          # out of memory, and dies — over and over, serving nothing, while its Service still lists
+          # it between restarts. Waiting-reason rather than a restart count, because a restart
+          # count that stops rising is a pod that gave up.
+          - alert: PodCrashLooping
+            expr: kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"} > 0
+            for: 10m
+            labels: { severity: page }
+            annotations:
+              summary: "{{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) is crash-looping"
+              description: "kubectl -n {{ $labels.namespace }} logs {{ $labels.pod }} --previous"
+          # The specific case worth naming, because the answer is different: it is not a bug, it is
+          # a limit. On this box that is usually the resource-safety sizing rather than a leak.
+          - alert: ContainerOOMKilled
+            expr: increase(kube_pod_container_status_restarts_total[1h]) > 0
+                  and on (namespace, pod, container) kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+            for: 5m
+            labels: { severity: warning }
+            annotations:
+              summary: "{{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) was OOMKilled"
+              description: >-
+                Its memory limit is too low for what it is doing. See "what happens under memory
+                pressure" in deploy/k3s/README.md — in delivery-dev this is the first thing to
+                check after the 416Mi service limits land.
+          - alert: JobFailed
+            expr: kube_job_failed{condition="true"} > 0
+            for: 5m
+            labels: { severity: warning }
+            annotations:
+              summary: "Job {{ $labels.namespace }}/{{ $labels.job_name }} failed"
+              description: "kubectl -n {{ $labels.namespace }} logs job/{{ $labels.job_name }}"
+          - alert: DeploymentNotReady
+            expr: kube_deployment_status_replicas_available{namespace=~"delivery-.*"}
+                  < kube_deployment_spec_replicas{namespace=~"delivery-.*"}
+            for: 15m
+            labels: { severity: warning }
+            annotations:
+              summary: "{{ $labels.namespace }}/{{ $labels.deployment }} has been short of replicas for 15m"
+
+      - name: backups
+        rules:
+          # These four read node-exporter's textfile collector, which is how a CronJob leaves a
+          # metric behind: by the time Prometheus comes round the pod is gone, and whether last
+          # night's backup actually uploaded anything is exactly what has to outlive it.
+          #
+          # `absent` matters as much as the value. A metric that has never been written means the
+          # job has never completed a run, which is the state a new environment is in and the state
+          # a permanently broken one is in.
+          - alert: BackupNotConfigured
+            expr: youdrop_backup_configured == 0
+            for: 1h
+            labels: { severity: page }
+            annotations:
+              summary: "{{ $labels.env }}: the {{ $labels.backup }} backup has nowhere to go"
+              description: >-
+                The job ran and found no destination, so NOTHING IS BEING BACKED UP. Create the
+                backup-rclone and backup-age Secrets — see "Backups" in deploy/k3s/README.md.
+          - alert: BackupDidNotReport
+            expr: >-
+              (time() - youdrop_backup_last_success_timestamp_seconds{backup="postgres"} > 7200)
+              or (youdrop_backup_configured{backup="postgres"} == 1
+                  unless youdrop_backup_last_success_timestamp_seconds{backup="postgres"})
+            for: 10m
+            labels: { severity: page }
+            annotations:
+              summary: "{{ $labels.env }}: no database backup has succeeded for over two hours"
+              description: >-
+                The hourly job is failing or not running. kubectl -n delivery-{{ $labels.env }} get
+                cronjob postgres-backup; logs job/postgres-backup-<id>. The external dead-man
+                switch is the other half of this and is the only one that survives the box dying.
+          - alert: MinioBackupDidNotReport
+            expr: time() - youdrop_backup_last_success_timestamp_seconds{backup="minio"} > 129600
+            for: 30m
+            labels: { severity: warning }
+            annotations:
+              summary: "{{ $labels.env }}: objects have not been copied off the box for 36 hours"
+          # A backup nobody has restored is a belief. This is the alert that says the belief is
+          # wrong, and it is the most important one in this file.
+          - alert: RestoreTestFailing
+            expr: youdrop_restore_test_ok == 0
+            for: 10m
+            labels: { severity: page }
+            annotations:
+              summary: "{{ $labels.env }}: the weekly restore test FAILED"
+              description: >-
+                What is being written off the box could not be turned back into a database. Read
+                `kubectl -n delivery-{{ $labels.env }} logs job/restore-test-<id>` before the next
+                deploy; until this passes there is no recovery path.
+          - alert: RestoreTestStale
+            expr: time() - youdrop_restore_test_last_run_timestamp_seconds > 1209600
+            for: 1h
+            labels: { severity: warning }
+            annotations:
+              summary: "{{ $labels.env }}: the restore test has not run for two weeks"
+
+      - name: edge
+        rules:
+          # Certificates come from Let's Encrypt over HTTP-01 and renew themselves at 30 days. A
+          # renewal that is failing is silent until the certificate expires, at which point every
+          # browser and every phone refuses the connection at once, and the fix (fixing ACME, then
+          # waiting for issuance) takes longer than the outage anybody can tolerate. Fourteen days
+          # is two full renewal attempts of warning.
+          - alert: CertificateExpiringSoon
+            expr: (traefik_tls_certs_not_after - time()) / 86400 < 14
+            for: 1h
+            labels: { severity: page }
+            annotations:
+              summary: "the certificate for {{ $labels.cn }} expires in {{ $value | printf \"%.0f\" }} days"
+              description: >-
+                ACME renewal is not completing. Check Traefik's logs for the `letsencrypt`
+                resolver, that port 80 still reaches it (the HTTP-01 challenge is answered before
+                the https redirect), and that acme.json on the 128Mi PVC is still mode 600.
+          - alert: CertificateExpiringCritical
+            expr: (traefik_tls_certs_not_after - time()) / 86400 < 5
+            labels: { severity: page }
+            annotations:
+              summary: "the certificate for {{ $labels.cn }} expires in {{ $value | printf \"%.0f\" }} days"
+
+          # A ratio, not a count: five errors a minute out of ten requests is an outage and out of
+          # ten thousand is background. The edge sees this before any application does, including
+          # the requests that never reached one.
+          - alert: HighServerErrorRate
+            expr: >-
+              sum by (entrypoint) (rate(traefik_entrypoint_requests_total{code=~"5..",entrypoint="websecure"}[5m]))
+                / clamp_min(sum by (entrypoint) (rate(traefik_entrypoint_requests_total{entrypoint="websecure"}[5m])), 0.01)
+              > 0.02
+            for: 10m
+            labels: { severity: page }
+            annotations:
+              summary: "{{ $value | humanizePercentage }} of requests are answering 5xx"
+              description: >-
+                Break it down by router in Grafana (traefik_router_requests_total by router, code)
+                before looking at any one service.
+
+          # The rate limit is 20 req/s per IP with a burst of 40, and Lebanese mobile networks put
+          # a very large number of real users behind one CGNAT address. A rising 429 rate is far
+          # more likely to be the limit catching customers than an attack, and either way it is
+          # invisible from inside the application — the request never arrives.
+          - alert: RateLimitRejectionsHigh
+            expr: sum(rate(traefik_entrypoint_requests_total{code="429"}[10m])) > 1
+            for: 15m
+            labels: { severity: warning }
+            annotations:
+              summary: "{{ $value | printf \"%.1f\" }} requests a second are being rate-limited"
+              description: >-
+                Check whether one source address dominates. If this is ordinary traffic behind
+                CGNAT, the limit in overlays/ingress.template.yaml is what needs to change, not the
+                clients.
+
+      - name: data
+        rules:
+          # max_connections is 200 with three reserved for superusers. The README's connection
+          # budget puts the services' pools at 98 maximum, so 170 is a long way past anything
+          # normal and a long way before the wall. Past 197 the failure is not graceful: a service
+          # that cannot get a connection blocks for Hikari's 30-second timeout, and the losers are
+          # whichever services started last rather than whichever matter least.
+          - alert: PostgresConnectionsHigh
+            expr: sum by (namespace) (pg_stat_activity_count) > 170
+            for: 5m
+            labels: { severity: page }
+            annotations:
+              summary: "{{ $labels.namespace }} Postgres has {{ $value }} of 197 usable connections open"
+              description: >-
+                See "The connection budget" in deploy/k3s/README.md. Find the holder with
+                `select usename, count(*) from pg_stat_activity group by 1 order by 2 desc`.
+          - alert: PostgresConnectionsClimbing
+            expr: sum by (namespace) (pg_stat_activity_count) > 140
+            for: 30m
+            labels: { severity: warning }
+            annotations:
+              summary: "{{ $labels.namespace }} Postgres has held over 140 connections for half an hour"
+          - alert: PostgresDown
+            expr: pg_up == 0
+            for: 5m
+            labels: { severity: page }
+            annotations:
+              summary: "{{ $labels.namespace }}: the Postgres exporter cannot reach the database"
+
+      - name: spend
+        rules:
+          # Every SMS costs money and every one is triggered by an unauthenticated request. The
+          # plan's protections are a spend cap and a geo permission AT THE PROVIDER; this is what
+          # says the cap is about to be reached. Two hundred an hour is far above anything this
+          # platform's traffic produces and far below a bill worth noticing.
+          - alert: SmsRateHigh
+            expr: sum by (namespace) (rate(delivery_sms_sent_total[1h])) * 3600 > 200
+            for: 15m
+            labels: { severity: page }
+            annotations:
+              summary: "{{ $labels.namespace }} has sent {{ $value | printf \"%.0f\" }} SMS in the last hour"
+              description: >-
+                Check the verification endpoints for one source repeating. The provider's own spend
+                cap is the backstop; this is the warning before it.
+          # RECON-04: a settlement that failed used to leave no trace anywhere. It now writes a row,
+          # and a row here is money that did not reach whoever it was owed to.
+          - alert: SettlementFailuresRecorded
+            expr: delivery_settlement_failures > 0
+            for: 5m
+            labels: { severity: page }
+            annotations:
+              summary: "{{ $labels.namespace }} has {{ $value }} unresolved settlement failure(s)"
+              description: >-
+                GET /api/accounting/reconciliation/settlement-failures lists them with the reason.
+                Each is an order whose money did not move; they do not resolve on their own.
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -300,7 +587,7 @@ spec:
         fsGroup: 65534
       containers:
         - name: prometheus
-          image: prom/prometheus:v3.2.1
+          image: prom/prometheus:v3.2.1@sha256:6927e0919a144aa7616fd0137d4816816d42f6b816de3af269ab065250859a62
           args:
             - --config.file=/etc/prometheus/prometheus.yml
             - --storage.tsdb.path=/prometheus
@@ -414,7 +701,7 @@ spec:
         fsGroup: 472
       containers:
         - name: grafana
-          image: grafana/grafana:11.5.2
+          image: grafana/grafana:11.5.2@sha256:8b37a2f028f164ce7b9889e1765b9d6ee23fec80f871d156fbf436d6198d32b7
           env:
             - name: GF_SECURITY_ADMIN_USER
               valueFrom: { secretKeyRef: { name: grafana-admin, key: username } }

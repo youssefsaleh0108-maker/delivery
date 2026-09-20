@@ -1,0 +1,56 @@
+# What dev is allowed to take from a box it shares with production.
+#
+# The node is 8 vCPU / 23 GiB with NO SWAP. Before this file, the two environments' memory LIMITS
+# added up to 106% of it: nothing was over-committed at idle (12.7 GiB in use), but nothing stopped
+# them from being, and the kernel's answer to a 23 GiB box being asked for 24 GiB is to start
+# killing processes in an order nobody chose. dev is also the half that changes on every merge.
+#
+# 9 GiB is the share the production plan allots dev (item 7). It is a ceiling on the sum of the
+# memory LIMITS of every pod in this namespace, and it is ENFORCED AT ADMISSION: a pod whose limit
+# would take the namespace past 9 GiB is refused outright, with the arithmetic in the event.
+#
+# THIS IS TIGHT ON PURPOSE AND DEV IS NEARLY FULL. The rendered overlay comes to 8.875 GiB, so
+# there is about 128 MiB of headroom — room for nothing. That is the quota doing its job rather
+# than a mis-sizing: fourteen JVMs, Keycloak, Postgres, Redis, RabbitMQ, MinIO, Vault and mailpit
+# do not fit in 9 GiB with the margins any of them would prefer. The answer when dev next needs
+# something is the one the plan already gives (item 7, step 19): a second VPS for dev. Raising this
+# number instead takes the room back out of production.
+#
+# scripts/verify.sh adds up the rendered overlay and fails if it exceeds this figure, so the two
+# cannot drift.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: dev-memory
+spec:
+  hard:
+    limits.memory: 9Gi
+    # Requests are what the SCHEDULER reserves, and they are what decides whether a production pod
+    # can be placed at all. Capped well under the limit ceiling: dev's requests today are about
+    # 5.3 GiB, and nothing in dev should be able to reserve memory it does not use.
+    requests.memory: 6Gi
+---
+# The safety net under the quota above.
+#
+# A ResourceQuota that names limits.memory makes a memory limit COMPULSORY for every container in
+# the namespace: one without a limit is not defaulted, it is refused. For a Deployment that shows
+# up as a ReplicaSet that never produces a pod and an error two levels down from where anyone is
+# looking. This makes the failure impossible instead — a container that declares no limit gets
+# these, and starts.
+#
+# The defaults are deliberately small, so leaning on them is a mistake that surfaces as one pod
+# under pressure rather than as a namespace over budget. Everything in base/ declares its own
+# limits and scripts/verify.sh fails if one stops doing so; the one container that relies on this
+# is the `mc` bucket-bootstrap Job, whose spec is immutable once it has Completed and so cannot be
+# given limits without renaming the Job.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: dev-defaults
+spec:
+  limits:
+    - type: Container
+      default:
+        memory: 256Mi
+      defaultRequest:
+        memory: 128Mi

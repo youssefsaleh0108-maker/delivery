@@ -1,0 +1,44 @@
+# Who survives when the node runs out of memory.
+#
+# Applied once per cluster (kubectl apply -f), like cluster/traefik-config.yaml: a PriorityClass is
+# cluster-scoped, and both namespaces choose from the same two.
+#
+# The box is 8 vCPU / 23 GiB with NO SWAP, and it runs dev and production side by side. Without a
+# priority there is no difference between them: the scheduler preempts whatever it finds and the
+# kubelet, once the node crosses its eviction threshold, ranks candidates by QoS class and then by
+# how far over its REQUEST each pod is — an ordering in which a dev pod and a customer-facing one
+# are indistinguishable. This makes them distinguishable, in both places:
+#
+#   * The scheduler will preempt `dev-standard` pods to place a `prod-critical` one, and will never
+#     do the reverse.
+#   * The kubelet breaks its eviction ties by priority, lowest first.
+#
+# Neither is globalDefault. A default priority is invisible — every pod in the cluster silently
+# acquires it, including in namespaces nobody was thinking about — so each overlay names its class
+# on every workload, and scripts/verify.sh fails if one is missing.
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: prod-critical
+# Well below system-cluster-critical (2000000000) and system-node-critical: nothing here may
+# preempt kube-proxy, CoreDNS, Traefik or the kubelet's own static pods. Comfortably above
+# dev-standard, which is the only comparison that matters day to day.
+value: 1000000
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: >-
+  The production namespace (delivery-qa, which becomes production in place). Preempts dev when the
+  node is full, and is evicted last under memory pressure.
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: dev-standard
+value: 100
+globalDefault: false
+# Never preempts. A dev deploy that does not fit should WAIT, visibly, as a Pending pod with a
+# scheduling event — not make room for itself by evicting something a customer is using.
+preemptionPolicy: Never
+description: >-
+  The development namespace (delivery-dev). Never preempts anything, and is the first thing evicted
+  when the node runs short of memory.

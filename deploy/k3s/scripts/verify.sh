@@ -55,6 +55,10 @@ api /merchant-kyc/applications/8f2/8f2.jpg minio
 api /delivery-proof/8f2.jpg UNROUTED
 api /receipts/8f2.pdf UNROUTED
 api /webhooks/dlr sms-connector
+api /s/dekkanet-al-rawche-1a2b3c4d product-service
+api /s/dekkanet-al-rawche-1a2b3c4d/qr.png product-service
+api /s/assets/shop.css product-service
+api /sitemap.xml product-service
 '
 
 for env in dev qa; do
@@ -245,6 +249,64 @@ grep -q 'add_header Cache-Control "no-cache"' ../../clients/website/nginx.conf \
   && ok "the site revalidates its unhashed HTML, JS and config.js (PT-11)" \
   || fail "clients/website/nginx.conf has no server-level Cache-Control: the site goes stale again"
 
+echo "== the public shop page (/s/{slug}) =="
+# The one page on this platform a stranger opens with no app and no account. Three things about it
+# are decided here rather than in Java, so this is where they are checked.
+#
+# Every grep below reads a comment-STRIPPED copy of the rendered overlay. The route and its
+# middleware are documented at length in the template — including the sentence "there is no
+# contentSecurityPolicy here", which a check looking for that word would read as one.
+for env in dev qa; do
+  ing="$tmp/$env-ingress-nocomments.yaml"
+  sed 's/[[:space:]]*#.*$//' "overlays/$env/ingress.yaml" > "$ing"
+  shop_mw=$(awk 'BEGIN{RS="\n---"} /name: shop-page-headers/ {print}' "$ing" | tr -d '\n')
+  # THE LOAD-BEARING ONE. product-service sends the page's own Content-Security-Policy, built from
+  # the same setting that produced the image URLs in the markup and asserted by its own tests. A
+  # `headers` middleware that named a policy would REPLACE that header with a string nothing can
+  # test, and the first symptom would be every product photo silently blocked in the browser.
+  case "$shop_mw" in
+    *contentSecurityPolicy*) fail "$env shop-page-headers sets a CSP: it would replace the page's own" ;;
+    *) ok "$env shop-page-headers leaves the CSP to product-service" ;;
+  esac
+  case "$shop_mw" in
+    *"stsSeconds: 15552000"*"stsIncludeSubdomains: false"*"stsPreload: false"*)
+      ok "$env shop page HSTS matches the site's (180 days, no subdomains, no preload)" ;;
+    *) fail "$env shop page HSTS does not match the portal's and the site's" ;;
+  esac
+  grep -F -A9 "Host(\`api-$env.youdrop.shop\`) && (PathPrefix(\`/s/\`)" "$ing" \
+    | grep -q 'name: shop-page-compress' \
+    && ok "$env shop page is compressed on the way out" \
+    || fail "$env shop page is served uncompressed: it is read on a phone on 3G"
+done
+# www is ONE hostname and it points at ONE environment (clients/website/config.js). Rendering this
+# route into qa as well would put two identical routers on www in two namespaces and let whichever
+# synced last decide which environment's shops the public site serves.
+dev_ing="$tmp/dev-ingress-nocomments.yaml"
+qa_ing="$tmp/qa-ingress-nocomments.yaml"
+grep -q 'Host(`www.youdrop.shop`) && (PathPrefix(`/s/`)' "$dev_ing" \
+  && ok "dev serves the shop page on www, the address a shop prints" \
+  || fail "no www route for /s/: the canonical URL would 404 on the public site"
+grep -q 'Host(`www.youdrop.shop`)' "$qa_ing" \
+  && fail "qa also claims www: two routers on one public hostname, last sync wins" \
+  || ok "qa claims no www route"
+# The site's own router owns the whole of www (cluster/website.yaml). Traefik gives a rule with no
+# `priority` one equal to the LENGTH OF ITS RULE, so this route wins today by being the longer
+# string — which is not a thing to rely on across two files.
+grep -F -A2 'Host(`www.youdrop.shop`) && (PathPrefix(`/s/`)' "$dev_ing" | grep -q 'priority:' \
+  && ok "the www shop-page route outranks the site's catch-all explicitly" \
+  || fail "the www shop-page route has no explicit priority: the static site would answer /s/"
+# Both hostnames share one middleware list, by alias, so a change can never reach one and not the
+# other — the way a shop page with no compression on www and compression on the API host would.
+grep -F -A4 'Host(`www.youdrop.shop`) && (PathPrefix(`/s/`)' "$dev_ing" \
+  | grep -q 'middlewares: \*shop-page-mw' \
+  && ok "www and the API host serve the shop page through the same middlewares" \
+  || fail "the www shop-page route has a middleware list of its own: the two will drift"
+# A shop's page is the only thing on this platform a crawler can index, so the file that tells it
+# where to look has to name the sitemap the service serves.
+grep -q 'Sitemap: https://www.youdrop.shop/sitemap.xml' ../../clients/website/nginx.conf \
+  && ok "robots.txt points crawlers at the shop sitemap" \
+  || fail "clients/website/nginx.conf serves a robots.txt with no Sitemap line"
+
 echo "== the realm a fresh import would build (PT-3, PT-7) =="
 # Greps rather than jq: jq is not assumed anywhere in this script, and every value below is alone
 # on its line in the realm file. These assert the FILE, which is what a fresh database imports; a
@@ -330,6 +392,332 @@ after=$(printf '%s\n' "$step" | awk '/the token it replaced is refused/ {on = 1;
   && ok "nothing expects a token to be accepted after the replay" \
   || fail "$after assertion(s) expect a 200 after the replay, which has already revoked the session"
 
+echo "== every image is pinned (PIN-1) =="
+# A moving tag is a deployment nobody performed. The pod restarts for an unrelated reason, re-pulls
+# `:main` / `:latest` / `:qa` / `:develop` / `:3-management`, and comes back on a build nobody chose
+# at an hour nobody picked — with nothing in git to say it happened. That is how `minio:latest`
+# became an outage when Docker Hub stopped serving the repository.
+#
+# Two shapes are allowed and nothing else: a digest (`@sha256:<64 hex>`), which is the content
+# itself, or one of our own CI's `sha-<40 hex>` tags, which that CI never re-points.
+pinned() {   # pinned <image reference>
+  printf '%s' "$1" | grep -Eq '@sha256:[0-9a-f]{64}$|:sha-[0-9a-f]{40}$'
+}
+for f in base/data-layer.yaml base/identity.yaml base/services.yaml base/portal.yaml \
+         cluster/monitoring.yaml cluster/logging.yaml cluster/website.yaml cluster/traefik-config.yaml; do
+  sed -n 's/^ *image: *//p' "$f" | while read -r img; do
+    [ -n "$img" ] || continue
+    if pinned "$img"; then
+      ok "$f ${img##*/}"
+    else
+      echo "FAIL: $f pulls a moving tag: $img"
+      echo fail >> "$tmp/failed"
+    fi
+  done
+done
+# The overlays override those defaults, so an overlay may not reintroduce a moving tag either.
+for env in dev qa; do
+  bad_tags=$(sed -n 's/^ *newTag: *//p' "overlays/$env/kustomization.yaml" | grep -Ev '^sha-[0-9a-f]{40}$' | tr '\n' ' ')
+  [ -z "$bad_tags" ] \
+    && ok "$env overlay pins every newTag" \
+    || fail "$env overlay carries moving tag(s): $bad_tags"
+  bad_digests=$(sed -n 's/^ *digest: *//p' "overlays/$env/kustomization.yaml" | grep -Ev '^sha256:[0-9a-f]{64}$' | tr '\n' ' ')
+  [ -z "$bad_digests" ] \
+    && ok "$env overlay's digests are well formed" \
+    || fail "$env overlay has malformed digest(s): $bad_digests"
+done
+[ ! -f "$tmp/failed" ] || { fails=$((fails + $(wc -l < "$tmp/failed" | tr -d ' '))); rm -f "$tmp/failed"; }
+
+echo "== both overlays render (kubectl kustomize) =="
+# The one check that proves the whole document set parses AND that every patch still finds its
+# target. Skipped rather than failed where kubectl is absent, so this script still runs on a
+# machine that has no cluster tooling at all — but it is never silently skipped.
+if command -v kubectl >/dev/null 2>&1; then
+  for env in dev qa; do
+    if kubectl kustomize "overlays/$env" > "$tmp/render-$env.yaml" 2>"$tmp/render-$env.err"; then
+      ok "overlays/$env renders ($(grep -c '^kind:' "$tmp/render-$env.yaml") objects)"
+    else
+      fail "overlays/$env does not render: $(head -n3 "$tmp/render-$env.err" | tr '\n' ' ')"
+    fi
+  done
+  # cluster/ is applied with `kubectl apply -f`, not through an overlay, so nothing else here ever
+  # parses it. A kustomization that lists the files is the cheapest way to make the same parser
+  # read them — and these are the manifests whose failure mode is "monitoring did not come back".
+  mkdir -p "$tmp/cluster"
+  { echo 'apiVersion: kustomize.config.k8s.io/v1beta1'
+    echo 'kind: Kustomization'
+    echo 'resources:'
+    for f in cluster/*.yaml; do
+      # The Traefik HelmChartConfig's `valuesContent` is a Helm document, not Kubernetes objects,
+      # and kustomize has no schema for the CRD; it parses as YAML, which is all that is claimed.
+      case "$f" in *traefik-config.yaml) continue ;; esac
+      cp "$f" "$tmp/cluster/"
+      echo "  - ${f##*/}"
+    done
+  } > "$tmp/cluster/kustomization.yaml"
+  if kubectl kustomize "$tmp/cluster" > "$tmp/cluster-render.yaml" 2>"$tmp/cluster.err"; then
+    ok "cluster/ parses ($(grep -c '^kind:' "$tmp/cluster-render.yaml") objects)"
+  else
+    fail "cluster/ does not parse: $(head -n3 "$tmp/cluster.err" | tr '\n' ' ')"
+  fi
+else
+  echo "  --    kubectl not on PATH: the kustomize render is not checked here"
+fi
+
+echo "== one node, two environments: resource safety (PS-3) =="
+# Every container that base declares must carry its own memory limit. dev's ResourceQuota makes a
+# limit compulsory, and its LimitRange exists so that a missing one does not REFUSE the pod — but
+# leaning on that default is how a namespace quietly goes over budget, so the default should never
+# have anything to do. (The `mc` bootstrap container is the one exception: its Job has Completed,
+# and a Job's pod spec is immutable, so giving it limits means renaming the Job.)
+for f in base/data-layer.yaml base/identity.yaml base/services.yaml base/portal.yaml; do
+  missing=$(awk '
+    /^ *- name: [a-z0-9-]+$/ && match($0, /^ {8}- name: /) { if (c != "") { if (!seen) print c }; c = $NF; seen = 0 }
+    /^ *limits: *\{? *memory/ { seen = 1 }
+    /^ *limits: *$/ { inlim = 1; next }
+    inlim && /memory:/ { seen = 1; inlim = 0 }
+    END { if (c != "" && !seen) print c }
+  ' "$f" | grep -v -e '^realm$' -e '^theme$' -e '^bootstrap$' -e '^policies$' -e '^conf$' -e '^web$' -e '^init$' -e '^data$' -e '^mc$' | tr '\n' ' ')
+  [ -z "$missing" ] \
+    && ok "$f: every container declares a memory limit" \
+    || fail "$f: container(s) with no memory limit: $missing"
+done
+
+for env in dev qa; do
+  [ -s "$tmp/render-$env.yaml" ] || continue
+  want=prod-critical; [ "$env" = dev ] && want=dev-standard
+  # Count pod templates (every Deployment, StatefulSet and Job has exactly one) against the number
+  # that name a priority. A workload added later without one is what this catches.
+  templates=$(grep -c '^ *priorityClassName:' "$tmp/render-$env.yaml" || true)
+  workloads=$(grep -c '^kind: \(Deployment\|StatefulSet\|Job\|CronJob\)$' "$tmp/render-$env.yaml" || true)
+  [ "$templates" = "$workloads" ] && [ "$workloads" -gt 0 ] \
+    && ok "$env: all $workloads workloads carry a priorityClassName" \
+    || fail "$env: $workloads workloads but $templates priorityClassName(s)"
+  wrong=$(grep 'priorityClassName:' "$tmp/render-$env.yaml" | awk '{print $2}' | sort -u | grep -v "^$want$" | tr '\n' ' ')
+  [ -z "$wrong" ] \
+    && ok "$env: the priority is $want" \
+    || fail "$env: unexpected priority class(es): $wrong (expected $want)"
+  # The two policies that make the wall, and the mistake that silently removes it.
+  for pol in default-deny-ingress allow-same-namespace allow-edge allow-monitoring; do
+    grep -q "name: $pol" "$tmp/render-$env.yaml" \
+      && ok "$env: NetworkPolicy $pol" \
+      || fail "$env: no NetworkPolicy $pol — the two environments can reach each other"
+  done
+done
+# `namespaceSelector: {}` inside allow-same-namespace means "every namespace", which is the exact
+# opposite of what the policy is named for and is invisible in a diff that only reads the name.
+awk 'BEGIN{RS="\n---"} /name: allow-same-namespace/ {print}' base/network-policies.yaml \
+  | sed 's/#.*//' | grep -q 'namespaceSelector: *{}' \
+  && fail "allow-same-namespace uses an empty namespaceSelector: that admits EVERY namespace" \
+  || ok "allow-same-namespace admits only its own namespace"
+
+# Two things no manifest can assert, so the live steps that do are checked for instead: a PV's
+# reclaim policy (the PV does not exist until the PVC binds) and whether k3s enforces
+# NetworkPolicies at all (a cluster started with --disable-network-policy accepts them and does
+# nothing).
+for step in pv-retain netpol-proof; do
+  grep -q "^  $step)" scripts/rotate-secrets.sh \
+    && ok "rotate-secrets.sh has the $step step" \
+    || fail "rotate-secrets.sh has no $step step, and $step is not something a manifest can do"
+done
+grep -q 'persistentVolumeReclaimPolicy' scripts/rotate-secrets.sh \
+  && ok "pv-retain patches the reclaim policy" \
+  || fail "nothing sets persistentVolumeReclaimPolicy: deleting a PVC would delete the database"
+
+# dev's rendered limits against dev's own quota, from the same two files the cluster reads.
+if [ -s "$tmp/render-dev.yaml" ]; then
+  quota=$(awk '/^ *limits\.memory:/ { print $2; exit }' overlays/dev/resource-safety.yaml)
+  # A ResourceQuota counts RUNNING PODS, so this models the same thing: every Deployment,
+  # StatefulSet and Job contributes its pod, and a CronJob contributes its pod only if it is not
+  # suspended (a suspended one never creates one). Within a pod, initContainers count alongside
+  # containers because a native sidecar runs beside the main container rather than before it.
+  used=$(awk '
+    BEGIN { RS = "\n---\n" }
+    {
+      # The record ENDS just before the "\n---\n" separator, so the last line has no trailing
+      # newline of its own — hence (\n|$) rather than \n on the suspend match.
+      if ($0 ~ /(^|\n)kind: CronJob\n/ && $0 ~ /(^|\n)  suspend: true(\n|$)/) next
+      n = split($0, lines, "\n")
+      inlim = 0
+      for (i = 1; i <= n; i++) {
+        l = lines[i]
+        if (l ~ /^ *limits: *$/) { inlim = 1; continue }
+        if (!inlim) continue
+        if (l ~ /^ *(cpu|ephemeral-storage): /) continue
+        if (l ~ /^ *memory: /) {
+          split(l, f, ":"); v = f[2]; gsub(/ /, "", v); m = v + 0
+          if (v ~ /Mi$/) m *= 1048576; else if (v ~ /Gi$/) m *= 1073741824; else if (v ~ /Ki$/) m *= 1024
+          total += m
+        }
+        inlim = 0
+      }
+    }
+    END { printf "%d", total }
+  ' "$tmp/render-dev.yaml")
+  cap=$(printf '%s' "$quota" | awk '{ v = $0; n = v + 0; if (v ~ /Mi$/) n *= 1048576; else if (v ~ /Gi$/) n *= 1073741824; printf "%d", n }')
+  if [ "$used" -le "$cap" ]; then
+    ok "dev fits its own quota: $((used / 1048576))Mi of $quota ($(( (cap - used) / 1048576 ))Mi spare)"
+  else
+    fail "dev's rendered limits are $((used / 1048576))Mi, over its $quota ResourceQuota by $(( (used - cap) / 1048576 ))Mi: every pod in delivery-dev would be refused at admission"
+  fi
+fi
+
+# Production's Postgres asks for what it is allowed to use, so the kubelet's OOM score for it is
+# the lowest a container can have without a CPU limit.
+if [ -s "$tmp/render-qa.yaml" ]; then
+  # The StatefulSet's own document: the Service is also called postgres, and it has no resources.
+  # `^` anchors to the RECORD here, not the line, so both matches spell out the newline.
+  pg=$(awk 'BEGIN{RS="\n---\n"} /(^|\n)kind: StatefulSet\n/ && /(^|\n)  name: postgres\n/ {print}' "$tmp/render-qa.yaml")
+  pg_req=$(printf '%s\n' "$pg" | awk '/^ *requests: *$/ {inr=1;next} inr && /memory:/ {print $2; exit}')
+  pg_lim=$(printf '%s\n' "$pg" | awk '/^ *limits: *$/ {inl=1;next} inl && /memory:/ {print $2; exit}')
+  [ -n "$pg_req" ] && [ "$pg_req" = "$pg_lim" ] \
+    && ok "qa postgres requests what it may use ($pg_req = $pg_lim)" \
+    || fail "qa postgres requests $pg_req against a $pg_lim limit: it is evicted as if it were over budget"
+fi
+
+echo "== the safe value is the default (PD-1) =="
+# `env_literal <env> <KEY>` — what an overlay's platform-env sets, or empty.
+env_literal() { sed -n "s/^ *- \{0,4\}$2=//p" "overlays/$1/kustomization.yaml" | head -n1; }
+
+# A dev switch on platform-common is a dev switch in EVERY environment, production included, by
+# default and silently. These two are the ones that cost money or take an order: SIMULATE_WALLETS
+# offers a customer a wallet payment that never happens, for an order the platform then treats as
+# paid, and WHATSAPP_SIMULATOR_ENABLED replaces the Meta Cloud API with a loopback.
+for key in SIMULATE_WALLETS WHATSAPP_SIMULATOR_ENABLED; do
+  v=$(sed -n "s/^ *$key: *//p" base/configmap-common.yaml | tr -d '"')
+  [ "$v" = false ] \
+    && ok "platform-common defaults $key to false" \
+    || fail "platform-common has $key=$v: every environment inherits it, production included"
+done
+# The mail sink was the quietest one of all: a code delivered successfully to a mailbox nobody
+# reads, with no error anywhere. It is gone from the shared file, so an environment must name its
+# own relay — and if it forgets, this is what says so rather than a customer.
+for key in SMTP_HOST SMTP_PORT EMAIL_FROM; do
+  grep -qE "^ *$key:" base/configmap-common.yaml \
+    && fail "platform-common still carries $key: an environment that forgets mail config gets the sink" \
+    || ok "platform-common carries no $key"
+done
+case "$(sed -n 's/^ *NOMINATIM_USER_AGENT: *//p' base/configmap-common.yaml)" in
+  *-dev*) fail "platform-common's NOMINATIM_USER_AGENT still says -dev: that is what a live shop's geocoding would report" ;;
+  "") fail "platform-common sets no NOMINATIM_USER_AGENT; Nominatim refuses a request without one" ;;
+  *) ok "platform-common's Nominatim User-Agent is the honest one" ;;
+esac
+
+for env in dev qa; do
+  # Every environment must say what it is: the demo-storefront gate refuses to guess, and the
+  # production checks below have nothing to key on without it.
+  tier=$(env_literal "$env" ENVIRONMENT_TIER)
+  case "$tier" in
+    development|test|production) ok "$env declares ENVIRONMENT_TIER=$tier" ;;
+    "") fail "overlays/$env sets no ENVIRONMENT_TIER; the demo-storefront gate will refuse to run" ;;
+    *) fail "overlays/$env has ENVIRONMENT_TIER=$tier (expected development, test or production)" ;;
+  esac
+  # Six values, all of which used to come free from platform-common's mailpit defaults.
+  for key in SMTP_HOST SMTP_PORT SMTP_USER SMTP_AUTH SMTP_STARTTLS EMAIL_FROM; do
+    [ -n "$(env_literal "$env" "$key")" ] \
+      && ok "$env sets $key" \
+      || fail "overlays/$env sets no $key, and platform-common no longer provides one"
+  done
+
+  # THE PRODUCTION GATE. Everything here is allowed in a test environment and forbidden in a real
+  # one, and flipping ENVIRONMENT_TIER to production is what turns this from a list into a
+  # checklist: the failing run names, one by one, what is still to be changed.
+  [ "$tier" = production ] || continue
+  echo "-- $env is PRODUCTION"
+  # The test code sink keeps one-time codes in a table for the smoke tests to read. In production
+  # it is a table of live verification codes for anyone who reaches the database.
+  [ "$(env_literal "$env" TEST_CODE_SINK_ENABLED)" = true ] \
+    && fail "$env is production and TEST_CODE_SINK_ENABLED=true: live one-time codes would be kept in notification.test_code_sink" \
+    || ok "$env has no test code sink"
+  for key in SIMULATE_WALLETS WHATSAPP_SIMULATOR_ENABLED; do
+    [ "$(env_literal "$env" "$key")" = true ] \
+      && fail "$env is production and $key=true" \
+      || ok "$env has $key off"
+  done
+  for key in AUTO_APPROVE_RIDER AUTO_APPROVE_MERCHANT AUTO_APPROVE_CARRIER; do
+    [ "$(env_literal "$env" "$key")" = true ] \
+      && fail "$env is production and $key=true: applicants would be approved with nobody reading the documents" \
+      || ok "$env approves $key by hand"
+  done
+  case "$(env_literal "$env" SMTP_HOST)" in
+    mailpit|localhost|"") fail "$env is production and its mail goes to a sink" ;;
+    *) ok "$env mails through a real relay" ;;
+  esac
+  case "$(env_literal "$env" EMAIL_FROM)" in
+    *.local|*mydelivery*) fail "$env is production and EMAIL_FROM is a made-up domain: SPF and DKIM would both fail" ;;
+    *) ok "$env sends from a real domain" ;;
+  esac
+  [ "$(env_literal "$env" TRACKING_SERVICE_AREA_ENABLED)" = false ] \
+    && fail "$env is production with the rider service area off: a spoofed position from anywhere would be accepted" \
+    || ok "$env keeps the rider service area"
+done
+
+# The demo storefront: eight shops seeded into every fresh database by V12, which a migration
+# cannot gate.
+grep -q "demo-merchant" base/assets/demo-data/purge-demo-storefront.sh \
+  && ok "the demo storefront gate knows what to remove" \
+  || fail "base/assets/demo-data/purge-demo-storefront.sh does not identify the demo merchant"
+grep -q 'argocd.argoproj.io/hook: PostSync' base/demo-storefront-gate.yaml \
+  && ok "it runs after every sync, not once" \
+  || fail "the demo-storefront gate is not a PostSync hook, so it would run once and never again"
+grep -q 'ENVIRONMENT_TIER' base/demo-storefront-gate.yaml \
+  && ok "it is gated on the environment's tier" \
+  || fail "the demo-storefront gate is not gated: it would delete dev's demo shops too"
+
+echo "== backups (BK-1) =="
+for cj in postgres-backup minio-backup restore-test; do
+  grep -q "^  name: $cj$" base/backup.yaml \
+    && ok "CronJob $cj" \
+    || fail "base/backup.yaml has no $cj CronJob"
+done
+# Suspended in base, so a namespace created later starts safe instead of starting to upload.
+[ "$(grep -c '^  suspend: true$' base/backup.yaml)" = 3 ] \
+  && ok "all three ship suspended in base" \
+  || fail "base/backup.yaml must ship every backup CronJob suspended: an overlay opts in"
+if [ -s "$tmp/render-dev.yaml" ] && [ -s "$tmp/render-qa.yaml" ]; then
+  [ "$(grep -c '^  suspend: true$' "$tmp/render-dev.yaml")" = 3 ] \
+    && ok "dev keeps them suspended (its quota has no room for a backup pod)" \
+    || fail "dev un-suspends a backup CronJob: the pod would be refused by dev's ResourceQuota"
+  [ "$(grep -c '^  suspend: false$' "$tmp/render-qa.yaml")" = 3 ] \
+    && ok "qa runs all three" \
+    || fail "qa does not un-suspend the backup CronJobs, so nothing is backed up"
+fi
+# Every Secret these Jobs read must be optional, or the pod cannot START before the owner has
+# created it — which is a CreateContainerConfigError, not a message anybody can act on.
+for s in backup-rclone backup-age backup-deadman; do
+  n=$(grep -c "secretName: $s" base/backup.yaml || true)
+  opt=$(grep -A1 "secretName: $s" base/backup.yaml | grep -c 'optional: true' || true)
+  [ "$n" -gt 0 ] && [ "$n" = "$opt" ] \
+    && ok "$s is mounted optional in all $n place(s)" \
+    || fail "$s is mounted non-optionally: the backup pod would not start until it exists"
+done
+# ...and the scripts must then say what is missing and SUCCEED, rather than crash-looping.
+for f in base/assets/backup/postgres-backup.sh base/assets/backup/minio-backup.sh; do
+  grep -q 'NOT CONFIGURED' "$f" && grep -q '^  exit 0$' "$f" \
+    && ok "${f##*/} exits 0 when the destination is not configured" \
+    || fail "${f##*/} does not exit 0 when unconfigured: the CronJob would crash-loop"
+done
+# pg_dump refuses to dump a server NEWER than itself, so the backup image's major version must
+# never fall behind Postgres's. This is the check that catches a Postgres upgrade done alone.
+server_major=$(sed -n 's|.*image: postgis/postgis:\([0-9]*\)-.*|\1|p' base/data-layer.yaml | head -n1)
+dump_major=$(sed -n 's|.*image: postgres:\([0-9]*\)-alpine@.*|\1|p' base/backup.yaml | head -n1)
+[ -n "$server_major" ] && [ "$server_major" = "$dump_major" ] \
+  && ok "the backup image is Postgres $dump_major, the same major as the server" \
+  || fail "Postgres is $server_major and the backup image is $dump_major: pg_dump refuses a newer server"
+# A backup nobody can restore is not a backup, so the way back ships with the way out.
+[ -s scripts/restore.sh ] && grep -q 'into-live' scripts/restore.sh \
+  && ok "scripts/restore.sh exists and can restore into a live environment" \
+  || fail "there is no scripts/restore.sh"
+grep -q 'Backups' README.md && grep -q 'lifecycle' README.md \
+  && ok "README documents the backups and their retention" \
+  || fail "README.md does not document the backups"
+# Nothing on this branch may print a secret. These scripts read passwords from the environment and
+# keys from mounted files; an echo of either is the bug this catches.
+leak=$(grep -n 'echo.*\$\(PGPASSWORD\|MINIO_ROOT_PASSWORD\|AGE\)' base/assets/backup/*.sh scripts/restore.sh | tr '\n' ' ')
+[ -z "$leak" ] \
+  && ok "no backup script echoes a credential" \
+  || fail "a backup script prints a credential: $leak"
+
 echo "== every YAML alias resolves =="
 # A ConfigMap's `data:` values are strings to Kubernetes, so a dangling `*alias` inside one is
 # waved through by kubectl and by kustomize and only fails when Prometheus or Grafana parses it —
@@ -359,6 +747,98 @@ for f in $(find base cluster overlays -name '*.yaml'); do
   fi
 done
 [ "${dangling:-0}" = 1 ] || ok "no dangling aliases in base, cluster or overlays"
+
+echo "== alerting: it reaches somebody (AL-1) =="
+mon=cluster/monitoring.yaml
+alert=cluster/alerting.yaml
+# A Prometheus with rules and no Alertmanager behind it is what both environments ran for their
+# whole lives: every rule evaluated, every alert marked firing, nobody told.
+grep -q '^    alerting:' "$mon" && grep -q 'targets: \["alertmanager:9093"\]' "$mon" \
+  && ok "Prometheus sends firing alerts to Alertmanager" \
+  || fail "cluster/monitoring.yaml has no alerting: block, so nothing leaves Prometheus"
+for want in alertmanager node-exporter kube-state-metrics; do
+  grep -q "name: $want$" "$alert" \
+    && ok "$want is deployed" \
+    || fail "cluster/alerting.yaml does not deploy $want"
+done
+grep -q 'smtp_auth_password_file' "$alert" \
+  && ok "the relay password is read from a file, not written in the ConfigMap" \
+  || fail "Alertmanager's SMTP password is not a _file reference: it would be in the ConfigMap"
+grep -q 'smtp_password\|smtp_auth_password:' "$alert" \
+  && fail "cluster/alerting.yaml contains a literal SMTP password" \
+  || ok "no literal SMTP password in cluster/alerting.yaml"
+grep -q 'alertmanager-smtp' scripts/setup-monitoring.sh \
+  && ok "setup-monitoring.sh copies the relay password into monitoring" \
+  || fail "nothing creates alertmanager-smtp, so every alert email fails to send"
+grep -q 'cluster/alerting.yaml' scripts/setup-monitoring.sh \
+  && ok "setup-monitoring.sh applies cluster/alerting.yaml" \
+  || fail "setup-monitoring.sh never applies cluster/alerting.yaml"
+# Telegram must be OFF by being absent. Alertmanager validates its whole configuration at startup
+# and refuses to start on a half-filled receiver — which would take monitoring down entirely.
+awk '/telegram_configs:/ && $0 !~ /^ *#/ { found = 1 } END { exit !found }' "$alert" \
+  && fail "an active telegram receiver is configured; a placeholder chat_id stops Alertmanager starting" \
+  || ok "Telegram is off (the receiver is commented, with instructions)"
+# kube-state-metrics must not be able to read Secrets: `list` on secrets returns their values.
+awk 'BEGIN{RS="\n---\n"} /(^|\n)kind: ClusterRole\n/ && /kube-state-metrics/ {print}' "$alert" \
+  | sed 's/#.*//' | grep -q 'secrets' \
+  && fail "the kube-state-metrics ClusterRole grants access to secrets, which returns their values" \
+  || ok "kube-state-metrics cannot read Secrets"
+grep -q 'metrics.prometheus=true' cluster/traefik-config.yaml \
+  && ok "Traefik exports its metrics (5xx, 429 and certificate expiry)" \
+  || fail "Traefik metrics are off: nothing can see the 5xx rate, the 429 rate or a certificate about to expire"
+sed 's/#.*//' cluster/traefik-config.yaml | grep -q 'entrypoints\.metrics\.address' \
+  && fail "a new Traefik entrypoint is defined for metrics: a name collision with the chart's own takes the whole edge down" \
+  || ok "Traefik metrics reuse the chart's existing entrypoint"
+grep -q 'postgres-exporter' base/data-layer.yaml \
+  && ok "the Postgres connection count has an exporter behind it" \
+  || fail "nothing exports pg_stat_activity_count, so the connection alert can never fire"
+
+# Every rule the production plan asks for, by name.
+for a in NodeDiskFilling NodeMemoryCritical PodCrashLooping JobFailed BackupDidNotReport \
+         CertificateExpiringSoon HighServerErrorRate PostgresConnectionsHigh \
+         RateLimitRejectionsHigh SmsRateHigh SettlementFailuresRecorded RestoreTestFailing; do
+  grep -q "alert: $a$" "$mon" \
+    && ok "rule $a" \
+    || fail "no alert rule called $a"
+done
+# ...and each one has an expression. An alert with no expr is not a rule, it is a comment.
+noexpr=$(awk '
+  /^ *- alert: / { name = $3; seen = 0 }
+  /^ *expr: / { if (name != "") seen = 1 }
+  /^ *- alert: / && prev != "" && !prevseen { print prev }
+  { if ($0 ~ /^ *- alert: /) { prev = name; prevseen = 0 } else if ($0 ~ /^ *expr: /) prevseen = 1 }
+  END { if (prev != "" && !prevseen) print prev }
+' "$mon" | tr '\n' ' ')
+[ -z "$noexpr" ] \
+  && ok "every alert rule has an expression" \
+  || fail "alert rule(s) with no expr: $noexpr"
+
+# A rule whose metric nothing produces never fires, and looks exactly like a rule that is fine.
+# Every custom metric an expression names is resolved back to whatever emits it.
+#
+# PENDING is the honest half: these two need a service change this branch does not own (see the
+# report). They are listed here so the gap is visible and so removing a name from this line is the
+# entire edit once the metric exists.
+PENDING_METRICS="delivery_sms_sent_total delivery_settlement_failures"
+for m in $(grep -o 'delivery_[a-z_]*\|youdrop_[a-z_]*' "$mon" | sort -u); do
+  case " $PENDING_METRICS " in
+    *" $m "*)
+      ok "$m is PENDING a service change (the rule is written and waiting)"
+      continue ;;
+  esac
+  # Micrometer names its meters with dots and Prometheus exports them with underscores, and which
+  # separator sits where is not recoverable from the exported name — so each `_` is allowed to be
+  # either. `_total` is the suffix Prometheus adds to a counter. Main sources only: a test that
+  # asserts on the scraped name is not something that produces the metric.
+  pat=$(printf '%s' "$m" | sed 's/_total$//; s/_/[._]/g')
+  if grep -rEq "\"$pat\"" --include='*.java' ../../platform/*/src/main ../../services/*/src/main 2>/dev/null; then
+    ok "$m is registered by a service"
+  elif grep -q "$m" base/assets/backup/*.sh; then
+    ok "$m is written by a backup job (node-exporter textfile)"
+  else
+    fail "the rules use $m and nothing in this repository produces it: that alert can never fire"
+  fi
+done
 
 echo "== monitoring =="
 mon=cluster/monitoring.yaml

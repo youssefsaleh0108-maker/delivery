@@ -1,7 +1,8 @@
 #!/bin/sh
 # Carrier delivery receipts (DLRs) — proving the platform can tell "accepted" from "arrived".
 #
-#   cd infra && docker run --rm --network delivery -v "$PWD/smoke-test-dlr.sh:/smoke.sh:ro" \
+#   cd infra && docker run --rm --network delivery \
+#     -e DEMO_BACKOFFICE_PASSWORD -v "$PWD/smoke-test-dlr.sh:/smoke.sh:ro" \
 #     alpine:latest sh -c "apk add --no-cache curl jq openssl >/dev/null && sh /smoke.sh"
 #
 # NOTE: needs `openssl` as well as curl/jq — the signature is the whole point, so the script has to
@@ -40,8 +41,10 @@ check() {
 }
 
 token() {
-  curl -s -X POST "$KC" -d "client_id=${3:-mobile-app}" \
-    -d "username=$1" -d "password=$2" -d "grant_type=password" | jq -r '.access_token'
+  printf '%s' "$2" | curl -s -X POST "$KC" \
+    -d "client_id=${3:-mobile-app}" \
+    --data-urlencode "username=$1" --data-urlencode "password@-" \
+    -d "grant_type=password" | jq -r '.access_token'
 }
 
 sign() { # sign <body>
@@ -57,7 +60,11 @@ psql_one() {
   psql -h "$PG" -U delivery -d delivery -t -A -c "$1" 2>/dev/null | head -1
 }
 
-BACKOFFICE=$(token backoffice 400004 mobile-app)
+# The demo logins' passwords, from the environment's demo-logins Secret, supplied by whoever runs
+# this — they were literals here, and the repository was public. On the box, for example:
+#   DEMO_CUSTOMER_PASSWORD=$(kubectl -n delivery-dev get secret demo-logins -o jsonpath='{.data.customer}' | base64 -d)
+: "${DEMO_BACKOFFICE_PASSWORD:?set DEMO_BACKOFFICE_PASSWORD from the demo-logins Secret}"
+BACKOFFICE=$(token backoffice "$DEMO_BACKOFFICE_PASSWORD" mobile-app)
 [ -n "$BACKOFFICE" ] && [ "$BACKOFFICE" != null ] || { echo 'No backoffice token'; exit 1; }
 
 echo

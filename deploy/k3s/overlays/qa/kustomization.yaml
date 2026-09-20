@@ -11,6 +11,20 @@ resources:
 configMapGenerator:
   - name: platform-env
     literals:
+      # What this environment IS, and the switch that turns it into production.
+      #
+      # `test` today. Changing this one line to `production` is what makes the cutover real:
+      # base/demo-storefront-gate.yaml then deletes the eight demo shops and proves they are gone,
+      # and scripts/verify.sh starts REFUSING every line below that is marked "test only" —
+      # TEST_CODE_SINK_ENABLED, SIMULATE_WALLETS, WHATSAPP_SIMULATOR_ENABLED. So the failing
+      # verify run is the checklist: it names, one by one, everything still to be changed.
+      - ENVIRONMENT_TIER=test
+      # TEST ONLY, and each must go when the line above says production (PD-1). They are here
+      # rather than in platform-common because a default in a shared file is a default production
+      # inherits silently — SIMULATE_WALLETS in particular offers a customer a wallet payment that
+      # never happens, for an order the platform then treats as paid.
+      - SIMULATE_WALLETS=true
+      - WHATSAPP_SIMULATOR_ENABLED=true
       - KEYCLOAK_PUBLIC_URL=https://iam-qa.youdrop.shop
       - KEYCLOAK_ISSUER_URI=https://iam-qa.youdrop.shop/realms/delivery-platform
       - MINIO_PUBLIC_ENDPOINT=https://api-qa.youdrop.shop
@@ -51,35 +65,112 @@ patches:
         path: /spec/template/spec/volumes/1/hostPath/path
         value: /opt/delivery/sites/qa/portal
 
-# Which build each service runs. CI rewrites these lines after every image build on this
-# environment's branch (see reusable-service-ci.yml, update-environment-manifest) and Argo CD
-# deploys the result — edit by merge, not by hand.
+  # -------------------------------------------------------------------------- resource safety
+  # This namespace becomes production in place, on a node it shares with dev. See
+  # cluster/priority-classes.yaml: `prod-critical` is what makes the scheduler preempt dev to place
+  # a pod here, and what puts this namespace last in the kubelet's eviction order. `name: .*` is a
+  # regex, so a workload added later cannot forget it, and scripts/verify.sh fails if any pod in
+  # the rendered overlay has no priorityClassName.
+  #
+  # There is deliberately no ResourceQuota here. dev gets one because dev is the half that may be
+  # squeezed; a quota on production would mean a pod refused at admission during an incident.
+  - target: { kind: Deployment, name: ".*" }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/priorityClassName
+        value: prod-critical
+  - target: { kind: StatefulSet, name: ".*" }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/priorityClassName
+        value: prod-critical
+  - target: { kind: Job, name: ".*" }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/priorityClassName
+        value: prod-critical
+  - target: { kind: CronJob, name: ".*" }
+    patch: |-
+      - op: add
+        path: /spec/jobTemplate/spec/template/spec/priorityClassName
+        value: prod-critical
+
+  # ------------------------------------------------------------------------------- backups ON
+  # base/backup.yaml ships all three suspended, so a namespace created later starts safe rather
+  # than starting to upload. This is the environment whose data matters, so this is where they run.
+  #
+  # Un-suspending them does NOT start backing anything up on its own: until the `backup-rclone` and
+  # `backup-age` Secrets exist on the box, each run says what is missing and exits 0, and the
+  # BackupNotConfigured alert is what reports the state. See base/backup.yaml for the exact keys.
+  - target: { kind: CronJob, name: "^(postgres-backup|minio-backup|restore-test)$" }
+    patch: |-
+      - op: replace
+        path: /spec/suspend
+        value: false
+
+  # Postgres asks for exactly what it is allowed to use.
+  #
+  # Base requests 512Mi against a 1536Mi limit, which is Burstable: the kubelet computes a
+  # container's OOM score from how far its usage sits above its REQUEST, so a Postgres using 1.2
+  # GiB of its legitimate 1.5 GiB scores as a process 700 MiB over budget and is a prime candidate
+  # — ahead of a dev JVM sitting quietly inside its own request. With request == limit that
+  # arithmetic disappears and Postgres becomes the last thing on the node the kernel reaches for.
+  # It also means the scheduler reserves the whole 1.5 GiB, so nothing else can be placed into
+  # memory Postgres is entitled to.
+  #
+  # CPU is deliberately left alone: platform-common's JVM flags are chosen for a node with NO CPU
+  # limits (see its comment), so adding one here would change the thing that comment warns about.
+  # The pod's QoS class therefore stays Burstable; the protection being bought is the memory one.
+  - target: { kind: StatefulSet, name: postgres }
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 1536Mi
+
+# Which build each service runs.
+#
+# PIN-1. Every line here used to be a MOVING tag: `:main` for the thirteen GHCR services and `:qa`
+# for order-manager. That is the one thing an environment becoming production cannot keep. A pod
+# restarts for an unrelated reason — an eviction, a node reboot, a limit breach — re-pulls the tag,
+# and comes back on a build nobody chose, at an hour nobody picked, with no diff anywhere saying
+# so. The plan calls this "build once, then promote that same build" (item 11).
+#
+# These digests are what each tag resolved to on 2026-09-20, so this is a PIN, not a promotion:
+# applying it does not change which build qa runs, it freezes it. order-manager is by digest rather
+# than by an immutable tag because its CI published no `sha-` tag for the build `:qa` points at
+# (2026-09-04); every other repository publishes one, and the promotion PR below uses those.
+#
+# THE LAUNCH BUILD IS A SEPARATE, DELIBERATE DECISION. To promote the build that has soaked on dev,
+# replace each digest here with the `sha-` tag from overlays/dev/kustomization.yaml — today
+# `sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7` for all thirteen, and
+# `sha-044d1b8b2a5b22d6143bbfa05ec8b688f35d564f` for order-manager — in a PR of its own, so the
+# build change is reviewable on its own and revertible on its own.
 images:
 - name: docker.io/youssefsaleh0108/delivery-order-manager
-  newTag: qa
+  digest: sha256:36f360f3045aef2c91144d39c7e6761b220a95646dbbc707733cd6bd8a45b980
 - name: ghcr.io/youssefsaleh0108-maker/product-service
-  newTag: main
+  digest: sha256:ab4f0830681a0a5b90d7c6986c7c372a91dc72675ec8337b13e0de7ac160c149
 - name: ghcr.io/youssefsaleh0108-maker/order-tracking
-  newTag: main
+  digest: sha256:96de584f61d12551653f6b51886d96be27e1d198846a9e4abed4a58bffda4bf2
 - name: ghcr.io/youssefsaleh0108-maker/transfer-service
-  newTag: main
+  digest: sha256:d8efdc08b775a5394a09c4be33cef0b29ddc1ba5175c0e5ed73160a0237b55c9
 - name: ghcr.io/youssefsaleh0108-maker/connector-settings
-  newTag: main
+  digest: sha256:75b3440e03e21c38b0371e630fac021083fd28aa274093f028258d5a15633e0c
 - name: ghcr.io/youssefsaleh0108-maker/notifications-manager
-  newTag: main
+  digest: sha256:f8833f4ebb6a1847ee7e0df4659103c0e40b5f62a344ee9b998dc04582be6763
 - name: ghcr.io/youssefsaleh0108-maker/app-notification
-  newTag: main
+  digest: sha256:960550e6835c6390565cb7c2a04072918f7e99613a5cecb8d055b696b795ce69
 - name: ghcr.io/youssefsaleh0108-maker/email-connector
-  newTag: main
+  digest: sha256:ec4a96919e0be4cee09f98eb2c93c92cec8216497db8bf8b0239c22c16e03858
 - name: ghcr.io/youssefsaleh0108-maker/push-connector
-  newTag: main
+  digest: sha256:03a6da0263b6a176ae1d6817fdd2669c9476aa2cc242103851bbc9ea8253e1ec
 - name: ghcr.io/youssefsaleh0108-maker/sms-connector
-  newTag: main
+  digest: sha256:f93938c00c2c6c374437e8742829d8b92cf707f63b50eeb5db62eeabc286150f
 - name: ghcr.io/youssefsaleh0108-maker/accounting-service
-  newTag: main
+  digest: sha256:2a5ba1fe3896de69a2c004f905da84c986a324017639e99bc22cfa7cb74f9856
 - name: ghcr.io/youssefsaleh0108-maker/whatsapp-service
-  newTag: main
+  digest: sha256:88f3d7d7b9a390ce739521079d7bf00f43953f8c1409ef31e13c82dcd0b50d7d
 - name: ghcr.io/youssefsaleh0108-maker/onboarding-service
-  newTag: main
+  digest: sha256:bf09063e374ca11878f920be575935dc4caadff914d0a0f8e9210bf4cc180e8a
 - name: ghcr.io/youssefsaleh0108-maker/config-server
-  newTag: main
+  digest: sha256:807169e4e6ac7185f2d90d1bd45044e0b72e3d9d2e62846bcec184ee6a2529f5

@@ -214,12 +214,15 @@ public class SettlementRecovery {
      * <ul>
      *   <li>the wrap fee lives inside {@code gift} on the REST shape and beside the fee on the
      *       event, so it is lifted out;</li>
-     *   <li>{@code deliveryProviderAccount} is deliberately not on the REST shape — knowing who
-     *       delivered an order is reasonable, knowing where they bank is not. What it decides here
-     *       is only whether the fee is a company's or the rider's own, which {@code
-     *       deliveryProviderId} answers, so the company's leg is booked to the unmapped account:
-     *       the amount, the counterparty and the statement are right, and the account reads as the
-     *       placeholder it is. Nothing posts it anywhere, because no bank is deployed.</li>
+     *   <li>{@code deliveryProviderAccount} now comes from Order Manager, which exposes it on this
+     *       read to the back office alone — whose token this is. A re-driven settlement therefore
+     *       credits the company's PROVIDER_CREDIT to the account it would have been credited to
+     *       had the event never been lost, instead of to the unmapped account. The old fallback
+     *       stays for the orders that have none: an order dispatched before the account was
+     *       recorded, or a deployment whose Order Manager predates the field. There the amount,
+     *       the counterparty and the statement are still right and the account reads as the
+     *       placeholder it is. Nothing posts it anywhere either way, because no bank is
+     *       deployed.</li>
      * </ul>
      */
     ObjectNode asDeliveredEvent(JsonNode order) {
@@ -241,7 +244,12 @@ public class SettlementRecovery {
         }
         if (!order.path("deliveryProviderId").isNull()
                 && !order.path("deliveryProviderId").asText("").isBlank()) {
-            event.put("deliveryProviderAccount", unmappedAccount);
+            // Where the company is actually paid, when Order Manager told us. Only its presence
+            // decides whether the fee is a company's or a rider's own, so the fallback keeps the
+            // leg on the right side of that question for an order that carries no account.
+            String account = order.path("deliveryProviderAccount").asText("");
+            event.put("deliveryProviderAccount",
+                    account.isBlank() ? unmappedAccount : account);
         }
         return event;
     }

@@ -1,7 +1,8 @@
 #!/bin/sh
 # Phase 2 end-to-end smoke test: the full order lifecycle through the API Gateway.
 #
-#   cd infra && docker run --rm --network delivery -v "$PWD/smoke-test-phase2.sh:/smoke.sh:ro" \
+#   cd infra && docker run --rm --network delivery \
+#     -e DEMO_CUSTOMER_PASSWORD -e DEMO_RIDER_PASSWORD -e DEMO_MERCHANT_PASSWORD -e DEMO_BACKOFFICE_PASSWORD -v "$PWD/smoke-test-phase2.sh:/smoke.sh:ro" \
 #     alpine:latest sh -c "apk add --no-cache curl jq >/dev/null && sh /smoke.sh"
 #
 # Exercises the state machine, cross-role authorisation, the outbox -> RabbitMQ -> tracking
@@ -27,8 +28,10 @@ check() {
 }
 
 token() {
-  curl -s -X POST "$KC" -d "client_id=${3:-mobile-app}" \
-    -d "username=$1" -d "password=$2" -d "grant_type=password" | jq -r '.access_token'
+  printf '%s' "$2" | curl -s -X POST "$KC" \
+    -d "client_id=${3:-mobile-app}" \
+    --data-urlencode "username=$1" --data-urlencode "password@-" \
+    -d "grant_type=password" | jq -r '.access_token'
 }
 
 claim_of() {
@@ -49,10 +52,14 @@ status() { # status <method> <path> <token> [body]
 echo
 echo '=== 0. Actors ==================================================================='
 
-CUSTOMER=$(token customer 100001 mobile-app)
-RIDER=$(token rider 300003 mobile-app)
-MERCHANT=$(token merchant 200002 mobile-app)
-BACKOFFICE=$(token backoffice 400004 mobile-app)
+# The demo logins' passwords, from the environment's demo-logins Secret, supplied by whoever runs
+# this — they were literals here, and the repository was public. On the box, for example:
+#   DEMO_CUSTOMER_PASSWORD=$(kubectl -n delivery-dev get secret demo-logins -o jsonpath='{.data.customer}' | base64 -d)
+: "${DEMO_CUSTOMER_PASSWORD:?set DEMO_CUSTOMER_PASSWORD from the demo-logins Secret}" "${DEMO_RIDER_PASSWORD:?set DEMO_RIDER_PASSWORD from the demo-logins Secret}" "${DEMO_MERCHANT_PASSWORD:?set DEMO_MERCHANT_PASSWORD from the demo-logins Secret}" "${DEMO_BACKOFFICE_PASSWORD:?set DEMO_BACKOFFICE_PASSWORD from the demo-logins Secret}"
+CUSTOMER=$(token customer "$DEMO_CUSTOMER_PASSWORD" mobile-app)
+RIDER=$(token rider "$DEMO_RIDER_PASSWORD" mobile-app)
+MERCHANT=$(token merchant "$DEMO_MERCHANT_PASSWORD" mobile-app)
+BACKOFFICE=$(token backoffice "$DEMO_BACKOFFICE_PASSWORD" mobile-app)
 
 MERCHANT_SUB=$(claim_of "$MERCHANT" '.sub')
 RIDER_SUB=$(claim_of "$RIDER" '.sub')
@@ -64,6 +71,12 @@ done
 echo "  customer, rider, merchant, backoffice tokens obtained"
 
 # A second rider, to prove one rider cannot touch another's delivery.
+#
+# Its passcode is drawn fresh each run and set on the account below, like the accounts the
+# onboarding smokes create: rider2 stays on the environment after this script ends, and a passcode
+# written in a public file would make it a login anybody could use. Nothing here prints it.
+pc() { printf '%06d' $(( $(od -An -N4 -tu4 /dev/urandom | tr -d ' ') % 1000000 )); }
+RIDER2_PC=$(pc)
 ADMIN=$(curl -s -X POST "$KC_ADMIN/realms/master/protocol/openid-connect/token" \
   -d 'client_id=admin-cli' -d 'grant_type=password' -d "username=${KEYCLOAK_ADMIN:-admin}" -d "password=${KEYCLOAK_ADMIN_PASSWORD:-admin}" | jq -r '.access_token')
 curl -s -o /dev/null -X POST "$KC_ADMIN/admin/realms/delivery-platform/users" \
@@ -75,13 +88,13 @@ R2_ID=$(curl -s "$KC_ADMIN/admin/realms/delivery-platform/users?username=rider2&
 curl -s -o /dev/null -X PUT \
   "$KC_ADMIN/admin/realms/delivery-platform/users/$R2_ID/reset-password" \
   -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' \
-  -d '{"type":"password","value":"300013","temporary":false}'
+  -d "{\"type\":\"password\",\"value\":\"$RIDER2_PC\",\"temporary\":false}"
 ROLE=$(curl -s "$KC_ADMIN/admin/realms/delivery-platform/roles/DELIVERY" \
   -H "Authorization: Bearer $ADMIN" | jq -c '{id,name}')
 curl -s -o /dev/null -X POST \
   "$KC_ADMIN/admin/realms/delivery-platform/users/$R2_ID/role-mappings/realm" \
   -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' -d "[$ROLE]"
-RIDER2=$(token rider2 300013 mobile-app)
+RIDER2=$(token rider2 "$RIDER2_PC" mobile-app)
 check 'second rider provisioned' 'DELIVERY' \
   "$(claim_of "$RIDER2" '.realm_access.roles[]' | grep -x DELIVERY || echo none)"
 

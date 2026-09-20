@@ -1,0 +1,104 @@
+/*
+  The public shop page. Phone first, one file, no font.
+
+  Colours are the platform's, lifted from clients/website/site.css so a shop's page and the site it
+  links to are plainly the same company. No @font-face: this page is opened on a phone on 3G to
+  find out whether a shop is open, and a typeface is the largest thing that could be made to load
+  before the answer appears. Logical properties throughout (inline-start, padding-inline), so the
+  Arabic rendering is the same stylesheet mirrored by dir="rtl" rather than a second set of rules.
+*/
+:root {
+  --brand: #E11D48;
+  --ink: #0F172A;
+  --muted: #475569;
+  --faint: #94A3B8;
+  --border: #E2E8F0;
+  --bg: #F8FAFC;
+  --white: #FFF;
+  --emerald: #10B981;
+  --amber: #B45309;
+  --r: 12px;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Naskh Arabic", sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+.shop { max-width: 720px; margin: 0 auto; background: var(--white); }
+h1 { font-size: 1.55rem; line-height: 1.2; margin: 0 0 4px; }
+h2 { font-size: 1.05rem; margin: 0 0 10px; }
+h3 { font-size: .92rem; margin: 18px 0 8px; color: var(--muted); font-weight: 600; }
+p { margin: 0 0 8px; }
+ul { margin: 0; padding: 0; list-style: none; }
+a { color: var(--brand); }
+
+.hero .cover { display: block; width: 100%; height: 190px; object-fit: cover; background: var(--border); }
+.head { padding: 16px; border-bottom: 1px solid var(--border); }
+.logo {
+  width: 64px; height: 64px; border-radius: var(--r); object-fit: cover;
+  border: 1px solid var(--border); background: var(--white); display: block;
+  margin-block-start: -46px; margin-block-end: 10px; position: relative;
+}
+.what { color: var(--muted); margin-block-end: 10px; }
+.tagline { font-weight: 600; }
+.about { color: var(--muted); }
+
+.badges { display: flex; flex-wrap: wrap; gap: 6px; margin-block-end: 10px; }
+.badges li {
+  font-size: .8rem; padding: 4px 10px; border-radius: 100px;
+  background: var(--bg); border: 1px solid var(--border); color: var(--muted);
+}
+.badges .open { background: #ECFDF5; border-color: #A7F3D0; color: #047857; font-weight: 600; }
+.badges .shut { background: #FEF2F2; border-color: #FECACA; color: #B91C1C; font-weight: 600; }
+.badges .power.generator { background: #FFFBEB; border-color: #FDE68A; color: var(--amber); }
+.badges .power.dark { background: #F1F5F9; border-color: #CBD5E1; color: #334155; }
+.badges .power.mains { background: #ECFDF5; border-color: #A7F3D0; color: #047857; }
+
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tags li { font-size: .78rem; color: var(--faint); }
+.tags li::before { content: "#"; }
+
+.block { padding: 16px; border-bottom: 1px solid var(--border); }
+.facts li, .areas li { padding: 3px 0; }
+.areas { display: flex; flex-wrap: wrap; gap: 6px; }
+.areas li {
+  font-size: .82rem; padding: 3px 10px; border-radius: 100px; background: var(--bg);
+  border: 1px solid var(--border);
+}
+.note { color: var(--faint); font-size: .82rem; }
+
+.hours table { width: 100%; border-collapse: collapse; }
+.hours th, .hours td { text-align: start; padding: 5px 0; font-weight: 400; vertical-align: top; }
+.hours td { color: var(--muted); }
+.hours .today th, .hours .today td { font-weight: 700; color: var(--ink); }
+.hours .now { color: var(--brand); font-size: .75rem; font-weight: 600; }
+
+.items { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.items li {
+  border: 1px solid var(--border); border-radius: var(--r); padding: 8px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.items img {
+  width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px;
+  background: var(--bg); margin-block-end: 6px;
+}
+.items .n { font-size: .9rem; font-weight: 600; }
+.items .p { font-size: .84rem; color: var(--muted); }
+.items .x { font-size: .75rem; color: #B91C1C; font-weight: 600; }
+.items .gone { opacity: .55; }
+
+.cta {
+  display: inline-block; background: var(--brand); color: var(--white); text-decoration: none;
+  padding: 11px 20px; border-radius: 100px; font-weight: 600;
+}
+.qr { font-size: .88rem; }
+.foot { padding: 16px; }
+.missing { padding: 48px 16px; text-align: center; }
+
+@media (min-width: 560px) {
+  .items { grid-template-columns: repeat(3, 1fr); }
+  .hero .cover { height: 260px; }
+}

@@ -2,7 +2,7 @@
 # F: the carrier's hand-over (twice at once), the company paying the platform (twice at once), and
 # the platform rider banking their takings. Then the float and ledger invariants.
 . /dev/shm/recon/lib.sh
-RIDER=$(tok rider); CARR=$(tok carrier); BACK=$(tok backoffice delivery-portal)
+RIDER=$(tok rider); CARR=$(tok carrier); BACK=$(tok backoffice)
 RSUB=$(sub_of "$RIDER")
 COMPANY=5857ac51-ef54-4c80-b50c-750998e50986
 

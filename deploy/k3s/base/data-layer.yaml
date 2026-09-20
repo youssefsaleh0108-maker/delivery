@@ -19,7 +19,12 @@ spec:
     spec:
       containers:
         - name: postgres
-          image: postgis/postgis:17-3.5
+          # postgis/postgis:17-3.5, pinned by digest (PIN-1). A floating tag on a StatefulSet is
+          # the sharpest edge on this box: the pod restarts for any ordinary reason, pulls a newer
+          # 17-3.5 build, and the first thing it does with the data directory is whatever that
+          # build's entrypoint decides. Upgrade deliberately, by changing the digest — and take a
+          # backup first (scripts/restore.sh documents the way back).
+          image: postgis/postgis:17-3.5@sha256:01a6a70e41e6c4467c8f55f6063555ed72db2d6662cd0d571040d42eadaeb6f6
           args:
             # The compose box starved this at 384m; the upgraded node can afford a real buffer
             # pool. Still modest — two environments share the machine.
@@ -86,6 +91,59 @@ spec:
     - port: 5432
       targetPort: 5432
 ---
+# How many connections are open, and whether the database is answering at all.
+#
+# Postgres allows 200 connections, three reserved for superusers, and the README's connection
+# budget puts the services' Hikari pools at 98 maximum between them — so the platform runs at half
+# the wall and nothing watched the other half. Past 197 the failure is not graceful: a service that
+# cannot get a connection blocks for Hikari's 30-second timeout, and the losers are whichever
+# services started last rather than whichever matter least.
+#
+# A separate Deployment rather than a sidecar on the StatefulSet: a sidecar would restart Postgres
+# every time the exporter changed, and this is the one workload on the platform that should restart
+# as rarely as possible.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-exporter
+  labels: { app: postgres-exporter }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: postgres-exporter }
+  template:
+    metadata:
+      labels: { app: postgres-exporter }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9187"
+    spec:
+      containers:
+        - name: exporter
+          image: quay.io/prometheuscommunity/postgres-exporter:v0.17.1@sha256:38606faa38c54787525fb0ff2fd6b41b4cfb75d455c1df294927c5f611699b17
+          env:
+            # Split into URI + user + password so the password is never part of a URL: a DSN in
+            # DATA_SOURCE_NAME would put it in the pod spec, in `kubectl describe`, and in every
+            # log line the exporter writes about a connection failure.
+            - name: DATA_SOURCE_URI
+              value: postgres:5432/delivery?sslmode=disable
+            - name: DATA_SOURCE_USER
+              value: delivery
+            - name: DATA_SOURCE_PASS
+              valueFrom: { secretKeyRef: { name: platform-secrets, key: POSTGRES_PASSWORD } }
+            # Connection counts are per database and the alert sums them, so the default
+            # per-database collectors are all this needs. The expensive ones stay off.
+            - name: PG_EXPORTER_DISABLE_SETTINGS_METRICS
+              value: "true"
+          ports:
+            - containerPort: 9187
+          readinessProbe:
+            httpGet: { path: /metrics, port: 9187 }
+            periodSeconds: 30
+          resources:
+            requests: { memory: 24Mi, cpu: 10m }
+            limits: { memory: 64Mi }
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -102,7 +160,8 @@ spec:
     spec:
       containers:
         - name: redis
-          image: redis:7-alpine
+          # redis:7-alpine, pinned by digest (PIN-1).
+          image: redis:7-alpine@sha256:520775a41a63e77e06c73e35d2fd9cc15921a609516818796b4ecbb813078bc7
           command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$REDIS_PASSWORD\""]
           env:
             - name: REDIS_PASSWORD
@@ -161,7 +220,10 @@ spec:
     spec:
       containers:
         - name: rabbitmq
-          image: rabbitmq:3-management
+          # rabbitmq:3-management, pinned by digest (PIN-1). `3-management` moves across minor
+          # versions, and a broker that comes back on a different minor with an existing Mnesia
+          # directory is not a restart, it is a migration.
+          image: rabbitmq:3-management@sha256:e582c0bc7766f3342496d8485efb5a1df782b5ce3886ad017e2eaae442311f69
           env:
             - name: RABBITMQ_DEFAULT_USER
               valueFrom: { secretKeyRef: { name: platform-secrets, key: RABBITMQ_USER } }
@@ -354,7 +416,9 @@ spec:
     spec:
       containers:
         - name: mailpit
-          image: axllent/mailpit:latest
+          # Was `:latest`, which is how the MinIO outage began: a restart re-pulls, and whatever
+          # the tag points at that day is what runs. v1.31.2, pinned by digest (PIN-1).
+          image: axllent/mailpit:v1.31.2@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d
           env:
             # Served under /mailpit on the monitoring hostname, and it has to KNOW that — the
             # proxy must not strip the prefix (see the ingress notes).

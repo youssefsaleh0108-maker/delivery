@@ -1,6 +1,7 @@
 package com.delivery.product.service;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -205,8 +206,35 @@ public class ProductImageService {
      */
     @Transactional(readOnly = true)
     public List<ImageUrl> resolveImages(List<String> objectKeys) {
+        Map<String, ImageUrl> byKey = resolveByKey(objectKeys);
+        // Preserve the caller's display order, and drop keys whose metadata is missing or not yet
+        // confirmed rather than emitting a URL that would 404 in the client.
+        List<ImageUrl> resolved = new ArrayList<>(objectKeys.size());
+        for (String key : objectKeys) {
+            ImageUrl url = byKey.get(key);
+            if (url != null) {
+                resolved.add(url);
+            }
+        }
+        return resolved;
+    }
+
+    /**
+     * {@link #resolveImages} keyed by the object key that produced each URL.
+     *
+     * <p>For a caller holding many things that each have one picture — the public shop page's
+     * shelf, where a hundred products carry a hundred different keys. The list form cannot serve
+     * it: it drops a key whose upload was never confirmed, so position N of the answer is not
+     * position N of the request, and a shelf mapped by index would hang one product's photo on
+     * another product. The map says which key each URL came from, so the mismatch cannot happen.
+     *
+     * <p>One round trip whatever the size of the list, like the list form, and the same
+     * missing-thumbnail fallback — it is the same code.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, ImageUrl> resolveByKey(List<String> objectKeys) {
         if (objectKeys.isEmpty()) {
-            return List.of();
+            return Map.of();
         }
 
         List<String> wanted = new ArrayList<>(objectKeys.size() * 2);
@@ -218,9 +246,7 @@ public class ProductImageService {
                 .collect(Collectors.toMap(FileMetadata::getObjectKey, Function.identity(),
                         (first, second) -> first));
 
-        // Preserve the product's display order, and drop keys whose metadata is missing or not yet
-        // confirmed rather than emitting a URL that would 404 in the client.
-        List<ImageUrl> resolved = new ArrayList<>(objectKeys.size());
+        Map<String, ImageUrl> resolved = new LinkedHashMap<>();
         for (String key : objectKeys) {
             FileMetadata original = byKey.get(key);
             if (original == null) {
@@ -228,7 +254,7 @@ public class ProductImageService {
             }
             String full = storage.readUrl(original);
             FileMetadata thumb = byKey.get(Thumbnailer.thumbKeyFor(key));
-            resolved.add(new ImageUrl(full, thumb == null ? full : storage.readUrl(thumb)));
+            resolved.put(key, new ImageUrl(full, thumb == null ? full : storage.readUrl(thumb)));
         }
         return resolved;
     }

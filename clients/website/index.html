@@ -711,7 +711,8 @@
       <nav class="footer-col" aria-label="Company">
         <h2 data-t="footer-company">Company</h2>
         <a href="/register" data-t="footer-partner">Partner with us</a>
-        <a href="https://portal-dev.youdrop.shop" data-t="footer-signin">Sign in</a>
+        <!-- The portal config.js names, not an environment spelled out here. -->
+        <a data-portal-link data-t="footer-signin">Sign in</a>
       </nav>
 
       <nav class="footer-col" aria-label="Support">
@@ -731,6 +732,7 @@
 </footer>
 
 <script src="config.js"></script>
+<script src="portal-link.js"></script>
 <script src="lib/qr.js"></script>
 <script src="site.js"></script>
 </body>

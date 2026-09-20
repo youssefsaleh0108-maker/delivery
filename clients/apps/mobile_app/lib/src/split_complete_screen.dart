@@ -5,9 +5,16 @@ import 'package:flutter/material.dart';
 
 import 'split_labels.dart';
 
-/// All Shares Paid (Figma `split-complete` 83:683): the green tick, the group summary with how
-/// each share travels, the rider-collects note for every share handed over at the door, and Track
-/// Order out.
+/// The end of the split flow (Figma `split-complete` 83:683): the green tick, the group summary
+/// with how each share travels, the rider-collects note for every share handed over at the door,
+/// and Track Order out.
+///
+/// The frame's headline was "All Shares Paid!", and since RECON-01 that is not true of any share
+/// here: a share is COMMITTED — a promise — until a real provider carries its money, which on a
+/// cash order none of them does. The rows below have always said so (a simulated wallet, "Rider
+/// will collect $5.00 from Farid at delivery"), so the headline was the one line on the screen
+/// contradicting the rest of it, and the only one a customer reads at a glance. It now says the
+/// shares are agreed, and on a cash order a line under it says where the money is actually taken.
 class SplitCompleteScreen extends StatelessWidget {
   const SplitCompleteScreen({
     super.key,
@@ -73,7 +80,7 @@ class SplitCompleteScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: DeliverySpacing.md),
                   Text(
-                    t.custAllSharesPaid,
+                    t.custAllSharesAgreed,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 24,
@@ -82,6 +89,22 @@ class SplitCompleteScreen extends StatelessWidget {
                       height: 1.2,
                     ),
                   ),
+                  // Only on a cash order, because only there does a rider collect anything. On a
+                  // card or wallet order nothing is handed over at the door and no share note is
+                  // drawn either, so the headline stands alone rather than promising a collection
+                  // that will not happen.
+                  if (cashOrder) ...<Widget>[
+                    const SizedBox(height: DeliverySpacing.sm),
+                    Text(
+                      t.custSharesAgreedAtDoor,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: DeliveryColors.muted,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: DeliverySpacing.xl),
                   Text(
                     t.custGroupSplitSummary,

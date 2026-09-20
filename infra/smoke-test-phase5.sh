@@ -1,7 +1,8 @@
 #!/bin/sh
 # Phase 5 hardening verification.
 #
-#   cd infra && docker run --rm --network delivery -v "$PWD/smoke-test-phase5.sh:/smoke.sh:ro" \
+#   cd infra && docker run --rm --network delivery \
+#     -e DEMO_CUSTOMER_PASSWORD -e DEMO_MERCHANT_PASSWORD -e DEMO_RIDER_PASSWORD -e DEMO_BACKOFFICE_PASSWORD -v "$PWD/smoke-test-phase5.sh:/smoke.sh:ro" \
 #     alpine:latest sh -c "apk add --no-cache curl jq postgresql-client >/dev/null && sh /smoke.sh"
 #
 # Unlike the phase 1-4 files this asserts properties rather than features: that a token from an
@@ -34,8 +35,10 @@ check() {
 }
 
 token() {
-  curl -s -X POST "$KCT" -d "client_id=${3:-mobile-app}" \
-    -d "username=$1" -d "password=$2" -d "grant_type=password" | jq -r '.access_token'
+  printf '%s' "$2" | curl -s -X POST "$KCT" \
+    -d "client_id=${3:-mobile-app}" \
+    --data-urlencode "username=$1" --data-urlencode "password@-" \
+    -d "grant_type=password" | jq -r '.access_token'
 }
 
 status() {
@@ -59,10 +62,14 @@ wait_for() {
   return 1
 }
 
-CUSTOMER=$(token customer 100001 mobile-app)
-MERCHANT=$(token merchant 200002 mobile-app)
-RIDER=$(token rider 300003 mobile-app)
-BACKOFFICE=$(token backoffice 400004 mobile-app)
+# The demo logins' passwords, from the environment's demo-logins Secret, supplied by whoever runs
+# this — they were literals here, and the repository was public. On the box, for example:
+#   DEMO_CUSTOMER_PASSWORD=$(kubectl -n delivery-dev get secret demo-logins -o jsonpath='{.data.customer}' | base64 -d)
+: "${DEMO_CUSTOMER_PASSWORD:?set DEMO_CUSTOMER_PASSWORD from the demo-logins Secret}" "${DEMO_MERCHANT_PASSWORD:?set DEMO_MERCHANT_PASSWORD from the demo-logins Secret}" "${DEMO_RIDER_PASSWORD:?set DEMO_RIDER_PASSWORD from the demo-logins Secret}" "${DEMO_BACKOFFICE_PASSWORD:?set DEMO_BACKOFFICE_PASSWORD from the demo-logins Secret}"
+CUSTOMER=$(token customer "$DEMO_CUSTOMER_PASSWORD" mobile-app)
+MERCHANT=$(token merchant "$DEMO_MERCHANT_PASSWORD" mobile-app)
+RIDER=$(token rider "$DEMO_RIDER_PASSWORD" mobile-app)
+BACKOFFICE=$(token backoffice "$DEMO_BACKOFFICE_PASSWORD" mobile-app)
 ADMIN=$(curl -s -X POST "$KC/realms/master/protocol/openid-connect/token" \
   -d 'client_id=admin-cli' -d 'grant_type=password' -d "username=${KEYCLOAK_ADMIN:-admin}" -d "password=${KEYCLOAK_ADMIN_PASSWORD:-admin}" | jq -r '.access_token')
 
@@ -80,8 +87,10 @@ curl -s -o /dev/null -X POST "$KC/admin/realms/delivery-platform/clients" \
 PROBE_UUID=$(curl -s "$KC/admin/realms/delivery-platform/clients?clientId=phase5-probe" \
   -H "Authorization: Bearer $ADMIN" | jq -r '.[0].id')
 
-ROGUE=$(curl -s -X POST "$KCT" -d 'client_id=phase5-probe' -d 'client_secret=probe-secret' \
-  -d 'username=customer' -d 'password=100001' -d 'grant_type=password' | jq -r '.access_token')
+ROGUE=$(printf '%s' "$DEMO_CUSTOMER_PASSWORD" \
+  | curl -s -X POST "$KCT" -d 'client_id=phase5-probe' -d 'client_secret=probe-secret' \
+    -d 'username=customer' --data-urlencode "password@-" -d 'grant_type=password' \
+  | jq -r '.access_token')
 
 check 'the probe client issues a real token' 'phase5-probe' \
   "$(echo "$ROGUE" | cut -d. -f2 | tr '_-' '/+' | sed 's/$/==/' | base64 -d 2>/dev/null | jq -r '.azp')"

@@ -397,8 +397,14 @@ public class Store {
      * <p>A bad zone string must not be able to take the storefront down. It is a data-entry field,
      * and an unrecognised value should degrade one store's clock, not throw out of a list query
      * rendering fifty of them.
+     *
+     * <p>Public because the fallback is the interesting part and there must be exactly one of it.
+     * The public shop page prints this shop's week in this shop's calendar, so it needs the same
+     * {@link ZoneId} the availability answers above were computed in — a second
+     * {@code ZoneId.of(getTimezone())} somewhere else would be a second copy of the rule, and the
+     * two would disagree about a bad value on the one page a stranger reads.
      */
-    private ZoneId zone() {
+    public ZoneId zone() {
         try {
             return ZoneId.of(timezone);
         } catch (DateTimeException e) {

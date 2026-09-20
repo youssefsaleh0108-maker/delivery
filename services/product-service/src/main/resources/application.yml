@@ -117,6 +117,41 @@ spring:
           jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://localhost:8180/realms/delivery-platform/protocol/openid-connect/certs}
 
 delivery:
+  security:
+    # THE ONLY ANONYMOUS PATHS IN THIS SERVICE, and the list REPLACES the platform default rather
+    # than adding to it — so the six actuator and API-doc paths below are repeated here on purpose.
+    # Dropping one of them would take this pod's readiness probe or its Swagger page off without
+    # anything else in the repository changing. (PlatformSecurityProperties#permitAll.)
+    #
+    # /s/** and /sitemap.xml are the public shop page: a document a shopkeeper pastes into a
+    # WhatsApp status and prints as a QR for the counter, and the only thing on this platform a
+    # search engine can index. It cannot ask for a token — a crawler has none and a chat app
+    # building a link preview has none — so it is built to be read by a stranger instead: it takes
+    # no input but a slug, reads no caller, and renders a fixed set of fields that contains no
+    # merchant identity (PublicShopPage).
+    permit-all:
+      - /actuator/health
+      - /actuator/health/**
+      - /actuator/info
+      - /actuator/prometheus
+      - /v3/api-docs/**
+      - /swagger-ui/**
+      - /swagger-ui.html
+      - /s/**
+      - /sitemap.xml
+
+  public:
+    # The address the public page believes it lives at: the canonical link, every og: URL, the
+    # target inside the QR code and the "Get the app" link are all built from it.
+    #
+    # Configuration, never the request's Host header. The page is reachable on the API hostname as
+    # well as on www (deploy/k3s/overlays/ingress.template.yaml), and a page that named whichever
+    # host it was reached on would hand a crawler two indexable copies of every shop — and mint a
+    # QR code pointing at an address no customer was ever given.
+    #
+    # It moves at go-live with clients/website/config.js and the site's own hosts.
+    base-url: ${PUBLIC_SITE_BASE_URL:https://www.youdrop.shop}
+
   # The platform's own calendar. One setting, spelled the same in every service that needs it
   # (MERCHANT_SUITE_SPEC names it for reporting-service; the clients' comments already quote it), so
   # moving the platform to another country is one value rather than a search across the estate.
@@ -130,6 +165,21 @@ delivery:
   # existing shop's stored zone is never rewritten from here — its hours were typed against it.
   platform:
     zone: ${PLATFORM_ZONE:Asia/Beirut}
+
+  market:
+    # LBP per USD — the platform's one display-and-collection rate, served to every client by
+    # MarketController (GET /api/market/config).
+    #
+    # It MUST read the same environment variable transfer-service locks its quotes from. The key
+    # and the 90000 default were already spelled the same in both services, which read as "one
+    # rate" but was not: only transfer-service bound the key to ${MARKET_LBP_PER_USD}, so this
+    # service fell through to the hard-coded default of its @Value. An operator who moved the
+    # rate — the whole reason it is configuration — moved what checkout charges and left what the
+    # storefront displays at 90000, so a customer browsed "$3.50 / 315,000 LBP" and was quoted a
+    # different lira figure at the door, with nothing in either service disagreeing with itself.
+    #
+    # Zero still means "do not show LBP at all" (MarketController).
+    lbp-per-usd: ${MARKET_LBP_PER_USD:90000}
 
   outbox:
     exchange: delivery.events

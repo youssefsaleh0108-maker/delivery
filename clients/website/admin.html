@@ -22,11 +22,15 @@
     <div class="lock" aria-hidden="true">&#9679;</div>
     <h1>Platform administration</h1>
     <p>Staff only. You will be asked to sign in.</p>
-    <!-- The deployed portal, not a developer's loopback address. This link read
-         http://127.0.0.1:5011 — a port that resolves to nothing from any machine but the one the
-         stack was built on, which is every machine that will ever load this page. -->
-    <a class="primary wide" href="https://portal-dev.youdrop.shop">Open the Backoffice</a>
+    <!-- The deployed portal, from config.js — not a developer's loopback address, and not an
+         environment spelled out here. This link read http://127.0.0.1:5011, a port that resolves
+         to nothing from any machine but the one the stack was built on; it then read
+         https://portal-dev.youdrop.shop, which is right until www stops pointing at dev. One file
+         decides that now, the same one that decides where the API and the realm are. -->
+    <a class="primary wide" data-portal-link>Open the Backoffice</a>
     <a class="back" href="/">Back to the site</a>
   </main>
+  <script src="config.js"></script>
+  <script src="portal-link.js"></script>
 </body>
 </html>

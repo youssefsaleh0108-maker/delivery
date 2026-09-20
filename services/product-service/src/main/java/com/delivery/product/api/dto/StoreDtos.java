@@ -230,7 +230,13 @@ public final class StoreDtos {
             @NotNull Store.Vertical vertical,
             @Size(max = 240) String tagline,
             @Size(max = 4000) String description,
-            List<@Size(max = 40) String> tags,
+            /**
+             * The shop's own keywords. Bounded twice on purpose: the inner limit is what one tag
+             * may be, the outer is how many there may be — without it a save could carry a hundred
+             * thousand forty-character tags, all of them valid, into a jsonb column, and every one
+             * of them onto the public page as a chip.
+             */
+            @Size(max = 20) List<@Size(max = 40) String> tags,
             @Size(max = 64) String timezone,
             @Size(max = 400) String address,
             /** District identity for the hyperlocal browse. Free text; the chips are distinct values. */

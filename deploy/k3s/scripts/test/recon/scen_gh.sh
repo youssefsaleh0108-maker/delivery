@@ -3,7 +3,7 @@
 # read or change whose money.
 . /dev/shm/recon/lib.sh
 CUST=$(tok customer); RIDER=$(tok rider); MERCH=$(tok merchant); CARR=$(tok carrier)
-BACK=$(tok backoffice delivery-portal)
+BACK=$(tok backoffice)
 MSUB=$(sub_of "$MERCH"); RSUB=$(sub_of "$RIDER")
 COMPANY=5857ac51-ef54-4c80-b50c-750998e50986
 INHOUSE=00000000-0000-4000-8000-00000000d001
@@ -13,6 +13,10 @@ E_OTHER=$(sed -n 's/.*E_OTHER=\([^ ]*\).*/\1/p' /dev/shm/recon/orders.txt | tail
 
 echo "=== G. the merchant turns 1000 points into money"
 c=$(api "$MERCH" GET "/api/points/balance"); BEFORE=$(j '.points'); note "balance HTTP $c points=$BEFORE value=$(j '.value')"
+if [ "${BEFORE:-0}" -lt 1000 ]; then
+  note "G skipped: the merchant holds $BEFORE points, and this section spends 1000 — top them up to run it again"
+  RID=
+else
 c=$(api "$MERCH" POST "/api/points/redemptions" '{"points":1000,"payoutNote":"recon test"}')
 RID=$(j '.id // empty'); note "request HTTP $c id=$RID amount=$(j '.amount') status=$(j '.status') $(err)"
 c=$(api "$BACK" POST "/api/points/redemptions/$RID/approve" '{"note":"recon test"}'); note "approve HTTP $c status=$(j '.status')"
@@ -23,6 +27,8 @@ c=$(api "$MERCH" GET "/api/points/balance"); AFTER=$(j '.points')
 [ "$AFTER" -eq $((BEFORE-1000)) ] && ok "points fell by exactly 1000 ($BEFORE -> $AFTER)" || bad "points balance" "$BEFORE -> $AFTER"
 printf '%s\n' "select 'points rows|' || reason || '|' || points from accounting.points_ledger where redemption_id = '$RID' order by created_at;" | sql
 echo "RID=$RID" >> /dev/shm/recon/orders.txt
+
+fi
 
 echo "=== H1. statements per role vs the ledger ($FROM..$TO, as sent)"
 kubectl -n "$NS" exec -i postgres-0 -- psql -U delivery -d delivery -At -F'|' -v f="$F" -v t="$T" \
@@ -73,7 +79,7 @@ expect "carrier records a hand-over for a stranger" 404 "$CARR" POST "/api/accou
 expect "carrier reads another company's points" 403 "$CARR" GET "/api/points/carriers/$INHOUSE/balance"
 expect "carrier redeems another company's points" 403 "$CARR" POST "/api/points/redemptions" "{\"ownerKind\":\"CARRIER\",\"ownerRef\":\"$INHOUSE\",\"points\":1000}"
 expect "merchant redeems as a carrier" 403 "$MERCH" POST "/api/points/redemptions" "{\"ownerKind\":\"CARRIER\",\"ownerRef\":\"$COMPANY\",\"points\":1000}"
-expect "rider cancels the merchant's redemption" 403 "$RIDER" POST "/api/points/redemptions/$RID/cancel"
+[ -n "$RID" ] && expect "rider cancels the merchant's redemption" 403 "$RIDER" POST "/api/points/redemptions/$RID/cancel" || note "skipped: no redemption of this run to cancel"
 expect "rider records their own banking" 403 "$RIDER" POST "/api/accounting/float/$RSUB/remit" '{}'
 expect "carrier records its own payment to the platform" 403 "$CARR" POST "/api/accounting/float/$COMPANY/remit" '{}'
 expect "rider reads the cash-out queue" 403 "$RIDER" GET "/api/rider/cash-outs/queue"

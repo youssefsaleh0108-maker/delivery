@@ -18,9 +18,15 @@ import org.springframework.web.bind.annotation.RestController;
  * which is why this is a config value and not a column on products.
  *
  * <p>Served from the storefront service because every surface that shows a price already talks to
- * it. The rate comes from configuration (`delivery.market.lbp-per-usd`) so an operator moves it
- * without a build; zero means "do not show LBP at all", which is also what a client that never
- * managed to fetch this renders.
+ * it. The rate comes from configuration (`delivery.market.lbp-per-usd`, bound to
+ * `MARKET_LBP_PER_USD`) so an operator moves it without a build; zero means "do not show LBP at
+ * all", which is also what a client that never managed to fetch this renders.
+ *
+ * <p>That key and that variable are the SAME ones transfer-service locks a checkout quote's rate
+ * from — one rate for the whole platform, displayed here and charged there. The default below is
+ * a last resort for a service started with no configuration at all, not the value the platform
+ * runs on: while this service alone left the key unbound, moving the rate moved what checkout
+ * collected and left every displayed lira figure at 90000.
  */
 @RestController
 @RequestMapping("/api/market")

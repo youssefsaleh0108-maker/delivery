@@ -24,9 +24,19 @@ import 'product_form_screen.dart';
 /// Android app hands it 360dp and a gesture bar. What changes between them is the column count and
 /// whether the page can be pulled to refresh — see [_ProductListScreenState._phoneWidth].
 class ProductListScreen extends StatefulWidget {
-  const ProductListScreen({super.key, required this.api, this.storeApi, this.photoSource});
+  const ProductListScreen(
+      {super.key, required this.api, this.storeApi, this.storeId, this.photoSource});
 
   final CatalogApi api;
+
+  /// Which of the merchant's shops this page is standing in, when the host knows.
+  ///
+  /// It scopes what a NEW product is created in and what a photo find searches — not the list,
+  /// which is `/api/products/mine` and is every shop the caller owns. Without it a merchant with
+  /// two shops had a product filed in whichever the server calls their first, whatever shelf they
+  /// were looking at, exactly as Inventory did before it was given one. Null lets the server
+  /// decide, which is right for a host that is not standing in a shop.
+  final String? storeId;
 
   /// Find a product in the shop's catalogue by photo. Non-null draws a camera in the search box;
   /// null draws none. Handed over by the host only to a MERCHANT, as Merchant Blitz is, since the
@@ -110,6 +120,9 @@ class _ProductListScreenState extends State<ProductListScreen> {
           api: widget.api,
           storeApi: widget.storeApi,
           existing: existing,
+          // The shop this catalogue page is standing in, so a new product is created in it. An
+          // existing one keeps its own shop — the form reads it off the product.
+          storeId: widget.storeId,
         ),
       ),
     );
@@ -240,8 +253,8 @@ class _ProductListScreenState extends State<ProductListScreen> {
   Future<void> _findByPhoto() async {
     final ShelfPhotoSource? source = widget.photoSource;
     if (source == null) return;
-    final PhotoFindChoice? choice =
-        await findProductByPhoto(context, api: widget.api, source: source);
+    final PhotoFindChoice? choice = await findProductByPhoto(context,
+        api: widget.api, source: source, storeId: widget.storeId);
     if (choice == null || !mounted) return;
     await Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (BuildContext _) => ProductFormScreen(
@@ -249,6 +262,8 @@ class _ProductListScreenState extends State<ProductListScreen> {
         storeApi: widget.storeApi,
         existing: choice.product,
         prefill: choice.prefill,
+        // The shop the find was scoped to, so a new product is created where it was looked for.
+        storeId: widget.storeId,
       ),
     ));
     if (!mounted) return;

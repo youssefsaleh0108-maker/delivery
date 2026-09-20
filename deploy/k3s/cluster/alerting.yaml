@@ -1,0 +1,381 @@
+# The half of monitoring that reaches a human.
+#
+# Until now: Prometheus had rules and Grafana could draw them, and that was all. A firing alert was
+# a red line on a page nobody had open. The survey put it plainly — "no Alertmanager, no
+# node-exporter or kube-state-metrics, no external uptime check: no alert reaches anyone."
+#
+# Four things here, all in the `monitoring` namespace and all applied by scripts/setup-monitoring.sh
+# alongside cluster/monitoring.yaml:
+#
+#   alertmanager        takes what Prometheus fires and emails it through the M365 relay
+#   node-exporter       the node itself: disk, memory, load — the things that kill everything at
+#                       once and that no pod can see
+#   kube-state-metrics  the API server's own view: crash loops, failed Jobs, CronJob outcomes
+#   (textfile)          node-exporter's textfile collector, which is how the backup CronJobs
+#                       publish whether they actually did anything (see base/backup.yaml)
+#
+# WHAT ONLY THE OWNER CAN DO: an alert about this box, sent from this box, does not arrive when the
+# box is the thing that has failed. The dead-man switch in the backup job and an EXTERNAL uptime
+# monitor on api/iam/portal/www are the only things that notice that, and neither lives here.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+data:
+  alertmanager.yml: |
+    global:
+      # The relay qa already proved it can send through, as the sender the domain's SPF and DKIM
+      # are aligned for. The password is NOT here: smtp_auth_password_file is read at send time
+      # from a Secret that scripts/setup-monitoring.sh copies out of the environment's
+      # platform-secrets, so it is never in this ConfigMap, in git, or in `kubectl describe`.
+      smtp_smarthost: smtp.office365.com:587
+      smtp_from: noreply@youdrop.shop
+      smtp_auth_username: noreply@youdrop.shop
+      smtp_auth_password_file: /etc/alertmanager/smtp/password
+      smtp_require_tls: true
+      # M365 allows 30 messages a minute. Nothing here should come close, but a flapping rule plus
+      # a retry storm could, and being throttled by the relay is how alerting stops silently.
+      resolve_timeout: 10m
+
+    route:
+      receiver: owner-email
+      # Group by the alert and the environment, so twelve pods crash-looping in delivery-qa is one
+      # email about delivery-qa and not twelve about pods.
+      group_by: [alertname, namespace]
+      # Wait half a minute before the first email of a group, so a burst arrives as one message.
+      group_wait: 30s
+      # A new member of an existing group waits this long before it is worth another email.
+      group_interval: 5m
+      # And a group that is still firing is repeated this often. Four hours, not one: an alert
+      # nobody can act on at 03:00 should not arrive six times before breakfast.
+      repeat_interval: 4h
+      routes:
+        # `page` is money in the wrong place or an environment that is down. It is repeated hourly
+        # and it is not grouped with anything else.
+        - matchers: [severity="page"]
+          receiver: owner-email
+          group_wait: 0s
+          repeat_interval: 1h
+        # Anything from dev is information, not an incident. It still arrives, once a day.
+        - matchers: [namespace="delivery-dev"]
+          receiver: owner-email
+          repeat_interval: 24h
+
+    # A warning about a symptom is noise while the cause is already firing.
+    inhibit_rules:
+      # If the node is out of memory, the pods restarting on it are not news.
+      - source_matchers: [alertname="NodeMemoryCritical"]
+        target_matchers: [severity="warning"]
+        equal: [instance]
+      # If every scrape target in a namespace is down, its individual alerts add nothing.
+      - source_matchers: [alertname="ScrapeTargetDown"]
+        target_matchers: [alertname="PostgresConnectionsHigh"]
+        equal: [namespace]
+
+    receivers:
+      - name: owner-email
+        email_configs:
+          # CHANGE THIS ADDRESS and re-run scripts/setup-monitoring.sh to make it take effect. It
+          # is the one piece of alerting configuration that is worth checking twice: an address
+          # nobody reads is the same as no alerting at all.
+          - to: youssef.saleh0108@gmail.com
+            send_resolved: true
+            headers:
+              subject: '[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }} {{ .CommonLabels.namespace }}'
+            html: |
+              <h3>{{ .Status | toUpper }}: {{ .CommonLabels.alertname }}</h3>
+              {{ range .Alerts }}
+              <p><b>{{ .Annotations.summary }}</b><br>
+              {{ .Annotations.description }}<br>
+              <small>{{ range .Labels.SortedPairs }}{{ .Name }}={{ .Value }} {{ end }}</small><br>
+              <small>since {{ .StartsAt }}</small></p>
+              {{ end }}
+
+    # TELEGRAM IS OFF, and it is off by being absent rather than by a switch.
+    #
+    # Alertmanager validates its whole configuration at startup and refuses to start on anything
+    # incomplete — a telegram receiver with a placeholder chat_id or an unreadable token file is a
+    # monitoring stack that does not come up, which is a worse failure than not having Telegram. So
+    # it is written out here, commented, with everything needed to turn it on:
+    #
+    #   1. Create the bot with @BotFather and send it a message; read the chat id from
+    #      https://api.telegram.org/bot<TOKEN>/getUpdates
+    #   2. kubectl -n monitoring create secret generic alertmanager-telegram \
+    #        --from-file=token=/dev/stdin          # paste with read -rs, never on the command line
+    #   3. Uncomment the four lines below, put the real chat_id in, add `- name: telegram` to the
+    #      `page` route's receiver, and run scripts/setup-monitoring.sh.
+    #
+    #   - name: telegram
+    #     telegram_configs:
+    #       - bot_token_file: /etc/alertmanager/telegram/token
+    #         chat_id: 0
+    #         message: '{{ .CommonLabels.alertname }} {{ .CommonLabels.namespace }}: {{ range .Alerts }}{{ .Annotations.summary }} {{ end }}'
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: alertmanager-data
+  namespace: monitoring
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: { storage: 1Gi }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  namespace: monitoring
+  labels: { app: alertmanager }
+spec:
+  replicas: 1
+  # Recreate, for the same reason as Prometheus and Grafana: one ReadWriteOnce volume, and a
+  # rolling update deadlocks waiting for a disk the old pod has not let go of.
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: alertmanager }
+  template:
+    metadata:
+      labels: { app: alertmanager }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9093"
+    spec:
+      securityContext:
+        fsGroup: 65534
+      containers:
+        - name: alertmanager
+          image: quay.io/prometheus/alertmanager:v0.28.1@sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba
+          args:
+            - --config.file=/etc/alertmanager/alertmanager.yml
+            - --storage.path=/alertmanager
+            # Silences and the notification log are what stop a resolved alert being re-sent and a
+            # silenced one coming back after a restart. They live on the PVC.
+            - --data.retention=120h
+          ports:
+            - containerPort: 9093
+          volumeMounts:
+            - { name: config, mountPath: /etc/alertmanager/alertmanager.yml, subPath: alertmanager.yml, readOnly: true }
+            # optional: the pod starts before the relay password has been copied in. Sending then
+            # fails and is logged, which is recoverable; refusing to start is not.
+            - { name: smtp, mountPath: /etc/alertmanager/smtp, readOnly: true }
+            - { name: telegram, mountPath: /etc/alertmanager/telegram, readOnly: true }
+            - { name: data, mountPath: /alertmanager }
+          readinessProbe:
+            httpGet: { path: /-/ready, port: 9093 }
+            periodSeconds: 10
+          resources:
+            requests: { memory: 48Mi, cpu: 10m }
+            limits: { memory: 128Mi }
+      volumes:
+        - name: config
+          configMap: { name: alertmanager-config }
+        - name: smtp
+          secret: { secretName: alertmanager-smtp, optional: true }
+        - name: telegram
+          secret: { secretName: alertmanager-telegram, optional: true }
+        - name: data
+          persistentVolumeClaim: { claimName: alertmanager-data }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  namespace: monitoring
+spec:
+  selector: { app: alertmanager }
+  ports:
+    - port: 9093
+      targetPort: 9093
+---
+# The node itself. Every alert about the thing that takes the whole platform down at once — the
+# disk filling, memory running out on a box with no swap — needs a number that comes from outside
+# any container, and this is the only thing that has one.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-exporter
+  namespace: monitoring
+  labels: { app: node-exporter }
+spec:
+  selector:
+    matchLabels: { app: node-exporter }
+  template:
+    metadata:
+      labels: { app: node-exporter }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9100"
+    spec:
+      # NOT hostNetwork.
+      #
+      # The usual deployment puts node-exporter on the host's network namespace so its network
+      # counters are the node's. The cost here is that it would then bind :9100 on every interface
+      # of a box whose firewall is the only thing in front of it, for metrics that name every mount
+      # point and process count on the machine. Everything this platform alerts on — filesystem
+      # usage, memory, load — is read from the mounted /proc, /sys and rootfs and is correct
+      # either way; only the per-interface network counters become the pod's, and nothing alerts on
+      # those. Scraped on the pod IP instead.
+      securityContext:
+        runAsUser: 65534
+        runAsNonRoot: true
+      initContainers:
+        # The textfile directory, shared with the backup CronJobs.
+        #
+        # A CronJob cannot be scraped: by the time Prometheus comes round the pod is gone, and
+        # whether last night's backup worked is exactly the thing that must outlive the pod. The
+        # textfile collector is the standard answer — a job writes a .prom file and node-exporter
+        # serves its contents as metrics until it is replaced. This makes the directory, root-owned
+        # and sticky so each job can replace its own file and nothing else's.
+        - name: textfile-dir
+          image: busybox:1.36@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
+          securityContext:
+            runAsUser: 0
+          command: ["sh", "-c", "mkdir -p /textfile && chmod 1777 /textfile"]
+          volumeMounts:
+            - { name: textfile, mountPath: /textfile }
+      containers:
+        - name: node-exporter
+          image: quay.io/prometheus/node-exporter:v1.9.1@sha256:d00a542e409ee618a4edc67da14dd48c5da66726bbd5537ab2af9c1dfc442c8a
+          args:
+            - --path.procfs=/host/proc
+            - --path.sysfs=/host/sys
+            - --path.rootfs=/host/root
+            - --collector.textfile.directory=/textfile
+            # Every container filesystem and every k3s overlay mount would otherwise appear as its
+            # own "disk", and the disk-space alert would fire on all of them at once.
+            - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run|var/lib/kubelet/.+|var/lib/rancher/k3s/agent/containerd/.+)($|/)
+            - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|overlay|proc|procfs|pstore|securityfs|sysfs|tracefs)$
+            - --no-collector.wifi
+            - --no-collector.hwmon
+          ports:
+            - containerPort: 9100
+          volumeMounts:
+            - { name: proc, mountPath: /host/proc, readOnly: true }
+            - { name: sys, mountPath: /host/sys, readOnly: true }
+            - { name: root, mountPath: /host/root, readOnly: true, mountPropagation: HostToContainer }
+            - { name: textfile, mountPath: /textfile, readOnly: true }
+          readinessProbe:
+            httpGet: { path: /metrics, port: 9100 }
+            periodSeconds: 30
+          resources:
+            requests: { memory: 24Mi, cpu: 10m }
+            limits: { memory: 96Mi }
+      tolerations:
+        # One node, which is also the control plane. Without this the DaemonSet would schedule
+        # nowhere on a cluster that ever grows a taint.
+        - operator: Exists
+      volumes:
+        - name: proc
+          hostPath: { path: /proc }
+        - name: sys
+          hostPath: { path: /sys }
+        - name: root
+          hostPath: { path: / }
+        - name: textfile
+          hostPath: { path: /var/lib/node-exporter/textfile, type: DirectoryOrCreate }
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kube-state-metrics
+  namespace: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kube-state-metrics
+rules:
+  # Read-only, and deliberately NOT `secrets`.
+  #
+  # kube-state-metrics' own default role includes secrets, to publish kube_secret_info — metadata
+  # only, but the permission that produces it is `list` on secrets, and `list` on secrets returns
+  # their VALUES. Granting a metrics exporter the ability to read every credential in the cluster
+  # to learn the names of some of them is not a trade worth making; the one alert that wanted it
+  # (whether a backup destination is configured) is answered by the backup job itself, through
+  # node-exporter's textfile collector.
+  - apiGroups: [""]
+    resources: [nodes, pods, services, namespaces, resourcequotas, limitranges,
+                persistentvolumes, persistentvolumeclaims, replicationcontrollers, endpoints]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, statefulsets, daemonsets, replicasets]
+    verbs: [get, list, watch]
+  - apiGroups: [batch]
+    resources: [jobs, cronjobs]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies, ingresses]
+    verbs: [get, list, watch]
+  - apiGroups: [scheduling.k8s.io]
+    resources: [priorityclasses]
+    verbs: [get, list, watch]
+  - apiGroups: [storage.k8s.io]
+    resources: [storageclasses, volumeattachments]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kube-state-metrics
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kube-state-metrics
+subjects:
+  - kind: ServiceAccount
+    name: kube-state-metrics
+    namespace: monitoring
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kube-state-metrics
+  namespace: monitoring
+  labels: { app: kube-state-metrics }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: kube-state-metrics }
+  template:
+    metadata:
+      labels: { app: kube-state-metrics }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      serviceAccountName: kube-state-metrics
+      securityContext:
+        runAsUser: 65534
+        runAsNonRoot: true
+      containers:
+        - name: kube-state-metrics
+          image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.15.0@sha256:db384bf43222b066c378e77027a675d4cd9911107adba46c2922b3a55e10d6fb
+          args:
+            # Exactly the resources the ClusterRole above grants. Listing them explicitly means a
+            # future kube-state-metrics that adds a collector does not start failing on a
+            # permission it was never given — it simply does not collect it.
+            - --resources=nodes,pods,services,namespaces,resourcequotas,limitranges,persistentvolumes,persistentvolumeclaims,replicationcontrollers,endpoints,deployments,statefulsets,daemonsets,replicasets,jobs,cronjobs,networkpolicies,ingresses,storageclasses,volumeattachments
+            - --metric-labels-allowlist=pods=[app],namespaces=[*]
+          ports:
+            - containerPort: 8080
+            - containerPort: 8081
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8081 }
+            periodSeconds: 30
+          resources:
+            requests: { memory: 48Mi, cpu: 10m }
+            limits: { memory: 160Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-state-metrics
+  namespace: monitoring
+spec:
+  selector: { app: kube-state-metrics }
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: 8080

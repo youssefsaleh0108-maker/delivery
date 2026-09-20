@@ -63,10 +63,11 @@
 
     <div class="w-top">
       <p class="w-top-note">
-        <!-- The same destination the site's own footer signs people in at. One portal now serves
-             shops and delivery companies alike, so there is nothing left to choose between. -->
+        <!-- The same destination the site's own footer signs people in at, and from the same
+             place: config.js, through portal-link.js. One portal now serves shops and delivery
+             companies alike, so there is nothing left to choose between. -->
         <span data-t="signin-note">Already registered?</span>
-        <a href="https://portal-dev.youdrop.shop" data-t="signin-link">Sign in</a>
+        <a data-portal-link data-t="signin-link">Sign in</a>
       </p>
       <div class="w-top-right">
         <!--
@@ -713,6 +714,7 @@
 </div>
 
 <script src="config.js"></script>
+<script src="portal-link.js"></script>
 <script src="register.js"></script>
 </body>
 </html>

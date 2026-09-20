@@ -104,8 +104,15 @@ for (const [label, id] of [['About us', 'about'], ['Contact us', 'contact']]) {
   // A nav link to a section that does not exist scrolls nowhere and looks like a broken page.
   check(`and the section it points at exists`, home.body.includes(`id="${id}"`), 'present');
 }
-check('sign-in offers the merchant portal', home.body.includes('127.0.0.1:5010'), 'port 5010');
-check('sign-in offers the carrier portal', home.body.includes('127.0.0.1:5013'), 'port 5013');
+// One portal now, for shops and delivery companies alike — and its address is config.js's, not
+// the markup's, so what the page must carry is the marker, never a host. Asserting a host here
+// would be asserting which environment the site is pointed at, which is exactly what moved out.
+check('sign-in leaves for the portal config.js names',
+  /<a[^>]*\bdata-portal-link\b[^>]*data-t="footer-signin"/.test(home.body), 'data-portal-link');
+check('and the script that resolves it is loaded',
+  home.body.includes('portal-link.js'), 'portal-link.js');
+check('with no environment spelled out in the markup',
+  !/href="https?:\/\/[^"]*portal[^"]*"/.test(home.body), 'no portal host in the page');
 // Customers and riders sign themselves up in a minute; a web form would be a longer road to the
 // same place. They get the app, and they get the SAME app — one sign-in, two roles.
 check('customers and riders are sent to the app instead',
@@ -146,7 +153,9 @@ check('and it is the administration page', admin.body.includes('Platform adminis
 check('with a trailing slash too', fetchPath('/admin/').code === '200', '/admin/');
 check('it asks search engines to stay away',
   /<meta name="robots" content="noindex/.test(admin.body), 'noindex');
-check('and it is the Backoffice behind it', admin.body.includes('127.0.0.1:5011'), 'port 5011');
+check('and it is the Backoffice behind it',
+  /<a[^>]*\bdata-portal-link\b/.test(admin.body) && admin.body.includes('portal-link.js'),
+  'data-portal-link + portal-link.js');
 
 // The whole point of an unadvertised door. Checked across everything a stranger can read without
 // being told where to look: the page, the script, and the stylesheet.
@@ -154,6 +163,8 @@ const publicText = home.body + fetchPath('/site.js').body + fetchPath('/site.css
     + register.body + fetchPath('/register.js').body;
 const mentions = (publicText.match(/admin/gi) || []).length;
 check('nothing a visitor can read names it', mentions === 0, `${mentions} mentions`);
+// The public page links the portal, which is the same door — but it must not name the Backoffice's
+// own local port, which would tell a reader what to try.
 check('nor does the page link the Backoffice port',
   !home.body.includes('127.0.0.1:5011'), 'absent from the public page');
 

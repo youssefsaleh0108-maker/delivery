@@ -2,7 +2,8 @@
 # Phase 1 end-to-end smoke test, run from inside the compose network.
 #
 #   cd infra && ./smoke-test.ps1        (Windows)
-#   docker run --rm --network delivery -v "$PWD/smoke-test.sh:/smoke.sh:ro" alpine:latest \
+#   docker run --rm --network delivery \
+#     -e DEMO_MERCHANT_PASSWORD -e DEMO_CUSTOMER_PASSWORD -e DEMO_BACKOFFICE_PASSWORD -v "$PWD/smoke-test.sh:/smoke.sh:ro" alpine:latest \
 #     sh -c "apk add --no-cache curl jq >/dev/null && sh /smoke.sh"
 #
 # Every call goes through the API Gateway with a real Keycloak token — nothing here talks to a
@@ -34,8 +35,9 @@ check() { # check <description> <expected> <actual>
 # second factor. Nothing is lost here — a token's roles come from the ACCOUNT, not from the client
 # it was minted for, so what these scripts are allowed to do is unchanged.
 token() { # token <username> <password> [client]
-  curl -s -X POST "$KC" \
-    -d "client_id=${3:-mobile-app}" -d "username=$1" -d "password=$2" \
+  printf '%s' "$2" | curl -s -X POST "$KC" \
+    -d "client_id=${3:-mobile-app}" \
+    --data-urlencode "username=$1" --data-urlencode "password@-" \
     -d "grant_type=password" | jq -r '.access_token'
 }
 
@@ -66,9 +68,13 @@ status() { # status <method> <path> <token> [body]
 echo
 echo '=== 1. Authentication ==========================================================='
 
-MERCHANT=$(token merchant 200002)
-CUSTOMER=$(token customer 100001 mobile-app)
-BACKOFFICE=$(token backoffice 400004 mobile-app)
+# The demo logins' passwords, from the environment's demo-logins Secret, supplied by whoever runs
+# this — they were literals here, and the repository was public. On the box, for example:
+#   DEMO_CUSTOMER_PASSWORD=$(kubectl -n delivery-dev get secret demo-logins -o jsonpath='{.data.customer}' | base64 -d)
+: "${DEMO_MERCHANT_PASSWORD:?set DEMO_MERCHANT_PASSWORD from the demo-logins Secret}" "${DEMO_CUSTOMER_PASSWORD:?set DEMO_CUSTOMER_PASSWORD from the demo-logins Secret}" "${DEMO_BACKOFFICE_PASSWORD:?set DEMO_BACKOFFICE_PASSWORD from the demo-logins Secret}"
+MERCHANT=$(token merchant "$DEMO_MERCHANT_PASSWORD")
+CUSTOMER=$(token customer "$DEMO_CUSTOMER_PASSWORD" mobile-app)
+BACKOFFICE=$(token backoffice "$DEMO_BACKOFFICE_PASSWORD" mobile-app)
 
 [ -n "$MERCHANT" ] && [ "$MERCHANT" != null ] || { echo 'Could not obtain a merchant token'; exit 1; }
 
@@ -86,6 +92,12 @@ echo '=== 2. Second merchant (for the ownership test) ==========================
 
 # The realm ships one merchant. Cross-merchant isolation is the security property that matters most
 # in this phase, so a second one is created here via the admin API rather than assumed.
+#
+# Its passcode is drawn fresh each run and set on the account below, like the accounts the
+# onboarding smokes create: merchant2 stays on the environment after this script ends, and a
+# passcode written in a public file would make it a login anybody could use. Nothing prints it.
+pc() { printf '%06d' $(( $(od -An -N4 -tu4 /dev/urandom | tr -d ' ') % 1000000 )); }
+MERCHANT2_PC=$(pc)
 ADMIN=$(curl -s -X POST "$KC_ADMIN/realms/master/protocol/openid-connect/token" \
   -d 'client_id=admin-cli' -d 'grant_type=password' -d "username=${KEYCLOAK_ADMIN:-admin}" -d "password=${KEYCLOAK_ADMIN_PASSWORD:-admin}" | jq -r '.access_token')
 
@@ -113,7 +125,7 @@ M2_ID=$(curl -s "$KC_ADMIN/admin/realms/delivery-platform/users?username=merchan
 curl -s -o /dev/null -X PUT \
   "$KC_ADMIN/admin/realms/delivery-platform/users/$M2_ID/reset-password" \
   -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' \
-  -d '{"type":"password","value":"200012","temporary":false}'
+  -d "{\"type\":\"password\",\"value\":\"$MERCHANT2_PC\",\"temporary\":false}"
 
 ROLE=$(curl -s "$KC_ADMIN/admin/realms/delivery-platform/roles/MERCHANT" \
   -H "Authorization: Bearer $ADMIN" | jq -c '{id,name}')
@@ -121,7 +133,7 @@ curl -s -o /dev/null -X POST \
   "$KC_ADMIN/admin/realms/delivery-platform/users/$M2_ID/role-mappings/realm" \
   -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' -d "[$ROLE]"
 
-MERCHANT2=$(token merchant2 200012)
+MERCHANT2=$(token merchant2 "$MERCHANT2_PC")
 check 'second merchant provisioned'           'MERCHANT'   "$(claim "$MERCHANT2" '.realm_access.roles[]' | grep -x MERCHANT || echo none)"
 
 echo
