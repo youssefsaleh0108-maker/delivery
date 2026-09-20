@@ -29,8 +29,12 @@ public class FakeVisionProvider implements VisionProvider {
 
     public static final String NAME = "FAKE";
 
-    /** A shelf a Beirut minimarket might plausibly carry, with a group to match sections against. */
-    private record Sample(String name, String brand, String size, String priceGuess, Group group) {
+    /**
+     * A shelf a Beirut minimarket might plausibly carry, with a group to match sections against, and
+     * what photo search would say about each: its Arabic name and a few generic words in both languages.
+     */
+    private record Sample(String name, String nameAr, String brand, String size, String priceGuess,
+                          Group group, List<String> keywords) {
     }
 
     /** How a sample finds a section, by a few words its name is likely to contain in either language. */
@@ -59,22 +63,52 @@ public class FakeVisionProvider implements VisionProvider {
     }
 
     private static final List<Sample> SHELF = List.of(
-            new Sample("Pepsi 1L", "Pepsi", "1 L", "1.20", Group.DRINKS),
-            new Sample("Lay's Classic", "Lay's", "170 g", "0.80", Group.SNACKS),
-            new Sample("Tannourine Water 1.5L", "Tannourine", "1.5 L", "0.60", Group.DRINKS),
-            new Sample("Kinder Bueno", "Kinder", "43 g", "1.00", Group.SNACKS),
-            new Sample("Picon Cheese Portions", "Picon", "140 g", "2.50", Group.DAIRY),
-            new Sample("Nido Milk Powder", "Nido", "900 g", "9.50", Group.DAIRY),
-            new Sample("Mymouné Apricot Jam", "Mymouné", "450 g", "4.00", Group.PANTRY),
-            new Sample("Al Wadi Tahini", "Al Wadi Al Akhdar", "400 g", "2.20", Group.PANTRY),
-            new Sample("Maggi Chicken Stock", "Maggi", "20 cubes", "1.75", Group.PANTRY),
-            new Sample("Persil Liquid Detergent", "Persil", "3 L", "7.00", Group.HOUSEHOLD),
-            new Sample("Pringles Original", "Pringles", "165 g", "2.10", Group.SNACKS),
-            new Sample("Nescafé Classic", "Nescafé", "200 g", "6.50", Group.DRINKS));
+            new Sample("Pepsi 1L", "بيبسي 1 لتر", "Pepsi", "1 L", "1.20", Group.DRINKS,
+                    List.of("cola", "soft drink", "كولا", "مشروب غازي")),
+            new Sample("Lay's Classic", "ليز كلاسيك", "Lay's", "170 g", "0.80", Group.SNACKS,
+                    List.of("potato chips", "crisps", "شيبس", "رقائق البطاطا")),
+            new Sample("Tannourine Water 1.5L", "مياه تنورين 1.5 لتر", "Tannourine", "1.5 L", "0.60",
+                    Group.DRINKS, List.of("water", "mineral water", "مياه", "مياه معدنية")),
+            new Sample("Kinder Bueno", "كيندر بوينو", "Kinder", "43 g", "1.00", Group.SNACKS,
+                    List.of("chocolate", "wafer", "شوكولا", "ويفر")),
+            new Sample("Picon Cheese Portions", "جبنة بيكون", "Picon", "140 g", "2.50", Group.DAIRY,
+                    List.of("cheese", "cheese portions", "جبنة", "أجبان")),
+            new Sample("Nido Milk Powder", "حليب نيدو", "Nido", "900 g", "9.50", Group.DAIRY,
+                    List.of("milk powder", "milk", "حليب بودرة", "حليب")),
+            new Sample("Mymouné Apricot Jam", "مربى المشمش ميموني", "Mymouné", "450 g", "4.00",
+                    Group.PANTRY, List.of("apricot jam", "jam", "مربى المشمش", "مربى")),
+            new Sample("Al Wadi Tahini", "طحينة الوادي الأخضر", "Al Wadi Al Akhdar", "400 g", "2.20",
+                    Group.PANTRY, List.of("tahini", "sesame paste", "طحينة", "طحينة سمسم")),
+            new Sample("Maggi Chicken Stock", "مرقة دجاج ماجي", "Maggi", "20 cubes", "1.75",
+                    Group.PANTRY, List.of("chicken stock", "stock cubes", "مرقة دجاج", "مكعبات مرقة")),
+            new Sample("Persil Liquid Detergent", "برسيل سائل غسيل", "Persil", "3 L", "7.00",
+                    Group.HOUSEHOLD, List.of("laundry detergent", "detergent", "سائل غسيل", "منظف")),
+            new Sample("Pringles Original", "برينجلز أوريجينال", "Pringles", "165 g", "2.10",
+                    Group.SNACKS, List.of("potato chips", "crisps", "شيبس", "رقائق البطاطا")),
+            new Sample("Nescafé Classic", "نسكافيه كلاسيك", "Nescafé", "200 g", "6.50", Group.DRINKS,
+                    List.of("instant coffee", "coffee", "قهوة سريعة التحضير", "قهوة")));
 
     @Override
     public String name() {
         return NAME;
+    }
+
+    /**
+     * One sample product the photo's bytes choose, the same one every time for the same bytes.
+     *
+     * <p>Never about the photo, like every line this class gives, and never with a barcode: a sample's
+     * name is visibly a sample under its label, but a made-up code prefilled into a merchant's product
+     * form would pass for a real one. Photo search for customers never asks the fake at all
+     * ({@link VisionProviders#real}); a merchant finding a product by photo does, and is told the answer
+     * is a sample.
+     */
+    @Override
+    public ProductDescription describe(ProductPhoto photo) {
+        byte[] seed = digest(photo == null ? null : photo.jpeg());
+        Sample sample = SHELF.get(Math.floorMod(seed[1], SHELF.size()));
+        double confidence = 0.70 + (Math.floorMod(seed[2], 256) / 255d) * 0.29;
+        return new ProductDescription(true, sample.name(), sample.nameAr(), sample.brand(), sample.size(),
+                sample.keywords(), null, confidence);
     }
 
     @Override

@@ -29,9 +29,20 @@ class ProductFormScreen extends StatefulWidget {
     required this.api,
     this.storeApi,
     this.existing,
+    this.prefill,
+    this.storeId,
   });
 
   final CatalogApi api;
+
+  /// Which of the merchant's shops a NEW product belongs to, when the host knows — the shop whose
+  /// shelves are on screen. Sent with the create, because a merchant with more than one shop would
+  /// otherwise have it filed in whichever the server calls their first ({@code CatalogService.create}).
+  /// Null lets the server decide, which is right for a host that is not standing in a shop.
+  ///
+  /// Ignored for an existing product: a product cannot be moved between shops by saving it, and the
+  /// service reads the shop off the product itself.
+  final String? storeId;
 
   /// Reads the product's option groups for the design's variants card.
   ///
@@ -42,21 +53,51 @@ class ProductFormScreen extends StatefulWidget {
 
   final Product? existing;
 
+  /// What a NEW product starts from when it came from a photo the merchant took: the name and code
+  /// the reader read, a section when it named one of the shop's own, and the photo itself as the
+  /// product's first image. Everything in it can be changed or removed before the first save, and
+  /// nothing is sent until the merchant saves. Ignored when [existing] is given.
+  final ProductPrefill? prefill;
+
   @override
   State<ProductFormScreen> createState() => _ProductFormScreenState();
+}
+
+/// What a product form opens with when it comes from a photo ([ProductFormScreen.prefill]).
+class ProductPrefill {
+  const ProductPrefill({this.name, this.barcode, this.categoryId, this.photo, this.storeId});
+
+  final String? name;
+  final String? barcode;
+  final String? categoryId;
+
+  /// The shop the find was scoped to, so the new product is created where the merchant was looking
+  /// rather than in whichever shop the server calls their first. Null when the find searched all of
+  /// the caller's goods shops and no one of them is the answer.
+  final String? storeId;
+
+  /// The photo, as the product's first pending image — removable like any other.
+  final PickedImageBytes? photo;
 }
 
 class _ProductFormScreenState extends State<ProductFormScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
-  late final TextEditingController _name =
-      TextEditingController(text: widget.existing?.name ?? '');
+  late final TextEditingController _name = TextEditingController(
+      text: widget.existing?.name ?? (widget.existing == null ? widget.prefill?.name : null) ?? '');
   late final TextEditingController _description =
       TextEditingController(text: widget.existing?.description ?? '');
   late final TextEditingController _price =
       TextEditingController(text: widget.existing?.price.toStringAsFixed(2) ?? '');
 
-  late String? _categoryId = widget.existing?.categoryId;
+  /// The shop's own codes, seeded from the product being edited — which is what stops a save from
+  /// clearing them, since the form sends whatever is in them.
+  late final TextEditingController _sku = TextEditingController(text: widget.existing?.sku ?? '');
+  late final TextEditingController _barcode = TextEditingController(
+      text: widget.existing?.barcode ?? (widget.existing == null ? widget.prefill?.barcode : null) ?? '');
+
+  late String? _categoryId =
+      widget.existing?.categoryId ?? (widget.existing == null ? widget.prefill?.categoryId : null);
   late Product? _product = widget.existing;
 
   /// The category tree, which does not change while a form is open — but the fetch can fail, and a
@@ -101,10 +142,23 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    // The photo the merchant took becomes the new product's first image, held like any other picked
+    // before the first save and removable the same way.
+    final PickedImageBytes? photo = widget.existing == null ? widget.prefill?.photo : null;
+    if (photo != null) {
+      _pendingImages.add(photo);
+    }
+  }
+
+  @override
   void dispose() {
     _name.dispose();
     _description.dispose();
     _price.dispose();
+    _sku.dispose();
+    _barcode.dispose();
     super.dispose();
   }
 
@@ -117,11 +171,25 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     final Product draft = Product(
       id: _product?.id ?? '',
       merchantId: '',
+      // The shop this product is in, or the one the host is standing in for a product that does not
+      // exist yet. Without it a create lands in whichever shop the service calls the merchant's
+      // first, which for a merchant with two shops is the wrong one half the time — and the shelf
+      // the merchant was looking at when they added it is the one they will look for it on.
+      storeId: _product?.storeId ?? widget.prefill?.storeId ?? widget.storeId,
       name: _name.text.trim(),
       description: _description.text.trim(),
       price: double.parse(_price.text.trim()),
       categoryId: _categoryId,
       status: ProductStatus.draft,
+      // Always sent, even empty: a code left out of the request is read by the service as "cleared",
+      // which is how an edit used to wipe the SKU and the barcode. Empty here means the merchant
+      // really did clear the field.
+      sku: _sku.text.trim(),
+      barcode: _barcode.text.trim(),
+      // Carried, never built here: this is the goods form, and a service offer has its own. Sending
+      // nothing for an offer that has terms would be refused outright (an offer in a service shop
+      // needs its terms) and would drop the service block from the update event.
+      service: _product?.service,
     );
 
     try {
@@ -436,6 +504,42 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
             ),
             const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
             Expanded(child: _categoryField(t)),
+          ],
+        ),
+        const SizedBox(height: 14),
+        // The shop's own codes. They are on the form because they are SENT by it: before these
+        // fields existed, every edit saved a product with neither, and the service reads a missing
+        // code as "cleared" — so editing a price quietly wiped the SKU and the barcode the till and
+        // the shelf labels depend on. Blank still means cleared, on purpose.
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Expanded(
+              child: _Labelled(
+                label: t.pfindSkuLabel,
+                child: TextFormField(
+                  controller: _sku,
+                  maxLength: 64,
+                  style: _valueStyle,
+                  cursorColor: DeliveryColors.brand,
+                  decoration: _boxDecoration(hint: t.pfindSkuHint),
+                ),
+              ),
+            ),
+            const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+            Expanded(
+              child: _Labelled(
+                label: t.pfindBarcodeLabel,
+                child: TextFormField(
+                  controller: _barcode,
+                  maxLength: 32,
+                  keyboardType: TextInputType.number,
+                  style: _valueStyle,
+                  cursorColor: DeliveryColors.brand,
+                  decoration: _boxDecoration(hint: t.pfindBarcodeHint),
+                ),
+              ),
+            ),
           ],
         ),
       ],
@@ -753,7 +857,7 @@ const TextStyle _valueStyle = TextStyle(
 ///
 /// `counterText` is blanked because the frame draws no character counter; the `maxLength` limits
 /// still apply, they are simply not narrated at a length no menu item comes near.
-InputDecoration _boxDecoration() {
+InputDecoration _boxDecoration({String? hint}) {
   const EdgeInsetsGeometry padding = EdgeInsetsDirectional.all(DeliverySpacing.md - DeliverySpacing.xs);
   OutlineInputBorder border(Color color, [double width = 1]) => OutlineInputBorder(
         borderRadius: BorderRadius.circular(DeliveryRadius.md),
@@ -765,6 +869,7 @@ InputDecoration _boxDecoration() {
     filled: true,
     fillColor: DeliveryColors.white,
     counterText: '',
+    hintText: hint,
     contentPadding: padding,
     border: border(DeliveryColors.border),
     enabledBorder: border(DeliveryColors.border),

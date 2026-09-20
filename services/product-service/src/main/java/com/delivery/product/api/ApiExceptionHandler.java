@@ -285,6 +285,74 @@ public class ApiExceptionHandler {
     }
 
     /**
+     * A photo not read, or not searched ({@code PhotoSearchException}): the status and {@code code} the
+     * refusal names, the limit, which limit ({@code scope}) and the wait for a 429, and the wait for a
+     * busy reader — both as Retry-After, which HTTP clients understand, and in the body, which the apps
+     * read. The detail is the service's own; it never repeats the photo, what it was read as, or who sent
+     * it.
+     */
+    @ExceptionHandler(com.delivery.product.service.PhotoSearchException.class)
+    public ResponseEntity<ProblemDetail> onPhotoSearchRefused(
+            com.delivery.product.service.PhotoSearchException e) {
+        HttpStatus status = HttpStatus.valueOf(e.refusal().status());
+        ProblemDetail detail = problem(status, photoTitle(e.refusal()), e.getMessage());
+        detail.setProperty("code", e.getCode());
+        if (e.getLimit() != null) {
+            detail.setProperty("limit", e.getLimit());
+        }
+        if (e.getScope() != null) {
+            detail.setProperty("scope", e.getScope().name());
+        }
+        ResponseEntity.BodyBuilder answer = ResponseEntity.status(status);
+        if (e.getRetryAfterSeconds() != null) {
+            detail.setProperty("retryAfterSeconds", e.getRetryAfterSeconds());
+            answer.header(HttpHeaders.RETRY_AFTER, Long.toString(e.getRetryAfterSeconds()));
+        }
+        return answer.body(detail);
+    }
+
+    private static String photoTitle(com.delivery.product.service.PhotoSearchException.Refusal refusal) {
+        return switch (refusal) {
+            case UNAVAILABLE -> "Photo search unavailable";
+            case SEARCH_LIMIT, FIND_LIMIT -> "Photo limit reached";
+            case BUSY -> "Photo reader busy";
+            case TOO_LARGE -> "Photo too large";
+            case TYPE -> "Unsupported photo type";
+            case UNREADABLE -> "Photo unreadable";
+            case REFUSED -> "Photo refused";
+            case FAILED -> "Photo reader failed";
+            case MISSING -> "Bad request";
+        };
+    }
+
+    /**
+     * A multipart upload over the container's limit ({@code spring.servlet.multipart}), refused while it
+     * was being parsed, before any controller ran.
+     *
+     * <p>The only multipart endpoints in this service take one photo to be read, so this is that photo
+     * being too large: 413 {@code PHOTO_TOO_LARGE}, as the controllers' own check answers. Without this
+     * mapping the catch-all below would have made it a 500.
+     */
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ProblemDetail onUploadTooLarge(org.springframework.web.multipart.MaxUploadSizeExceededException e) {
+        ProblemDetail detail = problem(HttpStatus.PAYLOAD_TOO_LARGE, "Photo too large",
+                "The photo is larger than this service accepts.");
+        detail.setProperty("code", com.delivery.product.service.PhotoSearchException.Refusal.TOO_LARGE.code());
+        return detail;
+    }
+
+    /**
+     * A request to a multipart endpoint that is not a readable multipart form. The caller's mistake, and
+     * a 400 rather than the catch-all's 500.
+     */
+    @ExceptionHandler({org.springframework.web.multipart.MultipartException.class,
+            org.springframework.web.multipart.support.MissingServletRequestPartException.class})
+    public ProblemDetail onUnreadableMultipart(Exception e) {
+        return problem(HttpStatus.BAD_REQUEST, "Bad request",
+                "Send the photo as a multipart form with a part named 'photo'.");
+    }
+
+    /**
      * The geocoder could not answer.
      *
      * <p>503 and never an empty result. An address picker handed an empty list concludes the street

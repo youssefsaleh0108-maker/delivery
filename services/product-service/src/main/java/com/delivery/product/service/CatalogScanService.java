@@ -107,16 +107,15 @@ public class CatalogScanService {
     public record PhotoRef(UUID photoId, String bucket, String objectKey) {
     }
 
-    /** A section a line may be filed under — the store's own, or the platform's. */
-    public record CategoryChoice(UUID id, String name, boolean storeOwned) {
-    }
-
     /**
      * Everything the analyser needs, read in one short transaction so nothing is held open across
      * a provider call that can take a minute.
+     *
+     * <p>The sections a line may be filed under are {@link CategoryChoices}', shared with the
+     * merchant's find by photo so both suggest a section the same way.
      */
     public record AnalysisJob(UUID scanId, int attempt, List<PhotoRef> photos,
-                              List<CategoryChoice> categories) {
+                              List<CategoryChoices.Choice> categories) {
 
         /** Store sections first, so the model sees the shop's own vocabulary before the platform's. */
         public List<String> categoryNames() {
@@ -314,7 +313,7 @@ public class CatalogScanService {
                                 .map(p -> new PhotoRef(p.getId(), FilePurpose.PRODUCT_IMAGE.bucket(),
                                         p.getObjectKey()))
                                 .toList(),
-                        categoryChoices(scan.getStoreId())));
+                        CategoryChoices.forStore(categories, scan.getStoreId())));
     }
 
     /**
@@ -342,7 +341,7 @@ public class CatalogScanService {
                     line.name(),
                     line.brand(),
                     line.size(),
-                    resolveCategory(line.category(), job.categories()),
+                    CategoryChoices.resolve(line.category(), job.categories()),
                     line.confidence(),
                     line.priceGuess(),
                     toBox(line.box())));
@@ -631,35 +630,6 @@ public class CatalogScanService {
         if (!category.isPlatformOwned() && !category.isOwnedByStore(storeId)) {
             throw new CategoryNotFoundException(categoryId);
         }
-    }
-
-    private List<CategoryChoice> categoryChoices(UUID storeId) {
-        List<CategoryChoice> choices = new ArrayList<>();
-        categories.findByStoreIdOrderByPositionAscNameAsc(storeId)
-                .forEach(c -> choices.add(new CategoryChoice(c.getId(), c.getName(), true)));
-        categories.findByStoreIdIsNull()
-                .forEach(c -> choices.add(new CategoryChoice(c.getId(), c.getName(), false)));
-        return choices;
-    }
-
-    /**
-     * A suggested section name back to an id — only ever one that was offered.
-     *
-     * <p>Exact match, ignoring case and surrounding space, store sections first. No fuzzy matching:
-     * a near miss filed under the wrong shelf is worse than no suggestion, which the merchant sees
-     * as an empty picker and fills in.
-     */
-    static UUID resolveCategory(String suggested, List<CategoryChoice> choices) {
-        if (suggested == null || suggested.isBlank()) {
-            return null;
-        }
-        String wanted = suggested.trim().toLowerCase(Locale.ROOT);
-        for (CategoryChoice choice : choices) {
-            if (choice.name() != null && choice.name().trim().toLowerCase(Locale.ROOT).equals(wanted)) {
-                return choice.id();
-            }
-        }
-        return null;
     }
 
     /**

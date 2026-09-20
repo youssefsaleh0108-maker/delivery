@@ -329,6 +329,15 @@ public class ItemSearchService {
         }
     }
 
+    /**
+     * An answer with no shops, in the shape {@link #search} gives it: for a caller with nothing it can
+     * search for, such as a photo of something that is not a product. Reads nothing.
+     */
+    public ItemSearchResult nothing(GeoPoint centre, int size) {
+        PageRequest pageable = PageRequest.of(0, Math.min(Math.max(size, 1), MAX_PAGE_SIZE));
+        return new ItemSearchResult(pageOf(List.of(), pageable), false, maxCandidates, centre != null);
+    }
+
     private ItemSearchResult searchWithinTimeout(ItemQuery query, GeoPoint centre, int page, int size) {
         PageRequest pageable = PageRequest.of(Math.max(page, 0),
                 Math.min(Math.max(size, 1), MAX_PAGE_SIZE));

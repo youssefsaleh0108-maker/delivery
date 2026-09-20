@@ -4,6 +4,8 @@ import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import 'photo_find_sheet.dart';
+import 'photo_source.dart';
 import 'order_detail_screen.dart';
 import 'product_form_screen.dart';
 
@@ -22,9 +24,14 @@ import 'product_form_screen.dart';
 /// Android app hands it 360dp and a gesture bar. What changes between them is the column count and
 /// whether the page can be pulled to refresh — see [_ProductListScreenState._phoneWidth].
 class ProductListScreen extends StatefulWidget {
-  const ProductListScreen({super.key, required this.api, this.storeApi});
+  const ProductListScreen({super.key, required this.api, this.storeApi, this.photoSource});
 
   final CatalogApi api;
+
+  /// Find a product in the shop's catalogue by photo. Non-null draws a camera in the search box;
+  /// null draws none. Handed over by the host only to a MERCHANT, as Merchant Blitz is, since the
+  /// find is MERCHANT-only on the server.
+  final ShelfPhotoSource? photoSource;
 
   /// Only used to read a product's option groups on the form behind this screen — see
   /// [ProductFormScreen.storeApi]. Optional so the hosts that have no [StoreApi] to hand keep
@@ -222,8 +229,31 @@ class _ProductListScreenState extends State<ProductListScreen> {
         controller: _search,
         hintText: t.merchbSearchMenuItems,
         onChanged: (String value) => setState(() => _query = value.trim().toLowerCase()),
+        onCameraTap: widget.photoSource == null ? null : _findByPhoto,
+        cameraSemanticLabel: widget.photoSource == null ? null : t.pfindCamera,
       ),
     );
+  }
+
+  /// The camera beside the search box: a photo of a pack, then the product the shop already has, or
+  /// a new one started from what the reader read.
+  Future<void> _findByPhoto() async {
+    final ShelfPhotoSource? source = widget.photoSource;
+    if (source == null) return;
+    final PhotoFindChoice? choice =
+        await findProductByPhoto(context, api: widget.api, source: source);
+    if (choice == null || !mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (BuildContext _) => ProductFormScreen(
+        api: widget.api,
+        storeApi: widget.storeApi,
+        existing: choice.product,
+        prefill: choice.prefill,
+      ),
+    ));
+    if (!mounted) return;
+    // A product added or edited behind the sheet belongs on this list.
+    _reload();
   }
 
   /// The horizontally scrolling category chips, on the page background rather than on the header.

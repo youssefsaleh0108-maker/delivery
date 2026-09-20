@@ -34,7 +34,7 @@ import com.delivery.product.domain.Store;
 import com.delivery.product.service.CatalogScanService.Acceptance;
 import com.delivery.product.service.CatalogScanService.AnalysisJob;
 import com.delivery.product.service.CatalogScanService.CatalogScanNotFoundException;
-import com.delivery.product.service.CatalogScanService.CategoryChoice;
+import com.delivery.product.service.CategoryChoices.Choice;
 import com.delivery.product.service.CatalogScanService.Limits;
 import com.delivery.product.service.CatalogScanService.PhotoRef;
 import com.delivery.product.service.CatalogScanService.ScanDetails;
@@ -475,8 +475,8 @@ class CatalogScanServiceTest {
             UUID platformDrinks = UUID.randomUUID();
             AnalysisJob job = new AnalysisJob(scan.getId(), attempt,
                     List.of(new PhotoRef(photo.getId(), "product-images", photo.getObjectKey())),
-                    List.of(new CategoryChoice(ownSection, "Cold Drinks", true),
-                            new CategoryChoice(platformDrinks, "Drinks", false)));
+                    List.of(new Choice(ownSection, "Cold Drinks", true),
+                            new Choice(platformDrinks, "Drinks", false)));
 
             service.recordDetections(job, "CLAUDE", List.of(
                     new Detection(0, "Pepsi 1L", "Pepsi", "1 L", " cold drinks ", 0.93,

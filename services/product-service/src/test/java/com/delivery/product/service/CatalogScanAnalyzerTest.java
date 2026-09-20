@@ -19,7 +19,7 @@ import org.mockito.ArgumentCaptor;
 
 import com.delivery.product.domain.CatalogScan.FailureCode;
 import com.delivery.product.service.CatalogScanService.AnalysisJob;
-import com.delivery.product.service.CatalogScanService.CategoryChoice;
+import com.delivery.product.service.CategoryChoices.Choice;
 import com.delivery.product.service.CatalogScanService.PhotoRef;
 import com.delivery.product.vision.VisionException;
 import com.delivery.product.vision.VisionProvider;
@@ -67,7 +67,7 @@ class CatalogScanAnalyzerTest {
 
         job = new AnalysisJob(SCAN, 1,
                 List.of(new PhotoRef(PHOTO, "product-images", "scans/s/shelf.png")),
-                List.of(new CategoryChoice(UUID.randomUUID(), "Drinks", true)));
+                List.of(new Choice(UUID.randomUUID(), "Drinks", true)));
         when(scans.loadForAnalysis(SCAN, 1)).thenReturn(Optional.of(job));
     }
 

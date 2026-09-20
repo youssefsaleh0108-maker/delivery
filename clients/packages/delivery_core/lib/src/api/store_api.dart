@@ -6,7 +6,9 @@ import '../models/catalog_models.dart';
 import '../models/geo_models.dart';
 import '../models/gift_models.dart';
 import '../models/item_search_models.dart';
+import '../models/photo_search_models.dart';
 import '../models/store_models.dart';
+import '../util/image_prep.dart';
 
 /// Typed client for the storefront half of the Product Service.
 class StoreApi {
@@ -219,6 +221,81 @@ class StoreApi {
     }
     final Object? body = response.data;
     return ItemSearchPage.fromJson(body is Map<String, dynamic> ? body : const <String, dynamic>{});
+  }
+
+  /// The largest photo sent to photo search: about 800 KB. A 1568 px JPEG of one product needs no
+  /// more, the server reads nothing larger, and on mobile data every kilobyte is the customer's.
+  static const int photoSearchMaxBytes = 800 * 1024;
+
+  /// The long edge a photo keeps when it has to be shrunk: 1568 px, what the server's reader reads.
+  static const int photoSearchMaxEdge = 1568;
+
+  /// How long a photo search may take to send and to answer: the reader alone may take 25 seconds, and
+  /// a phone on a weak signal takes a while to send the photo. Longer than the app's usual 20 seconds,
+  /// whose send timeout would also tell the app it is offline when it is only slow.
+  static const Duration photoSearchTimeout = Duration(seconds: 45);
+
+  /// Whether this account may search by photo, how many it has left today, and how large a photo may
+  /// be. Home asks this with its rails, and draws the camera only when [PhotoSearchCapabilities.photoSearch].
+  Future<PhotoSearchCapabilities> photoCapabilities() async {
+    final Response<dynamic> response =
+        await _dio.get<dynamic>('/api/products/search/capabilities');
+    final Object? body = response.data;
+    return body is Map<String, dynamic>
+        ? PhotoSearchCapabilities.fromJson(body)
+        : PhotoSearchCapabilities.none;
+  }
+
+  /// Searches the shops for what a photo shows: the first page of shops, and what the photo was read
+  /// as. The next pages are [searchItems] with [PhotoSearchPage.nextQuery], so the photo is sent once.
+  ///
+  /// The photo is shrunk first ([photoSearchMaxBytes], [photoSearchMaxEdge]) and sent as a multipart
+  /// part straight to the server, which reads it and keeps nothing; the pin travels as form fields in
+  /// the same body, never in the URL. A refusal the server gives a code throws [PhotoSearchFailure]
+  /// (unavailable, a limit, a busy reader, a photo too large, of the wrong type, unreadable or refused,
+  /// or a reader that failed); anything else arrives as the [DioException] it is.
+  ///
+  /// [maxBytes] is what the server says it accepts ([PhotoSearchCapabilities.maxPhotoBytes]). The
+  /// photo is brought under whichever is smaller, that or [photoSearchMaxBytes]: this build's own
+  /// preference is the kinder of the two on mobile data, but the server's is the one that decides
+  /// whether the photo is read at all, and an old build that kept sending 800 KB to a server that had
+  /// lowered its cap would spend a photo of the day's allowance on a 413.
+  Future<PhotoSearchPage> searchByPhoto({
+    required Uint8List bytes,
+    required String contentType,
+    double? latitude,
+    double? longitude,
+    int? maxBytes,
+  }) async {
+    final int cap = maxBytes != null && maxBytes > 0 && maxBytes < photoSearchMaxBytes
+        ? maxBytes
+        : photoSearchMaxBytes;
+    final PreparedImage prepared = ImagePrep.forUpload(bytes, contentType,
+        maxBytes: cap, maxEdge: photoSearchMaxEdge);
+    final bool pinned = latitude != null && longitude != null;
+    final FormData form = FormData.fromMap(<String, dynamic>{
+      'photo': MultipartFile.fromBytes(
+        prepared.bytes,
+        filename: prepared.contentType == 'image/png' ? 'photo.png' : 'photo.jpg',
+        contentType: DioMediaType.parse(prepared.contentType),
+      ),
+      if (pinned) 'latitude': latitude.toString(),
+      if (pinned) 'longitude': longitude.toString(),
+    });
+    final Response<dynamic> response;
+    try {
+      response = await _dio.post<dynamic>(
+        '/api/products/search/photo',
+        data: form,
+        options: Options(sendTimeout: photoSearchTimeout, receiveTimeout: photoSearchTimeout),
+      );
+    } on DioException catch (e) {
+      final PhotoSearchFailure? failure = PhotoSearchFailure.fromDio(e);
+      if (failure != null) throw failure;
+      rethrow;
+    }
+    final Object? body = response.data;
+    return PhotoSearchPage.fromJson(body is Map<String, dynamic> ? body : const <String, dynamic>{});
   }
 
   Future<Paged<StoreCard>> favorites({int page = 0, int size = 20}) async {
