@@ -26,6 +26,7 @@ Future<PickedShelfPhoto?> pickPhotoToRead(
   required ShelfPhotoSource source,
   required String title,
   String? message,
+  int? photosLeft,
 }) async {
   final DeliveryStrings t = DeliveryStrings.of(context);
   final ScaffoldMessengerState? messenger = ScaffoldMessenger.maybeOf(context);
@@ -36,8 +37,11 @@ Future<PickedShelfPhoto?> pickPhotoToRead(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(DeliveryRadius.sheet)),
     ),
-    builder: (BuildContext _) =>
-        PhotoPickSheet(title: title, message: message, canUseCamera: source.canUseCamera),
+    builder: (BuildContext _) => PhotoPickSheet(
+        title: title,
+        message: message,
+        canUseCamera: source.canUseCamera,
+        photosLeft: photosLeft),
   );
   switch (choice) {
     case null:
@@ -69,6 +73,7 @@ class PhotoPickSheet extends StatelessWidget {
     required this.title,
     required this.canUseCamera,
     this.message,
+    this.photosLeft,
   });
 
   final String title;
@@ -77,6 +82,12 @@ class PhotoPickSheet extends StatelessWidget {
   /// Whether to offer "Take photo". False on the web and on desktops, where there is no camera to
   /// open.
   final bool canUseCamera;
+
+  /// How many photos the server says this account has left today, drawn under the buttons as Merchant
+  /// Blitz draws its own count. Null when the caller has no count to give, and then nothing is drawn:
+  /// a photo read is a few cents of somebody else's money, and a number nobody checked is worse than
+  /// no number.
+  final int? photosLeft;
 
   @override
   Widget build(BuildContext context) {
@@ -130,6 +141,14 @@ class PhotoPickSheet extends StatelessWidget {
               icon: Icons.photo_library_outlined,
               onPressed: () => Navigator.of(context).pop(PhotoPick.gallery),
             ),
+            if (photosLeft != null) ...<Widget>[
+              const SizedBox(height: DeliverySpacing.sm),
+              Text(
+                t.psrchLeftToday(photosLeft!),
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 12, color: DeliveryColors.muted),
+              ),
+            ],
             const SizedBox(height: DeliverySpacing.md),
             PhotoConsentLine(text: t.psrchConsent),
           ],

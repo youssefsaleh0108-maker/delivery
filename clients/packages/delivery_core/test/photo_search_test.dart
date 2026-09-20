@@ -175,6 +175,47 @@ void main() {
       expect(sent.height, lessThan(StoreApi.photoSearchMaxEdge));
     });
 
+    /// The server says how large a photo it takes ({@code maxPhotoBytes} on the capabilities). The
+    /// app's own 800 KB is the kinder number on mobile data, but it is not the one that decides, and a
+    /// build that ignored a smaller server cap would spend one of the day's photos on a 413.
+    test('the smaller of the app\'s cap and the server\'s is what the photo is brought under',
+        () async {
+      // A gradient with a little grain: big enough as a PNG to need shrinking, and compressible
+      // enough that the quality steps really do reach the caps below — unlike pure noise, which
+      // bottoms out at the quality floor and lands on the same bytes whatever the cap.
+      final Random grain = Random(11);
+      final img.Image large = img.Image(width: 2400, height: 1800);
+      for (final img.Pixel pixel in large) {
+        pixel
+          ..r = (pixel.x * 255) ~/ large.width
+          ..g = (pixel.y * 255) ~/ large.height
+          ..b = (pixel.x + pixel.y + grain.nextInt(24)) % 256;
+      }
+      final Uint8List png = Uint8List.fromList(img.encodePng(large));
+      expect(png.length, greaterThan(StoreApi.photoSearchMaxBytes));
+
+      Future<int> sentBytesWith(int? maxBytes) async {
+        final ({StoreApi api, _Server server}) stores = _stores((_) => _photoPage());
+        await stores.api
+            .searchByPhoto(bytes: png, contentType: 'image/png', maxBytes: maxBytes);
+        final String body = stores.server.bodies.single;
+        final int partStart = body.indexOf('\r\n\r\n', body.indexOf('name="photo"')) + 4;
+        return body.indexOf('\r\n--', partStart) - partStart;
+      }
+
+      final int withAppsOwn = await sentBytesWith(null);
+      expect(withAppsOwn, lessThanOrEqualTo(StoreApi.photoSearchMaxBytes));
+
+      // A server that takes less gets less.
+      expect(await sentBytesWith(200 * 1024), lessThan(withAppsOwn));
+
+      // A server that takes more does not make this build send more: 800 KB is still enough of a
+      // photo to read a pack, and the rest is the customer's data.
+      expect(await sentBytesWith(5 * 1024 * 1024), withAppsOwn);
+      // Nor does a nonsense cap, which would otherwise send a photo nothing could read.
+      expect(await sentBytesWith(0), withAppsOwn);
+    });
+
     test('reads the page, what the photo was read as, and the query for the next page', () async {
       final ({StoreApi api, _Server server}) stores = _stores((_) => _photoPage(similar: true));
 

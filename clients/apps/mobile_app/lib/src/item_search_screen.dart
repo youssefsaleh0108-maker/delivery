@@ -38,6 +38,7 @@ class ItemSearchScreen extends StatefulWidget {
     required this.addresses,
     this.query,
     this.photo,
+    this.maxPhotoBytes,
     required this.onOpenBasket,
     this.orderApi,
     this.onFavoriteChanged,
@@ -53,6 +54,10 @@ class ItemSearchScreen extends StatefulWidget {
 
   /// The photo to search by, sent once. Null for a search by words.
   final PickedShelfPhoto? photo;
+
+  /// The largest photo the server says it accepts, from the capabilities Home read
+  /// ([PhotoSearchCapabilities.maxPhotoBytes]). Null falls back to this build's own cap.
+  final int? maxPhotoBytes;
 
   /// Told when the server says photo search is not available after all, so the camera that opened
   /// this screen stops being offered.
@@ -116,6 +121,7 @@ class _ItemSearchScreenState extends State<ItemSearchScreen> {
             contentType: photo.contentType,
             latitude: latitude,
             longitude: longitude,
+            maxBytes: widget.maxPhotoBytes,
           );
         } on PhotoSearchFailure catch (failure) {
           // The camera that opened this screen stops being offered: the server has just said there

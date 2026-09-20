@@ -21680,6 +21680,12 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Finding products by photo is very busy today. Search your catalogue by name, or try again later.'**
   String get pfindLimitPlatform;
+
+  /// No description provided for @psrchLeftToday.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No photo searches left today} =1{1 photo search left today} other{{count} photo searches left today}}'**
+  String psrchLeftToday(int count);
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

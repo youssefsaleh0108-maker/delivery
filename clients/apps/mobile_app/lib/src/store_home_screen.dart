@@ -299,6 +299,8 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
           const DeviceShelfPhotoSource(cameraMaxEdge: StoreApi.photoSearchMaxEdge),
       title: t.psrchSheetTitle,
       message: t.psrchSheetBody,
+      // What the server says is left, before one is spent rather than after.
+      photosLeft: _photo.photosLeftToday,
     );
     if (photo == null || !mounted) return;
     await Navigator.of(context).push(MaterialPageRoute<void>(
@@ -308,6 +310,9 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
         cart: widget.cart,
         addresses: widget.addresses,
         photo: photo,
+        // The largest photo the server says it will take, so this build never sends one it would
+        // refuse — and never spends a photo of the day on a 413.
+        maxPhotoBytes: _photo.maxPhotoBytes,
         onOpenBasket: widget.onOpenBasket,
         onFavoriteChanged: _applyFavorite,
         // The server has just said there is no photo search after all; stop offering it.

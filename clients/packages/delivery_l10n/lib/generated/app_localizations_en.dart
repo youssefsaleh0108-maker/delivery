@@ -12821,4 +12821,16 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get pfindLimitPlatform =>
       'Finding products by photo is very busy today. Search your catalogue by name, or try again later.';
+
+  @override
+  String psrchLeftToday(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count photo searches left today',
+      one: '1 photo search left today',
+      zero: 'No photo searches left today',
+    );
+    return '$_temp0';
+  }
 }

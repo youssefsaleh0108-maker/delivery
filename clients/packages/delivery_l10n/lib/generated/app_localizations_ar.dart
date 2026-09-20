@@ -12987,4 +12987,19 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get pfindLimitPlatform =>
       'البحث عن المنتجات بالصورة مزدحم جدًا اليوم. ابحث في كتالوجك بالاسم، أو حاول لاحقًا.';
+
+  @override
+  String psrchLeftToday(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'بقيت $count عملية بحث بالصورة اليوم',
+      many: 'بقيت $count عملية بحث بالصورة اليوم',
+      few: 'بقيت $count عمليات بحث بالصورة اليوم',
+      two: 'بقي بحثان بالصورة اليوم',
+      one: 'بقي بحث واحد بالصورة اليوم',
+      zero: 'لم يتبقَّ بحث بالصورة اليوم',
+    );
+    return '$_temp0';
+  }
 }

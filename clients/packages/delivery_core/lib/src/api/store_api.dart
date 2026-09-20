@@ -254,14 +254,24 @@ class StoreApi {
   /// the same body, never in the URL. A refusal the server gives a code throws [PhotoSearchFailure]
   /// (unavailable, a limit, a busy reader, a photo too large, of the wrong type, unreadable or refused,
   /// or a reader that failed); anything else arrives as the [DioException] it is.
+  ///
+  /// [maxBytes] is what the server says it accepts ([PhotoSearchCapabilities.maxPhotoBytes]). The
+  /// photo is brought under whichever is smaller, that or [photoSearchMaxBytes]: this build's own
+  /// preference is the kinder of the two on mobile data, but the server's is the one that decides
+  /// whether the photo is read at all, and an old build that kept sending 800 KB to a server that had
+  /// lowered its cap would spend a photo of the day's allowance on a 413.
   Future<PhotoSearchPage> searchByPhoto({
     required Uint8List bytes,
     required String contentType,
     double? latitude,
     double? longitude,
+    int? maxBytes,
   }) async {
+    final int cap = maxBytes != null && maxBytes > 0 && maxBytes < photoSearchMaxBytes
+        ? maxBytes
+        : photoSearchMaxBytes;
     final PreparedImage prepared = ImagePrep.forUpload(bytes, contentType,
-        maxBytes: photoSearchMaxBytes, maxEdge: photoSearchMaxEdge);
+        maxBytes: cap, maxEdge: photoSearchMaxEdge);
     final bool pinned = latitude != null && longitude != null;
     final FormData form = FormData.fromMap(<String, dynamic>{
       'photo': MultipartFile.fromBytes(

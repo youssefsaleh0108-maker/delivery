@@ -289,6 +289,9 @@ void main() {
       expect(find.text(en.psrchConsent), findsOneWidget);
       expect(find.text(en.psrchTakePhoto), findsOneWidget);
       expect(find.text(en.psrchChoosePhoto), findsOneWidget);
+      // What the server says is left, said before one is spent rather than after — a photo read is
+      // a few cents of somebody's money, and the count is the server's, not this build's guess.
+      expect(find.text(en.psrchLeftToday(7)), findsOneWidget);
     });
 
     testWidgets('offers no camera on a device that has none, and still says where the photo goes',
