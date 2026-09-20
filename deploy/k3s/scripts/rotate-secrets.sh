@@ -932,6 +932,37 @@ step_netpol_proof() {
   echo "(--disable-network-policy). Nothing in these manifests can fix that; the flag must change."
 }
 
+step_demand_seen() {
+  # The key the demand digest counts distinct people with: it stores HMAC(secret, account|area|term|
+  # week) and nothing else, so a term is published only after five different people asked for it,
+  # while the stored marker names nobody and cannot be joined across terms.
+  #
+  # Its own Secret, referenced once (base/services.yaml, product-service, optional). Without it the
+  # platform records no searches and publishes no digest — the floor is never weakened instead.
+  #
+  # NEVER store this beside a database backup: whoever holds both can test a guess ("did this
+  # account search for that?"). It is minted here, on the box, and printed nowhere.
+  #
+  # Idempotent: an existing key is left alone unless --force, because rotating it makes the current
+  # week's markers unmatchable, so that week under-counts and can publish less than it should.
+  local force=0
+  [ "${1:-}" = --force ] && force=1
+  if k get secret demand-seen >/dev/null 2>&1 && [ "$force" = 0 ]; then
+    ok "demand-seen already exists; pass --force to mint a new one (this week would under-count)"
+    return
+  fi
+  local value
+  value=$(head -c 32 /dev/urandom | base64 | tr -d '\n')
+  k create secret generic demand-seen --from-literal=DEMAND_SEEN_SECRET="$value" \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null \
+    || die "could not write the demand-seen Secret"
+  unset value
+  check "demand-seen holds a key of the right length" 44 \
+    "$(k get secret demand-seen -o jsonpath='{.data.DEMAND_SEEN_SECRET}' | base64 -d | wc -c | tr -d ' ')"
+  ok "demand-seen minted; restart product-service to pick it up"
+}
+
+
 step_verify() {
   local c key u client p notready r
   echo "== $NS"
@@ -1016,6 +1047,7 @@ case "$STEP" in
   netpol-proof) step_netpol_proof ;;
   edge-identity) step_edge_identity ;;
   refresh-rotation) step_refresh_rotation ;;
+  demand-seen) step_demand_seen "$@" ;;
   verify) step_verify ;;
   *) die "unknown step '$STEP' (see the header of this script)" ;;
 esac
