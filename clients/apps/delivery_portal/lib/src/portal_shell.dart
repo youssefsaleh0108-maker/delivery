@@ -320,10 +320,15 @@ class PortalArea {
         // These pages are only built for an account carrying MERCHANT, so the find's camera is
         // offered here as the shelf scan is. On the web there is no camera to open, so its sheet
         // offers the gallery alone.
-        build: (PortalApis a, _, __, ___) => ProductListScreen(
+        //
+        // Scoped to a shop like Inventory and the rest of the suite: the list itself is every shop
+        // the merchant owns, but "Add Product" and the photo find must name one, or a merchant
+        // with two shops files the product in whichever the server calls their first.
+        build: (PortalApis a, _, __, ___) => _withStore(a, (String? storeId) => ProductListScreen(
               api: a.catalog,
+              storeId: storeId,
               photoSource: const DeviceShelfPhotoSource(cameraMaxEdge: CatalogApi.photoFindMaxEdge),
-            ),
+            )),
       ),
       PortalDestination(
         icon: Icons.receipt_long_outlined,
