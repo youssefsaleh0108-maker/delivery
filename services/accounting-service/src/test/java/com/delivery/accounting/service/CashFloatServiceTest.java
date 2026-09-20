@@ -112,12 +112,19 @@ class CashFloatServiceTest {
         assertThat(outstanding.get(0).getClearedBy()).isEqualTo(remittanceId);
     }
 
+    /** The same service with a Core Banking connector to ask, which is not what is deployed. */
+    private CashFloatService withABank() {
+        return new CashFloatService(floatEntries, transactions, postings, PLATFORM, "USD",
+                SettlementService.SettlementMode.BANK);
+    }
+
     @Test
     void banking_the_takings_credits_the_platform_at_the_bank() {
-        // Unlike a collection, this one IS a real movement — the money genuinely arrives.
+        // Unlike a collection, this one IS a real movement — the money genuinely arrives. With a
+        // bank configured it is a posting the bank is asked for.
         carrying("42.75");
 
-        service.remitAll(RIDER, "corr-1");
+        withABank().remitAll(RIDER, "corr-1");
 
         ArgumentCaptor<AccountingTransaction> saved =
                 ArgumentCaptor.forClass(AccountingTransaction.class);
@@ -127,6 +134,60 @@ class CashFloatServiceTest {
         assertThat(saved.getValue().getDirection()).isEqualTo(Direction.CREDIT);
         assertThat(saved.getValue().getAmount()).isEqualByComparingTo("42.75");
         assertThat(saved.getValue().isPostingRequired()).isTrue();
+        assertThat(saved.getValue().getStatus()).isEqualTo(AccountingTransaction.Status.PENDING);
+    }
+
+    @Test
+    @DisplayName("RECON-06: with no bank, a remittance is settled as it is written and nobody is asked")
+    void with_no_bank_the_remittance_is_settled_as_it_is_written() {
+        carrying("42.75");
+
+        service.remitAll(RIDER, "corr-1");
+
+        ArgumentCaptor<AccountingTransaction> saved =
+                ArgumentCaptor.forClass(AccountingTransaction.class);
+        verify(transactions).save(saved.capture());
+        assertThat(saved.getValue().getLeg()).isEqualTo(Leg.CASH_REMITTANCE);
+        assertThat(saved.getValue().getAmount()).isEqualByComparingTo("42.75");
+        assertThat(saved.getValue().getStatus())
+                .isEqualTo(AccountingTransaction.Status.SETTLED_IN_CASH);
+        assertThat(saved.getValue().isPostingRequired()).isFalse();
+        verifyNoInteractions(postings);
+    }
+
+    @Test
+    @DisplayName("RECON-06: remittances left PENDING for a bank are settled once, and only they")
+    void remittances_left_waiting_for_a_bank_are_settled_once() {
+        AccountingTransaction company = pendingRemittance("76.39");
+        AccountingTransaction rider = pendingRemittance("254.87");
+        when(transactions.findByLegAndStatus(Leg.CASH_REMITTANCE,
+                AccountingTransaction.Status.PENDING))
+                .thenReturn(List.of(company, rider))
+                .thenReturn(List.of());
+
+        assertThat(service.settlePendingRemittancesWithoutBank()).isEqualTo(2);
+        assertThat(List.of(company, rider)).allSatisfy(leg -> {
+            assertThat(leg.getStatus()).isEqualTo(AccountingTransaction.Status.SETTLED_IN_CASH);
+            assertThat(leg.isPostingRequired()).isFalse();
+            assertThat(leg.getAmount()).isNotNull();
+        });
+        verify(transactions).saveAll(List.of(company, rider));
+        // A second start finds nothing left; nothing is ever deleted or published.
+        assertThat(service.settlePendingRemittancesWithoutBank()).isZero();
+        verify(transactions, never()).delete(any());
+        verifyNoInteractions(postings);
+    }
+
+    @Test
+    @DisplayName("RECON-06: with a bank, a waiting remittance is the bank's to answer")
+    void with_a_bank_the_sweep_leaves_remittances_to_the_bank() {
+        assertThat(withABank().settlePendingRemittancesWithoutBank()).isZero();
+        verifyNoInteractions(transactions, postings);
+    }
+
+    private static AccountingTransaction pendingRemittance(String amount) {
+        return new AccountingTransaction(UUID.randomUUID(), Leg.CASH_REMITTANCE, PLATFORM,
+                new BigDecimal(amount), "USD", Direction.CREDIT, "corr");
     }
 
     @Test
@@ -176,7 +237,7 @@ class CashFloatServiceTest {
         // documented fallback. The ordering itself is enforced by the after-commit hook.
         carrying("42.75");
 
-        service.remitAll(RIDER, "corr-1");
+        withABank().remitAll(RIDER, "corr-1");
 
         verify(postings).request(any(AccountingTransaction.class));
     }

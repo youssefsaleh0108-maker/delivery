@@ -13082,4 +13082,116 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get actionCloseNotDelivered => 'إغلاق الطلب كغير مُسلَّم';
+
+  @override
+  String get merchRejectConfirmTitle => 'رفض هذا الطلب؟';
+
+  @override
+  String get merchRejectConfirmBody =>
+      'سيُلغى طلب الزبون، ولا يمكن التراجع عن ذلك.';
+
+  @override
+  String get merchRejectReason => 'السبب، لفريق الدعم (اختياري)';
+
+  @override
+  String get invUnavailable => 'كميات المخزون غير متاحة بعد';
+
+  @override
+  String get invUnavailableHint =>
+      'لم يُفعَّل المخزون لمتجرك. هذا لا يؤثر على قائمة منتجاتك.';
+
+  @override
+  String get portalSignInWelcome => 'أهلاً بعودتك';
+
+  @override
+  String get portalSignInPrompt => 'سجّل الدخول بحسابك في YouDrop لفتح لوحتك.';
+
+  @override
+  String get portalSignInRedirect =>
+      'سننقلك إلى خدمة الهوية في YouDrop لتسجيل الدخول، ثم نعيدك إلى هنا مباشرة.';
+
+  @override
+  String get portalSignInApply =>
+      'تاجر جديد أو شركة توصيل؟ قدّم طلبك من تطبيق YouDrop، وتُفتح لوحتك فور الموافقة على الطلب.';
+
+  @override
+  String get portalBrandEyebrow => 'لوحة الشركاء';
+
+  @override
+  String get portalBrandHeadline => 'أدِر عملك كله من لوحة واحدة.';
+
+  @override
+  String get portalBrandBlurb =>
+      'المتاجر وشركات التوصيل وفريق المنصة يسجّلون الدخول من هنا. الطلبات المباشرة والإرسال والكتالوج والتسويات، بالحساب نفسه أيًّا كنت منهم.';
+
+  @override
+  String get portalBrandAudiences => 'التجّار · شركات التوصيل · الإدارة';
+
+  @override
+  String reconOwedToCompany(String company) {
+    return 'مستحق لشركة $company';
+  }
+
+  @override
+  String get reconCompanyTakesItIn =>
+      'تستلم الشركة هذا المبلغ في مركزها، ولا يُسجَّل إيداعه هنا.';
+
+  @override
+  String reconBankedAmountChanged(String holder, String amount) {
+    return 'يحمل $holder الآن $amount للمنصة، وليس المبلغ الذي أكّدته. لم يُسجَّل أي شيء.';
+  }
+
+  @override
+  String get reconLegCustomerDebit => 'خُصم من العميل';
+
+  @override
+  String get reconLegCashCollected => 'نقد مقبوض عند الباب';
+
+  @override
+  String get reconLegMerchantCredit => 'مستحقات المتجر';
+
+  @override
+  String get reconLegGiftWrapCredit => 'تغليف الهدية';
+
+  @override
+  String get reconLegRiderCredit => 'مستحقات السائق';
+
+  @override
+  String get reconLegProviderCredit => 'مستحقات شركة التوصيل';
+
+  @override
+  String get reconLegPlatformCommission => 'عمولة المنصة';
+
+  @override
+  String get reconLegPlatformSubsidy => 'مساهمة المنصة';
+
+  @override
+  String get reconLegPlatformLoss => 'خسارة بعد الاستلام';
+
+  @override
+  String get reconLegCashRemittance => 'نقد مودَع';
+
+  @override
+  String get reconLegPayout => 'مبلغ مدفوع';
+
+  @override
+  String get reconLegCustomerRefund => 'استرداد';
+
+  @override
+  String get reconStatusPending => 'قيد الانتظار';
+
+  @override
+  String get reconStatusPosted => 'مُرحَّل';
+
+  @override
+  String get reconStatusSettledInCash => 'سُوّي نقدًا';
+
+  @override
+  String get reconStatusFailed => 'فشل';
+
+  @override
+  String get reconStatusCompensated => 'معكوس';
+
+  @override
+  String get reconStatusAbandoned => 'متروك';
 }

@@ -89,9 +89,24 @@ public class StatementService {
     private final StatementDispatchRepository dispatches;
     private final CounterpartyDirectory directory;
     private final BigDecimal commissionPercentage;
+    private final BigDecimal deliveryCommissionPercentage;
     private final String currency;
     private final ZoneId zone;
 
+    /** With the delivery rate left at the shipped one, for tests that do not speak of carriers. */
+    public StatementService(AccountingTransactionRepository transactions,
+                            CashFloatRepository floatEntries,
+                            RiderLedgerRepository riderLedger,
+                            StatementDispatchRepository dispatches,
+                            CounterpartyDirectory directory,
+                            BigDecimal commissionPercentage,
+                            String currency,
+                            String zone) {
+        this(transactions, floatEntries, riderLedger, dispatches, directory, commissionPercentage,
+                new BigDecimal("10"), currency, zone);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
     public StatementService(AccountingTransactionRepository transactions,
                             CashFloatRepository floatEntries,
                             RiderLedgerRepository riderLedger,
@@ -102,17 +117,24 @@ public class StatementService {
                             // applied afterwards would restate history the moment the rate changed.
                             @Value("${delivery.ordering.commission-percentage:12.5}")
                             BigDecimal commissionPercentage,
+                            // The platform's take on a delivery it did not perform, for the label on
+                            // a carrier's commission line: a carrier is charged this rate and never
+                            // the goods rate, and a line quoting the wrong one would be argued with.
+                            @Value("${delivery.ordering.delivery-commission-percentage:10}")
+                            BigDecimal deliveryCommissionPercentage,
                             @Value("${delivery.accounting.currency:USD}") String currency,
-                            // The calendar a date range is interpreted in. One region, one zone; the
-                            // same fallback the rider Earnings screen uses, and for the same reason —
-                            // "August" is a different 31 days depending on where you are standing.
-                            @Value("${delivery.accounting.statements.zone:UTC}") String zone) {
+                            // The platform's one calendar (RECON-08): a from/to range means the
+                            // same 31 days here as a pay period, a rider's week and a dashboard.
+                            // One key, one default, checked at start-up by PlatformCalendar.
+                            @Value("${" + PlatformCalendar.ZONE_PROPERTY + ":"
+                                    + PlatformCalendar.DEFAULT_ZONE + "}") String zone) {
         this.transactions = transactions;
         this.floatEntries = floatEntries;
         this.riderLedger = riderLedger;
         this.dispatches = dispatches;
         this.directory = directory;
         this.commissionPercentage = commissionPercentage;
+        this.deliveryCommissionPercentage = deliveryCommissionPercentage;
         this.currency = currency;
         this.zone = ZoneId.of(zone);
     }
@@ -179,8 +201,15 @@ public class StatementService {
         Attribution take = ledger.platformTake(CounterpartyKind.MERCHANT, ref);
 
         List<Statement.Line> lines = new ArrayList<>(grossUp("Goods sold", goods, take,
-                ledger.orderCount() + " orders"));
+                ledger.orderCount() + " orders", commissionLabel()));
         addIfAny(lines, Statement.Line.credit("Gift wrapping", wrapping, null));
+
+        // What the platform has already handed this shop, in points redeemed for money (RECON-11).
+        // A debit, because it is a debt discharged: without it the statement kept asking for money
+        // that had been paid, month after month.
+        BigDecimal paidOut = ledger.sumOf(Leg.PAYOUT);
+        addIfAny(lines, Statement.Line.debit("Paid to you", paidOut,
+                "points you redeemed, paid by the platform"));
 
         BigDecimal kept = ledger.keptAtTheCounter(ref);
         // The till as the float holds it now, whenever each pickup was paid for — and as a shop,
@@ -195,9 +224,9 @@ public class StatementService {
                         + "platform its commission, including any not yet paid from earlier "
                         + "periods"));
 
-        // Independently of the lines, as on every statement: the shop's credits, less the share it
-        // kept and what it still owes out of its till.
-        BigDecimal control = goods.add(wrapping).subtract(kept).subtract(owed);
+        // Independently of the lines, as on every statement: the shop's credits, less what it has
+        // been paid, the share it kept and what it still owes out of its till.
+        BigDecimal control = goods.add(wrapping).subtract(paidOut).subtract(kept).subtract(owed);
 
         List<Statement.Entry> entries = ledger.entriesFor(Leg.MERCHANT_CREDIT, take);
         return Statement.of(CounterpartyKind.MERCHANT, ref, name, range, currency,
@@ -246,7 +275,7 @@ public class StatementService {
         Attribution take = ledger.platformTake(CounterpartyKind.CARRIER, ref);
 
         List<Statement.Line> lines = new ArrayList<>(grossUp("Delivery fees", owed, take,
-                ledger.orderCount() + " jobs"));
+                ledger.orderCount() + " jobs", deliveryCommissionLabel()));
 
         // The company's cash, since delivery companies hold their riders' takings (V50). Both halves
         // shown, as on a rider's statement: what its riders handed over is the platform's money in
@@ -260,9 +289,14 @@ public class StatementService {
                 "the platform's money, now held by your company"));
         addIfAny(lines, Statement.Line.credit("Cash paid to the platform", paid, null));
 
+        // What the platform has already handed the company, in points redeemed (RECON-11).
+        BigDecimal paidOut = ledger.sumOf(Leg.PAYOUT);
+        addIfAny(lines, Statement.Line.debit("Paid to you", paidOut,
+                "points you redeemed, paid by the platform"));
+
         // Independently of the lines, as on every statement: the fee legs, plus what was paid in,
-        // less what was taken into custody.
-        BigDecimal control = owed.add(paid).subtract(received);
+        // less what was taken into custody and what has already been paid out.
+        BigDecimal control = owed.add(paid).subtract(received).subtract(paidOut);
 
         List<Statement.Entry> entries = ledger.entriesFor(Leg.PROVIDER_CREDIT, take);
         return Statement.of(CounterpartyKind.CARRIER, ref, name, range, currency,
@@ -535,18 +569,33 @@ public class StatementService {
                                         Ledger ledger) {
         BigDecimal commission = ledger.sumOf(Leg.PLATFORM_COMMISSION);
         BigDecimal subsidy = ledger.sumOf(Leg.PLATFORM_SUBSIDY);
+        // What it absorbed on orders closed after pickup (RECON-10). Its own line, not added into
+        // subsidies: an offer the platform chose to fund and an order that went wrong are different
+        // facts, and a figure that mixed them could not tell one from the other.
+        BigDecimal loss = ledger.sumOf(Leg.PLATFORM_LOSS);
+
+        // Everything the platform handed out in the period, to everybody (RECON-11). Read across
+        // counterparties rather than off the platform's own legs: a payout is attributed to
+        // whoever received it, so the platform cannot find its own payments among its own rows.
+        BigDecimal paidOut = orZero(transactions.sumOfLegBetween(
+                Leg.PAYOUT, range.fromInstant(), range.toExclusive()));
 
         List<Statement.Line> lines = new ArrayList<>();
         addIfAny(lines, Statement.Line.debit("Commission earned", commission,
                 ledger.orderCount() + " orders"));
         addIfAny(lines, Statement.Line.credit("Subsidies paid", subsidy,
                 "free delivery and promotions the platform absorbed"));
+        addIfAny(lines, Statement.Line.credit("Paid out", paidOut,
+                "points redeemed and riders' cash-outs the platform paid"));
+        addIfAny(lines, Statement.Line.credit("Absorbed on orders closed after pickup", loss,
+                "the shop's share and the delivery fee on orders that never arrived"));
 
-        BigDecimal control = subsidy.subtract(commission);
+        BigDecimal control = subsidy.add(paidOut).add(loss).subtract(commission);
 
         List<Statement.Entry> entries = ledger.own().stream()
                 .filter(t -> t.getLeg() == Leg.PLATFORM_COMMISSION
-                        || t.getLeg() == Leg.PLATFORM_SUBSIDY)
+                        || t.getLeg() == Leg.PLATFORM_SUBSIDY
+                        || t.getLeg() == Leg.PLATFORM_LOSS)
                 .limit(MAX_ENTRIES)
                 .map(t -> {
                     BigDecimal kept = t.getLeg() == Leg.PLATFORM_COMMISSION
@@ -598,9 +647,13 @@ public class StatementService {
      * <p>Always exactly two lines that sum to the net, or one line that IS the net. The gross is
      * derived by ADDING the commission to the net rather than being read from anywhere, so the two
      * lines cannot fail to add up however odd the underlying order was.
+     *
+     * @param commissionLabel what the charge is called on this kind of statement: a shop is charged
+     *                        the goods rate and a carrier the delivery rate, and a line that quoted
+     *                        the other one would be wrong on its face
      */
     private List<Statement.Line> grossUp(String grossLabel, BigDecimal owed, Attribution take,
-                                         String grossNote) {
+                                         String grossNote, String commissionLabel) {
         BigDecimal kept = take.amount();
         if (kept.signum() == 0) {
             // No line at all when there is nothing to report. A zero line reads as a claim that
@@ -613,7 +666,7 @@ public class StatementService {
         if (kept.signum() > 0) {
             return List.of(
                     Statement.Line.credit(grossLabel, owed.add(kept), grossNote),
-                    Statement.Line.debit(commissionLabel(), kept, null));
+                    Statement.Line.debit(commissionLabel, kept, null));
         }
         // The platform paid INTO these orders rather than taking out of them — a free delivery or a
         // promo code costing more than the commission it earned. Shown as what it is rather than as
@@ -627,8 +680,23 @@ public class StatementService {
 
     /** "Platform commission (12.5%)", with the rate rendered as it is configured. */
     private String commissionLabel() {
-        return "Platform commission (" + commissionPercentage.stripTrailingZeros().toPlainString()
-                + "%)";
+        return rateLabel(commissionPercentage);
+    }
+
+    /**
+     * The same line on a carrier's statement, at the delivery rate.
+     *
+     * <p>A carrier is charged the platform's take on a delivery it did not perform, which is a
+     * different and lower rate than the goods commission. The line only used to appear on a
+     * delivery-only job, where it was rare enough for the wrong rate in its label to go unnoticed;
+     * now that the charge is recorded on the leg it appears on every job.
+     */
+    private String deliveryCommissionLabel() {
+        return rateLabel(deliveryCommissionPercentage);
+    }
+
+    private static String rateLabel(BigDecimal rate) {
+        return "Platform commission (" + rate.stripTrailingZeros().toPlainString() + "%)";
     }
 
     /**
@@ -887,14 +955,20 @@ public class StatementService {
         }
 
         /**
-         * What the platform kept on the orders where THIS party is the only one it could be about.
+         * What the platform charged this party over these orders.
          *
-         * <p>The platform's leg is a residue — everything the customer paid that nobody else
-         * received — so on an order with a shop and a delivery company it is the goods commission
-         * and the delivery cut added together, and there is nothing in the ledger that separates
-         * them. Guessing a split would put an invented number on a statement somebody is going to
-         * check. So the residue is claimed only where there is exactly one non-platform payee, and
-         * the orders where it is not are counted so the note can admit it.
+         * <p><strong>Read from the payee's own leg where it is there (V54, RECON-05).</strong>
+         * Settlement writes what it charged beside the credit it came out of, so the figure is
+         * exact whatever else happened on the order — an express premium the customer paid and a
+         * promotion the platform funded are both outside it, and both used to be inside.
+         *
+         * <p>Otherwise the old attribution, for legs written before that figure existed: the
+         * platform's leg is a residue — everything the customer paid that nobody else received — so
+         * on an order with a shop and a delivery company it is the goods commission and the
+         * delivery cut added together, and nothing in the ledger separates them. Guessing a split
+         * would put an invented number on a statement somebody is going to check. So the residue is
+         * claimed only where there is exactly one non-platform payee, and the orders where it is
+         * not are counted so the note can admit it.
          *
          * <p>An unattributed payee leg on the order counts AS a second payee. It might be this same
          * party, but "might" is not a basis for putting a figure on a statement.
@@ -905,13 +979,49 @@ public class StatementService {
 
             for (UUID orderId : orderIds) {
                 List<AccountingTransaction> legs = byOrder.getOrDefault(orderId, List.of());
-                if (solePayee(legs, kind, ref)) {
+                BigDecimal charged = chargedOn(legs, kind, ref);
+                if (charged != null) {
+                    claimed = claimed.add(charged);
+                } else if (solePayee(legs, kind, ref)) {
                     claimed = claimed.add(keptOn(legs));
                 } else if (keptOn(legs).signum() != 0) {
                     unprovable++;
                 }
             }
             return new Attribution(claimed, unprovable);
+        }
+
+        /**
+         * What one order's legs say this party was charged, or null when they do not say.
+         *
+         * <p>The party's principal credit carries it: a shop's goods, a company's or a rider's
+         * delivery. Gift wrapping is charged nothing and says so, and adding its zero would make no
+         * difference; it is left out so that "the leg does not say" stays a question about the one
+         * leg the line is built from.
+         */
+        private static BigDecimal chargedOn(List<AccountingTransaction> legs, CounterpartyKind kind,
+                                            String ref) {
+            Leg principal = switch (kind) {
+                case MERCHANT -> Leg.MERCHANT_CREDIT;
+                case CARRIER -> Leg.PROVIDER_CREDIT;
+                case RIDER -> Leg.RIDER_CREDIT;
+                // The platform is not charged a commission by anybody.
+                case PLATFORM -> null;
+            };
+            if (principal == null) {
+                return null;
+            }
+            BigDecimal charged = null;
+            for (AccountingTransaction leg : legs) {
+                if (leg.getLeg() == principal && kind == leg.getCounterpartyKind()
+                        && ref.equals(leg.getCounterpartyRef())
+                        && leg.getCommissionAmount() != null) {
+                    charged = charged == null
+                            ? leg.getCommissionAmount()
+                            : charged.add(leg.getCommissionAmount());
+                }
+            }
+            return charged;
         }
 
         private static boolean solePayee(List<AccountingTransaction> legs, CounterpartyKind kind,
@@ -1001,7 +1111,11 @@ public class StatementService {
                     break;
                 }
                 List<AccountingTransaction> legs = byOrder.getOrDefault(t.getOrderId(), List.of());
-                BigDecimal kept = provable ? keptOn(legs) : BigDecimal.ZERO;
+                // What this row's own leg says it was charged, where it says (V54); otherwise the
+                // order's residue, on the same terms as the total above it.
+                BigDecimal kept = t.getCommissionAmount() != null
+                        ? t.getCommissionAmount()
+                        : (provable ? keptOn(legs) : BigDecimal.ZERO);
                 // The shop's gift wrapping on the same order is owed beside its goods and carries no
                 // commission, so it adds to the row's gross and net alike.
                 BigDecimal net = leg == Leg.MERCHANT_CREDIT

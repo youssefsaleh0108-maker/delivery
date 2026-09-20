@@ -122,6 +122,8 @@ class MerchantCashConstraintTest {
 
         assertThat(floats.outstandingTotalFor(account, RIDER)).isEqualByComparingTo("13.25");
         assertThat(floats.outstandingTotalFor(account, MERCHANT)).isEqualByComparingTo("40.00");
+        // What a cash-out is netted against: the bag, never the till (RECON-12).
+        assertThat(floats.riderOwesPlatform(account)).isEqualByComparingTo("13.25");
         assertThat(floats.totalForHolderBetween(account, RIDER, CashFloatEntry.Kind.COLLECTED,
                 FROM, TO)).isEqualByComparingTo("13.25");
         assertThat(floats.totalForHolderBetween(account, MERCHANT, CashFloatEntry.Kind.COLLECTED,

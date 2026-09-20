@@ -256,33 +256,33 @@ class CarrierCashServiceTest {
         private static final Instant FIFTY_HOURS = Instant.parse("2026-10-22T10:00:00Z");
         private static final Instant TEN_HOURS = Instant.parse("2026-10-24T02:00:00Z");
 
-        /** A row of {@code oldestHeldByRider}: a null company is the platform's own fleet. */
-        private static Object[] oldest(String rider, String company, Instant at) {
-            return new Object[] {rider, company, at};
+        /** One line of the cash-on-hand query: a null company is owed to the platform. */
+        private static CashFloatRepository.CreditorBalance line(String ref, HolderKind kind,
+                                                                 String company, Instant oldest) {
+            return new Balance(ref, kind, company, new BigDecimal("10.00"), 1, oldest);
         }
 
-        private static CashFloatRepository.HolderBalance line(String ref, HolderKind kind,
-                                                               Instant oldest) {
-            return new Balance(ref, kind, new BigDecimal("10.00"), 1, oldest);
+        /** The one line of a holder's cash owed to {@code company} (null: to the platform). */
+        private static CarrierCashService.OnHand lineOf(List<CarrierCashService.OnHand> list,
+                                                        String ref, String company) {
+            List<CarrierCashService.OnHand> lines = list.stream()
+                    .filter(h -> h.holderRef().equals(ref)
+                            && java.util.Objects.equals(h.carrierRef(), company))
+                    .toList();
+            assertThat(lines).as("lines of %s owed to %s", ref, company).hasSize(1);
+            return lines.get(0);
         }
 
         private static boolean lateOf(List<CarrierCashService.OnHand> list, String ref) {
-            return list.stream()
-                    .filter(h -> h.holderRef().equals(ref))
-                    .findFirst()
-                    .orElseThrow()
-                    .overdue();
+            return lineOf(list, ref, null).overdue();
         }
 
         @Test
         @DisplayName("holds the platform's own riders to a day, as the Back Office always did")
         void platformFleetKeepsItsDay() {
-            when(floats.oldestHeldByRider()).thenReturn(List.of(
-                    oldest("rider-late", null, THIRTY_HOURS),
-                    oldest("rider-fresh", null, TEN_HOURS)));
-            when(floats.outstandingByHolder()).thenReturn(List.of(
-                    line("rider-late", HolderKind.RIDER, THIRTY_HOURS),
-                    line("rider-fresh", HolderKind.RIDER, TEN_HOURS)));
+            when(floats.outstandingByCreditor()).thenReturn(List.of(
+                    line("rider-late", HolderKind.RIDER, null, THIRTY_HOURS),
+                    line("rider-fresh", HolderKind.RIDER, null, TEN_HOURS)));
 
             List<CarrierCashService.OnHand> list = service.cashOnHand();
 
@@ -293,42 +293,44 @@ class CarrierCashServiceTest {
         @Test
         @DisplayName("holds a company's cash to the carrier limit, with its rider or with the company")
         void carrierCustodyGetsTheCarrierLimit() {
-            when(floats.oldestHeldByRider()).thenReturn(List.of(
-                    oldest(YOUSSEF, COMPANY, THIRTY_HOURS),
-                    oldest(MICHEL, COMPANY, FIFTY_HOURS)));
-            when(floats.outstandingByHolder()).thenReturn(List.of(
-                    line(YOUSSEF, HolderKind.RIDER, THIRTY_HOURS),
-                    line(MICHEL, HolderKind.RIDER, FIFTY_HOURS),
-                    line(COMPANY, HolderKind.PROVIDER, THIRTY_HOURS),
-                    line("provider-late", HolderKind.PROVIDER, FIFTY_HOURS)));
+            when(floats.outstandingByCreditor()).thenReturn(List.of(
+                    line(YOUSSEF, HolderKind.RIDER, COMPANY, THIRTY_HOURS),
+                    line(MICHEL, HolderKind.RIDER, COMPANY, FIFTY_HOURS),
+                    // A company's own rows name itself; as a line its cash is owed to the platform.
+                    line(COMPANY, HolderKind.PROVIDER, COMPANY, THIRTY_HOURS),
+                    line("provider-late", HolderKind.PROVIDER, "provider-late", FIFTY_HOURS)));
 
             List<CarrierCashService.OnHand> list = service.cashOnHand();
 
-            assertThat(lateOf(list, YOUSSEF)).isFalse();
-            assertThat(lateOf(list, MICHEL)).isTrue();
+            assertThat(lineOf(list, YOUSSEF, COMPANY).overdue()).isFalse();
+            assertThat(lineOf(list, MICHEL, COMPANY).overdue()).isTrue();
             assertThat(lateOf(list, COMPANY)).isFalse();
             assertThat(lateOf(list, "provider-late")).isTrue();
         }
 
         @Test
-        @DisplayName("a rider carrying both kinds is late when either part is, each by its own line")
+        @DisplayName("RECON-03: a rider carrying both kinds has a line for each, judged by its own limit")
         void bothKindsAreJudgedApart() {
-            // Rania's platform cash is thirty hours old beside a fresh company bag: late. Michel's
-            // oldest note is thirty hours old too, but it is the company's and his platform cash is
-            // fresh: on time. Judging the oldest of both by one line would get one of them wrong.
-            when(floats.oldestHeldByRider()).thenReturn(List.of(
-                    oldest(RANIA, null, THIRTY_HOURS),
-                    oldest(RANIA, COMPANY, TEN_HOURS),
-                    oldest(MICHEL, null, TEN_HOURS),
-                    oldest(MICHEL, COMPANY, THIRTY_HOURS)));
-            when(floats.outstandingByHolder()).thenReturn(List.of(
-                    line(RANIA, HolderKind.RIDER, THIRTY_HOURS),
-                    line(MICHEL, HolderKind.RIDER, THIRTY_HOURS)));
+            // Rania's platform cash is thirty hours old beside a fresh company bag: her platform line
+            // is late and her company line is not. Michel's company bag is thirty hours old and his
+            // platform cash fresh: neither line is late. One line for both would get one wrong, and
+            // its one "banked" button cleared the company's cash as the platform's.
+            when(floats.outstandingByCreditor()).thenReturn(List.of(
+                    line(RANIA, HolderKind.RIDER, null, THIRTY_HOURS),
+                    line(RANIA, HolderKind.RIDER, COMPANY, TEN_HOURS),
+                    line(MICHEL, HolderKind.RIDER, null, TEN_HOURS),
+                    line(MICHEL, HolderKind.RIDER, COMPANY, THIRTY_HOURS)));
 
             List<CarrierCashService.OnHand> list = service.cashOnHand();
 
-            assertThat(lateOf(list, RANIA)).isTrue();
-            assertThat(lateOf(list, MICHEL)).isFalse();
+            assertThat(list).hasSize(4);
+            assertThat(lineOf(list, RANIA, null).overdue()).isTrue();
+            assertThat(lineOf(list, RANIA, COMPANY).overdue()).isFalse();
+            assertThat(lineOf(list, MICHEL, null).overdue()).isFalse();
+            assertThat(lineOf(list, MICHEL, COMPANY).overdue()).isFalse();
+            // Only the platform's lines are the platform's to record as banked.
+            assertThat(lineOf(list, RANIA, null).owedToPlatform()).isTrue();
+            assertThat(lineOf(list, RANIA, COMPANY).owedToPlatform()).isFalse();
         }
 
         @Test
@@ -336,23 +338,20 @@ class CarrierCashServiceTest {
         void bothLinesAreConfigured() {
             CarrierCashService configured = new CarrierCashService(floats, riderLedger, accounts,
                     72, 36, "UTC", "USD", Clock.fixed(NOW, ZoneOffset.UTC));
-            when(floats.oldestHeldByRider()).thenReturn(List.of(
-                    oldest("rider-platform", null, THIRTY_HOURS),
-                    oldest(YOUSSEF, COMPANY, FIFTY_HOURS)));
-            when(floats.outstandingByHolder()).thenReturn(List.of(
-                    line("rider-platform", HolderKind.RIDER, THIRTY_HOURS),
-                    line(YOUSSEF, HolderKind.RIDER, FIFTY_HOURS)));
+            when(floats.outstandingByCreditor()).thenReturn(List.of(
+                    line("rider-platform", HolderKind.RIDER, null, THIRTY_HOURS),
+                    line(YOUSSEF, HolderKind.RIDER, COMPANY, FIFTY_HOURS)));
 
             List<CarrierCashService.OnHand> list = configured.cashOnHand();
 
             assertThat(lateOf(list, "rider-platform")).isFalse();
-            assertThat(lateOf(list, YOUSSEF)).isFalse();
+            assertThat(lineOf(list, YOUSSEF, COMPANY).overdue()).isFalse();
         }
 
         /** A row of the cash-on-hand query, shaped as Spring Data projects it. */
-        private record Balance(String getHolderRef, HolderKind getHolderKind, BigDecimal getAmount,
-                               long getOrders, Instant getOldest)
-                implements CashFloatRepository.HolderBalance {
+        private record Balance(String getHolderRef, HolderKind getHolderKind, String getCarrierRef,
+                               BigDecimal getAmount, long getOrders, Instant getOldest)
+                implements CashFloatRepository.CreditorBalance {
         }
     }
 

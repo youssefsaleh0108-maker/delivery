@@ -21830,6 +21830,210 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Close as not delivered'**
   String get actionCloseNotDelivered;
+
+  /// No description provided for @merchRejectConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject this order?'**
+  String get merchRejectConfirmTitle;
+
+  /// No description provided for @merchRejectConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The customer\'s order is cancelled, and this can\'t be undone.'**
+  String get merchRejectConfirmBody;
+
+  /// No description provided for @merchRejectReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Why, for support (optional)'**
+  String get merchRejectReason;
+
+  /// No description provided for @invUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock levels are not available yet'**
+  String get invUnavailable;
+
+  /// No description provided for @invUnavailableHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory isn\'t switched on for your shop. Your catalogue is unaffected.'**
+  String get invUnavailableHint;
+
+  /// No description provided for @portalSignInWelcome.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome back'**
+  String get portalSignInWelcome;
+
+  /// No description provided for @portalSignInPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with your YouDrop account to open your console.'**
+  String get portalSignInPrompt;
+
+  /// No description provided for @portalSignInRedirect.
+  ///
+  /// In en, this message translates to:
+  /// **'You will be taken to the YouDrop identity service to sign in, then brought straight back here.'**
+  String get portalSignInRedirect;
+
+  /// No description provided for @portalSignInApply.
+  ///
+  /// In en, this message translates to:
+  /// **'New merchant or delivery partner? Apply in the YouDrop app — your console opens as soon as the application is approved.'**
+  String get portalSignInApply;
+
+  /// No description provided for @portalBrandEyebrow.
+  ///
+  /// In en, this message translates to:
+  /// **'PARTNER CONSOLE'**
+  String get portalBrandEyebrow;
+
+  /// No description provided for @portalBrandHeadline.
+  ///
+  /// In en, this message translates to:
+  /// **'Run your whole operation from one console.'**
+  String get portalBrandHeadline;
+
+  /// No description provided for @portalBrandBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Shops, delivery companies and the platform team sign in here. Live orders, dispatch, catalogue and settlement — the same account, whichever of them you are.'**
+  String get portalBrandBlurb;
+
+  /// No description provided for @portalBrandAudiences.
+  ///
+  /// In en, this message translates to:
+  /// **'Merchants · Carriers · Backoffice'**
+  String get portalBrandAudiences;
+
+  /// No description provided for @reconOwedToCompany.
+  ///
+  /// In en, this message translates to:
+  /// **'Owed to {company}'**
+  String reconOwedToCompany(String company);
+
+  /// No description provided for @reconCompanyTakesItIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Their company takes this in at its hub. It is not banked here.'**
+  String get reconCompanyTakesItIn;
+
+  /// No description provided for @reconBankedAmountChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'{holder} now holds {amount} for the platform, not the amount you confirmed. Nothing was recorded.'**
+  String reconBankedAmountChanged(String holder, String amount);
+
+  /// No description provided for @reconLegCustomerDebit.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer charged'**
+  String get reconLegCustomerDebit;
+
+  /// No description provided for @reconLegCashCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash taken at the door'**
+  String get reconLegCashCollected;
+
+  /// No description provided for @reconLegMerchantCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Merchant payout'**
+  String get reconLegMerchantCredit;
+
+  /// No description provided for @reconLegGiftWrapCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Gift wrapping'**
+  String get reconLegGiftWrapCredit;
+
+  /// No description provided for @reconLegRiderCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider payout'**
+  String get reconLegRiderCredit;
+
+  /// No description provided for @reconLegProviderCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery company payout'**
+  String get reconLegProviderCredit;
+
+  /// No description provided for @reconLegPlatformCommission.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission'**
+  String get reconLegPlatformCommission;
+
+  /// No description provided for @reconLegPlatformSubsidy.
+  ///
+  /// In en, this message translates to:
+  /// **'Platform contribution'**
+  String get reconLegPlatformSubsidy;
+
+  /// No description provided for @reconLegPlatformLoss.
+  ///
+  /// In en, this message translates to:
+  /// **'Absorbed after pickup'**
+  String get reconLegPlatformLoss;
+
+  /// No description provided for @reconLegCashRemittance.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash banked'**
+  String get reconLegCashRemittance;
+
+  /// No description provided for @reconLegPayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid out'**
+  String get reconLegPayout;
+
+  /// No description provided for @reconLegCustomerRefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund'**
+  String get reconLegCustomerRefund;
+
+  /// No description provided for @reconStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get reconStatusPending;
+
+  /// No description provided for @reconStatusPosted.
+  ///
+  /// In en, this message translates to:
+  /// **'Posted'**
+  String get reconStatusPosted;
+
+  /// No description provided for @reconStatusSettledInCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Settled in cash'**
+  String get reconStatusSettledInCash;
+
+  /// No description provided for @reconStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get reconStatusFailed;
+
+  /// No description provided for @reconStatusCompensated.
+  ///
+  /// In en, this message translates to:
+  /// **'Reversed'**
+  String get reconStatusCompensated;
+
+  /// No description provided for @reconStatusAbandoned.
+  ///
+  /// In en, this message translates to:
+  /// **'Abandoned'**
+  String get reconStatusAbandoned;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

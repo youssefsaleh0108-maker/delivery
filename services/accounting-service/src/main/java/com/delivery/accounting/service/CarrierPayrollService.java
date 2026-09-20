@@ -158,8 +158,11 @@ public class CarrierPayrollService {
                                  RiderDeliveriesSource deliveriesSource,
                                  AccountDirectory accounts,
                                  PlatformTransactionManager transactionManager,
-                                 // The calendar pay periods are in: order-tracking's day zone.
-                                 @Value("${delivery.accounting.payroll.zone:Asia/Beirut}") String zone,
+                                 // The calendar pay periods are in: the platform's one calendar,
+                                 // which is also order-tracking's day zone (RECON-08). One key, one
+                                 // default, checked at start-up by PlatformCalendar.
+                                 @Value("${" + PlatformCalendar.ZONE_PROPERTY + ":"
+                                         + PlatformCalendar.DEFAULT_ZONE + "}") String zone,
                                  @Value("${delivery.accounting.currency:USD}") String currency) {
         this(policies, runs, payslips, lines, adjustments, snapshots, deliveredCopies, events,
                 riderLedger, carrierCash, cashFloat, attendance, deliveriesSource, accounts,

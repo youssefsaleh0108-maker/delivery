@@ -37,6 +37,8 @@ public class PointsService {
 
     private final PointsEntryRepository entries;
     private final PointsRedemptionRepository redemptions;
+    private final com.delivery.accounting.domain.AccountingTransactionRepository transactions;
+    private final String platformAccount;
     private final BigDecimal merchantRate;
     private final BigDecimal deliveryRate;
     private final BigDecimal customerRate;
@@ -46,6 +48,12 @@ public class PointsService {
 
     public PointsService(PointsEntryRepository entries,
                          PointsRedemptionRepository redemptions,
+                         // Where a payment to a shop, a company or a rider is written down, so that
+                         // what the platform has paid reduces what its statements say it owes
+                         // (RECON-11).
+                         com.delivery.accounting.domain.AccountingTransactionRepository transactions,
+                         @Value("${delivery.accounting.platform-account:ACC-PLATFORM}")
+                         String platformAccount,
                          // Points per unit of the goods subtotal. A percentage-shaped reward: a
                          // bigger basket is worth more, which is what a shop expects.
                          @Value("${delivery.points.merchant-rate:5}") BigDecimal merchantRate,
@@ -65,6 +73,8 @@ public class PointsService {
                          @Value("${delivery.accounting.currency:USD}") String currency) {
         this.entries = entries;
         this.redemptions = redemptions;
+        this.transactions = transactions;
+        this.platformAccount = platformAccount;
         this.merchantRate = merchantRate;
         this.deliveryRate = deliveryRate;
         this.customerRate = customerRate;
@@ -326,9 +336,19 @@ public class PointsService {
     /**
      * Records that an operator handed the money over.
      *
-     * <p>The ledger row written here carries zero points: the balance already fell when the hold
+     * <p>The points row written here carries zero points: the balance already fell when the hold
      * was taken, and taking them again would charge the requester twice for one redemption. It
      * exists so the history shows the payment.
+     *
+     * <p><strong>And the money reaches the ledger (RECON-11).</strong> A redemption paid is the
+     * platform handing over real money, and until now it appeared nowhere in the books: a shop's
+     * statement went on reporting the whole amount owed after it had been paid, and the platform's
+     * own statement showed what it earned with nothing for what it gave out. The {@code PAYOUT} leg
+     * is a debit against whoever was paid, so their statement falls by exactly what they received.
+     *
+     * <p>A customer's redemption is recorded with no counterparty: a customer is not a party the
+     * platform settles with and has no statement — but the money still left, so the platform's own
+     * figures must contain it.
      */
     @Transactional
     public PointsRedemption markPaid(UUID id, String by, String reference) {
@@ -336,9 +356,30 @@ public class PointsService {
         redemption.markPaid(by, reference);
         entries.save(PointsEntry.paid(redemption.getOwnerKind(), redemption.getOwnerRef(),
                 redemption.getId()));
+        transactions.save(com.delivery.accounting.domain.AccountingTransaction.paidOut(
+                        redemption.getId(), platformAccount, redemption.getAmount(),
+                        redemption.getCurrency(), null)
+                .attributedTo(counterpartyOf(redemption.getOwnerKind()),
+                        redemption.getOwnerRef()));
         log.info("Redemption {} paid: {} points, {} {}, ref {}", id, redemption.getPoints(),
                 redemption.getAmount(), redemption.getCurrency(), reference);
         return redemption;
+    }
+
+    /**
+     * Who a points owner is on the ledger.
+     *
+     * <p>Null for a CUSTOMER, who is the one owner with no counterparty there — the ledger settles
+     * with shops, carriers, riders and the platform, and a customer's side of an order is the order
+     * itself. Its payout is still recorded, unattributed, because the money still went.
+     */
+    private static com.delivery.accounting.domain.CounterpartyKind counterpartyOf(OwnerKind kind) {
+        return switch (kind) {
+            case MERCHANT -> com.delivery.accounting.domain.CounterpartyKind.MERCHANT;
+            case CARRIER -> com.delivery.accounting.domain.CounterpartyKind.CARRIER;
+            case RIDER -> com.delivery.accounting.domain.CounterpartyKind.RIDER;
+            case CUSTOMER -> null;
+        };
     }
 
     private PointsRedemption load(UUID id) {

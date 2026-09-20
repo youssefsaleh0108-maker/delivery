@@ -89,6 +89,20 @@ public class ApiExceptionHandler {
     }
 
     /**
+     * A banner id that names nothing: withdrawn in another tab, or mistyped.
+     *
+     * <p>404, like every other unknown id in this service. Without this mapping the exception fell
+     * through to the catch-all and back office's PUT, DELETE and image presign on a banner that had
+     * just been removed all answered 500 "Internal error" — which reads as our fault and invites a
+     * retry that can never succeed, where "that banner is gone, reload the list" is the whole truth.
+     */
+    @ExceptionHandler(com.delivery.product.service.BannerService.BannerNotFoundException.class)
+    public ProblemDetail onBannerNotFound(
+            com.delivery.product.service.BannerService.BannerNotFoundException e) {
+        return problem(HttpStatus.NOT_FOUND, "Banner not found", e.getMessage());
+    }
+
+    /**
      * Two categories cannot stand for one vertical.
      *
      * <p>409 as before, but raised before the write instead of falling out of

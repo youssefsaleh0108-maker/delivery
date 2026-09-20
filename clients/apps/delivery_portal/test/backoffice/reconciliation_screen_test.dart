@@ -34,13 +34,15 @@ ResponseBody _json(String body, {int status = 200}) => ResponseBody.fromString(b
       Headers.contentTypeHeader: <String>[Headers.jsonContentType]
     });
 
+/// Each status with its two sides apart, as the server sends them (RECON-13): an order's debits
+/// and its credits are the same money described twice, so nothing adds them together.
 const String _summaryJson = '''
-{"byStatus":{"POSTED":{"count":9,"amount":300.00},
-             "FAILED":{"count":1,"amount":35.00},
-             "PENDING":{"count":2,"amount":15.00},
-             "COMPENSATED":{"count":1,"amount":20.00},
-             "ABANDONED":{"count":1,"amount":2.50}},
- "unsettledCount":3,"amountAtRisk":50.00}''';
+{"byStatus":{"POSTED":{"count":9,"debits":150.00,"credits":150.00},
+             "FAILED":{"count":1,"debits":0.00,"credits":35.00},
+             "PENDING":{"count":2,"debits":15.00,"credits":15.00},
+             "COMPENSATED":{"count":1,"debits":10.00,"credits":10.00},
+             "ABANDONED":{"count":1,"debits":0.00,"credits":2.50}},
+ "unsettledCount":3,"amountAtRisk":50.00,"atRiskDebits":15.00,"atRiskCredits":50.00}''';
 
 const String _unsettledJson = '''
 [
@@ -104,13 +106,15 @@ void main() {
   late AccountingApi api;
   late DeliveryProviderApi providers;
   late String floatJson;
+  late String unsettledJson;
+  late String summaryJson;
   late ResponseBody Function() carriers;
   late ResponseBody Function(RequestOptions) remit;
 
   ResponseBody route(RequestOptions options) {
     if (options.path.contains('sync-log')) return _json(_syncLogJson);
-    if (options.path.contains('summary')) return _json(_summaryJson);
-    if (options.path.contains('unsettled')) return _json(_unsettledJson);
+    if (options.path.contains('summary')) return _json(summaryJson);
+    if (options.path.contains('unsettled')) return _json(unsettledJson);
     // Before /float, which its own path also contains.
     if (options.path.contains('remit')) return remit(options);
     if (options.path.contains('/float/carriers')) return carriers();
@@ -126,6 +130,8 @@ void main() {
 
   setUp(() {
     floatJson = _floatJson();
+    unsettledJson = _unsettledJson;
+    summaryJson = _summaryJson;
     carriers = () => _json(_carriersJson);
     remit = (RequestOptions options) => _json(
         '{"remittanceId":"r1","holderRef":"eeeeeeee-5555-4555-8555-555555555555",'
@@ -556,6 +562,17 @@ void main() {
       );
     });
 
+    testWidgets('RECON-13: the tile counts what the shop owes, never the whole till',
+        (WidgetTester tester) async {
+      await pump(tester);
+
+      // 5.00 of commission out of the shop's till, plus the rider's 42.75. The till's other
+      // 35.00 is the shop's own share of pickups it was paid for at its counter.
+      expect(find.text('\$47.75'), findsOneWidget);
+      expect(find.text('\$82.75'), findsNothing);
+      expect(find.textContaining('2 holding'), findsOneWidget);
+    });
+
     testWidgets('cannot be recorded when the server did not say what the shop owes',
         (WidgetTester tester) async {
       floatJson = floatJson.replaceAll(',"owed":"5.00","retained":"35.00"', '');
@@ -567,6 +584,149 @@ void main() {
       expect(button.enabled, isFalse);
       // A dash, never a zero, where the figure would be.
       expect(find.descendant(of: shopRow(), matching: find.text('—')), findsOneWidget);
+    });
+  });
+
+  /// PT-2: the ledger knew four of the ten legs the accounting service writes and did not know
+  /// SETTLED_IN_CASH at all, so most of it read "Unknown" — including both rows dev was listing as
+  /// unsettled, which are cash remittances — and no tile or filter could reach a cash-settled row.
+  group('PT-2: every leg and status the service writes', () {
+    testWidgets('names a cash remittance and a cash-settled row', (WidgetTester tester) async {
+      unsettledJson = '''
+[{"id":"t9","orderId":"99999999-9999-4999-8999-999999999999","leg":"CASH_REMITTANCE",
+  "accountRef":"ACC-PLATFORM","amount":254.87,"currency":"USD","direction":"CREDIT",
+  "status":"SETTLED_IN_CASH","coreBankingRef":null,"failureReason":null,"attempts":0,
+  "createdAt":"2026-09-19T10:00:00Z","postedAt":"2026-09-19T10:00:00Z"},
+ {"id":"t10","orderId":"88888888-8888-4888-8888-888888888888","leg":"GIFT_WRAP_CREDIT",
+  "accountRef":"ACC-MERCHANT","amount":3.00,"currency":"USD","direction":"CREDIT",
+  "status":"SETTLED_IN_CASH","coreBankingRef":null,"failureReason":null,"attempts":0,
+  "createdAt":"2026-09-19T10:00:00Z","postedAt":"2026-09-19T10:00:00Z"}]''';
+      await pump(tester);
+
+      expect(find.text('Cash banked'), findsOneWidget);
+      expect(find.text('Gift wrapping'), findsOneWidget);
+      expect(find.text('Settled in cash'), findsWidgets);
+      expect(find.text('Unknown'), findsNothing);
+    });
+
+    testWidgets('shows a leg this build has never heard of by its own name',
+        (WidgetTester tester) async {
+      unsettledJson = '''
+[{"id":"t11","orderId":"77777777-1111-4111-8111-111111111111","leg":"DUTY_WITHHELD",
+  "accountRef":"ACC-PLATFORM","amount":1.50,"currency":"USD","direction":"CREDIT",
+  "status":"ESCROWED","coreBankingRef":null,"failureReason":null,"attempts":0,
+  "createdAt":"2026-09-19T10:00:00Z","postedAt":null}]''';
+      await pump(tester);
+
+      // An operator can act on the server's own word for it; "Unknown" tells them nothing.
+      expect(find.text('DUTY_WITHHELD'), findsOneWidget);
+      expect(find.text('ESCROWED'), findsOneWidget);
+      expect(find.text('Unknown'), findsNothing);
+    });
+
+    testWidgets('counts cash-settled rows as settled, and can filter for them',
+        (WidgetTester tester) async {
+      summaryJson = '''
+{"byStatus":{"POSTED":{"count":2,"debits":10.00,"credits":10.00},
+             "SETTLED_IN_CASH":{"count":118,"debits":500.00,"credits":500.00},
+             "PENDING":{"count":1,"debits":0.00,"credits":13.11}},
+ "unsettledCount":1,"amountAtRisk":13.11,"atRiskDebits":0.00,"atRiskCredits":13.11}''';
+      await pump(tester);
+
+      // 2 posted and 118 settled in cash: a platform with no bank settles almost everything in
+      // cash, and the tile used to report that as 2.
+      expect(find.text('120'), findsOneWidget);
+      expect(find.textContaining('118 in cash'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Settled in cash'));
+      await tester.pumpAndSettle();
+
+      expect(adapter.calls.any((String c) => c.contains('status=SETTLED_IN_CASH')), isTrue);
+    });
+  });
+
+  /// RECON-03: the dev rider held 254.87 of the platform's cash and 76.39 owed to a delivery
+  /// company, listed as one 331.26 line whose "Banked" sent the holder kind alone and cleared both.
+  /// The server now lists each debt as its own line, and "Banked" confirms the platform's figure.
+  group('RECON-03: a rider carrying a delivery company\'s cash', () {
+    const String riderRef = 'abcdef12-8888-4888-8888-888888888888';
+    const String companyRef = '77777777-7777-4777-8777-777777777777';
+
+    setUp(() {
+      final String at =
+          DateTime.now().toUtc().subtract(const Duration(hours: 3)).toIso8601String();
+      floatJson = '''
+[{"holderRef":"$riderRef","holderKind":"RIDER","carrierRef":null,"amount":254.87,"orders":7,
+  "oldest":"$at","overdue":false,"owed":"254.87"},
+ {"holderRef":"$riderRef","holderKind":"RIDER","carrierRef":"$companyRef","amount":76.39,
+  "orders":2,"oldest":"$at","overdue":false}]''';
+      remit = (RequestOptions options) => _json(
+          '{"remittanceId":"r9","holderRef":"$riderRef","amount":254.87,"collections":7,'
+          '"replayed":false}');
+    });
+
+    testWidgets('lists the platform\'s cash and the company\'s apart; only the first is banked here',
+        (WidgetTester tester) async {
+      await pump(tester);
+
+      expect(find.text('ABCDEF12'), findsNWidgets(2));
+      expect(find.text('\$254.87'), findsOneWidget);
+      expect(find.text('\$76.39'), findsOneWidget);
+      // The tile counts all the cash out there; no line adds the two debts together. And the
+      // rider is one person holding it, not two (RECON-13).
+      expect(find.text('\$331.26'), findsOneWidget);
+      expect(find.textContaining('1 holding'), findsOneWidget);
+      expect(
+          find.descendant(of: find.byType(ListView).first, matching: find.text('\$331.26')),
+          findsNothing);
+      // Named for the company it is owed to, with no button: the company takes it in at its hub.
+      expect(find.textContaining('Owed to Libanex Express'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'Banked'), findsOneWidget);
+      final Finder companyRow = find
+          .ancestor(of: find.textContaining('Owed to Libanex Express'), matching: find.byType(Row))
+          .first;
+      expect(find.descendant(of: companyRow, matching: find.text('Banked')), findsNothing);
+    });
+
+    testWidgets('banking confirms the platform\'s figure on screen, with one key',
+        (WidgetTester tester) async {
+      await pump(tester);
+
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Banked'));
+      await tester.pumpAndSettle();
+      final Finder dialog = find.byType(AlertDialog);
+      expect(find.descendant(of: dialog, matching: find.textContaining('\$254.87')),
+          findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Yes, they banked it'));
+      await tester.pumpAndSettle();
+
+      final RequestOptions post =
+          adapter.requests.singleWhere((RequestOptions o) => o.method == 'POST');
+      expect(post.path, '/api/accounting/float/$riderRef/remit');
+      final Map<String, dynamic> body = post.data as Map<String, dynamic>;
+      expect(body['expectedAmount'], '254.87');
+      expect(body['requestKey'], matches(RegExp(r'^[0-9a-f]{32}$')));
+      expect(body['holderKind'], 'RIDER');
+      expect(find.text('Recorded \$254.87 from ABCDEF12.'), findsOneWidget);
+    });
+
+    testWidgets('a banking refused because the rider collected more says what they hold now',
+        (WidgetTester tester) async {
+      remit = (RequestOptions options) => _json(
+          '{"error":"They are holding 260.12 now.","code":"AMOUNT_CHANGED","current":"260.12"}',
+          status: 409);
+      await pump(tester);
+
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Banked'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Yes, they banked it'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('ABCDEF12 now holds \$260.12 for the platform, not the amount you confirmed. '
+            'Nothing was recorded.'),
+        findsOneWidget,
+      );
     });
   });
 }
