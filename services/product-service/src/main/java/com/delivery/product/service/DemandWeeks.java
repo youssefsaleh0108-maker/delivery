@@ -9,6 +9,7 @@ import java.time.temporal.TemporalAdjusters;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * The platform's week: Monday 00:00 in {@code delivery.platform.zone}, wherever the server is.
@@ -27,6 +28,12 @@ public class DemandWeeks {
 
     private final ZoneId zone;
 
+    /**
+     * The one Spring is to use. Without this the class has two public constructors, Spring declines
+     * to guess, and the context fails at start-up with "no default constructor" — which is how it
+     * reached dev: the suite never boots this service's context.
+     */
+    @Autowired
     public DemandWeeks(@Value("${delivery.platform.zone:Asia/Beirut}") String platformZone) {
         this.zone = parse(platformZone);
     }
