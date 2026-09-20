@@ -96,22 +96,27 @@ class TrackingApi {
   ///
   /// The order-scoped ping cannot serve the roster between deliveries — it needs an order id and
   /// there isn't one. Fire-and-forget like that ping: a dropped fix is replaced by the next one.
-  Future<void> ping(double lat, double lng, {double? accuracyM}) async {
+  ///
+  /// Only a rider who is on duty or carrying a live order may send it; anyone else gets a 409 and
+  /// nothing is recorded. [recordedAt] and the 422 refusals are as on [OrderApi.ping].
+  Future<void> ping(double lat, double lng, {double? accuracyM, DateTime? recordedAt}) async {
     await _dio.post<dynamic>(
       '/api/tracking/riders/me/ping',
       data: <String, dynamic>{
         'lat': lat,
         'lng': lng,
         if (accuracyM != null) 'accuracyM': accuracyM,
+        if (recordedAt != null) 'recordedAt': recordedAt.toUtc().toIso8601String(),
       },
     );
   }
 
   /// Where one rider is.
   ///
-  /// The server narrows this sharply — self, backoffice, the employing fleet, or a customer with
-  /// a live order in that rider's hands — and answers 404 to everybody else, identically to a
-  /// rider who does not exist.
+  /// The server narrows this sharply — self; backoffice, with the last known position and its
+  /// time; or the employing fleet, with the position only while the rider is on duty — and answers
+  /// 404 to everybody else, identically to a rider who does not exist. A customer sees a rider
+  /// through their order (`OrderApi.riderSighting`), never here.
   Future<RiderPresence> riderLocation(String riderId) async {
     final Response<dynamic> response =
         await _dio.get<dynamic>('/api/tracking/riders/$riderId/location');

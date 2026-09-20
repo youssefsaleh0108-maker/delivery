@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import 'lira.dart';
+
 /// The platform's display rates — today, LBP per USD.
 ///
 /// Every price is stored and paid in USD; the Lebanese frames draw each one twice —
@@ -52,9 +54,12 @@ class MarketRates extends ChangeNotifier {
   /// For a caller that lays the figure out itself: the dekkane shop grid prints "LBP 313,000" in the
   /// reader's language, which needs the number handed to the translation rather than a finished
   /// English string.
+  ///
+  /// The conversion is [lbpFaceOf], the rule transfer-service uses, done in integers: in `double`
+  /// it fell a note short wherever the product lands on an exact half (RECON-14).
   int? lbpRounded(double usd) {
     if (!hasLbp) return null;
-    return (usd * _lbpPerUsd / 1000).round() * 1000;
+    return lbpFaceOf(usd, _lbpPerUsd);
   }
 
   /// "(315,000 LBP)" — the parenthesised secondary form most rows use.

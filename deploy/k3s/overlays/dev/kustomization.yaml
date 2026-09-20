@@ -35,6 +35,9 @@ configMapGenerator:
   - SMS_TEST_INBOX=youssef.saleh0108@gmail.com
   - TEST_CODE_SINK_ENABLED=true
   - AUTO_APPROVE_RIDER=true
+  # Dev only: accept rider positions from anywhere. Emulators report Mountain View, and dev's
+  # riders are mostly emulators. Overrides platform-common's "true"; qa keeps it on.
+  - TRACKING_SERVICE_AREA_ENABLED=false
   name: platform-env
 
 generatorOptions:

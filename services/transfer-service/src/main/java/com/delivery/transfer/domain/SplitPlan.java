@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import jakarta.persistence.CascadeType;
@@ -23,9 +24,11 @@ import jakarta.persistence.Table;
  * One group order's money, before the order exists.
  *
  * <p>The plan collects commitments: each {@link SplitShare} is one person's slice, and the plan
- * turns READY only when every live share is committed — paid through a wallet connector, promised
- * as cash at the door, or covered by the host. The ORDER is placed after that, which is the whole
- * design: nobody's food is ordered on money that has not shown up.
+ * turns READY only when nobody is left to answer — every share promised as cash at the door,
+ * carried by the host's own order, or covered by the host (a declined one waits for the host's
+ * cover). The ORDER is placed after that, which is the whole design: nobody's food is ordered
+ * before everybody has said how they pay. A commitment is not money, though: on a cash order the
+ * rider still collects the whole total at the door, which is what the ledger books.
  *
  * <p>The 15-minute window ({@code expiresAt}) is enforced lazily on read — a plan past its clock
  * that never got READY reads as EXPIRED, no scheduler required. A reminder buys five more
@@ -155,6 +158,49 @@ public class SplitPlan {
     public void placed(UUID order) {
         this.orderId = order;
         this.status = Status.PLACED;
+    }
+
+    /**
+     * Closes the plan over the order it pays for, at the ORDER's total.
+     *
+     * <p>The plan is priced from the basket before the order exists; Order Manager prices the order.
+     * EXPRESS adds its surcharge at checkout, the fee can come from the zone's terms, and a code can
+     * take something off. The rider collects the order's total, so the shares must add up to it, not
+     * to the basket's guess: the host's slice is re-priced as whatever the others leave of it, which
+     * is what it was at creation too.
+     *
+     * @throws IllegalArgumentException when the others alone come to more than the order's total —
+     *         a host slice below zero is not a slice anybody can pay; the caller refuses first
+     */
+    public void closeOver(UUID order, BigDecimal orderTotal) {
+        BigDecimal hostSlice = orderTotal.subtract(othersTotal());
+        if (hostSlice.signum() < 0) {
+            throw new IllegalArgumentException("the other shares exceed the order's total");
+        }
+        hostShare().ifPresent(host -> host.reprice(hostSlice));
+        this.totalUsd = orderTotal;
+        placed(order);
+    }
+
+    /** Everybody's slices but the host's own. */
+    public BigDecimal othersTotal() {
+        SplitShare host = hostShare().orElse(null);
+        return shares.stream()
+                .filter(s -> s != host)
+                .map(SplitShare::getAmountUsd)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /**
+     * The host's own slice: theirs by username, and travelling with the order. A covered flake is
+     * HOST_ORDER too but carries the flake's name, and {@code SplitService.create} never gives an
+     * invitee the host's username.
+     */
+    private Optional<SplitShare> hostShare() {
+        return shares.stream()
+                .filter(s -> hostUsername.equals(s.getPayeeUsername())
+                        && s.getMethod() == SplitShare.Method.HOST_ORDER)
+                .findFirst();
     }
 
     public UUID getId() { return id; }

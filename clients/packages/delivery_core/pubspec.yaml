@@ -28,6 +28,9 @@ dependencies:
   image: ^4.3.0
   dio: ^5.7.0
   geolocator: ^13.0.2
+  # The rider location reporter reads time through clock.now(), so a test driving it under fake
+  # time sees the same seconds pass that its timers do. Already in every app's graph via intl.
+  clock: ^1.1.2
   # The one realtime socket (STOMP over WebSocket on /ws/notifications). Chosen because it is the
   # only WebSocket client that works identically on mobile, desktop and web — the auth travels in
   # the STOMP CONNECT frame, so no platform needs upgrade-request headers.
@@ -41,3 +44,4 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  fake_async: ^1.3.3

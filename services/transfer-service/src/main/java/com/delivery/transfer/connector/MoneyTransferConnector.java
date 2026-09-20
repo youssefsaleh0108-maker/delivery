@@ -30,6 +30,15 @@ public interface MoneyTransferConnector {
      */
     boolean ready();
 
+    /**
+     * Whether this connector only stands in for a provider: it accepts the method so the flow can
+     * be exercised end to end, and no money moves. Whatever it "carries" is a simulation, and
+     * anything that shows it to a person must say so.
+     */
+    default boolean simulated() {
+        return false;
+    }
+
     /** Sets the transfer in motion. Implementations call {@code transfer.carriedBy(...)}. */
     void initiate(MoneyTransfer transfer);
 }

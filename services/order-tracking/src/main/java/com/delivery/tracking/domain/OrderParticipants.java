@@ -58,8 +58,30 @@ public class OrderParticipants {
     @Column(name = "dropoff_lng")
     private Double dropoffLng;
 
+    /**
+     * The checkout this order was placed in with other shops' orders; null when it was placed
+     * alone. The whole of what links a multi-shop basket's orders — see V17.
+     */
+    @Column(name = "checkout_id")
+    private UUID checkoutId;
+
+    /** The shop's name as the order recorded it, which is what a checkout map's rows are called. */
+    @Column(name = "store_name", length = STORE_NAME_LENGTH)
+    private String storeName;
+
+    /** When the rider collected: the occurredAt of the earliest PICKED_UP snapshot seen. */
+    @Column(name = "picked_up_at")
+    private Instant pickedUpAt;
+
+    /** When the order was delivered or cancelled: the earliest terminal snapshot's occurredAt. */
+    @Column(name = "completed_at")
+    private Instant completedAt;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    /** The column's width, which is also the product catalogue's limit on a shop's name. */
+    private static final int STORE_NAME_LENGTH = 160;
 
     /**
      * The statuses during which a rider's position is meaningful and may be watched.
@@ -90,7 +112,25 @@ public class OrderParticipants {
         this.updatedAt = Instant.now();
     }
 
+    /**
+     * Applies a snapshot's rider and status, unless the order has already finished.
+     *
+     * <p>A delivered or cancelled order is finished for good. Delivery is at-least-once and not in
+     * order, so a snapshot from before the end (a PICKED_UP redelivered after the DELIVERED, or
+     * one that was simply slow) can land at any time. Applying it would reopen the order: the
+     * rider's pings would be accepted again, it would count as a live delivery for the rider and
+     * the customer, and a finished order's map would start following the rider again. The end is
+     * recognised by a completion time or by a terminal status ({@link #isComplete()}), so an order
+     * that finished before completed_at existed is held just as firmly.
+     *
+     * <p>The cost is that a PICKED_UP snapshot arriving only after the DELIVERED one no longer
+     * stamps {@code picked_up_at}: the order is over, and nothing reads that time for a finished
+     * order except as a label.
+     */
     public void apply(String riderId, String status) {
+        if (isComplete()) {
+            return;
+        }
         this.riderId = riderId;
         this.status = status;
         this.updatedAt = Instant.now();
@@ -127,6 +167,60 @@ public class OrderParticipants {
     }
 
     /**
+     * Applies the checkout link and the shop's name, when the event carries them.
+     *
+     * <p>The same rule as {@link #applyRoute}: absent means "this event does not say", never "this
+     * is now unknown". An order is linked to its checkout once, at placement, and nothing upstream
+     * ever unlinks it, so there is no event whose silence should erase the link.
+     *
+     * <p>The name is cut to the column rather than refused. A message is untrusted input, and an
+     * over-long name failing the insert would lose the whole event — the customer's right to watch
+     * their own delivery included — over a label.
+     */
+    public void applyCheckout(UUID checkoutId, String storeName) {
+        if (checkoutId != null) {
+            this.checkoutId = checkoutId;
+        }
+        if (storeName != null && !storeName.isBlank()) {
+            String name = storeName.strip();
+            this.storeName = name.length() > STORE_NAME_LENGTH
+                    ? name.substring(0, STORE_NAME_LENGTH)
+                    : name;
+        }
+    }
+
+    /**
+     * Stamps when the order was collected and when it finished, from the snapshot just applied.
+     *
+     * <p>Earliest wins, rather than first-processed or last-processed. Delivery is at-least-once,
+     * so the same PICKED_UP snapshot can arrive twice, and a later event still in PICKED_UP (a
+     * reassigned fleet, a corrected address) carries a later occurredAt: either would move a stop
+     * the rider really collected first to second place on the customer's map. The earliest instant
+     * any PICKED_UP snapshot reports is the collection, whatever order the messages land in.
+     *
+     * <p>Judged on the status the snapshot itself reports, not on the status the order now holds:
+     * a finished order keeps its terminal status whatever arrives later ({@link #apply}), and a
+     * PICKED_UP replayed after the delivery must neither move the delivery's time nor be lost. A
+     * collection is never stamped after the order finished.
+     *
+     * @param snapshotStatus the status the event reports, as it was applied or refused
+     */
+    public void stampMilestones(String snapshotStatus, Instant occurredAt) {
+        if (occurredAt == null || snapshotStatus == null) {
+            return;
+        }
+        if (CARRYING_STATUS.equals(snapshotStatus)
+                && (completedAt == null || !occurredAt.isAfter(completedAt))
+                && (pickedUpAt == null || occurredAt.isBefore(pickedUpAt))) {
+            this.pickedUpAt = occurredAt;
+        }
+        if (TERMINAL_STATUSES.contains(snapshotStatus)
+                && (completedAt == null || occurredAt.isBefore(completedAt))) {
+            this.completedAt = occurredAt;
+        }
+    }
+
+    /**
      * Whether this user may watch this delivery.
      *
      * <p>Customer, merchant and assigned rider only. A rider who has not claimed the order cannot
@@ -159,9 +253,12 @@ public class OrderParticipants {
      * <p>The trail is closed at this point. Everything a rider's phone reports afterwards is the
      * rider's own movements, not the delivery's, and appending it would both extend a customer's
      * view of a worker past the job and grow the record a dispute is settled from after the fact.
+     *
+     * <p>Final: once a completion time is stamped the order stays complete, whatever a later
+     * snapshot says (see {@link #apply}).
      */
     public boolean isComplete() {
-        return TERMINAL_STATUSES.contains(status);
+        return completedAt != null || TERMINAL_STATUSES.contains(status);
     }
 
     public UUID getCarrierId() {
@@ -196,6 +293,22 @@ public class OrderParticipants {
 
     public String getStatus() {
         return status;
+    }
+
+    public UUID getCheckoutId() {
+        return checkoutId;
+    }
+
+    public String getStoreName() {
+        return storeName;
+    }
+
+    public Instant getPickedUpAt() {
+        return pickedUpAt;
+    }
+
+    public Instant getCompletedAt() {
+        return completedAt;
     }
 
     public Instant getUpdatedAt() {

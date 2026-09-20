@@ -1,5 +1,6 @@
 package com.delivery.transfer.client;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -83,11 +84,23 @@ public class OrderManagerClient {
     }
 
     /**
-     * Only the fields an ownership check needs. Order Manager's response carries a whole order;
+     * Only the fields this service decides on. Order Manager's response carries a whole order;
      * binding the rest here would make this service break every time that payload grows a field.
+     *
+     * <p>Whose order it is and who carries it ({@code customerId}, {@code riderId}), what it costs
+     * ({@code totalAmount}), and how it is paid ({@code paymentMethod}: CASH / CARD / WALLET, and
+     * {@code paymentStatus}: DUE, AUTHORIZATION_PENDING, AUTHORIZED while open; COLLECTED,
+     * CAPTURED, REFUNDED, FAILED once closed).
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record OrderSummary(UUID id, String customerId, String status) {
+    public record OrderSummary(UUID id, String customerId, String riderId, String status,
+                               BigDecimal totalAmount, String paymentMethod,
+                               String paymentStatus) {
+
+        /** Paid in cash at the door: the ledger books the whole total as collected by the rider. */
+        public boolean cash() {
+            return "CASH".equals(paymentMethod);
+        }
     }
 
     public static class OrderUnavailableException extends RuntimeException {

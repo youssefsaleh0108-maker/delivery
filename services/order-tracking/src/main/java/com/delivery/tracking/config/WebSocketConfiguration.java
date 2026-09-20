@@ -37,9 +37,12 @@ import com.delivery.tracking.service.TrackingService;
  * validated on the STOMP CONNECT frame rather than the handshake (a browser WebSocket cannot set
  * upgrade headers, and a query-string token would sit in access logs), SEND refused outright, and
  * subscriptions policed. The one difference is the authorisation unit: notifications are
- * per-user queues, positions are per-ORDER topics — so SUBSCRIBE here checks the same
- * participant rule the history endpoint enforces, and an order id you are not part of answers
- * with an error frame, not with somebody else's rider.
+ * per-user queues, positions are per-ORDER topics — so SUBSCRIBE here admits the order's customer
+ * and rider (and the back office), and an order id you are not part of answers with an error
+ * frame, not with somebody else's rider. The shop is not admitted: it sees the rider only until
+ * pickup, and a subscription cannot be withdrawn at that moment. Each frame is filtered for the
+ * customer before it is sent (TrackingService#sightingFor), so a subscription never outruns the
+ * rule the REST reads apply.
  *
  * <p>Every refusal below carries its own reason to the client. Left to itself the STOMP handler
  * reports whatever the inbound channel threw, which is the channel's own "failed to send" wrapper
@@ -167,8 +170,11 @@ public class WebSocketConfiguration implements WebSocketMessageBrokerConfigurer 
                     throw new SocketRefusedException(
                             "Subscriptions are only allowed on /topic/orders/{id}/position", e);
                 }
+                // The customer, the rider and the back office. Not the shop: it sees the rider only
+                // until pickup, and a subscription cannot be taken back at pickup. What goes out on
+                // the topic is filtered for the customer at ping time (TrackingController#ping).
                 boolean visible = backoffice || tracking.participantsOf(orderId)
-                        .map(p -> p.isVisibleTo(user.getName()))
+                        .map(p -> TrackingService.mayWatchLive(p, user.getName()))
                         .orElse(false);
                 if (!visible) {
                     // The same answer the REST reads give, and the same answer for both branches:

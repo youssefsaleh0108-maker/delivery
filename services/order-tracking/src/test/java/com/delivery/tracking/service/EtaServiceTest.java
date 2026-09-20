@@ -65,6 +65,9 @@ class EtaServiceTest {
                 List.of(new HaversineRouteProvider(60)), HaversineRouteProvider.NAME);
 
         eta = new EtaService(tracking, participants, providers, Duration.ofMinutes(5));
+        // Until a case says where the rider is, there is no fix to measure from.
+        when(tracking.sightingFor(any(OrderParticipants.class), anyString(), anyBoolean()))
+                .thenReturn(RiderSighting.nothing(RiderSighting.State.NO_FIX));
     }
 
     /** An order in the given status, with route points if {@code routed}. */
@@ -78,9 +81,16 @@ class EtaServiceTest {
     }
 
     private void riderAt(GeoPoint point, Instant fixTakenAt) {
-        when(tracking.currentPosition(any(UUID.class), anyString(), anyBoolean()))
-                .thenReturn(Optional.of(new Position(ORDER, RIDER, point.lat(), point.lng(),
-                        5.0f, fixTakenAt)));
+        sighted(RiderSighting.visible(position(point, fixTakenAt)));
+    }
+
+    private static Position position(GeoPoint point, Instant fixTakenAt) {
+        return new Position(ORDER, RIDER, point.lat(), point.lng(), 5.0f, fixTakenAt);
+    }
+
+    private void sighted(RiderSighting sighting) {
+        when(tracking.sightingFor(any(OrderParticipants.class), anyString(), anyBoolean()))
+                .thenReturn(sighting);
     }
 
     private EtaResult ask() {
@@ -99,8 +109,7 @@ class EtaServiceTest {
         @Test
         void when_the_rider_has_never_pinged() {
             order("PICKED_UP", true);
-            when(tracking.currentPosition(any(UUID.class), anyString(), anyBoolean()))
-                    .thenReturn(Optional.empty());
+            sighted(RiderSighting.nothing(RiderSighting.State.NO_FIX));
 
             EtaResult result = ask();
 
@@ -156,7 +165,7 @@ class EtaServiceTest {
 
             ask();
 
-            verify(tracking, never()).currentPosition(any(UUID.class), anyString(), anyBoolean());
+            verify(tracking, never()).sightingFor(any(OrderParticipants.class), anyString(), anyBoolean());
         }
 
         /**
@@ -267,6 +276,62 @@ class EtaServiceTest {
         }
     }
 
+    /** What the estimate may be measured from follows what the caller may know of the rider. */
+    @Nested
+    @DisplayName("as far as the caller may know where the rider is")
+    class AsTheRuleAllows {
+
+        /**
+         * A distance from another customer's stop points at it, and so would its time. Nothing is
+         * given — not even when the fix was taken.
+         */
+        @Test
+        void a_rider_on_another_delivery_gives_no_number_and_no_time() {
+            order("PICKED_UP", true);
+            sighted(RiderSighting.nothing(RiderSighting.State.ON_ANOTHER_DELIVERY));
+
+            EtaResult result = ask();
+
+            assertThat(result.available()).isFalse();
+            assertThat(result.reason()).isEqualTo(Reason.RIDER_ON_ANOTHER_DELIVERY);
+            assertThat(result.remainingMetres()).isNull();
+            assertThat(result.remainingSeconds()).isNull();
+            assertThat(result.estimatedArrival()).isNull();
+            assertThat(result.fixRecordedAt()).isNull();
+            assertThat(result.leg()).isNull();
+        }
+
+        /**
+         * Still far from the shop: the customer is not shown where the rider is, but is told when
+         * to expect them — measured from the position they do not get.
+         */
+        @Test
+        void a_rider_still_far_from_the_shop_gives_an_estimate_without_a_position() {
+            order("READY", true);
+            sighted(RiderSighting.timedOnly(RiderSighting.State.HEADING_TO_SHOP,
+                    position(new GeoPoint(34.0162, 35.7982), Instant.now())));
+
+            EtaResult result = ask();
+
+            assertThat(result.available()).isTrue();
+            assertThat(result.leg()).isEqualTo(Leg.TO_PICKUP);
+            assertThat(result.remainingMetres()).isCloseTo(45_812d, within(100d));
+        }
+
+        /** And the shop, once its order is collected, the same way. */
+        @Test
+        void a_shops_collected_order_gives_an_estimate_without_a_position() {
+            order("PICKED_UP", true);
+            sighted(RiderSighting.timedOnly(RiderSighting.State.AFTER_PICKUP,
+                    position(PICKUP, Instant.now())));
+
+            EtaResult result = eta.estimateFor(ORDER, MERCHANT, false);
+
+            assertThat(result.available()).isTrue();
+            assertThat(result.leg()).isEqualTo(Leg.TO_DROPOFF);
+        }
+    }
+
     @Nested
     @DisplayName("who may ask")
     class Authorisation {
@@ -283,7 +348,7 @@ class EtaServiceTest {
             assertThatThrownBy(() -> eta.estimateFor(ORDER, "stranger-sub", false))
                     .isInstanceOf(TrackingService.TrackingNotFoundException.class);
 
-            verify(tracking, never()).currentPosition(any(UUID.class), anyString(), anyBoolean());
+            verify(tracking, never()).sightingFor(any(OrderParticipants.class), anyString(), anyBoolean());
         }
 
         @Test

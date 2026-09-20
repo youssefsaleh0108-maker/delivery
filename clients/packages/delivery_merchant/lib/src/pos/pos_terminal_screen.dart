@@ -1095,7 +1095,11 @@ class _PosTerminalScreenState extends State<PosTerminalScreen> {
 
 /// The platform-rate preview, rounded to a note that exists — the same thousand [MarketRates]
 /// rounds to, computed from integer cents so the dollar figure itself is never parsed.
-int _previewLbp(int cents, double rate) => (cents * rate / 100 / 1000).round() * 1000;
+///
+/// Through [lbpFaceOfCents], which is that rounding done in integers: in `double` it fell a note
+/// short wherever the product landed on an exact half, and this preview sits beside figures the
+/// till itself computes exactly (RECON-14).
+int _previewLbp(int cents, double rate) => lbpFaceOfCents(cents, rate);
 
 /// Thousands separators. Local rather than borrowed from [MarketRates] because that one also
 /// appends an English "LBP", and the label around this comes from the ARB.

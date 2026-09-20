@@ -3,13 +3,17 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
+import 'split_labels.dart';
+
 /// All Shares Paid (Figma `split-complete` 83:683): the green tick, the group summary with how
-/// each share travelled, the rider-collects note for the cash ones, and Track Order out.
+/// each share travels, the rider-collects note for every share handed over at the door, and Track
+/// Order out.
 class SplitCompleteScreen extends StatelessWidget {
   const SplitCompleteScreen({
     super.key,
     required this.plan,
     required this.onTrack,
+    this.cashOrder = true,
   });
 
   final SplitPlan plan;
@@ -17,12 +21,32 @@ class SplitCompleteScreen extends StatelessWidget {
   /// Pops the flow and lands the customer on their order.
   final VoidCallback onTrack;
 
+  /// The order is paid in cash at the door. Then the rider collects every share there — the host's
+  /// own slice and a simulated wallet share included, since neither moved any money — which is what
+  /// the ledger books. On a card or wallet order nothing is collected, and no note is drawn.
+  final bool cashOrder;
+
+  static const Set<String> _wallets = <String>{'WHISH', 'OMT', 'BOB'};
+
+  /// Who hands this share to the rider, or null when nobody does: a share a real provider carried,
+  /// or one nobody has answered yet. A covered share is the host's to hand over.
+  String? _handedOverBy(SplitShare share) {
+    if (!cashOrder) return null;
+    return switch (share.status) {
+      'COMMITTED' => share.name,
+      'COVERED' => plan.hostName,
+      'PAID' when !(_wallets.contains(share.method) && !share.simulated) => share.name,
+      _ => null,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
-    final List<SplitShare> cashShares = plan.shares
-        .where((SplitShare s) => s.method == 'CASH_AT_DOOR')
-        .toList();
+    final List<(SplitShare, String)> doorNotes = <(SplitShare, String)>[
+      for (final SplitShare share in plan.shares)
+        if (_handedOverBy(share) case final String payer) (share, payer),
+    ];
 
     return Scaffold(
       backgroundColor: DeliveryColors.background,
@@ -79,16 +103,16 @@ class SplitCompleteScreen extends StatelessWidget {
                                 color: DeliveryColors.borderFaint),
                           _row(t, plan.shares[i]),
                         ],
-                        if (cashShares.isNotEmpty) ...<Widget>[
+                        if (doorNotes.isNotEmpty) ...<Widget>[
                           const Divider(
                               height: DeliverySpacing.md * 1.5,
                               color: DeliveryColors.borderFaint),
-                          for (final SplitShare s in cashShares)
+                          for (final (SplitShare s, String payer) in doorNotes)
                             Padding(
                               padding: const EdgeInsets.only(top: 2),
                               child: Text(
                                 t.custRiderCollectNote(
-                                    '\$${s.amountUsd.toStringAsFixed(2)}', s.name),
+                                    '\$${s.amountUsd.toStringAsFixed(2)}', payer),
                                 style: const TextStyle(
                                     fontSize: 12,
                                     color: DeliveryColors.muted,
@@ -113,6 +137,7 @@ class SplitCompleteScreen extends StatelessWidget {
   }
 
   Widget _row(DeliveryStrings t, SplitShare share) {
+    final String? caption = splitShareCaption(t, share);
     return Row(
       children: <Widget>[
         Icon(Icons.check_rounded, size: 18, color: DeliveryAccent.positive.color),
@@ -132,9 +157,9 @@ class SplitCompleteScreen extends StatelessWidget {
                   height: 1.25,
                 ),
               ),
-              if (share.method != null)
+              if (caption != null)
                 Text(
-                  t.custPaidVia(share.method!),
+                  caption,
                   style: const TextStyle(
                       fontSize: 11.5, color: DeliveryColors.faint, height: 1.3),
                 ),
