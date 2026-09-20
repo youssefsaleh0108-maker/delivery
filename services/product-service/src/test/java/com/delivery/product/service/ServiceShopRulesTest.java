@@ -74,7 +74,7 @@ class ServiceShopRulesTest {
                 mock(CategoryRepository.class), new ServiceCategories(environment),
                 mock(OnboardingApplicationClient.class),
                 Clock.fixed(Instant.parse("2026-09-13T10:00:00Z"), ZoneOffset.UTC),
-                Duration.ofHours(4));
+                Duration.ofHours(4), "Asia/Beirut");
         when(stores.save(any(Store.class))).thenAnswer(call -> call.getArgument(0));
     }
 

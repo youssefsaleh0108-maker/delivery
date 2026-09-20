@@ -482,13 +482,24 @@ public class StoreController {
      *
      * <p>MERCHANT, and the service then checks this merchant owns this store. Role alone would let
      * any merchant move any shop on the map.
+     *
+     * <p>BACKOFFICE may also pin, on any shop, and that is a separate road through the same door
+     * ({@link StoreService#pinAsBackoffice}, which records who did it). It is here for the shops
+     * that went live before a pin was required: their merchant is otherwise the only person who can
+     * put them on the map, and support cannot repair a trading shop that no "near you" can find.
+     * Checked before ownership, so an account holding both roles is treated as the more privileged
+     * one rather than being refused another merchant's shop.
      */
     @PutMapping("/{id}/location")
-    @PreAuthorize("hasRole('MERCHANT')")
+    @PreAuthorize("hasAnyRole('MERCHANT','BACKOFFICE')")
     public StoreResponse setLocation(@PathVariable UUID id,
                                      @Valid @RequestBody LocationRequest request) {
         GeoPoint location = new GeoPoint(request.latitude(), request.longitude());
-        return toResponse(storeService.pin(id, CurrentUser.requireId(), location), Set.of());
+        String caller = CurrentUser.requireId();
+        return toResponse(CurrentUser.hasRole("BACKOFFICE")
+                        ? storeService.pinAsBackoffice(id, caller, location)
+                        : storeService.pin(id, caller, location),
+                Set.of());
     }
 
     /** Takes the shop off the map. The address text is kept — only the pin goes. */

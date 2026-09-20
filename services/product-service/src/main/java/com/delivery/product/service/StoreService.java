@@ -2,9 +2,11 @@ package com.delivery.product.service;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.DateTimeException;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -86,13 +88,33 @@ public class StoreService {
      */
     private final OnboardingApplicationClient applications;
 
+    /**
+     * The calendar a new shop's opening hours are read in — {@code delivery.platform.zone}, the
+     * platform's own zone, {@code Asia/Beirut} unless configured otherwise.
+     *
+     * <p>It exists because the alternative was not a decision. {@code Store.timezone}'s field
+     * initialiser is {@code "UTC"} and nothing ever set anything else, so every shop on the platform
+     * declared its hours in a zone three hours behind the one its shutters actually open in: a shop
+     * that typed 08:00-23:00 was treated as open 11:00-02:00 Beirut, and item search, the storefront
+     * lists and every other "hide what is closed" answer inherited that.
+     *
+     * <p>Held as a {@link ZoneId} rather than the string, so a typo in the setting fails at startup
+     * with the property named instead of silently degrading to UTC in {@code Store.zone()} — the
+     * failure mode this whole field exists to end.
+     *
+     * <p>A default, not a rule. The merchant's own profile form still wins ({@link #open}), and no
+     * shop that already exists is ever moved onto it: its hours were typed against the zone it has.
+     */
+    private final ZoneId platformZone;
+
     public StoreService(StoreRepository stores, StoreOfferRepository offers,
                         StoreFavoriteRepository favorites, ProductRepository products,
                         CategoryRepository categories, ServiceCategories serviceCategories,
                         OnboardingApplicationClient applications,
                         Clock clock,
                         @Value("${delivery.product.power-declaration-fresh-for:4h}")
-                        Duration powerDeclarationFreshFor) {
+                        Duration powerDeclarationFreshFor,
+                        @Value("${delivery.platform.zone:Asia/Beirut}") String platformZone) {
         this.stores = stores;
         this.offers = offers;
         this.favorites = favorites;
@@ -102,6 +124,14 @@ public class StoreService {
         this.applications = applications;
         this.clock = clock;
         this.powerDeclarationFreshFor = powerDeclarationFreshFor;
+        try {
+            this.platformZone = ZoneId.of(platformZone);
+        } catch (DateTimeException e) {
+            throw new IllegalArgumentException("delivery.platform.zone is '" + platformZone
+                    + "', which is not a time zone. It is the calendar every new shop's opening "
+                    + "hours are read in; a shop opened under a name Java cannot resolve would fall "
+                    + "back to UTC and be open at the wrong hours with nothing saying why.", e);
+        }
     }
 
     // ---------------------------------------------------------------- storefront reads
@@ -864,12 +894,31 @@ public class StoreService {
             }
         }
         Store store = new Store(merchantId, "My Store", Store.Vertical.RESTAURANT);
+        store.useTimezone(platformZone.getId());
         store.replaceHours(java.util.Arrays.stream(DayOfWeek.values())
                 .map(day -> new StoreHours(day, DEFAULT_OPENS, DEFAULT_CLOSES))
                 .toList());
-        store.publish(clock.instant());
+        // Listed only if it CAN be — which today means never, because nothing here has a pin to give
+        // it and onboarding never collected one (CreatePartnerRecord does nothing for a merchant).
+        //
+        // This is the half of the pin rule that costs something, and it is deliberate. The paragraph
+        // above explains why this shop used to be listed immediately: a DRAFT shop is invisible to
+        // customers, so an order against that first product is refused. But an ACTIVE shop with no
+        // pin is not actually better off — it cannot be found by distance, has no delivery circle,
+        // cannot have a radius enforced and is missing from every "near you" — it is merely broken
+        // less visibly. And it is exactly how dev ended up with twelve live shops and no map.
+        //
+        // So the shop is opened, with its week of hours, and waits one tap: the merchant's My Shop
+        // page now shows the map picker with Publish beside it saying what is missing. The test is
+        // asked rather than assumed, so a future caller that DOES arrive with coordinates — an
+        // onboarding form that starts collecting them — lists the shop here with no further change.
+        if (store.isListable()) {
+            store.publish(clock.instant());
+        }
         stores.save(store);
-        log.info("Auto-provisioned store {} for merchant {}", store.getId(), merchantId);
+        log.info("Auto-provisioned store {} for merchant {} as {}{}", store.getId(), merchantId,
+                store.getStatus(),
+                store.isListable() ? "" : " (" + store.whyNotListable().code() + ")");
         return store;
     }
 
@@ -958,6 +1007,11 @@ public class StoreService {
         if (store.isServices()) {
             requireOpen(store.getServiceCategory(), open);
         }
+        // The platform's own zone unless the merchant named one. Not a fallback deep in the entity:
+        // a shop opened by a client that has no timezone field — which is every client today, the
+        // services bootstrap included — is opened in the zone the platform trades in, rather than in
+        // the JPA initialiser's UTC.
+        store.useTimezone(platformZone.getId());
         store.updateProfile(request.name(), request.tagline(), request.description(),
                 request.vertical(), request.tags(), request.timezone(), request.address());
         store.setNeighborhood(request.neighborhood());
@@ -1085,6 +1139,30 @@ public class StoreService {
     }
 
     /**
+     * Back office drops or moves a shop's pin, on any shop, without owning it.
+     *
+     * <p>Built like {@link #setVerifiedLocal}: who may call it is the controller's role check, and
+     * this only records who did — because moving somebody else's shop on the map is a change the
+     * merchant did not make and it should be possible to say afterwards who made it.
+     *
+     * <p>It exists for the shops that are already live without a pin. The rule added to
+     * {@link Store#publish} stops new ones appearing, but a shop that was listed before it cannot be
+     * unlisted to fix a data problem it never caused — and, as it stands, its own merchant is the
+     * only person on the platform who can put it on the map. That leaves support unable to repair a
+     * trading shop that no "near you" can see.
+     */
+    @Transactional
+    public StoreView pinAsBackoffice(UUID id, String backofficeId, GeoPoint location) {
+        Store store = stores.findById(id)
+                .orElseThrow(() -> new StoreNotFoundException(id.toString()));
+        boolean firstPin = store.location() == null;
+        store.pinAt(location);
+        log.info("Backoffice {} {} the pin on store {}", backofficeId,
+                firstPin ? "dropped" : "moved", id);
+        return view(store, clock.instant());
+    }
+
+    /**
      * Takes the shop off the map.
      *
      * <p>The address text is kept. A merchant removing a wrong pin has not stopped having an
@@ -1142,14 +1220,19 @@ public class StoreService {
         return view(store, clock.instant());
     }
 
+    /**
+     * Lists the shop.
+     *
+     * <p>{@link Store.NotListableException} is deliberately NOT folded into the generic 422 here.
+     * It is the one refusal on this endpoint a client has to be able to act on — send the merchant
+     * to the week's hours, or open the map picker — and it carries a {@code code} saying which,
+     * which a rewrap into {@code CatalogRuleViolationException} would throw away, leaving the app
+     * with an English sentence to pattern-match.
+     */
     @Transactional
     public StoreView publish(UUID id, String merchantId) {
         Store store = requireOwned(id, merchantId);
-        try {
-            store.publish(clock.instant());
-        } catch (IllegalStateException e) {
-            throw new CatalogService.CatalogRuleViolationException(e.getMessage());
-        }
+        store.publish(clock.instant());
         return view(store, clock.instant());
     }
 

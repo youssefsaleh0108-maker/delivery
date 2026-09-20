@@ -6292,5 +6292,18 @@
   "pfindSampleNoPrefill": "This reading is an example, so nothing is filled in for you. Only your own photo comes along.",
   "pfindLimitPlatform": "Finding products by photo is very busy today. Search your catalogue by name, or try again later.",
   "psrchLeftToday": "{count, plural, =0{No photo searches left today} =1{1 photo search left today} other{{count} photo searches left today}}",
-  "@psrchLeftToday": {"placeholders":{"count":{"type":"int"}}}
+  "@psrchLeftToday": {"placeholders":{"count":{"type":"int"}}},
+  "merchPublishNeedsPin": "Drop your shop's pin first — without it, nobody nearby can find you",
+  "merchPublishNeedsHours": "Set your opening hours first — without them, your shop is never open",
+  "merchPublishNotReady": "Not ready to publish yet",
+  "merchPublishRefused": "Your shop is not ready to be listed yet",
+  "boShopPinColumn": "On the map",
+  "boShopPinned": "Pinned",
+  "boShopNoPin": "No pin",
+  "boShopSetPin": "Set the pin",
+  "boShopMovePin": "Move the pin",
+  "boShopPinSaved": "Pin saved",
+  "boShopPinFailed": "The pin could not be saved",
+  "boShopPinGone": "That shop is no longer there",
+  "boShopPinWhy": "A shop with no pin has no distance, no delivery circle and no place in \"near you\"."
 }

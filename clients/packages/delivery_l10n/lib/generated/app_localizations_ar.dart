@@ -13363,4 +13363,46 @@ class DeliveryStringsAr extends DeliveryStrings {
     );
     return '$_temp0';
   }
+
+  @override
+  String get merchPublishNeedsPin =>
+      'حدِّد موقع متجرك على الخريطة أولاً — بدونه لن يعثر عليك أحد من القريبين';
+
+  @override
+  String get merchPublishNeedsHours =>
+      'حدِّد ساعات العمل أولاً — بدونها لن يكون متجرك مفتوحاً أبداً';
+
+  @override
+  String get merchPublishNotReady => 'المتجر غير جاهز للنشر بعد';
+
+  @override
+  String get merchPublishRefused => 'متجرك غير جاهز لعرضه في المتجر بعد';
+
+  @override
+  String get boShopPinColumn => 'على الخريطة';
+
+  @override
+  String get boShopPinned => 'محدَّد';
+
+  @override
+  String get boShopNoPin => 'بلا موقع';
+
+  @override
+  String get boShopSetPin => 'تحديد الموقع';
+
+  @override
+  String get boShopMovePin => 'تغيير الموقع';
+
+  @override
+  String get boShopPinSaved => 'تم حفظ الموقع';
+
+  @override
+  String get boShopPinFailed => 'تعذَّر حفظ الموقع';
+
+  @override
+  String get boShopPinGone => 'لم يعد هذا المتجر موجوداً';
+
+  @override
+  String get boShopPinWhy =>
+      'المتجر بلا موقع على الخريطة ليست له مسافة ولا نطاق توصيل ولا مكان في «القريب منك».';
 }

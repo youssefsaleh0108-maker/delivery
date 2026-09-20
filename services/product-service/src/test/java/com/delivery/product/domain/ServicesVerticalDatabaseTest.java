@@ -350,7 +350,7 @@ class ServicesVerticalDatabaseTest {
                 new ServiceCategories(environment),
                 org.mockito.Mockito.mock(
                         com.delivery.product.service.OnboardingApplicationClient.class),
-                Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofHours(4));
+                Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofHours(4), "Asia/Beirut");
     }
 
     private String urlInSchema() {
@@ -426,6 +426,7 @@ class ServicesVerticalDatabaseTest {
         store.replaceHours(Arrays.stream(DayOfWeek.values())
                 .map(day -> new StoreHours(day, LocalTime.MIDNIGHT, LocalTime.of(23, 59, 59)))
                 .toList());
+        TestPin.pinned(store);
         store.publish(NOW.minus(Duration.ofDays(30)));
         return store;
     }

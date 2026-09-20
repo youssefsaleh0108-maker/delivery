@@ -269,7 +269,7 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
       // Surfaces the server's own explanation — "a store needs opening hours before it can be
       // listed" is the whole reason publish fails, and hiding it leaves the merchant guessing.
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(_serverMessage(e)),
+        content: Text(_serverMessage(e, t)),
         backgroundColor: DeliveryColors.brandDark,
       ));
     } finally {
@@ -280,7 +280,19 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
     }
   }
 
-  static String _serverMessage(Object error) {
+  /// The server's refusal, in the merchant's own language where this app has wording for it.
+  ///
+  /// A shop that is not ready to be listed says which thing is missing, in a code — so the switch
+  /// can send the merchant to the map or to the week's hours rather than showing them the server's
+  /// English `detail`, which is what it did for every failure before.
+  static String _serverMessage(Object error, DeliveryStrings t) {
+    if (error is StoreNotListable) {
+      return switch (error.code) {
+        StoreNotListable.pinRequired => t.merchPublishNeedsPin,
+        StoreNotListable.hoursRequired => t.merchPublishNeedsHours,
+        _ => t.merchPublishRefused,
+      };
+    }
     final RegExpMatch? detail =
         RegExp(r'"detail"\s*:\s*"([^"]+)"').firstMatch(error.toString());
     return detail?.group(1) ?? error.toString();
@@ -308,7 +320,7 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
     return YdEmptyState(
       icon: Icons.cloud_off_rounded,
       title: t.couldNotLoadOrdersShort,
-      message: _serverMessage(error),
+      message: _serverMessage(error, t),
       action: YdPillButton.secondary(
         label: t.tryAgain,
         onPressed: () => _refresh(),

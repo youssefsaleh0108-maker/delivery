@@ -4068,5 +4068,18 @@
   "pfindSampleNoPrefill": "هذه القراءة مجرّد مثال، لذلك لا يُملأ لك أي حقل. تأتي معك صورتك وحدها.",
   "pfindLimitPlatform": "البحث عن المنتجات بالصورة مزدحم جدًا اليوم. ابحث في كتالوجك بالاسم، أو حاول لاحقًا.",
   "psrchLeftToday": "{count, plural, zero{لم يتبقَّ بحث بالصورة اليوم} one{بقي بحث واحد بالصورة اليوم} two{بقي بحثان بالصورة اليوم} few{بقيت {count} عمليات بحث بالصورة اليوم} many{بقيت {count} عملية بحث بالصورة اليوم} other{بقيت {count} عملية بحث بالصورة اليوم}}",
-  "@psrchLeftToday": {"placeholders":{"count":{"type":"int"}}}
+  "@psrchLeftToday": {"placeholders":{"count":{"type":"int"}}},
+  "merchPublishNeedsPin": "حدِّد موقع متجرك على الخريطة أولاً — بدونه لن يعثر عليك أحد من القريبين",
+  "merchPublishNeedsHours": "حدِّد ساعات العمل أولاً — بدونها لن يكون متجرك مفتوحاً أبداً",
+  "merchPublishNotReady": "المتجر غير جاهز للنشر بعد",
+  "merchPublishRefused": "متجرك غير جاهز لعرضه في المتجر بعد",
+  "boShopPinColumn": "على الخريطة",
+  "boShopPinned": "محدَّد",
+  "boShopNoPin": "بلا موقع",
+  "boShopSetPin": "تحديد الموقع",
+  "boShopMovePin": "تغيير الموقع",
+  "boShopPinSaved": "تم حفظ الموقع",
+  "boShopPinFailed": "تعذَّر حفظ الموقع",
+  "boShopPinGone": "لم يعد هذا المتجر موجوداً",
+  "boShopPinWhy": "المتجر بلا موقع على الخريطة ليست له مسافة ولا نطاق توصيل ولا مكان في «القريب منك»."
 }

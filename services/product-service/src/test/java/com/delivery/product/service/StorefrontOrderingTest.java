@@ -77,7 +77,7 @@ class StorefrontOrderingTest {
                 new ServiceCategories(new org.springframework.mock.env.MockEnvironment()),
                 org.mockito.Mockito.mock(OnboardingApplicationClient.class),
                 Clock.fixed(Instant.parse("2026-09-10T12:00:00Z"), ZoneOffset.UTC),
-                Duration.ofHours(4));
+                Duration.ofHours(4), "Asia/Beirut");
     }
 
     /** Runs a storefront read and hands back the Pageable the repository was actually given. */

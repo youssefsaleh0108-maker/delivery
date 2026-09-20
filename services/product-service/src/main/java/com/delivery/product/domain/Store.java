@@ -182,6 +182,16 @@ public class Store {
     @Column(name = "eta_max_minutes", nullable = false)
     private int etaMaxMinutes = 40;
 
+    /**
+     * The calendar this shop's opening hours are in.
+     *
+     * <p>Not a default anybody chose for a shop: {@link StoreService#open} sets the platform's own
+     * zone ({@code delivery.platform.zone}, {@code Asia/Beirut}) on every shop it opens, and a
+     * merchant may set another. What is left below is the last resort for a row that names no zone
+     * at all — an older shop, a seed, a hand-written INSERT — and it stays UTC deliberately: an
+     * existing row's hours were entered against whatever it says, so reinterpreting them here would
+     * move every one of those shops' opening times by the offset.
+     */
     @Column(name = "timezone", nullable = false, length = 64)
     private String timezone = "UTC";
 
@@ -433,20 +443,115 @@ public class Store {
     }
 
     /**
+     * What a shop still has to have before it may be listed, or null when it is ready.
+     *
+     * <p>Asked as a question as well as enforced as a rule, so the merchant's Publish button can say
+     * what is missing <em>before</em> it is pressed instead of turning a press into an error. One
+     * method answers both; a button and a refusal that computed the rule separately would eventually
+     * disagree.
+     *
+     * <p>Order is the order a merchant fixes them in: hours first, because a shop with neither is
+     * being set up rather than being corrected, and a list of two problems is harder to act on than
+     * the first one.
+     */
+    public NotListable whyNotListable() {
+        if (hours.isEmpty()) {
+            // Listing without hours would show a store that can never be open, because availability
+            // is derived entirely from them.
+            return NotListable.NO_HOURS;
+        }
+        if (location() == null) {
+            return NotListable.NO_PIN;
+        }
+        return null;
+    }
+
+    /** @see #whyNotListable() */
+    public boolean isListable() {
+        return whyNotListable() == null;
+    }
+
+    /**
      * Lists the store, stamping {@link #getPublishedAt} the first time.
      *
      * <p>Takes the instant rather than reading the clock, for the reason {@link #markBusyUntil}
      * gives.
+     *
+     * <p>Refuses a shop that is not ready — see {@link #whyNotListable()}. Only the transition is
+     * guarded: a shop that is ACTIVE already stays exactly as it is, pin or no pin, because
+     * unlisting the shops that went live before this rule existed would take real traders off the
+     * storefront to fix a data problem they never caused.
+     *
+     * @throws NotListableException naming the one thing that is missing
      */
     public void publish(Instant at) {
-        if (hours.isEmpty()) {
-            // Publishing without hours would list a store that can never be open, because
-            // availability is derived entirely from them.
-            throw new IllegalStateException("A store needs opening hours before it can be listed");
+        NotListable blocker = whyNotListable();
+        if (blocker != null) {
+            throw new NotListableException(blocker);
         }
         this.status = Status.ACTIVE;
         if (publishedAt == null) {
             publishedAt = at;
+        }
+    }
+
+    /**
+     * Why a shop may not be listed yet.
+     *
+     * <p>Each carries the {@code code} a client branches on. A code rather than only a sentence
+     * because the merchant app has to send the merchant somewhere — to the week's hours, or to the
+     * map picker — and matching on English prose to decide which is not something that survives
+     * translation.
+     */
+    public enum NotListable {
+
+        NO_HOURS("STORE_HOURS_REQUIRED",
+                "This shop has no opening hours yet, so it could never be open. Set the week's hours "
+                        + "before listing it."),
+
+        /**
+         * The gap this rule was written for. Without a pin the shop cannot be found by distance, has
+         * no delivery-area circle, cannot have its delivery radius enforced and cannot be ranked in
+         * a customer's "near you" — it is listed and unreachable by every feature that asks where it
+         * is.
+         */
+        NO_PIN("STORE_PIN_REQUIRED",
+                "This shop has no location on the map yet. Drop its pin before listing it, or "
+                        + "customers nearby will never find it.");
+
+        private final String code;
+        private final String message;
+
+        NotListable(String code, String message) {
+            this.code = code;
+            this.message = message;
+        }
+
+        public String code() {
+            return code;
+        }
+
+        public String message() {
+            return message;
+        }
+    }
+
+    /** A refused {@link #publish(Instant)}, with the {@code code} the client branches on. */
+    public static class NotListableException extends IllegalStateException {
+
+        private final NotListable reason;
+
+        public NotListableException(NotListable reason) {
+            super(reason.message());
+            this.reason = reason;
+        }
+
+        public NotListable reason() {
+            return reason;
+        }
+
+        public String getCode() {
+            return reason.code();
         }
     }
 
@@ -508,6 +613,20 @@ public class Store {
             this.timezone = timezone;
         }
         this.address = address;
+    }
+
+    /**
+     * Sets the calendar this shop's opening hours are read in.
+     *
+     * <p>Its own method rather than a field on the profile form's save, because the two have
+     * different owners: {@link StoreService} puts the platform's zone on a shop it opens, and the
+     * merchant may then choose another. Blank is ignored for the reason {@link #updateProfile}
+     * ignores it — a client that does not know the field exists must not be able to clear it.
+     */
+    public void useTimezone(String timezone) {
+        if (timezone != null && !timezone.isBlank()) {
+            this.timezone = timezone;
+        }
     }
 
     public void updateCommercials(BigDecimal deliveryFee, BigDecimal minOrder,

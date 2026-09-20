@@ -660,10 +660,28 @@ class StoreApi {
         .toList();
   }
 
-  /// Fails with 422 if the store has no opening hours — availability is derived entirely from
-  /// them, so a store without them could never be open.
+  /// Lists the shop on the storefront.
+  ///
+  /// Throws [StoreNotListable] when the shop is not ready: no opening hours, so it could never be
+  /// open, or no map pin, so no distance, no delivery circle and no "near you" can place it. The
+  /// server's 422 carries a `code`, and a caller branches on that rather than on the sentence —
+  /// which is English and is not what a merchant reading Arabic should be shown.
+  ///
+  /// Any other failure stays the [DioException] it is: a 409, a timeout and a 500 are not things a
+  /// merchant can fix by changing their shop.
   Future<Store> publish(String storeId) async {
-    final Response<dynamic> response = await _dio.post<dynamic>('/api/stores/$storeId/publish');
+    final Response<dynamic> response;
+    try {
+      response = await _dio.post<dynamic>('/api/stores/$storeId/publish');
+    } on DioException catch (e) {
+      final Object? body = e.response?.data;
+      final Object? code = body is Map ? body['code'] : null;
+      if (e.response?.statusCode == 422 && code is String && code.startsWith('STORE_')) {
+        final Object? detail = body is Map ? body['detail'] : null;
+        throw StoreNotListable(code, detail is String ? detail : '');
+      }
+      rethrow;
+    }
     return Store.fromJson(response.data as Map<String, dynamic>);
   }
 

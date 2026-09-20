@@ -117,6 +117,20 @@ spring:
           jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://localhost:8180/realms/delivery-platform/protocol/openid-connect/certs}
 
 delivery:
+  # The platform's own calendar. One setting, spelled the same in every service that needs it
+  # (MERCHANT_SUITE_SPEC names it for reporting-service; the clients' comments already quote it), so
+  # moving the platform to another country is one value rather than a search across the estate.
+  #
+  # Here it is the zone a NEW shop is opened in. It was UTC — not a decision, the JPA field's
+  # initialiser — and every shop on dev inherited it, so a Lebanese shop that entered 08:00-23:00 was
+  # read as open 11:00-02:00 Beirut and item search, the storefront lists and every other
+  # "hide what is closed" answer inherited the same three-hour lie.
+  #
+  # It is a DEFAULT, not a rule: a merchant may still set their own zone on the profile form, and an
+  # existing shop's stored zone is never rewritten from here — its hours were typed against it.
+  platform:
+    zone: ${PLATFORM_ZONE:Asia/Beirut}
+
   outbox:
     exchange: delivery.events
     relay-enabled: true

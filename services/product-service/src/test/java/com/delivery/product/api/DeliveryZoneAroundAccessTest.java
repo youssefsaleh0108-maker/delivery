@@ -17,6 +17,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
+import com.delivery.product.domain.TestPin;
 import com.delivery.product.domain.DeliveryZone;
 import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.domain.Store;
@@ -85,6 +86,7 @@ class DeliveryZoneAroundAccessTest {
         Store store = new Store(OWNER, "Hamra Sushi", Store.Vertical.RESTAURANT);
         store.replaceHours(List.of(
                 new StoreHours(DayOfWeek.MONDAY, LocalTime.of(9, 0), LocalTime.of(22, 0))));
+        TestPin.pinned(store);
         store.publish(Instant.parse("2026-09-01T09:00:00Z"));
         return store;
     }

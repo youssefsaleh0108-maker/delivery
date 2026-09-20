@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
+// The merchant's own pin picker, reused rather than reimplemented: a back-office map that drifted
+// from the one merchants use would be a repair tool that disagrees with what it repairs.
+import 'package:delivery_merchant/delivery_merchant.dart';
 import 'package:flutter/material.dart';
 
 import '../shell/shell.dart';
@@ -61,6 +64,10 @@ class _ShopsScreenState extends State<ShopsScreen> {
   /// The badge as the server stored it on this page, by shop — until the next read says otherwise.
   final Map<String, bool> _stored = <String, bool>{};
 
+  /// Likewise the pin: the shop the server handed back after a pin was moved, dropped or removed.
+  /// Held rather than re-reading the whole page, so the row updates the moment the write lands.
+  final Map<String, Store> _pinned = <String, Store>{};
+
   String? _busyId;
 
   /// What the last change came to.
@@ -95,8 +102,9 @@ class _ShopsScreenState extends State<ShopsScreen> {
         _result = page;
         _error = null;
         _loading = false;
-        // A fresh read is the server's word on every badge it lists.
+        // A fresh read is the server's word on every badge and every pin it lists.
         for (final StoreCard shop in page.content) {
+          _pinned.remove(shop.id);
           _stored.remove(shop.id);
         }
       });
@@ -273,6 +281,7 @@ class _ShopsScreenState extends State<ShopsScreen> {
       columns: <ConsoleColumn>[
         ConsoleColumn(label: t.svcBoColShop, flex: 2),
         ConsoleColumn(label: t.svcBoDetailKind, width: 240),
+        ConsoleColumn(label: t.boShopPinColumn, width: 200),
         ConsoleColumn(label: t.custVerifiedLocal, width: 160),
       ],
       empty: Text(t.svcBoShopsEmpty, style: ConsoleText.cellMuted),
@@ -287,11 +296,116 @@ class _ShopsScreenState extends State<ShopsScreen> {
                 leading: ConsoleInitialTile(label: shop.name),
               ),
               Text(_kindOf(t, shop), overflow: TextOverflow.ellipsis, style: ConsoleText.cellMuted),
+              _pin(t, shop),
               _badge(t, shop),
             ],
           ),
       ],
     );
+  }
+
+  /// Where this shop sits on the map, and the way to put it there.
+  ///
+  /// Listed shops with no pin are the whole reason this column exists. A shop cannot be published
+  /// without one any more, but the shops that went live before that rule are still trading with no
+  /// coordinates at all — twelve of them on dev, three from real sign-ups — and their own merchant
+  /// was the only person who could fix it. `PUT /api/stores/{id}/location` now takes a BACKOFFICE
+  /// token as well, and records who moved it.
+  Widget _pin(DeliveryStrings t, StoreCard shop) {
+    final ({double lat, double lng})? pin = _pinOf(shop);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Icon(
+          pin == null ? Icons.location_off_outlined : Icons.place,
+          size: 16,
+          color: pin == null ? DeliveryColors.faint : DeliveryColors.brand,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            pin == null ? t.boShopNoPin : t.boShopPinned,
+            overflow: TextOverflow.ellipsis,
+            style: pin == null ? ConsoleText.cellMuted : ConsoleText.body,
+          ),
+        ),
+        const SizedBox(width: DeliverySpacing.xs),
+        // An icon with its tooltip rather than a labelled button: this is the third control in a
+        // 200px column, and "Set the pin" beside "No pin" says the same thing twice while pushing
+        // the row past its width.
+        ConsoleIconAction(
+          icon: pin == null ? Icons.add_location_alt_outlined : Icons.edit_location_alt_outlined,
+          tooltip: pin == null ? t.boShopSetPin : t.boShopMovePin,
+          onPressed: _busyId != null ? null : () => unawaited(_editPin(shop)),
+        ),
+      ],
+    );
+  }
+
+  /// The shop's pin as this page currently knows it: what the last write stored, else what the list
+  /// was read with.
+  ({double lat, double lng})? _pinOf(StoreCard shop) {
+    final Store? written = _pinned[shop.id];
+    final double? lat = written != null ? written.latitude : shop.latitude;
+    final double? lng = written != null ? written.longitude : shop.longitude;
+    return lat == null || lng == null ? null : (lat: lat, lng: lng);
+  }
+
+  /// Opens the merchant's own picker — the same map, the same rules, the same delivery circle.
+  ///
+  /// Deliberately not a second implementation. The portal already depends on `delivery_merchant`
+  /// and mounts its shop page for merchants; a back-office map built separately would drift from
+  /// the one merchants actually use, and this is a repair tool that has to agree with it exactly.
+  ///
+  /// Pin before radius, and radius before unpinning, for the server's reason: a delivery circle
+  /// needs a centre, and setting one on a shop with no pin is refused.
+  Future<void> _editPin(StoreCard shop) async {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final ({double lat, double lng})? pin = _pinOf(shop);
+
+    final StorePinChoice? choice = await showStorePinPicker(
+      context,
+      latitude: pin?.lat,
+      longitude: pin?.lng,
+      initialRadiusMetres: _pinned[shop.id]?.deliveryRadiusMetres ?? shop.deliveryRadiusMetres,
+      addressHint: shop.name,
+    );
+    if (choice == null || !mounted) return;
+
+    setState(() {
+      _busyId = shop.id;
+      _outcome = null;
+    });
+    try {
+      final Store stored;
+      switch (choice) {
+        case StorePinPlaced(:final point, :final radiusMetres):
+          await widget.api.setPin(shop.id, lat: point.latitude, lng: point.longitude);
+          stored = await widget.api.setDeliveryRadius(shop.id, radiusMetres);
+        case StorePinRemoved():
+          await widget.api.setDeliveryRadius(shop.id, null);
+          stored = await widget.api.clearPin(shop.id);
+      }
+      if (!mounted) return;
+      setState(() {
+        _pinned[shop.id] = stored;
+        _busyId = null;
+        _outcome = (text: t.boShopPinSaved, good: true);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busyId = null;
+        _outcome = (
+          text: switch (refusalStatus(e)) {
+            404 => t.boShopPinGone,
+            _ => t.boShopPinFailed,
+          },
+          good: false,
+        );
+      });
+    }
   }
 
   Widget _badge(DeliveryStrings t, StoreCard shop) {

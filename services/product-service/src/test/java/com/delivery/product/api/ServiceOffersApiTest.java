@@ -33,6 +33,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.test.web.servlet.setup.StandaloneMockMvcBuilder;
 
 import com.delivery.platform.outbox.OutboxRecorder;
+import com.delivery.product.domain.TestPin;
 import com.delivery.product.domain.CategoryRepository;
 import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.domain.Product;
@@ -118,6 +119,7 @@ class ServiceOffersApiTest {
         press.replaceHours(Arrays.stream(DayOfWeek.values())
                 .map(day -> new StoreHours(day, LocalTime.MIDNIGHT, LocalTime.of(23, 59, 59)))
                 .toList());
+        TestPin.pinned(press);
         press.publish(Instant.parse("2026-09-01T09:00:00Z"));
         offer = new Product(PROVIDER, press.getId(), "Business card printing", null,
                 new BigDecimal("15.00"), null);
