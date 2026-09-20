@@ -158,12 +158,13 @@ public class CarrierPayrollService {
                                  RiderDeliveriesSource deliveriesSource,
                                  AccountDirectory accounts,
                                  PlatformTransactionManager transactionManager,
-                                 // The calendar pay periods are in: order-tracking's day zone.
-                                 @Value("${delivery.accounting.payroll.zone:Asia/Beirut}") String zone,
+                                 // The calendar pay periods are in: the platform's one calendar,
+                                 // which is also order-tracking's day zone (RECON-08).
+                                 PlatformCalendar calendar,
                                  @Value("${delivery.accounting.currency:USD}") String currency) {
         this(policies, runs, payslips, lines, adjustments, snapshots, deliveredCopies, events,
                 riderLedger, carrierCash, cashFloat, attendance, deliveriesSource, accounts,
-                transactionManager, zone, currency, Clock.systemUTC());
+                transactionManager, calendar.zone().getId(), currency, calendar.clock());
     }
 
     /** For tests, which need "today" to hold still while periods open and close around it. */

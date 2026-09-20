@@ -92,6 +92,23 @@ public class StatementService {
     private final String currency;
     private final ZoneId zone;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    public StatementService(AccountingTransactionRepository transactions,
+                            CashFloatRepository floatEntries,
+                            RiderLedgerRepository riderLedger,
+                            StatementDispatchRepository dispatches,
+                            CounterpartyDirectory directory,
+                            @Value("${delivery.ordering.commission-percentage:12.5}")
+                            BigDecimal commissionPercentage,
+                            @Value("${delivery.accounting.currency:USD}") String currency,
+                            // The platform's one calendar (RECON-08): a from/to range means the
+                            // same 31 days here as a pay period, a rider's week and a dashboard.
+                            PlatformCalendar calendar) {
+        this(transactions, floatEntries, riderLedger, dispatches, directory, commissionPercentage,
+                currency, calendar.zone().getId());
+    }
+
+    /** With the zone named outright, for tests that state the calendar they are reasoning in. */
     public StatementService(AccountingTransactionRepository transactions,
                             CashFloatRepository floatEntries,
                             RiderLedgerRepository riderLedger,
@@ -100,13 +117,9 @@ public class StatementService {
                             // Shown in the commission line's LABEL only, never used to recompute a
                             // figure. Everything on a statement is read from the legs; a percentage
                             // applied afterwards would restate history the moment the rate changed.
-                            @Value("${delivery.ordering.commission-percentage:12.5}")
                             BigDecimal commissionPercentage,
-                            @Value("${delivery.accounting.currency:USD}") String currency,
-                            // The calendar a date range is interpreted in. One region, one zone; the
-                            // same fallback the rider Earnings screen uses, and for the same reason —
-                            // "August" is a different 31 days depending on where you are standing.
-                            @Value("${delivery.accounting.statements.zone:UTC}") String zone) {
+                            String currency,
+                            String zone) {
         this.transactions = transactions;
         this.floatEntries = floatEntries;
         this.riderLedger = riderLedger;

@@ -113,12 +113,13 @@ public class CarrierCashService {
                               // custody already has. See cashOnHand().
                               @Value("${delivery.accounting.float.merchant-overdue-after-hours:48}")
                               int merchantOverdueAfterHours,
-                              // A "day" on this page is a local-calendar day, in the same zone the
-                              // statements use.
-                              @Value("${delivery.accounting.statements.zone:UTC}") String zone,
+                              // A "day" on this page is a local-calendar day, in the platform's one
+                              // calendar (RECON-08, PT-4): at 00:01 in Beirut this page used to
+                              // still be answering with yesterday's date.
+                              PlatformCalendar calendar,
                               @Value("${delivery.accounting.currency:USD}") String currency) {
         this(floats, riderLedger, accounts, overdueAfterHours, platformOverdueAfterHours,
-                merchantOverdueAfterHours, zone, currency, Clock.systemUTC());
+                merchantOverdueAfterHours, calendar.zone().getId(), currency, calendar.clock());
     }
 
     /**
