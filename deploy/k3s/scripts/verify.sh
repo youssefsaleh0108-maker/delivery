@@ -899,6 +899,7 @@ for secret in $( { grep -h -o 'secretKeyRef: { name: [a-z0-9-]*' base/*.yaml | a
                    grep -h -A1 'secretKeyRef:$' base/*.yaml | grep -o 'name: [a-z0-9-]*' | awk '{print $2}'
                    grep -h -o 'secret: [a-z0-9-]*' overlays/ingress.template.yaml | awk '{print $2}'; } | sort -u); do
   [ "$secret" = anthropic-api ] && continue   # optional, created by hand (README.md)
+  [ "$secret" = demand-seen ] && continue   # optional, minted by rotate-secrets.sh <ns> demand-seen
   grep -q -E "(mint|create secret generic) $secret( |\\\\|\$)" scripts/gen-secrets.sh \
     && ok "Secret $secret is minted by gen-secrets.sh" \
     || fail "Secret $secret is referenced but gen-secrets.sh never creates it"

@@ -58,6 +58,20 @@ spec:
                   name: anthropic-api
                   key: ANTHROPIC_API_KEY
                   optional: true
+            # The key that turns a customer's search into a marker the weekly demand digest can count
+            # people with, without keeping anything that names them: an HMAC of the account, the area,
+            # the term and the week, which is neither reversible nor joinable across terms.
+            #
+            # Its OWN Secret, for the reason anthropic-api has one, and minted on the box by
+            # scripts/rotate-secrets.sh <ns> demand-seen. OPTIONAL: without it the platform records no
+            # searches and publishes no digest — the floor is never weakened to compensate. It must
+            # never be stored beside a database backup: whoever holds both can test a guess.
+            - name: DEMAND_SEEN_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: demand-seen
+                  key: DEMAND_SEEN_SECRET
+                  optional: true
           ports:
             - containerPort: 8103
           # Ask the application, not the socket.
