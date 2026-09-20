@@ -34,6 +34,7 @@ import com.delivery.product.service.DeliveryZoneService;
 import com.delivery.product.service.ProductImageService;
 import com.delivery.product.service.ProductImageService.ImageUrl;
 import com.delivery.product.service.ServiceCategories;
+import com.delivery.product.service.Thumbnailer;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -65,6 +66,17 @@ final class ShopPageFixture {
     /** The merchant's own item codes, which the merchant-only endpoints return and this must not. */
     static final String SKU = "SKU-MERCHANT-ONLY-4471";
     static final String BARCODE = "6291041500213";
+
+    /**
+     * The two file ids the shop's artwork was uploaded under.
+     *
+     * <p>Fixed rather than random so a test can assert the exact URL the page prints, and real
+     * UUIDs because that is what {@code StorageService.buildObjectKey} mints for every upload.
+     */
+    private static final java.util.UUID LOGO_FILE =
+            java.util.UUID.fromString("2f6a1c74-9b0e-4c2a-8f31-5d7c0a9e4b13");
+    private static final java.util.UUID COVER_FILE =
+            java.util.UUID.fromString("c41d8e52-7a36-4f9b-b0d2-1e83f6a05c97");
 
     private final StoreRepository stores = mock(StoreRepository.class);
     private final ProductRepository products = mock(ProductRepository.class);
@@ -103,7 +115,14 @@ final class ShopPageFixture {
         shop.updateCommercials(new BigDecimal("2.00"), new BigDecimal("5.00"), 20, 40);
         shop.applyRating(new BigDecimal("4.6"), 128);
         shop.setVerifiedLocal(true);
-        shop.setImagery("stores/logo.png", "stores/cover.jpg");
+        // Keyed exactly as an upload keys it: StoreImageService.presign hands StorageService the
+        // prefix "stores/<storeId>/<slot>" and StorageService.buildObjectKey appends the file's own
+        // id and extension. So the store's id really is inside the page's image URLs, and a fixture
+        // that wrote "stores/logo.png" would let the "no ids on the page" test pass on a shape
+        // production never produces.
+        shop.setImagery(
+                "stores/" + shop.getId() + "/logo/" + LOGO_FILE + ".png",
+                "stores/" + shop.getId() + "/cover/" + COVER_FILE + ".jpg");
         shop.setDeliveryRadiusMetres(2500);
         openEveryDay(LocalTime.of(8, 0), LocalTime.of(23, 0));
         shop.pinAt(GeoPoint.of(33.8905, 35.4788));
@@ -194,6 +213,34 @@ final class ShopPageFixture {
         return shop.getSlug();
     }
 
+    /** The URL the page prints for the cover, full size, as the object store serves it. */
+    String coverUrl() {
+        return objectUrl(shop.getCoverRef());
+    }
+
+    /** The derivative the {@code og:image} tag carries. */
+    String coverThumbUrl() {
+        return objectUrl(Thumbnailer.thumbKeyFor(shop.getCoverRef()));
+    }
+
+    /** The derivative the page's small round logo is drawn from. */
+    String logoThumbUrl() {
+        return objectUrl(Thumbnailer.thumbKeyFor(shop.getLogoRef()));
+    }
+
+    /** The ids of everything on the shelf, which a picture URL may carry and the markup may not. */
+    List<String> productIds() {
+        return shelf.stream().map(product -> product.getId().toString()).toList();
+    }
+
+    /** The ids of the rows behind the section headings and the delivery areas. */
+    List<String> sectionAndAreaIds() {
+        List<String> ids = new ArrayList<>();
+        ownSections.forEach(section -> ids.add(section.getId().toString()));
+        areas.forEach(area -> ids.add(area.getId().toString()));
+        return List.copyOf(ids);
+    }
+
     String url() {
         return BASE + "/s/" + shop.getSlug();
     }
@@ -221,7 +268,14 @@ final class ShopPageFixture {
             Product product = new Product(shop.getMerchantId(), shop.getId(), name,
                     "A description nobody reads", new BigDecimal(price), categoryId);
             product.assignCodes(SKU, BARCODE);
-            String key = "products/" + product.getId() + "/1.jpg";
+            // products/<productId>/<fileId>.jpg — ProductImageService.presign's prefix and
+            // StorageService's own file id, so a product's id is in its photo's URL here exactly as
+            // it is in production. Derived from the product id rather than random, so the same
+            // shelf renders the same bytes twice and an ETag test cannot pass on noise.
+            String key = "products/" + product.getId() + "/"
+                    + java.util.UUID.nameUUIDFromBytes(
+                            product.getId().toString().getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                    + ".jpg";
             product.addImage(key);
             product.publish();
             if (!pictured) {
@@ -276,12 +330,19 @@ final class ShopPageFixture {
                 serviceCategories, clock, Duration.ofHours(4), rate);
     }
 
-    /** What {@code StorageService.readUrl} builds for a public bucket. */
+    /**
+     * What {@code StorageService.readUrl} builds for a public bucket, with the derivative named by
+     * {@link Thumbnailer#thumbKeyFor} rather than by a rule invented here — the fixture must not be
+     * the only place on the platform where a thumbnail is called something.
+     */
     private static ImageUrl picture(String key) {
         if (key == null || key.isBlank()) {
             return null;
         }
-        String full = IMAGE_ORIGIN + "/product-images/" + key;
-        return new ImageUrl(full, full.replace(".jpg", "_thumb.jpg").replace(".png", "_thumb.png"));
+        return new ImageUrl(objectUrl(key), objectUrl(Thumbnailer.thumbKeyFor(key)));
+    }
+
+    private static String objectUrl(String key) {
+        return IMAGE_ORIGIN + "/product-images/" + key;
     }
 }

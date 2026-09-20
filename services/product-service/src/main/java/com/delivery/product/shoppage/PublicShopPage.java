@@ -18,6 +18,16 @@ import com.delivery.product.domain.Store;
  * here can carry a merchant id, a commission or a phone number, because there is nowhere to put
  * one.
  *
+ * <p><strong>One exception, and it is deliberate: the picture URLs.</strong> An object key is
+ * {@code stores/<storeId>/logo/<fileId>.png} and {@code products/<productId>/<fileId>.jpg}
+ * ({@code StoreImageService.presign}, {@code StorageService.buildObjectKey}), so the store's id and
+ * each pictured product's id are inside the URLs this page prints, {@code og:image} included. They
+ * are the same URLs the app already hands any signed-in customer out of a public bucket, and an id
+ * on its own grants nothing — every endpoint that takes one still checks who is asking, and this
+ * page itself refuses an id in place of a slug. Hiding them would mean proxying every photo on the
+ * platform through this service. What the page does promise is that its own markup names no id at
+ * all, which {@code PublicShopPageApiTest.keepsIdsInsidePictureUrls} holds it to.
+ *
  * <p>Times are kept as {@link LocalTime} and money as {@link BigDecimal}: this is the shop's own
  * calendar and the shop's own prices, and how they are spelled is the renderer's business, which
  * is the only part that knows which language the reader asked for.

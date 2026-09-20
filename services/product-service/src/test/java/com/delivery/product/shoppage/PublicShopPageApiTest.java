@@ -99,11 +99,9 @@ class PublicShopPageApiTest {
                 .contains("<meta property=\"og:title\" content=\"Dekkanet Al Rawche — Ras Beirut · YouDrop\">")
                 // The derivative, not the merchant's 4 MB original: a chat app that cannot fetch
                 // the picture inside its budget shows the blank card this page exists to avoid.
-                .contains("<meta property=\"og:image\" content=\""
-                        + ShopPageFixture.IMAGE_ORIGIN + "/product-images/stores/cover_thumb.jpg\">")
+                .contains("<meta property=\"og:image\" content=\"" + shop.coverThumbUrl() + "\">")
                 // The page's own header still takes the cover whole.
-                .contains("<img class=\"cover\" src=\""
-                        + ShopPageFixture.IMAGE_ORIGIN + "/product-images/stores/cover.jpg\"")
+                .contains("<img class=\"cover\" src=\"" + shop.coverUrl() + "\"")
                 .contains("<meta property=\"og:locale\" content=\"en_US\">")
                 .contains("<meta name=\"twitter:card\" content=\"summary_large_image\">")
                 .contains("<title>Dekkanet Al Rawche — Ras Beirut · YouDrop</title>")
@@ -142,15 +140,58 @@ class PublicShopPageApiTest {
                 // The merchant's own item codes, off /api/products.
                 .doesNotContain(ShopPageFixture.SKU)
                 .doesNotContain(ShopPageFixture.BARCODE)
-                // Internal identifiers. The slug is the public name of this shop; the id is not,
-                // and an id in the markup is a key into every other endpoint.
-                .doesNotContain(shop.shop().getId().toString())
                 .doesNotContain("commission")
                 .doesNotContain("statement")
                 // The pin. A shop's district is public; the coordinates of the merchant's premises
                 // are a different thing, and this page is crawled.
                 .doesNotContain("33.8905")
                 .doesNotContain("35.4788");
+    }
+
+    /**
+     * The exact promise about internal ids, which is narrower than "no ids anywhere".
+     *
+     * <p>An object key is {@code stores/<storeId>/logo/<fileId>.png} and
+     * {@code products/<productId>/<fileId>.jpg} ({@code StoreImageService.presign},
+     * {@code StorageService.buildObjectKey}), so the store's id and every pictured product's id are
+     * inside the page's picture URLs — including {@code og:image}, which is the one a chat app
+     * copies into a preview card.
+     *
+     * <p><strong>That is allowed, deliberately.</strong> They are the same URLs the app already
+     * hands any signed-in customer, out of a public bucket, and a UUID on its own grants nothing:
+     * every endpoint that takes a store or product id still checks who is asking, and this page
+     * refuses an id in place of a slug ({@link #refusesAnIdInPlaceOfASlug}). Proxying every photo
+     * through product-service to hide them would put the whole platform's image traffic through a
+     * service with ten database connections, for an id a competitor can read off the app in a
+     * minute. So the promise is: <em>the page's own markup names no id</em> — not in the title, a
+     * link, a tag, a data attribute or a comment — and ids appear only inside the URL of a picture.
+     *
+     * <p>Asserted by deleting the picture URLs and searching what is left, so the day somebody
+     * prints a store id into a link or an {@code id=} attribute, this fails.
+     */
+    @Test
+    @DisplayName("the markup names no internal id; ids live only inside picture URLs")
+    void keepsIdsInsidePictureUrls() throws Exception {
+        ShopPageFixture shop = stocked();
+        String html = body(shop.mvc().perform(get("/s/" + shop.slug())).andReturn());
+
+        // The shape this decision was made about: if the keys ever stop carrying ids, or start
+        // carrying something else, this line fails and the decision gets made again.
+        assertThat(shop.coverUrl()).contains(shop.shop().getId().toString());
+        assertThat(html).contains(shop.coverUrl()).contains(shop.coverThumbUrl());
+
+        String markup = html.replaceAll(
+                java.util.regex.Pattern.quote(ShopPageFixture.IMAGE_ORIGIN) + "/product-images/[^\"]*",
+                "[picture]");
+        assertThat(markup).doesNotContain(shop.shop().getId().toString());
+        for (String productId : shop.productIds()) {
+            assertThat(markup).doesNotContain(productId);
+        }
+        // Nor the ids of anything else the page drew: a section is a Category row, an area a
+        // DeliveryZone row, and neither has any business being named here.
+        for (String otherId : shop.sectionAndAreaIds()) {
+            assertThat(html).doesNotContain(otherId);
+        }
     }
 
     // ---------------------------------------------------------------- the one refusal
