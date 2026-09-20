@@ -475,6 +475,9 @@ services:
       # Asked whether a merchant with no shop applied to offer services, so a first product never
       # opens a restaurant for a print shop. Without it the default is this container's localhost.
       ONBOARDING_SERVICE_URL: http://onboarding-service:8117
+      # The one platform rate, the same variable transfer-service locks its quotes from, so the
+      # LBP hint a customer browses and the lira they are quoted at checkout move together.
+      MARKET_LBP_PER_USD: ${MARKET_LBP_PER_USD:-90000}
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
