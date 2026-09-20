@@ -12922,4 +12922,58 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get psrchWrongType =>
       'لا يمكن استخدام هذه الصورة. اختر صورة بصيغة JPEG أو PNG.';
+
+  @override
+  String get pfindCamera => 'البحث بالصورة';
+
+  @override
+  String get pfindSheetTitle => 'ابحث في كتالوجك';
+
+  @override
+  String get pfindSheetBody => 'صوّر منتجًا لترى إن كان موجودًا في متجرك.';
+
+  @override
+  String get pfindInCatalogue => 'في كتالوجك';
+
+  @override
+  String get pfindMatchedByBarcode => 'الباركود نفسه';
+
+  @override
+  String get pfindAddNew => 'أضفه كمنتج جديد';
+
+  @override
+  String get pfindNoMatch => 'غير موجود في كتالوجك بعد';
+
+  @override
+  String pfindLimitDay(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'يمكنك البحث بـ$count صورة في اليوم، وقد استخدمتها كلها. حاول غدًا.',
+      many:
+          'يمكنك البحث بـ$count صورة في اليوم، وقد استخدمتها كلها. حاول غدًا.',
+      few: 'يمكنك البحث بـ$count صور في اليوم، وقد استخدمتها كلها. حاول غدًا.',
+      two: 'يمكنك البحث بصورتين في اليوم، وقد استخدمتهما. حاول غدًا.',
+      one: 'يمكنك البحث بصورة واحدة في اليوم، وقد استخدمتها. حاول غدًا.',
+      zero: 'لا يمكنك البحث بالصورة اليوم. حاول غدًا.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get pfindSkuLabel => 'رمز المنتج (SKU)';
+
+  @override
+  String get pfindSkuHint => 'رمزك الخاص';
+
+  @override
+  String get pfindBarcodeLabel => 'الباركود';
+
+  @override
+  String get pfindBarcodeHint => 'يُمسح عند الصندوق';
+
+  @override
+  String get pfindBlitzConsent =>
+      'تُرسَل صورك إلى Anthropic، مزوّد الذكاء الاصطناعي لدينا، للتعرّف على المنتجات، ونحذفها خلال يومين.';
 }

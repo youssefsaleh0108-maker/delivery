@@ -6163,5 +6163,19 @@
   "psrchRefused": "We can't search with this photo. Try another photo.",
   "psrchUnreadable": "We couldn't open this photo. Try another photo.",
   "psrchTooLarge": "This photo is too large. Try another photo.",
-  "psrchWrongType": "This photo can't be used. Choose a JPEG or PNG photo."
+  "psrchWrongType": "This photo can't be used. Choose a JPEG or PNG photo.",
+  "pfindCamera": "Find by photo",
+  "pfindSheetTitle": "Find in your catalogue",
+  "pfindSheetBody": "Photograph a product to see whether your shop already has it.",
+  "pfindInCatalogue": "In your catalogue",
+  "pfindMatchedByBarcode": "Same barcode",
+  "pfindAddNew": "Add as a new product",
+  "pfindNoMatch": "Not in your catalogue yet",
+  "pfindLimitDay": "{count, plural, =1{You can look up 1 photo a day, and you've used it. Try again tomorrow.} other{You can look up {count} photos a day, and you've used them all. Try again tomorrow.}}",
+  "@pfindLimitDay": {"placeholders":{"count":{"type":"int"}}},
+  "pfindSkuLabel": "SKU",
+  "pfindSkuHint": "Your own code",
+  "pfindBarcodeLabel": "Barcode",
+  "pfindBarcodeHint": "Scanned at the till",
+  "pfindBlitzConsent": "Your photos are sent to Anthropic, our AI provider, to recognise the products. We delete them within two days."
 }

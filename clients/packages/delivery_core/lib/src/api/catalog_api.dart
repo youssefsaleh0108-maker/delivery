@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
 import '../models/catalog_models.dart';
+import '../models/photo_search_models.dart';
 import '../util/image_prep.dart';
 // OptionGroup and its drafts live with the storefront models, because the customer side reads the
 // same structure this writes.
@@ -104,6 +105,55 @@ class CatalogApi {
         await _dio.put<dynamic>('/api/products/$id', data: product.toRequestJson());
     return Product.fromJson(response.data as Map<String, dynamic>);
   }
+
+  /// "Do I already have this?": the merchant's own products that match a photo of a pack, in any
+  /// status, and what a new product would start from when none does.
+  ///
+  /// MERCHANT-only on the server and scoped to the caller's own shops; [storeId] narrows it to one of
+  /// them, and one that is not theirs answers 404. The photo is shrunk to what the server's reader
+  /// reads, sent as a multipart part, read once and kept nowhere. A refusal the server gives a code
+  /// throws [PhotoSearchFailure] — the merchant's own daily and per-minute limits arrive as
+  /// [PhotoSearchFailure.findLimit] — and anything else stays the [DioException] it is.
+  ///
+  /// While the reader is not switched on the answer is sample lines with
+  /// [PhotoFindResult.sample] true, as a Merchant Blitz scan's are.
+  Future<PhotoFindResult> findByPhoto({
+    required Uint8List bytes,
+    required String contentType,
+    String? storeId,
+  }) async {
+    final PreparedImage prepared = ImagePrep.forUpload(bytes, contentType,
+        maxBytes: photoFindMaxBytes, maxEdge: photoFindMaxEdge);
+    final FormData form = FormData.fromMap(<String, dynamic>{
+      'photo': MultipartFile.fromBytes(
+        prepared.bytes,
+        filename: prepared.contentType == 'image/png' ? 'photo.png' : 'photo.jpg',
+        contentType: DioMediaType.parse(prepared.contentType),
+      ),
+      if (storeId != null) 'storeId': storeId,
+    });
+    final Response<dynamic> response;
+    try {
+      response = await _dio.post<dynamic>(
+        '/api/products/mine/find-by-photo',
+        data: form,
+        options: Options(sendTimeout: photoFindTimeout, receiveTimeout: photoFindTimeout),
+      );
+    } on DioException catch (e) {
+      final PhotoSearchFailure? failure = PhotoSearchFailure.fromDio(e);
+      if (failure != null) throw failure;
+      rethrow;
+    }
+    final Object? body = response.data;
+    return PhotoFindResult.fromJson(body is Map<String, dynamic> ? body : const <String, dynamic>{});
+  }
+
+  /// The largest photo sent to a find, and the long edge it keeps: the server's reader reads no more.
+  static const int photoFindMaxBytes = 800 * 1024;
+  static const int photoFindMaxEdge = 1568;
+
+  /// Long enough for the reader and a weak signal, as a customer's photo search waits.
+  static const Duration photoFindTimeout = Duration(seconds: 45);
 
   /// Fails with 422 if the product has no images — the service refuses to publish a blank listing.
   Future<Product> publish(String id) async {

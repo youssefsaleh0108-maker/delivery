@@ -17,6 +17,7 @@ import com.delivery.product.domain.ProductRepository;
 import com.delivery.product.domain.Store;
 import com.delivery.product.service.CatalogService.CatalogRuleViolationException;
 import com.delivery.product.vision.Descriptions;
+import com.delivery.product.vision.VisionException;
 import com.delivery.product.vision.FakeVisionProvider;
 import com.delivery.product.vision.VisionProvider;
 import com.delivery.product.vision.VisionProviders;
@@ -107,7 +108,14 @@ public class PhotoFindService {
      */
     public FindResult find(String merchantId, byte[] photo, UUID storeId) {
         List<Store> shops = goodsShopsOf(merchantId, storeId);
-        VisionProvider provider = providers.active();
+        VisionProvider provider;
+        try {
+            provider = providers.active();
+        } catch (VisionException e) {
+            // A provider name that matches nothing: an operator's mistake, not this merchant's, and
+            // an answer they can act on ("not available right now") rather than a 500.
+            throw PhotoSearchException.unavailable();
+        }
 
         PhotoReader.Reading reading = reader.read(photo, provider,
                 () -> quota.take(merchantId, Kind.MERCHANT_FIND));

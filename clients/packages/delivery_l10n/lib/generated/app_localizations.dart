@@ -21584,6 +21584,84 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'This photo can\'t be used. Choose a JPEG or PNG photo.'**
   String get psrchWrongType;
+
+  /// No description provided for @pfindCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Find by photo'**
+  String get pfindCamera;
+
+  /// No description provided for @pfindSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Find in your catalogue'**
+  String get pfindSheetTitle;
+
+  /// No description provided for @pfindSheetBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Photograph a product to see whether your shop already has it.'**
+  String get pfindSheetBody;
+
+  /// No description provided for @pfindInCatalogue.
+  ///
+  /// In en, this message translates to:
+  /// **'In your catalogue'**
+  String get pfindInCatalogue;
+
+  /// No description provided for @pfindMatchedByBarcode.
+  ///
+  /// In en, this message translates to:
+  /// **'Same barcode'**
+  String get pfindMatchedByBarcode;
+
+  /// No description provided for @pfindAddNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Add as a new product'**
+  String get pfindAddNew;
+
+  /// No description provided for @pfindNoMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Not in your catalogue yet'**
+  String get pfindNoMatch;
+
+  /// No description provided for @pfindLimitDay.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{You can look up 1 photo a day, and you\'ve used it. Try again tomorrow.} other{You can look up {count} photos a day, and you\'ve used them all. Try again tomorrow.}}'**
+  String pfindLimitDay(int count);
+
+  /// No description provided for @pfindSkuLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'SKU'**
+  String get pfindSkuLabel;
+
+  /// No description provided for @pfindSkuHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Your own code'**
+  String get pfindSkuHint;
+
+  /// No description provided for @pfindBarcodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Barcode'**
+  String get pfindBarcodeLabel;
+
+  /// No description provided for @pfindBarcodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Scanned at the till'**
+  String get pfindBarcodeHint;
+
+  /// No description provided for @pfindBlitzConsent.
+  ///
+  /// In en, this message translates to:
+  /// **'Your photos are sent to Anthropic, our AI provider, to recognise the products. We delete them within two days.'**
+  String get pfindBlitzConsent;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

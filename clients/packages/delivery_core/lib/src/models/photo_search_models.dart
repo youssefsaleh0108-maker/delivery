@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import 'catalog_models.dart';
 import 'item_search_models.dart';
 
 /// What the app may offer this account in the way of photo search —
@@ -131,6 +132,99 @@ class PhotoSearchPage extends ItemSearchPage {
       similar: json['similar'] == true,
       nextQuery: nextQuery,
       photosLeftToday: (json['photosLeftToday'] as num?)?.toInt(),
+    );
+  }
+}
+
+/// One of the merchant's own products a photo matched — `PhotoFindDtos.PhotoFindMatchResponse`.
+class PhotoFindMatch {
+  const PhotoFindMatch({required this.product, required this.matchedBy});
+
+  final Product product;
+
+  /// [byBarcode] when the code was equal, [byName] otherwise.
+  final String matchedBy;
+
+  static const String byBarcode = 'BARCODE';
+  static const String byName = 'NAME';
+
+  bool get isBarcodeMatch => matchedBy == byBarcode;
+
+  static PhotoFindMatch? maybeFromJson(Object? json) {
+    if (json is! Map<String, dynamic>) return null;
+    final Object? product = json['product'];
+    if (product is! Map<String, dynamic> || product['id'] is! String) return null;
+    return PhotoFindMatch(
+      product: Product.fromJson(product),
+      matchedBy: json['matchedBy'] as String? ?? byName,
+    );
+  }
+}
+
+/// What a new product would start from when the photo is of something the shop does not have yet —
+/// `PhotoFindDtos.PhotoFindSuggestionResponse`.
+class PhotoFindSuggestion {
+  const PhotoFindSuggestion({this.name, this.barcode, this.categoryId});
+
+  final String? name;
+
+  /// Null when a product in these shops already carries it: two products that scan the same at the
+  /// till would be worse than none.
+  final String? barcode;
+
+  /// A section of the shop the photo's keywords named exactly, or null.
+  final String? categoryId;
+
+  factory PhotoFindSuggestion.fromJson(Map<String, dynamic> json) => PhotoFindSuggestion(
+        name: json['name'] as String?,
+        barcode: json['barcode'] as String?,
+        categoryId: json['categoryId'] as String?,
+      );
+}
+
+/// What a merchant's find by photo came to — `PhotoFindDtos.PhotoFindResponse`.
+///
+/// [sample] is true while the reader is not switched on: the lines are examples, not a reading of the
+/// photo, and the sheet says so in Merchant Blitz's own words.
+class PhotoFindResult {
+  const PhotoFindResult({
+    required this.provider,
+    required this.sample,
+    required this.understood,
+    this.matches = const <PhotoFindMatch>[],
+    this.suggestion,
+    this.findsLeftToday,
+  });
+
+  final String provider;
+  final bool sample;
+  final PhotoUnderstanding understood;
+
+  /// The merchant's own products that matched, best first, at most five.
+  final List<PhotoFindMatch> matches;
+
+  /// Null for a photo with no product in it.
+  final PhotoFindSuggestion? suggestion;
+
+  final int? findsLeftToday;
+
+  factory PhotoFindResult.fromJson(Map<String, dynamic> json) {
+    final Object? rows = json['matches'];
+    final Object? understood = json['understood'];
+    final Object? suggestion = json['suggestion'];
+    return PhotoFindResult(
+      provider: json['provider'] as String? ?? '',
+      sample: json['sample'] == true,
+      understood: understood is Map<String, dynamic>
+          ? PhotoUnderstanding.fromJson(understood)
+          : const PhotoUnderstanding(isProduct: false),
+      matches: rows is List
+          ? rows.map(PhotoFindMatch.maybeFromJson).whereType<PhotoFindMatch>().toList()
+          : const <PhotoFindMatch>[],
+      suggestion: suggestion is Map<String, dynamic>
+          ? PhotoFindSuggestion.fromJson(suggestion)
+          : null,
+      findsLeftToday: (json['findsLeftToday'] as num?)?.toInt(),
     );
   }
 }

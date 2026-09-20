@@ -309,7 +309,13 @@ class PortalArea {
         icon: Icons.inventory_2_outlined,
         selectedIcon: Icons.inventory_2,
         label: (DeliveryStrings t) => t.navProducts,
-        build: (PortalApis a, _, __, ___) => ProductListScreen(api: a.catalog),
+        // These pages are only built for an account carrying MERCHANT, so the find's camera is
+        // offered here as the shelf scan is. On the web there is no camera to open, so its sheet
+        // offers the gallery alone.
+        build: (PortalApis a, _, __, ___) => ProductListScreen(
+              api: a.catalog,
+              photoSource: const DeviceShelfPhotoSource(cameraMaxEdge: CatalogApi.photoFindMaxEdge),
+            ),
       ),
       PortalDestination(
         icon: Icons.receipt_long_outlined,
@@ -356,6 +362,7 @@ class PortalArea {
           storeApi: a.store,
           storeId: storeId,
           catalogScanApi: a.catalogScan,
+          photoSource: const DeviceShelfPhotoSource(cameraMaxEdge: CatalogApi.photoFindMaxEdge),
         )),
       ),
       PortalDestination(

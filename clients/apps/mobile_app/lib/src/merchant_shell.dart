@@ -480,6 +480,11 @@ class _MerchantShellState extends State<MerchantShell> {
           storeId: _storeId,
           onOpenAlerts: _openStockAlerts,
           catalogScanApi: _mayScan ? widget.catalogScanApi : null,
+          // The same rule as the scan: MERCHANT-only on the server, so an employee never meets a
+          // camera that would answer 403.
+          photoSource: _mayScan
+              ? const DeviceShelfPhotoSource(cameraMaxEdge: CatalogApi.photoFindMaxEdge)
+              : null,
         );
       case MerchantTab.orders:
         if (services) {

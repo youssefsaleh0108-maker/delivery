@@ -255,6 +255,111 @@ void main() {
     });
   });
 
+  group("a merchant's find by photo", () {
+    ({CatalogApi api, _Server server}) catalogue(Object? Function(RequestOptions options) answer,
+        {int status = 200}) {
+      final _Server server = _Server(answer, status: status);
+      final Dio dio = Dio(BaseOptions(baseUrl: 'http://gateway.test'))..httpClientAdapter = server;
+      return (api: CatalogApi(dio), server: server);
+    }
+
+    /// An answer as `PhotoFindController` writes it: one match the merchant already has.
+    Map<String, dynamic> findAnswer({bool sample = false, bool isProduct = true}) =>
+        <String, dynamic>{
+          'provider': sample ? 'FAKE' : 'CLAUDE',
+          'sample': sample,
+          'understood': isProduct
+              ? <String, dynamic>{'name': 'Pepsi 1L', 'nameAr': 'بيبسي', 'isProduct': true}
+              : <String, dynamic>{'isProduct': false},
+          'matches': <Object?>[
+            <String, dynamic>{
+              'product': <String, dynamic>{
+                'id': 'p1',
+                'merchantId': 'merchant-1',
+                'storeId': 'shop-1',
+                'name': 'Pepsi 1 litre',
+                'price': 1.25,
+                'status': 'ARCHIVED',
+                'barcode': '5449000000996',
+                'inStock': true,
+              },
+              'matchedBy': 'BARCODE',
+            },
+          ],
+          'suggestion': <String, dynamic>{
+            'name': 'Pepsi 1L',
+            'barcode': null,
+            'categoryId': 'cat-drinks',
+          },
+          'findsLeftToday': 29,
+        };
+
+    test('sends the photo and the shop as a multipart form', () async {
+      final ({CatalogApi api, _Server server}) shop = catalogue((_) => findAnswer());
+
+      await shop.api
+          .findByPhoto(bytes: _smallJpeg(), contentType: 'image/jpeg', storeId: 'shop-1');
+
+      final RequestOptions sent = shop.server.requests.single;
+      expect(sent.method, 'POST');
+      expect(sent.path, '/api/products/mine/find-by-photo');
+      expect(sent.contentType, startsWith('multipart/form-data'));
+      expect(sent.sendTimeout, const Duration(seconds: 45));
+      final String body = shop.server.bodies.single;
+      expect(body, contains('name="photo"'));
+      expect(body.toLowerCase(), contains('content-type: image/jpeg'));
+      expect(body, contains('name="storeId"'));
+      expect(body, contains('shop-1'));
+    });
+
+    test('reads the matches, how each matched, and what a new product would start from', () async {
+      final ({CatalogApi api, _Server server}) shop = catalogue((_) => findAnswer());
+
+      final PhotoFindResult result =
+          await shop.api.findByPhoto(bytes: _smallJpeg(), contentType: 'image/jpeg');
+
+      expect(result.provider, 'CLAUDE');
+      expect(result.sample, isFalse);
+      expect(result.understood.label, 'Pepsi 1L');
+      expect(result.matches.single.product.name, 'Pepsi 1 litre');
+      expect(result.matches.single.product.status, ProductStatus.archived);
+      expect(result.matches.single.isBarcodeMatch, isTrue);
+      expect(result.suggestion!.name, 'Pepsi 1L');
+      expect(result.suggestion!.barcode, isNull);
+      expect(result.suggestion!.categoryId, 'cat-drinks');
+      expect(result.findsLeftToday, 29);
+    });
+
+    test('a sample answer says which reader gave it', () async {
+      final ({CatalogApi api, _Server server}) shop = catalogue((_) => findAnswer(sample: true));
+
+      final PhotoFindResult result =
+          await shop.api.findByPhoto(bytes: _smallJpeg(), contentType: 'image/jpeg');
+
+      expect(result.sample, isTrue);
+      expect(result.provider, 'FAKE');
+    });
+
+    test("the merchant's own limit arrives as a failure of its own", () async {
+      final ({CatalogApi api, _Server server}) shop = catalogue(
+          (_) => <String, dynamic>{
+                'code': 'PHOTO_FIND_LIMIT',
+                'limit': 30,
+                'scope': 'DAY',
+                'retryAfterSeconds': 900,
+              },
+          status: 429);
+
+      await expectLater(
+        shop.api.findByPhoto(bytes: _smallJpeg(), contentType: 'image/jpeg'),
+        throwsA(isA<PhotoSearchFailure>()
+            .having((PhotoSearchFailure f) => f.code, 'code', PhotoSearchFailure.findLimit)
+            .having((PhotoSearchFailure f) => f.isLimit, 'isLimit', isTrue)
+            .having((PhotoSearchFailure f) => f.limit, 'limit', 30)),
+      );
+    });
+  });
+
   group('what photo search the app may offer', () {
     test('reads photoSearch, what is left today and the largest photo', () async {
       final ({StoreApi api, _Server server}) stores = _stores((_) => <String, dynamic>{

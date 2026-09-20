@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+import 'dart:convert';
 
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
@@ -10,7 +10,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:image/image.dart' as img;
 import 'package:mobile_app/src/customer_shell.dart';
 import 'package:mobile_app/src/item_search_screen.dart';
 
@@ -23,6 +22,7 @@ import 'widget_test.dart' show sessionWith;
 /// `POST /api/products/search/photo` as `PhotoSearchController` does. What the server makes of a photo
 /// is product-service's own tests; these hold what the app does with the answer — and, above all, that
 /// no camera is drawn unless the server says a real reader is there.
+
 /// Stands in for the phone's camera and gallery.
 class _Photos extends ShelfPhotoSource {
   _Photos({required this.bytes, this.canUseCamera = true});
@@ -65,8 +65,9 @@ void main() {
   final DeliveryStrings en = lookupDeliveryStrings(const Locale('en'));
   final DeliveryStrings ar = lookupDeliveryStrings(const Locale('ar'));
 
-  /// A photo from the gallery: a real JPEG, so the app's own preparation runs on it.
-  final Uint8List jpeg = Uint8List.fromList(img.encodeJpg(img.Image(width: 120, height: 90)));
+  // A 1x1 JPEG: small enough that the app sends it untouched, which is what a phone photo already
+  // prepared looks like by the time it reaches the API.
+  final Uint8List jpeg = base64Decode('/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==');
 
   Map<String, dynamic> emptyPage() => <String, dynamic>{
         'content': <Object?>[],

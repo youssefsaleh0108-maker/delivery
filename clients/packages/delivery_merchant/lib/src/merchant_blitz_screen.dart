@@ -43,6 +43,7 @@ import 'package:flutter/material.dart';
 
 import 'catalog_scan_review_screen.dart';
 import 'order_detail_screen.dart';
+import 'photo_pick_sheet.dart';
 import 'photo_source.dart';
 
 /// The Merchant Blitz screen. Pushed as its own route; see the library comment.
@@ -630,6 +631,9 @@ class _MerchantBlitzScreenState extends State<MerchantBlitzScreen>
     return <Widget>[
       if (uploaded == 0) ...<Widget>[
         _Explainer(title: t.blitzIntroTitle, body: t.blitzIntroBody),
+        const SizedBox(height: DeliverySpacing.sm),
+        // Before the first photo is taken: the shelf photos go to the reader too, once it is on.
+        PhotoConsentLine(text: t.pfindBlitzConsent),
         const SizedBox(height: DeliverySpacing.md),
       ],
       if (scan != null && scan.photos.isNotEmpty) ...<Widget>[

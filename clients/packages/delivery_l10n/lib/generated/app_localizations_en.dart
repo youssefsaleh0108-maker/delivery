@@ -12759,4 +12759,55 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get psrchWrongType =>
       'This photo can\'t be used. Choose a JPEG or PNG photo.';
+
+  @override
+  String get pfindCamera => 'Find by photo';
+
+  @override
+  String get pfindSheetTitle => 'Find in your catalogue';
+
+  @override
+  String get pfindSheetBody =>
+      'Photograph a product to see whether your shop already has it.';
+
+  @override
+  String get pfindInCatalogue => 'In your catalogue';
+
+  @override
+  String get pfindMatchedByBarcode => 'Same barcode';
+
+  @override
+  String get pfindAddNew => 'Add as a new product';
+
+  @override
+  String get pfindNoMatch => 'Not in your catalogue yet';
+
+  @override
+  String pfindLimitDay(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'You can look up $count photos a day, and you\'ve used them all. Try again tomorrow.',
+      one:
+          'You can look up 1 photo a day, and you\'ve used it. Try again tomorrow.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get pfindSkuLabel => 'SKU';
+
+  @override
+  String get pfindSkuHint => 'Your own code';
+
+  @override
+  String get pfindBarcodeLabel => 'Barcode';
+
+  @override
+  String get pfindBarcodeHint => 'Scanned at the till';
+
+  @override
+  String get pfindBlitzConsent =>
+      'Your photos are sent to Anthropic, our AI provider, to recognise the products. We delete them within two days.';
 }
