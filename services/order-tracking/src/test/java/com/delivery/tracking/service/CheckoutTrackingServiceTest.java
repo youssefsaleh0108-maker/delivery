@@ -668,6 +668,36 @@ class CheckoutTrackingServiceTest {
                     anyBoolean());
         }
 
+        /**
+         * Order events arrive at least once and in no order, so the PICKED_UP snapshot of an order
+         * that has since been delivered can land again at any time. Applied as it came, it put the
+         * order back in PICKED_UP and this map started following the rider again — away from the
+         * door they had already handed the delivery over at.
+         */
+        @Test
+        @DisplayName("a PICKED_UP replayed after the delivery leaves the map finished")
+        void a_replayed_pickup_does_not_reopen_the_map() {
+            OrderParticipants a = collected(A, "Hamra Bakery", SHOP_A, RIDER,
+                    clock.instant().minusSeconds(900));
+            a.apply(RIDER, "DELIVERED");
+            a.stampMilestones("DELIVERED", clock.instant().minusSeconds(120));
+            // The rider has moved on since; their phone's last fix on this order is at the door.
+            riderAt(A, RIDER, DOOR, Duration.ofSeconds(130));
+
+            a.apply(RIDER, "PICKED_UP");
+            a.stampMilestones("PICKED_UP", clock.instant().minusSeconds(600));
+
+            CheckoutView view = view();
+
+            assertThat(row(view, A).status()).isEqualTo("DELIVERED");
+            assertThat(row(view, A).completedAt()).isEqualTo(clock.instant().minusSeconds(120));
+            assertThat(row(view, A).eta().reason()).isEqualTo(Reason.ORDER_COMPLETE);
+            assertThat(view.riders()).isEmpty();
+            assertThat(view.paths()).isEmpty();
+            verify(tracking, never()).sightingFor(any(OrderParticipants.class), anyString(),
+                    anyBoolean());
+        }
+
         @Test
         @DisplayName("with every order finished the map is pins and outcomes only")
         void all_terminal_is_a_static_summary() {
