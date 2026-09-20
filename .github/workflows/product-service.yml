@@ -48,6 +48,12 @@ jobs:
   # PhotoSearchDatabaseTest too: the photo quota (V38) caps a paid vision call per account and across
   # the platform under PostgreSQL advisory locks, and only a real database shows two photos sent at once
   # cannot both take an account's last use.
+  #
+  # SearchDemandDatabaseTest above all, and for a reason the others do not have: it reads
+  # information_schema and asserts the exact set of columns search_demand_log (V40) has. The search
+  # log's whole design is that it cannot be used to follow a customer — no account, no session, no
+  # device, no pin, no sequential key — and a promise like that made in a comment lasts until somebody
+  # adds a column. Made as an assertion, and run here, it fails the build instead.
   database-tests:
     runs-on: ubuntu-latest
     permissions:
@@ -81,17 +87,17 @@ jobs:
 
       # -am builds the platform libraries this module depends on, as the build job does. The test
       # filter matches nothing in them, which failIfNoSpecifiedTests=false allows.
-      - name: Storefront isolation, item search, delivery areas and the photo quota against PostGIS
+      - name: Storefront isolation, item search, delivery areas, the photo quota and the demand log against PostGIS
         env:
           PRODUCT_TEST_DB_URL: jdbc:postgresql://localhost:5432/postgres
         run: >-
           mvn -B -U -pl services/product-service -am test
-          -Dtest=ServicesVerticalDatabaseTest,ItemSearchDatabaseTest,DeliveryAreaDatabaseTest,PhotoSearchDatabaseTest
+          -Dtest=ServicesVerticalDatabaseTest,ItemSearchDatabaseTest,DeliveryAreaDatabaseTest,PhotoSearchDatabaseTest,SearchDemandDatabaseTest
           -Dsurefire.failIfNoSpecifiedTests=false
 
       - name: Fail if the database tests did not run
         run: |
-          for test in ServicesVerticalDatabaseTest ItemSearchDatabaseTest DeliveryAreaDatabaseTest PhotoSearchDatabaseTest; do
+          for test in ServicesVerticalDatabaseTest ItemSearchDatabaseTest DeliveryAreaDatabaseTest PhotoSearchDatabaseTest SearchDemandDatabaseTest; do
             report=services/product-service/target/surefire-reports/TEST-com.delivery.product.domain.$test.xml
             if [ ! -f "$report" ]; then
               echo "::error::No report at $report, so the database tests did not run."
