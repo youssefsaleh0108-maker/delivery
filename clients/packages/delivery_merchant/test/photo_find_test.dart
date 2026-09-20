@@ -231,6 +231,18 @@ void main() {
       expect(find.text(en.blitzSampleBody), findsOneWidget);
     });
 
+    testWidgets('a sample offers a blank form, never one prefilled from the example',
+        (WidgetTester tester) async {
+      await pumpList(tester, _Gateway(find: found(sample: true)), photos: _Photos(bytes: jpeg));
+
+      await findWithAPhoto(tester, t: en);
+
+      // The example's own words are not on an "Add as a new product" button.
+      expect(find.text(en.pfindAddNew), findsNothing);
+      expect(find.text(en.pfindAddBlank), findsOneWidget);
+      expect(find.text(en.pfindSampleNoPrefill), findsOneWidget);
+    });
+
     testWidgets('says so when the photo showed no product, and offers nothing to add',
         (WidgetTester tester) async {
       await pumpList(tester, _Gateway(find: found(isProduct: false, withMatch: false)),
@@ -314,6 +326,23 @@ void main() {
       expect(find.widgetWithText(TextFormField, 'Pepsi 1L'), findsOneWidget);
       expect(find.widgetWithText(TextFormField, '5449000000996'), findsOneWidget);
       // The photo is the new product's first image, and can be removed like any other.
+      expect(find.byType(PendingProductImageTile), findsOneWidget);
+    });
+
+    testWidgets('a sample leads to an empty form, with only the merchant\'s own photo on it',
+        (WidgetTester tester) async {
+      await pumpList(tester, _Gateway(find: found(sample: true)), photos: _Photos(bytes: jpeg));
+      await findWithAPhoto(tester, t: en);
+
+      await tester.tap(find.text(en.pfindAddBlank));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.byType(ProductFormScreen), findsOneWidget);
+      // Nothing the example said reached a field: no name, and no barcode the till would scan.
+      expect(find.widgetWithText(TextFormField, 'Pepsi 1L'), findsNothing);
+      expect(find.widgetWithText(TextFormField, '5449000000996'), findsNothing);
+      // Their own photo is not an example, so it still comes along.
       expect(find.byType(PendingProductImageTile), findsOneWidget);
     });
   });

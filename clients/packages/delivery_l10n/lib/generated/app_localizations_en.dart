@@ -12810,4 +12810,11 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get pfindBlitzConsent =>
       'Your photos are sent to Anthropic, our AI provider, to recognise the products. We delete them within two days.';
+
+  @override
+  String get pfindAddBlank => 'Add a product';
+
+  @override
+  String get pfindSampleNoPrefill =>
+      'This reading is an example, so nothing is filled in for you. Only your own photo comes along.';
 }

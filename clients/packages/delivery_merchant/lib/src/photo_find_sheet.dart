@@ -226,16 +226,35 @@ class _PhotoFindSheetState extends State<PhotoFindSheet> {
               ),
           ],
           const SizedBox(height: DeliverySpacing.md),
-          YdPillButton(
-            label: t.pfindAddNew,
-            icon: Icons.add,
-            onPressed: () => Navigator.of(context).pop(PhotoFindChoice.add(ProductPrefill(
-              name: result.suggestion?.name ?? read,
-              barcode: result.suggestion?.barcode,
-              categoryId: result.suggestion?.categoryId,
-              photo: PickedImageBytes(widget.photo.bytes, widget.photo.contentType),
-            ))),
-          ),
+          // A sample reading is a fixed example of a product nobody photographed — the reader is not
+          // switched on. Carrying its name, barcode and section into the form would turn an example
+          // into a real product on a real shelf, with a barcode the till would scan, and a merchant
+          // who tapped past the banner would never see where it came from. So a sample offers a blank
+          // form instead, and says so. Their own photo still comes along: that part is not an example.
+          if (result.sample) ...<Widget>[
+            YdPillButton(
+              label: t.pfindAddBlank,
+              icon: Icons.add,
+              onPressed: () => Navigator.of(context).pop(PhotoFindChoice.add(ProductPrefill(
+                photo: PickedImageBytes(widget.photo.bytes, widget.photo.contentType),
+              ))),
+            ),
+            const SizedBox(height: DeliverySpacing.sm),
+            Text(
+              t.pfindSampleNoPrefill,
+              style: const TextStyle(fontSize: 12, color: DeliveryColors.muted, height: 1.4),
+            ),
+          ] else
+            YdPillButton(
+              label: t.pfindAddNew,
+              icon: Icons.add,
+              onPressed: () => Navigator.of(context).pop(PhotoFindChoice.add(ProductPrefill(
+                name: result.suggestion?.name ?? read,
+                barcode: result.suggestion?.barcode,
+                categoryId: result.suggestion?.categoryId,
+                photo: PickedImageBytes(widget.photo.bytes, widget.photo.contentType),
+              ))),
+            ),
         ],
         const SizedBox(height: DeliverySpacing.md),
         PhotoConsentLine(text: t.psrchConsent),

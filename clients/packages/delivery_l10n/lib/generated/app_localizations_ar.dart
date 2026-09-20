@@ -12976,4 +12976,11 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get pfindBlitzConsent =>
       'تُرسَل صورك إلى Anthropic، مزوّد الذكاء الاصطناعي لدينا، للتعرّف على المنتجات، ونحذفها خلال يومين.';
+
+  @override
+  String get pfindAddBlank => 'إضافة منتج';
+
+  @override
+  String get pfindSampleNoPrefill =>
+      'هذه القراءة مجرّد مثال، لذلك لا يُملأ لك أي حقل. تأتي معك صورتك وحدها.';
 }

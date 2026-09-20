@@ -21662,6 +21662,18 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Your photos are sent to Anthropic, our AI provider, to recognise the products. We delete them within two days.'**
   String get pfindBlitzConsent;
+
+  /// No description provided for @pfindAddBlank.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a product'**
+  String get pfindAddBlank;
+
+  /// No description provided for @pfindSampleNoPrefill.
+  ///
+  /// In en, this message translates to:
+  /// **'This reading is an example, so nothing is filled in for you. Only your own photo comes along.'**
+  String get pfindSampleNoPrefill;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {
