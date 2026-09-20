@@ -12921,4 +12921,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   String splitAmountConfirmedOf(String confirmed, String total) {
     return '$confirmed of $total confirmed';
   }
+
+  @override
+  String get actionCloseNotDelivered => 'Close as not delivered';
 }

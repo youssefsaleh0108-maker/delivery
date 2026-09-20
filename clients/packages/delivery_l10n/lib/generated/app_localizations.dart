@@ -21824,6 +21824,12 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'{confirmed} of {total} confirmed'**
   String splitAmountConfirmedOf(String confirmed, String total);
+
+  /// No description provided for @actionCloseNotDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Close as not delivered'**
+  String get actionCloseNotDelivered;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

@@ -13079,4 +13079,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   String splitAmountConfirmedOf(String confirmed, String total) {
     return '$confirmed من $total مؤكَّدة';
   }
+
+  @override
+  String get actionCloseNotDelivered => 'إغلاق الطلب كغير مُسلَّم';
 }

@@ -404,7 +404,15 @@ class _TodayButton extends StatelessWidget {
   }
 }
 
-/// One order, and the one thing Backoffice may do to it.
+/// One order, and the one thing Backoffice may do to it — which is not the same thing at every
+/// point in its life.
+///
+/// Before a rider has it that is a cancellation. Once a rider has it, cancelling is refused for
+/// everybody, and what support has instead is closing the order as not delivered: the customer
+/// refused it at the door, nobody was there, the goods are gone. That collects nothing from the
+/// customer and decides, explicitly, whether the shop and the delivery are still paid — so it is a
+/// form of its own rather than the same button with different words. Which of the two is offered
+/// comes from the server ([DeliveryOrder.availableActions]); this screen never decides it.
 class _OrderDetailDialog extends StatefulWidget {
   const _OrderDetailDialog({
     required this.order,
@@ -424,9 +432,14 @@ class _OrderDetailDialog extends StatefulWidget {
 
 class _OrderDetailDialogState extends State<_OrderDetailDialog> {
   final TextEditingController _reason = TextEditingController();
-  bool _cancelling = false;
+  bool _sending = false;
   bool _confirming = false;
   Object? _failure;
+
+  /// Both on, which is the owner's default: the shop made the goods and the rider carried them,
+  /// and the platform bears the shortfall unless somebody decides otherwise on this order.
+  bool _payShop = true;
+  bool _payDelivery = true;
 
   @override
   void dispose() {
@@ -436,24 +449,49 @@ class _OrderDetailDialogState extends State<_OrderDetailDialog> {
 
   bool get _canCancel => widget.order.availableActions.contains(OrderAction.cancel);
 
+  /// Offered by the server on an order a rider already has, and only to Backoffice.
+  bool get _canClose =>
+      widget.order.availableActions.contains(OrderAction.closeNotDelivered);
+
+  /// An errand has no shop, so there is no shop's share to pay and no switch to offer.
+  bool get _hasShop => !widget.order.kind.isErrand;
+
   Future<void> _cancel() async {
     final String reason = _reason.text.trim();
     // The server takes an empty reason. This screen does not offer one: a cancellation with no
     // recorded why is a support case nobody can reconstruct afterwards.
     if (reason.isEmpty) return;
 
+    await _send(() => widget.api.act(widget.order.id, OrderAction.cancel, reason: reason));
+  }
+
+  /// Closes an order the rider has, with the two decisions exactly as they are switched here. The
+  /// server requires both, so nothing is paid because a field was left out.
+  Future<void> _close() async {
+    final String reason = _reason.text.trim();
+    if (reason.isEmpty) return;
+
+    await _send(() => widget.api.closeNotDelivered(
+          widget.order.id,
+          reason: reason,
+          compensateMerchant: _hasShop && _payShop,
+          compensateCarrier: _payDelivery,
+        ));
+  }
+
+  Future<void> _send(Future<DeliveryOrder> Function() request) async {
     setState(() {
-      _cancelling = true;
+      _sending = true;
       _failure = null;
     });
     try {
-      await widget.api.act(widget.order.id, OrderAction.cancel, reason: reason);
+      await request();
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _cancelling = false;
+        _sending = false;
         _failure = e;
       });
     }
@@ -513,11 +551,16 @@ class _OrderDetailDialogState extends State<_OrderDetailDialog> {
               ),
               if (o.cancelReason != null && o.cancelReason!.isNotEmpty)
                 _DetailRow(
-                  label: 'Cancelled because',
+                  label: o.closedAfterPickup ? 'Closed because' : 'Cancelled because',
                   // A provider's decline is stored as a code; it is said in words, as the customer
                   // reads it.
                   value: o.declineReason?.labelIn(t) ?? o.cancelReason!,
                 ),
+              // An order closed while a rider had it is a cancellation, and its own kind of one:
+              // nothing was collected, and somebody may still have been paid. Both are said here,
+              // because "Cancelled" alone does not explain a payment on the statement.
+              if (o.closedAfterPickup)
+                _DetailRow(label: 'Closed after pickup', value: _whoWasPaid(o)),
               if (o.isService) ...<Widget>[
                 const SizedBox(height: DeliverySpacing.sm),
                 const Divider(height: 1, color: DeliveryColors.border),
@@ -529,27 +572,37 @@ class _OrderDetailDialogState extends State<_OrderDetailDialog> {
                   openLink: widget.openLink,
                 ),
               ],
-              if (_canCancel) ...<Widget>[
+              if (_canCancel || _canClose) ...<Widget>[
                 const SizedBox(height: ConsoleMetrics.kpiGap),
                 const Divider(height: 1, color: DeliveryColors.border),
                 const SizedBox(height: ConsoleMetrics.kpiGap),
-                const Text('Support cancellation', style: ConsoleText.fieldLabel),
+                Text(
+                  _canClose ? 'Close as not delivered' : 'Support cancellation',
+                  style: ConsoleText.fieldLabel,
+                ),
                 const SizedBox(height: DeliverySpacing.sm),
-                const Text(
-                  'The customer and the shop are both told. Say why — it is kept on the order.',
+                Text(
+                  _canClose
+                      ? 'The rider has this order, so it cannot be cancelled. Closing it collects '
+                          'nothing from the customer; whatever is left switched on below is paid '
+                          'by the platform. Say why — it is kept on the order.'
+                      : 'The customer and the shop are both told. Say why — it is kept on the '
+                          'order.',
                   style: ConsoleText.meta,
                 ),
                 const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
                 TextField(
                   controller: _reason,
-                  enabled: !_cancelling,
+                  enabled: !_sending,
                   style: ConsoleText.control,
                   cursorColor: DeliveryColors.brand,
                   maxLines: 2,
                   onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
                     isDense: true,
-                    hintText: 'Reason for cancelling',
+                    hintText: _canClose
+                        ? 'Why it was not delivered'
+                        : 'Reason for cancelling',
                     hintStyle: const TextStyle(fontSize: 13, color: DeliveryColors.faint),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: DeliverySpacing.md - 2,
@@ -562,10 +615,34 @@ class _OrderDetailDialogState extends State<_OrderDetailDialog> {
                   ),
                 ),
               ],
+              if (_canClose) ...<Widget>[
+                const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+                if (_hasShop)
+                  _PayToggle(
+                    id: 'merchant',
+                    label: 'Pay the shop its share',
+                    detail: 'The goods were made and handed to the rider.',
+                    value: _payShop,
+                    onChanged: _sending
+                        ? null
+                        : (bool on) => setState(() => _payShop = on),
+                  ),
+                _PayToggle(
+                  id: 'carrier',
+                  label: 'Pay the delivery fee',
+                  detail: 'The rider went to the shop and to the door.',
+                  value: _payDelivery,
+                  onChanged: _sending
+                      ? null
+                      : (bool on) => setState(() => _payDelivery = on),
+                ),
+              ],
               if (_failure != null) ...<Widget>[
                 const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
                 Text(
-                  'Could not cancel this order. $_failure',
+                  _canClose
+                      ? 'Could not close this order. $_failure'
+                      : 'Could not cancel this order. $_failure',
                   style: TextStyle(fontSize: 13, color: DeliveryAccent.critical.color),
                 ),
               ],
@@ -575,20 +652,23 @@ class _OrderDetailDialogState extends State<_OrderDetailDialog> {
                 children: <Widget>[
                   _DialogButton(
                     label: 'Close',
-                    onPressed: _cancelling ? null : () => Navigator.of(context).pop(false),
+                    onPressed: _sending ? null : () => Navigator.of(context).pop(false),
                   ),
-                  if (_canCancel) ...<Widget>[
+                  if (_canCancel || _canClose) ...<Widget>[
                     const SizedBox(width: DeliverySpacing.sm),
                     if (_confirming)
                       _DialogButton(
-                        label: _cancelling ? 'Cancelling…' : 'Yes, cancel it',
+                        label: _sending
+                            ? (_canClose ? 'Closing…' : 'Cancelling…')
+                            : (_canClose ? 'Yes, close it' : 'Yes, cancel it'),
                         destructive: true,
-                        onPressed:
-                            _cancelling || _reason.text.trim().isEmpty ? null : _cancel,
+                        onPressed: _sending || _reason.text.trim().isEmpty
+                            ? null
+                            : (_canClose ? _close : _cancel),
                       )
                     else
                       _DialogButton(
-                        label: 'Cancel order',
+                        label: _canClose ? 'Close as not delivered' : 'Cancel order',
                         destructive: true,
                         onPressed: _reason.text.trim().isEmpty
                             ? null
@@ -608,6 +688,70 @@ class _OrderDetailDialogState extends State<_OrderDetailDialog> {
         borderRadius: BorderRadius.circular(DeliveryRadius.sm),
         borderSide: BorderSide(color: color),
       );
+
+  /// What the platform paid out on an order that was closed after pickup, in the order the form
+  /// asks it — and "nobody" when both were switched off, which is a decision somebody made and
+  /// should read as one.
+  static String _whoWasPaid(DeliveryOrder order) {
+    final List<String> paid = <String>[
+      if (order.compensateMerchant) 'the shop its share',
+      if (order.compensateCarrier) 'the delivery fee',
+    ];
+    if (paid.isEmpty) {
+      return 'Nothing was collected, and nobody was paid';
+    }
+    return 'Nothing was collected; the platform paid ${paid.join(' and ')}';
+  }
+}
+
+/// One of the two decisions on the close form: paid, or not paid, said as a sentence rather than a
+/// bare switch. Both start on — the owner's default — and either can be switched off for this one
+/// order.
+class _PayToggle extends StatelessWidget {
+  const _PayToggle({
+    required this.id,
+    required this.label,
+    required this.detail,
+    required this.value,
+    required this.onChanged,
+  });
+
+  /// Names the switch for a test and for a screenshot diff, rather than counting them off in
+  /// layout order.
+  final String id;
+  final String label;
+  final String detail;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: DeliverySpacing.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: <Widget>[
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(label, style: ConsoleText.controlLabel),
+                Text(detail, style: ConsoleText.meta),
+              ],
+            ),
+          ),
+          const SizedBox(width: DeliverySpacing.sm),
+          Switch(
+            key: ValueKey<String>('close-not-delivered-pay-$id'),
+            value: value,
+            onChanged: onChanged,
+            activeThumbColor: DeliveryColors.brand,
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _DetailRow extends StatelessWidget {

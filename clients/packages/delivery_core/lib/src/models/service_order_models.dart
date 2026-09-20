@@ -37,6 +37,10 @@ enum OrderKind {
   /// The server's spelling; null for [unknown].
   final String? wire;
 
+  /// Whether nobody sold the goods: an errand the rider runs, which has no shop and so no shop's
+  /// share of anything.
+  bool get isErrand => this == butlerBuy || this == butlerSend;
+
   /// [catalog] when the server sent no kind; [unknown] when it sent one this build does not know.
   static OrderKind fromWire(Object? value) {
     if (value == null) {

@@ -3989,5 +3989,6 @@
   "splitNConfirmed": "{confirmed} / {total} مؤكَّدة",
   "@splitNConfirmed": {"placeholders":{"confirmed":{"type":"int"},"total":{"type":"int"}}},
   "splitAmountConfirmedOf": "{confirmed} من {total} مؤكَّدة",
-  "@splitAmountConfirmedOf": {"placeholders":{"confirmed":{"type":"String"},"total":{"type":"String"}}}
+  "@splitAmountConfirmedOf": {"placeholders":{"confirmed":{"type":"String"},"total":{"type":"String"}}},
+  "actionCloseNotDelivered": "إغلاق الطلب كغير مُسلَّم"
 }
