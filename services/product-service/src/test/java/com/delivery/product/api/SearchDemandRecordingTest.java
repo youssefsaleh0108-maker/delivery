@@ -228,7 +228,7 @@ class SearchDemandRecordingTest {
             thread.start();
         };
         SearchDemandRecorder real = new SearchDemandRecorder(null, null, java.time.Clock.systemUTC(),
-                null, slow, Duration.ZERO);
+                null, slow, Duration.ZERO, 1, Duration.ZERO);
         ItemSearchController controller = new ItemSearchController(itemSearch, storeService, catalog,
                 mock(ProductImageService.class), new ItemSearchThrottle(100, 1000), real);
         answering(new Searched("pepsi", 0, null, List.of()));
@@ -250,7 +250,7 @@ class SearchDemandRecordingTest {
             throw new RejectedExecutionException("queue full");
         };
         SearchDemandRecorder real = new SearchDemandRecorder(null, null, java.time.Clock.systemUTC(),
-                null, full, Duration.ZERO);
+                null, full, Duration.ZERO, 1, Duration.ZERO);
 
         real.record(new Recording("a", "rice", null, 0, null, List.of(), null));
 
@@ -263,7 +263,7 @@ class SearchDemandRecordingTest {
     void a_failed_write_is_swallowed() {
         // No repository and no transaction manager: every write fails as hard as it can.
         SearchDemandRecorder real = new SearchDemandRecorder(null, null, java.time.Clock.systemUTC(),
-                null, Runnable::run, Duration.ZERO);
+                null, Runnable::run, Duration.ZERO, 1, Duration.ZERO);
 
         real.record(new Recording("a", "rice", null, 0, null, List.of(), null));
 
@@ -274,11 +274,11 @@ class SearchDemandRecordingTest {
     @DisplayName("a search with no words — a barcode on its own — has nothing to record")
     void a_wordless_search_is_not_recorded() {
         SearchDemandRecorder real = new SearchDemandRecorder(null, null, java.time.Clock.systemUTC(),
-                null, Runnable::run, Duration.ZERO);
+                null, Runnable::run, Duration.ZERO, 1, Duration.ZERO);
 
         real.record(new Recording("a", "", null, 0, null, List.of(), null));
 
-        assertThat(real.counts()).isEqualTo(new SearchDemandRecorder.Counts(0, 0, 0, 0));
+        assertThat(real.counts()).isEqualTo(new SearchDemandRecorder.Counts(0, 0, 0, 0, 0));
     }
 
     // ------------------------------------------------------------------------------------ helpers

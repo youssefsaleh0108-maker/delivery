@@ -13,10 +13,15 @@ import jakarta.persistence.Table;
  * person (V40).
  *
  * <p>There is no column here anybody could join two rows on. No account id, no session, no device, no
- * request id, no exact pin, and the key is a random uuid rather than a sequence so even the order the
- * rows were written in is not readable. The time is truncated to the hour before it arrives, and the
- * place is the id of a delivery area — a neighbourhood shared by thousands — or nothing at all. Ask
- * this table "what did this customer look for" and there is no way to phrase the question.
+ * request id, no exact pin, and the key is a random uuid rather than a sequence. The time is
+ * truncated to the hour before it arrives, and the place is the id of a delivery area — a
+ * neighbourhood shared by thousands — or nothing at all. Ask this table "what did this customer look
+ * for" and there is no way to phrase the question.
+ *
+ * <p>The order the rows were written in is not in a column, but it is in the heap: {@code ORDER BY
+ * ctid} over an insert-only table returns the insertion sequence. That is removed by the writer
+ * rather than by the schema — rows are buffered and each flush is inserted in a shuffled order
+ * ({@code SearchDemandRecorder}) — because a sequence within one area reads as one shopper's basket.
  *
  * <p>That is the whole design constraint. Everything a shop wants to know — "nine people near me
  * looked for nappies and nobody within two kilometres sells them" — is a count over these rows, and a

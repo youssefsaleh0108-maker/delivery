@@ -173,6 +173,24 @@ delivery:
       # the promise; refused at start-up outside 7..400 so nobody widens it by a typo.
       retention-days: 90
 
+      # How the rows are written, rather than what they hold. The table is insert-only and has one
+      # writer, so ORDER BY ctid reads it in the order it was written in — which would hand back the
+      # minute-by-minute sequence that truncating the time to the hour exists to remove, and make
+      # consecutive rows in one area read as one shopper's basket. So rows are buffered and each
+      # flush is inserted in a shuffled order (SearchDemandRecorder).
+      #
+      # Fifty rows is a few minutes of searches from every area at once; ten minutes is longer than
+      # the burst one shopper makes, so a burst lands inside one flush. Two limits are constants
+      # rather than settings, because they are the privacy part: the timer never writes fewer than
+      # five rows (a flush under the digest's floor could be one household on its own), and nothing
+      # waits longer than an hour (by then the rows span the hour their own timestamps name, so the
+      # order they are written in says nothing the rows do not already say).
+      #
+      # What this costs: an unclean stop loses what is buffered — at most one flush, at most an hour
+      # of it. A clean shutdown writes it.
+      flush-rows: 50
+      flush-after: 10m
+
     digest:
       # Further than this and "somebody sells it" is not an answer a customer near you can use. Two
       # kilometres is a walk across a Beirut neighbourhood.

@@ -1,8 +1,10 @@
 package com.delivery.product.service;
 
+import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -11,7 +13,9 @@ import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -56,6 +60,38 @@ import com.delivery.product.domain.SearchDemandLogRepository;
  * answer is a yes or a no. No account id is passed to {@link SearchDemandLog}, and there is no column
  * on it that could hold one.
  *
+ * <p><strong>Rows are buffered and each flush is written in a shuffled order.</strong> A random
+ * primary key does not hide the order rows were written in: this is an insert-only table, so
+ * {@code ORDER BY ctid} reads the heap in physical order, which is the order the single writer
+ * inserted in. Left alone that would hand back the minute-by-minute sequence that truncating
+ * {@code searched_at} to the hour exists to remove, and consecutive rows from one area would read as
+ * one shopper's basket — which says far more about a household than any single word does. So rows
+ * wait here until there are enough of them to be written together, and the flush is shuffled
+ * ({@link #flush}) before it is inserted:
+ *
+ * <ul>
+ *   <li><strong>{@value #DEFAULT_FLUSH_ROWS} rows</strong> ({@code flush-rows}) write at once. At any
+ *       real traffic that is a handful of minutes of searches from every area at once, and one
+ *       shopper's burst is a few rows lost among them;</li>
+ *   <li><strong>{@value #HOLD_MINUTES} minutes</strong> ({@code flush-after}) is how long the oldest
+ *       row waits for company before the buffer goes anyway. A shopper's burst — typing a word,
+ *       trying a synonym, then a photo — happens inside a couple of minutes, so a burst lands inside
+ *       one flush and its order does not survive it;</li>
+ *   <li><strong>never fewer than {@value #MIN_FLUSH_ROWS}</strong> on that timer. A flush of one row
+ *       is exactly the sequence this is meant to hide, and a flush smaller than the digest's floor of
+ *       five could be one household on its own. A quiet area's rows therefore wait for neighbours
+ *       rather than being written alone;</li>
+ *   <li><strong>and never longer than {@value #MAX_HOLD_MINUTES} minutes</strong>, however few rows
+ *       there are. After an hour the rows in the buffer are spread across the hour that
+ *       {@code searched_at} already names, so writing them in whatever order can say nothing about
+ *       the sequence that the row itself does not already say — and holding them longer would only
+ *       mean losing more of them to a restart.</li>
+ * </ul>
+ *
+ * <p>The cost of the buffer is what an unclean stop loses: at most one flush, at most an hour old. A
+ * clean shutdown writes what it holds ({@link #destroy}). That is the right side of the trade — the
+ * numbers this feeds are counts over a week, and a handful of missing rows moves a band by nothing.
+ *
  * <p>Paging is handled by the caller rather than here: only the first page of an answer is a search
  * (see {@code ItemSearchController}), so scrolling through shops is not a second signal.
  */
@@ -81,18 +117,64 @@ public class SearchDemandRecorder implements DisposableBean {
     static final Duration MIN_REPEAT_WINDOW = Duration.ZERO;
     static final Duration MAX_REPEAT_WINDOW = Duration.ofHours(6);
 
+    /** How many rows are written in one shuffled flush, unless the timer comes first. */
+    static final int DEFAULT_FLUSH_ROWS = 50;
+
+    /** The bounds the flush size is held to. One row per flush is no shuffle at all. */
+    static final int MIN_FLUSH_ROWS_SETTING = 1;
+    static final int MAX_FLUSH_ROWS_SETTING = 500;
+
+    /** How long the oldest buffered row waits for company. See the class comment. */
+    static final int HOLD_MINUTES = 10;
+    static final Duration DEFAULT_HOLD = Duration.ofMinutes(HOLD_MINUTES);
+
+    /**
+     * The fewest rows the timer will write. Anything smaller waits for neighbours until
+     * {@link #MAX_HOLD}: the digest's floor is five people, and a flush under it could be one.
+     */
+    static final int MIN_FLUSH_ROWS = 5;
+
+    /**
+     * The longest a row waits, whatever the buffer holds — the same hour {@code searched_at} is
+     * truncated to, so a late flush discloses nothing the row does not already carry.
+     */
+    static final int MAX_HOLD_MINUTES = 60;
+    static final Duration MAX_HOLD = Duration.ofMinutes(MAX_HOLD_MINUTES);
+
+    /** How often the buffer is asked whether it has waited long enough. */
+    static final Duration TICK = Duration.ofMinutes(1);
+
+    /** How long a clean shutdown waits for the last flush before giving up on it. */
+    private static final Duration SHUTDOWN_GRACE = Duration.ofSeconds(5);
+
     private final SearchDemandLogRepository logs;
     private final CoarseAreas areas;
     private final Clock clock;
     private final Executor executor;
+    private final ScheduledExecutorService ticker;
     private final TransactionTemplate transaction;
     private final Duration repeatWindow;
+    private final int flushRows;
+    private final Duration holdFor;
 
     /** Dropped because the queue was full, and dropped because the write failed. For tests and logs. */
     private final AtomicLong refused = new AtomicLong();
     private final AtomicLong failed = new AtomicLong();
     private final AtomicLong written = new AtomicLong();
     private final AtomicLong repeats = new AtomicLong();
+
+    /**
+     * Rows waiting for a flush, and when the oldest of them arrived.
+     *
+     * <p>Touched only on the recorder's own thread: {@link #record} hands the work to the executor,
+     * and the timer submits its check to the same executor rather than reaching in from another
+     * thread. One writer means the buffer needs no lock and the shuffle needs no copy.
+     */
+    private final List<SearchDemandLog> buffer = new ArrayList<>();
+    private Instant bufferedSince;
+
+    /** The shuffle itself. Seeded by the platform, so the permutation is not one anybody can replay. */
+    private final SecureRandom shuffle = new SecureRandom();
 
     /**
      * When each (account, area, term) was last recorded. Access-ordered and capped, so it is an LRU
@@ -110,8 +192,20 @@ public class SearchDemandRecorder implements DisposableBean {
     public SearchDemandRecorder(SearchDemandLogRepository logs, CoarseAreas areas, Clock clock,
                                 PlatformTransactionManager transactionManager,
                                 @Value("${delivery.demand.search-log.repeat-window:30m}")
-                                Duration repeatWindow) {
-        this(logs, areas, clock, transactionManager, newPool(), repeatWindow);
+                                Duration repeatWindow,
+                                @Value("${delivery.demand.search-log.flush-rows:50}") int flushRows,
+                                @Value("${delivery.demand.search-log.flush-after:10m}")
+                                Duration flushAfter) {
+        this(logs, areas, clock, transactionManager, newPool(), newTicker(), repeatWindow, flushRows,
+                flushAfter);
+        // Started here rather than in the shared constructor, so nothing schedules a task that reads
+        // a half-built object. Its own ticker rather than @Scheduled: scheduling reaches this service
+        // through the outbox library's configuration, and a buffer that only emptied when somebody
+        // else's feature was switched on would hold rows for ever. One daemon thread, one periodic
+        // task, and all it does is ask the recorder's own thread whether the buffer has waited long
+        // enough.
+        this.ticker.scheduleWithFixedDelay(this::askForAFlush,
+                TICK.toMillis(), TICK.toMillis(), TimeUnit.MILLISECONDS);
     }
 
     /**
@@ -119,14 +213,25 @@ public class SearchDemandRecorder implements DisposableBean {
      * second constructor is: the pool is the only part of this class a test cannot assert against
      * directly, and the thing worth asserting about it — that {@link #record} returns before the
      * write happens — needs an executor that does not run inline.
+     *
+     * <p>No ticker: a test moves its own clock and calls {@link #flushIfDue} when it means to.
      */
     public SearchDemandRecorder(SearchDemandLogRepository logs, CoarseAreas areas, Clock clock,
                                 PlatformTransactionManager transactionManager, Executor executor,
-                                Duration repeatWindow) {
+                                Duration repeatWindow, int flushRows, Duration flushAfter) {
+        this(logs, areas, clock, transactionManager, executor, null, repeatWindow, flushRows,
+                flushAfter);
+    }
+
+    private SearchDemandRecorder(SearchDemandLogRepository logs, CoarseAreas areas, Clock clock,
+                                 PlatformTransactionManager transactionManager, Executor executor,
+                                 ScheduledExecutorService ticker, Duration repeatWindow,
+                                 int flushRows, Duration flushAfter) {
         this.logs = logs;
         this.areas = areas;
         this.clock = clock;
         this.executor = executor;
+        this.ticker = ticker;
         // A transaction of its own, started on the background thread: the search's own transaction
         // is read-only and, by the time this runs, closed. REQUIRES_NEW says so out loud.
         this.transaction = new TransactionTemplate(transactionManager);
@@ -134,6 +239,12 @@ public class SearchDemandRecorder implements DisposableBean {
         Duration window = repeatWindow == null ? Duration.ofMinutes(30) : repeatWindow;
         this.repeatWindow = window.compareTo(MIN_REPEAT_WINDOW) < 0 ? MIN_REPEAT_WINDOW
                 : window.compareTo(MAX_REPEAT_WINDOW) > 0 ? MAX_REPEAT_WINDOW : window;
+        // Clamped rather than refused: neither end of this can leak anything or lose anything that a
+        // restart would not, so a mistyped value should not stop the service from starting.
+        this.flushRows = Math.min(Math.max(flushRows, MIN_FLUSH_ROWS_SETTING), MAX_FLUSH_ROWS_SETTING);
+        Duration hold = flushAfter == null ? DEFAULT_HOLD : flushAfter;
+        this.holdFor = hold.isNegative() ? Duration.ZERO
+                : hold.compareTo(MAX_HOLD) > 0 ? MAX_HOLD : hold;
     }
 
     /**
@@ -192,13 +303,80 @@ public class SearchDemandRecorder implements DisposableBean {
             boolean inOwnArea = recording.shops() > 0 && areas.anyIn(recording.answering(), area);
             SearchDemandLog row = new SearchDemandLog(now, area, recording.term(),
                     recording.shops(), inOwnArea, recording.nearest(), recording.vertical());
-            transaction.executeWithoutResult(status -> logs.save(row));
-            written.incrementAndGet();
+            buffer.add(row);
+            if (bufferedSince == null) {
+                bufferedSince = now;
+            }
+            if (buffer.size() >= flushRows) {
+                flush();
+            }
         } catch (Throwable e) {
             // Including Errors: this thread is the platform's, and letting one die would stop every
             // later recording without a word. The search it describes was answered long ago.
             failed.incrementAndGet();
             log.debug("Could not record a search for the demand digest", e);
+        }
+    }
+
+    /**
+     * Writes the buffer if it has waited long enough, on the recorder's own thread.
+     *
+     * <p>Three states: not yet waited {@code flush-after}, so nothing happens; waited, and holding at
+     * least {@value #MIN_FLUSH_ROWS} rows, so it goes; waited {@value #MAX_HOLD_MINUTES} minutes with
+     * fewer than that, so it goes anyway — by then the rows span the hour their own timestamps name.
+     */
+    void flushIfDue() {
+        if (buffer.isEmpty() || bufferedSince == null) {
+            return;
+        }
+        Instant now = clock.instant();
+        if (bufferedSince.plus(holdFor).isAfter(now)) {
+            return;
+        }
+        if (buffer.size() < MIN_FLUSH_ROWS && bufferedSince.plus(MAX_HOLD).isAfter(now)) {
+            return;
+        }
+        flush();
+    }
+
+    /**
+     * Writes what is buffered, in an order that is not the order it happened in.
+     *
+     * <p>The shuffle is the whole point of the buffer: the rows are inserted in one transaction, in
+     * one statement batch, so the heap holds them in the order this list is in — and this list has
+     * been permuted. What a reader of {@code ctid} gets back is therefore which flush a row belonged
+     * to, never where in it. {@link SecureRandom} rather than a seeded {@link java.util.Random}, so
+     * the permutation cannot be recomputed by somebody who knows when the process started.
+     *
+     * <p>A flush that fails drops its rows rather than keeping them: the buffer is bounded by being
+     * emptied, and a database that refused fifty rows will refuse them again.
+     */
+    private void flush() {
+        if (buffer.isEmpty()) {
+            return;
+        }
+        List<SearchDemandLog> rows = new ArrayList<>(buffer);
+        buffer.clear();
+        bufferedSince = null;
+        Collections.shuffle(rows, shuffle);
+        try {
+            transaction.executeWithoutResult(status -> logs.saveAll(rows));
+            written.addAndGet(rows.size());
+        } catch (Throwable e) {
+            failed.addAndGet(rows.size());
+            log.debug("Could not write {} buffered searches for the demand digest", rows.size(), e);
+        }
+    }
+
+    /** Asks the recorder's thread to consider a flush. Called by the ticker, never by it directly. */
+    private void askForAFlush() {
+        try {
+            executor.execute(this::flushIfDue);
+        } catch (RejectedExecutionException e) {
+            // Every thread is busy writing; the next tick will ask again.
+            log.debug("The demand recorder was too busy to be asked for a flush");
+        } catch (RuntimeException e) {
+            log.debug("Could not ask the demand recorder for a flush", e);
         }
     }
 
@@ -212,7 +390,7 @@ public class SearchDemandRecorder implements DisposableBean {
         if (accountId == null || accountId.isBlank() || repeatWindow.isZero()) {
             return false;
         }
-        String key = accountId + ' ' + area + ' ' + term;
+        String key = accountId + ' ' + area + ' ' + term;
         Instant seen = lastSeen.put(key, now);
         return seen != null && seen.plus(repeatWindow).isAfter(now);
     }
@@ -229,24 +407,61 @@ public class SearchDemandRecorder implements DisposableBean {
                 new ThreadPoolExecutor.AbortPolicy());
     }
 
+    private static ScheduledExecutorService newTicker() {
+        return Executors.newSingleThreadScheduledExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "search-demand-flush");
+            thread.setDaemon(true);
+            return thread;
+        });
+    }
+
     @Override
     public void destroy() {
-        if (executor instanceof ExecutorService pool) {
-            // Not waited on. A recording lost to a rolling update is one search missing from one
-            // week's count, and holding the shutdown open for it would be the wrong trade.
+        if (ticker != null) {
+            ticker.shutdownNow();
+        }
+        if (!(executor instanceof ExecutorService pool)) {
+            return;
+        }
+        try {
+            // The buffer now holds up to an hour of rows, so a clean stop writes them: submitted
+            // before the pool is closed to new work, and waited on briefly. What a kill -9 loses is
+            // one flush, which is the price of not writing the sequence down.
+            pool.execute(this::flush);
+        } catch (RejectedExecutionException e) {
+            log.debug("The demand recorder could not be asked for a last flush");
+        }
+        pool.shutdown();
+        try {
+            if (!pool.awaitTermination(SHUTDOWN_GRACE.toSeconds(), TimeUnit.SECONDS)) {
+                pool.shutdownNow();
+            }
+        } catch (InterruptedException e) {
             pool.shutdownNow();
+            Thread.currentThread().interrupt();
         }
     }
 
-    /** How many recordings were written, dropped for a full queue, dropped on failure, or collapsed. */
-    public record Counts(long written, long refused, long failed, long repeats) {
+    /**
+     * How many recordings were written, dropped for a full queue, dropped on failure, or collapsed,
+     * and how many are waiting for a flush.
+     */
+    public record Counts(long written, long refused, long failed, long repeats, long waiting) {
     }
 
     public Counts counts() {
-        return new Counts(written.get(), refused.get(), failed.get(), repeats.get());
+        return new Counts(written.get(), refused.get(), failed.get(), repeats.get(), buffer.size());
     }
 
     Duration repeatWindow() {
         return repeatWindow;
+    }
+
+    int flushRows() {
+        return flushRows;
+    }
+
+    Duration holdFor() {
+        return holdFor;
     }
 }

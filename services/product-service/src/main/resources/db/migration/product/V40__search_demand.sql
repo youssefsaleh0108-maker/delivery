@@ -20,7 +20,11 @@
 --     the delivery area nearest the pin is kept, which is a neighbourhood shared by thousands;
 --   * sequential key. The primary key is random (uuid), NOT a bigserial: a monotonic id would order
 --     the rows, and two rows adjacent in a coarse hour would read as one person's two searches.
---     Random ids make any two rows unlinkable even to somebody holding the whole table;
+--     A random key is not enough on its own, and it would be a dangerous thing to claim it is: this
+--     table is insert-only and single-writer, so ORDER BY ctid reads the heap in the order the rows
+--     were inserted in and hands the sequence straight back. That is why the recorder buffers rows
+--     and writes each flush in a shuffled order (SearchDemandRecorder) — the heap says which flush a
+--     row was in, never where in it;
 --   * minute or second. searched_at is truncated to the hour by the writer, so the fine timing that
 --     would otherwise re-link rows within an hour is not recorded either.
 --

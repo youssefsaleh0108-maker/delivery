@@ -202,6 +202,35 @@ class SearchDemandDatabaseTest {
                 .isEqualTo("uuid");
     }
 
+    /**
+     * The claim the first version of this migration made in a comment, tested instead of asserted in
+     * prose: a random primary key does not hide the order rows were written in. {@code ORDER BY ctid}
+     * reads an insert-only table in physical order, which is insertion order — so the recorder
+     * shuffles every flush, and this is the proof that it does.
+     *
+     * <p>Written through the recorder rather than through the repository, because the shuffle is the
+     * writer's job and this has to fail if somebody takes it out.
+     */
+    @Test
+    @DisplayName("the heap does not give the order the searches happened in back")
+    void the_physical_order_is_not_the_search_order() throws SQLException {
+        SearchDemandRecorder recorder = recorder(Duration.ZERO, 40);
+        List<String> asSearched = new ArrayList<>();
+        for (int i = 0; i < 40; i++) {
+            String term = "term-" + (i < 10 ? "0" + i : i);
+            asSearched.add(term);
+            recorder.record(new Recording("account-" + i, term, HAMRA, 0, null, List.of(), null));
+        }
+
+        List<String> asStored = terms("SELECT term FROM search_demand_log ORDER BY ctid");
+
+        assertThat(asStored).containsExactlyInAnyOrderElementsOf(asSearched);
+        // Every row is there; the sequence that would read as one street's afternoon is not.
+        assertThat(asStored).isNotEqualTo(asSearched);
+        // And the id gives nothing either: random uuids sort into an order of their own.
+        assertThat(terms("SELECT term FROM search_demand_log ORDER BY id")).isNotEqualTo(asSearched);
+    }
+
     // ------------------------------------------------------------------------------ one row, coarse
 
     @Test
@@ -420,10 +449,16 @@ class SearchDemandDatabaseTest {
     // ------------------------------------------------------------------------------------ helpers
 
     private SearchDemandRecorder recorder(Duration repeatWindow) {
+        // One row per flush, so the assertion that follows sees the row. What the buffer is really
+        // for is proved on its own, below, where a flush is big enough to be shuffled.
+        return recorder(repeatWindow, 1);
+    }
+
+    private SearchDemandRecorder recorder(Duration repeatWindow, int flushRows) {
         // Inline, so the assertion that follows sees the row. The pool is the production path and is
         // covered where it matters: that record() returns before the write happens.
         return new SearchDemandRecorder(logs, areas, Clock.fixed(NOW, ZoneOffset.UTC),
-                transactionManager(), Runnable::run, repeatWindow);
+                transactionManager(), Runnable::run, repeatWindow, flushRows, Duration.ofMinutes(10));
     }
 
     private void searches(UUID area, String term, int howMany, int results, Integer nearest) {
@@ -498,6 +533,19 @@ class SearchDemandDatabaseTest {
         try (Connection connection = connection(); Statement statement = connection.createStatement()) {
             statement.execute(sql);
         }
+    }
+
+    /** One text column, in the order the query asked for. */
+    private List<String> terms(String sql) throws SQLException {
+        List<String> values = new ArrayList<>();
+        try (Connection connection = connection();
+             Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery(sql)) {
+            while (rows.next()) {
+                values.add(rows.getString(1));
+            }
+        }
+        return values;
     }
 
     private String scalar(String sql) throws SQLException {
