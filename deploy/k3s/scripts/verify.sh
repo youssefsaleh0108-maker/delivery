@@ -286,6 +286,19 @@ case "$mobile" in
   *'"directAccessGrantsEnabled": true'*) ok "mobile-app keeps the password grant the apps need" ;;
   *) fail "mobile-app lost the password grant: the phone sign-in and every smoke script use it" ;;
 esac
+# 14 days idle, 30 days maximum. Rotation guards only the current refresh token, and a thief
+# spending a stolen one keeps resetting the idle clock — so the MAXIMUM is what bounds an actively
+# abused token, and without these this client inherits the realm's 90 days.
+for pair in 'client.session.idle.timeout": "1209600' 'client.session.max.lifespan": "2592000'; do
+  case "$mobile" in
+    *"$pair"*) ok "mobile-app ${pair%%\"*}" ;;
+    *) fail "mobile-app is missing $pair: it would inherit the realm's 30 d / 90 d" ;;
+  esac
+done
+case "$mobile" in
+  *'https://www.youdrop.shop'*) ok "mobile-app allows the public site's origin" ;;
+  *) fail "mobile-app has no web origin for www: the site's receipt panel is refused by CORS" ;;
+esac
 # ...and no script may ask delivery-portal for one, because it will be refused. The three files
 # excluded here name the client in order to ASSERT on it rather than to sign in with it: this
 # script, scripts/test/, and rotate-secrets.sh — which proves the refusal against the live realm

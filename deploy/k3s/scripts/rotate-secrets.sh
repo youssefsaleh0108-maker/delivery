@@ -635,17 +635,36 @@ PY
   client_scope_drop "$id" delivery-portal offline_access
 
   echo "== the mobile-app client"
-  # The public site's receipt panel exchanges an applicant's passcode at the token endpoint from
-  # www, in a browser, with this client id. Keycloak's own CORS answer for that comes from the
-  # client's web origins, and "+" covers only the origins of its redirect URIs — none of which is
-  # www. Additive and idempotent: nothing else in the list is touched.
+  # Two changes, one read-modify-write.
+  #
+  # The web origin: the public site's receipt panel exchanges an applicant's passcode at the token
+  # endpoint from www, in a browser, with this client id. Keycloak's own CORS answer for that comes
+  # from the client's web origins, and "+" covers only the origins of its redirect URIs — none of
+  # which is www. Additive: nothing else in the list is touched.
+  #
+  # The session window, 14 days idle and 30 days maximum. Rotation guards the CURRENT refresh
+  # token and not the chain (see README, "what rotation does and does not stop"), so a token copied
+  # off a phone stays good for as long as its session lives — and a thief spending it keeps
+  # resetting the idle clock, which leaves the MAXIMUM as the only real bound. This client had no
+  # override and inherited the realm's 30 days idle / 90 days maximum; 90 days of usable stolen
+  # token is the thing being cut, to 30.
+  #
+  # It is the phones' window, so say plainly what it costs: a customer or rider who does not open
+  # the app for 14 days signs in again, and everybody signs in again within 30 days however often
+  # they use it. Biometric "Continue as" is no exception — the stash IS a refresh token, so it
+  # dies with the session it belongs to.
   id=$(client_uuid mobile-app); [ -n "$id" ] || die "client mobile-app not found in $REALM"
   kc "$ADMIN/clients/$id" > "$WORK/mobile.json"
-  if jq -e '.webOrigins | index("https://www.youdrop.shop")' "$WORK/mobile.json" >/dev/null; then
-    ok "mobile-app already allows the public site's origin"
+  if jq -e '(.webOrigins | index("https://www.youdrop.shop")) != null
+            and .attributes["client.session.idle.timeout"] == "1209600"
+            and .attributes["client.session.max.lifespan"] == "2592000"' "$WORK/mobile.json" >/dev/null; then
+    ok "mobile-app already has the public site's origin and its session window; nothing written"
   else
-    jq '.webOrigins += ["https://www.youdrop.shop"]' "$WORK/mobile.json" > "$WORK/mobile-new.json"
-    check "mobile-app accepted the public site's origin" 204 \
+    jq '.webOrigins = (.webOrigins + ["https://www.youdrop.shop"] | unique)
+        | .attributes["client.session.idle.timeout"] = "1209600"
+        | .attributes["client.session.max.lifespan"] = "2592000"' \
+      "$WORK/mobile.json" > "$WORK/mobile-new.json"
+    check "mobile-app accepted the origin and the session window" 204 \
       "$(kc -o /dev/null -w '%{http_code}' -X PUT -H 'Content-Type: application/json' --data-binary @"$WORK/mobile-new.json" "$ADMIN/clients/$id")"
   fi
 
@@ -671,6 +690,18 @@ edge_identity_proofs() {   # edge_identity_proofs <keep|drop>
   kc_fresh
   check "delivery-portal: offline_access is gone" 0 \
     "$( { kc "$ADMIN/clients/$id/default-client-scopes"; kc "$ADMIN/clients/$id/optional-client-scopes"; } | jq -s -r '[.[][] | select(.name == "offline_access")] | length')"
+
+  kc_fresh
+  id=$(client_uuid mobile-app)
+  kc "$ADMIN/clients/$id" > "$WORK/mobile-now.json"
+  # 14 days and 30 days, in seconds. Read back as strings: Keycloak keeps client attributes as
+  # text, and a number here would compare unequal to what it stores.
+  check "mobile-app: client session idle (14 days)" 1209600 "$(jq -r '.attributes["client.session.idle.timeout"]' "$WORK/mobile-now.json")"
+  check "mobile-app: client session max (30 days)" 2592000 "$(jq -r '.attributes["client.session.max.lifespan"]' "$WORK/mobile-now.json")"
+  check "mobile-app: the public site's origin" present \
+    "$(jq -r '[.webOrigins[] | select(. == "https://www.youdrop.shop")] | if length > 0 then "present" else "MISSING" end' "$WORK/mobile-now.json")"
+  check "mobile-app: the phones can still sign in directly" true \
+    "$(jq -r '.directAccessGrantsEnabled' "$WORK/mobile-now.json")"
 
   echo "== what a client can actually do"
   # The password the proof needs comes out of the Secret into a private file and is never printed

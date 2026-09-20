@@ -156,6 +156,7 @@ them* below for what it creates and who reads each one.
   | realm `sslRequired` | `none` | `external` |
   | realm refresh tokens | 30 days, reusable | rotated on every use, no reuse |
   | `mobile-app` web origins | `+` | `+` and `https://www.youdrop.shop`, which the site's receipt panel needs |
+  | `mobile-app` client session | the realm's 30 d idle / 90 d max | **14 d idle, 30 d max** |
 
   **`refresh-rotation` is the one that can sign somebody out**, which is why it is separate and
   goes last. Under it a client that runs two refresh grants at once presents a token the server
@@ -176,12 +177,23 @@ them* below for what it creates and who reads each one.
 
   So Keycloak guards the CURRENT token, not the chain. A refresh token copied out of a browser or
   a backup is still usable for as long as its session lives, unless the thief is unlucky enough to
-  race the real client's very next refresh. **The client session window is the real bound**, which
-  is why `delivery-portal` has one: 8 h idle / 24 h max, after which a stolen portal token is
-  worth nothing. `mobile-app` has no override and inherits the realm's 30 d idle / 90 d max, so a
-  token taken from a phone stays good for up to thirty quiet days. Giving `mobile-app` its own
-  window is a live decision about how often customers and riders are asked to sign in again, not a
-  change to make quietly — see the report that came with this branch.
+  race the real client's very next refresh. **The client session window is the real bound**, and
+  both clients now have one: `delivery-portal` 8 h idle / 24 h max, `mobile-app` 14 d idle /
+  30 d max. Note which number does the work — idle only expires a token nobody is using, and a
+  thief spending a stolen one keeps resetting that clock, so the MAXIMUM is what bounds an
+  actively abused token. `mobile-app` inherited the realm's 90 days; it is now 30.
+
+  **What that means for a rider or a customer.** They sign in again after 14 days without opening
+  the app, and after 30 days however often they use it. Biometric "Continue as" is not an
+  exception: the stash behind it IS a refresh token (`AuthService.signOut(keepForBiometrics:
+  true)`), so it dies with the session it belongs to, and the next sign-in asks for a passcode
+  before the fingerprint is offered again. A rider can meet the 30-day bound mid-shift; nothing in
+  the app defers it. Raising either number is one client attribute, applied by re-running
+  `edge-identity` after changing it here and in the realm file.
+
+  When the window is first narrowed, every session already older than the new maximum ends at
+  once. That was accepted deliberately in 2026-09, while the platform had no real user base — the
+  cost of this change grows every week it is deferred.
 
   `refresh-rotation` proves both halves of the first row, and it needs **two sign-ins** to do it:
   the replay is what revokes the session, so a proof that replays first and then checks the

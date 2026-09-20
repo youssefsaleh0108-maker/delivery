@@ -136,6 +136,8 @@
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
+        "client.session.idle.timeout": "1209600",
+        "client.session.max.lifespan": "2592000",
         "post.logout.redirect.uris": "com.delivery.app://logout##http://localhost:5012/*##http://127.0.0.1:5012/*"
       },
       "protocolMappers": [
