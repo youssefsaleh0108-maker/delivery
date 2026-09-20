@@ -58,7 +58,9 @@ class ReconciliationCarrierCashTest {
         carrierCash = mock(CarrierCashService.class);
         mvc = MockMvcBuilders.standaloneSetup(new ReconciliationController(
                         mock(AccountingTransactionRepository.class), cashFloat,
-                        mock(CoreBankingSyncLogRepository.class), carrierCash))
+                        mock(CoreBankingSyncLogRepository.class), carrierCash,
+                        mock(com.delivery.accounting.service.SettlementFailures.class),
+                        mock(com.delivery.accounting.service.SettlementRecovery.class)))
                 .build();
     }
 

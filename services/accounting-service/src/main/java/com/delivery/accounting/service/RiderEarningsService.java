@@ -67,43 +67,29 @@ public class RiderEarningsService {
                                 RiderCashOutRepository cashOuts,
                                 CashFloatRepository floatEntries,
                                 RiderPayoutProviders payoutProviders,
-                                @Value("${delivery.rider-earnings.minimum-cash-out:5.00}")
-                                BigDecimal minimumCashOut,
-                                @Value("${delivery.rider-earnings.maximum-tip:100.00}")
-                                BigDecimal maximumTip,
-                                @Value("${delivery.rider-earnings.offset-cash-float:true}")
-                                boolean offsetCashFloat,
-                                // The platform's one calendar (RECON-08): the rider's day is the
-                                // day their statement and their company's pay period count in. The
-                                // API still takes a zone per request; this is the fallback.
-                                PlatformCalendar calendar,
-                                @Value("${delivery.accounting.currency:USD}") String currency) {
-        this(ledger, cashOuts, floatEntries, payoutProviders, minimumCashOut, maximumTip,
-                offsetCashFloat, calendar.zone().getId(), currency);
-    }
-
-    /** With the zone named outright, for tests that state the calendar they are reasoning in. */
-    public RiderEarningsService(RiderLedgerRepository ledger,
-                                RiderCashOutRepository cashOuts,
-                                CashFloatRepository floatEntries,
-                                RiderPayoutProviders payoutProviders,
                                 // Below this a cash-out is refused. Nothing here pays automatically
                                 // — an operator does — so a queue of 40-cent requests costs more in
                                 // their time than the requests are worth.
+                                @Value("${delivery.rider-earnings.minimum-cash-out:5.00}")
                                 BigDecimal minimumCashOut,
                                 // A ceiling on a single tip. Not a policy about generosity: it is
                                 // the fat-finger guard, because the amount arrives from a phone
                                 // keypad and a misplaced decimal point is the common case.
+                                @Value("${delivery.rider-earnings.maximum-tip:100.00}")
                                 BigDecimal maximumTip,
                                 // Whether cash a rider is still carrying reduces what they can take
                                 // out. See availableFor() — the default is on, and turning it off
                                 // means the platform will hand a rider money while they are holding
                                 // more of the platform's.
+                                @Value("${delivery.rider-earnings.offset-cash-float:true}")
                                 boolean offsetCashFloat,
                                 // "Today" is a local-calendar question, answered in the platform's
-                                // one calendar. See statement(), which takes a zone per request.
-                                String zone,
-                                String currency) {
+                                // one calendar (RECON-08): one key, one default, checked at
+                                // start-up by PlatformCalendar. See statement(), which takes a zone
+                                // per request.
+                                @Value("${" + PlatformCalendar.ZONE_PROPERTY + ":"
+                                        + PlatformCalendar.DEFAULT_ZONE + "}") String zone,
+                                @Value("${delivery.accounting.currency:USD}") String currency) {
         this.ledger = ledger;
         this.cashOuts = cashOuts;
         this.floatEntries = floatEntries;

@@ -159,12 +159,14 @@ public class CarrierPayrollService {
                                  AccountDirectory accounts,
                                  PlatformTransactionManager transactionManager,
                                  // The calendar pay periods are in: the platform's one calendar,
-                                 // which is also order-tracking's day zone (RECON-08).
-                                 PlatformCalendar calendar,
+                                 // which is also order-tracking's day zone (RECON-08). One key, one
+                                 // default, checked at start-up by PlatformCalendar.
+                                 @Value("${" + PlatformCalendar.ZONE_PROPERTY + ":"
+                                         + PlatformCalendar.DEFAULT_ZONE + "}") String zone,
                                  @Value("${delivery.accounting.currency:USD}") String currency) {
         this(policies, runs, payslips, lines, adjustments, snapshots, deliveredCopies, events,
                 riderLedger, carrierCash, cashFloat, attendance, deliveriesSource, accounts,
-                transactionManager, calendar.zone().getId(), currency, calendar.clock());
+                transactionManager, zone, currency, Clock.systemUTC());
     }
 
     /** For tests, which need "today" to hold still while periods open and close around it. */

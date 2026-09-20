@@ -93,28 +93,6 @@ public class StatementService {
     private final String currency;
     private final ZoneId zone;
 
-    @org.springframework.beans.factory.annotation.Autowired
-    public StatementService(AccountingTransactionRepository transactions,
-                            CashFloatRepository floatEntries,
-                            RiderLedgerRepository riderLedger,
-                            StatementDispatchRepository dispatches,
-                            CounterpartyDirectory directory,
-                            @Value("${delivery.ordering.commission-percentage:12.5}")
-                            BigDecimal commissionPercentage,
-                            // The platform's take on a delivery it did not perform, for the label
-                            // on a carrier's commission line. A carrier is charged this rate and
-                            // never the goods rate, and a line that quoted the wrong one would be
-                            // argued with — rightly.
-                            @Value("${delivery.ordering.delivery-commission-percentage:10}")
-                            BigDecimal deliveryCommissionPercentage,
-                            @Value("${delivery.accounting.currency:USD}") String currency,
-                            // The platform's one calendar (RECON-08): a from/to range means the
-                            // same 31 days here as a pay period, a rider's week and a dashboard.
-                            PlatformCalendar calendar) {
-        this(transactions, floatEntries, riderLedger, dispatches, directory, commissionPercentage,
-                deliveryCommissionPercentage, currency, calendar.zone().getId());
-    }
-
     /** With the delivery rate left at the shipped one, for tests that do not speak of carriers. */
     public StatementService(AccountingTransactionRepository transactions,
                             CashFloatRepository floatEntries,
@@ -128,7 +106,7 @@ public class StatementService {
                 new BigDecimal("10"), currency, zone);
     }
 
-    /** With the zone named outright, for tests that state the calendar they are reasoning in. */
+    @org.springframework.beans.factory.annotation.Autowired
     public StatementService(AccountingTransactionRepository transactions,
                             CashFloatRepository floatEntries,
                             RiderLedgerRepository riderLedger,
@@ -137,10 +115,19 @@ public class StatementService {
                             // Shown in the commission line's LABEL only, never used to recompute a
                             // figure. Everything on a statement is read from the legs; a percentage
                             // applied afterwards would restate history the moment the rate changed.
+                            @Value("${delivery.ordering.commission-percentage:12.5}")
                             BigDecimal commissionPercentage,
+                            // The platform's take on a delivery it did not perform, for the label on
+                            // a carrier's commission line: a carrier is charged this rate and never
+                            // the goods rate, and a line quoting the wrong one would be argued with.
+                            @Value("${delivery.ordering.delivery-commission-percentage:10}")
                             BigDecimal deliveryCommissionPercentage,
-                            String currency,
-                            String zone) {
+                            @Value("${delivery.accounting.currency:USD}") String currency,
+                            // The platform's one calendar (RECON-08): a from/to range means the
+                            // same 31 days here as a pay period, a rider's week and a dashboard.
+                            // One key, one default, checked at start-up by PlatformCalendar.
+                            @Value("${" + PlatformCalendar.ZONE_PROPERTY + ":"
+                                    + PlatformCalendar.DEFAULT_ZONE + "}") String zone) {
         this.transactions = transactions;
         this.floatEntries = floatEntries;
         this.riderLedger = riderLedger;

@@ -57,40 +57,39 @@ class PlatformCalendarTest {
     @DisplayName("a reader's own key is honoured when it agrees, and unset is no opinion")
     void agreeingKeysAreAccepted() {
         assertThatCode(() -> new PlatformCalendar("Asia/Beirut", "Asia/Beirut", "Asia/Beirut",
-                "Asia/Beirut", Clock.systemUTC())).doesNotThrowAnyException();
-        assertThatCode(() -> new PlatformCalendar("Asia/Beirut", "", null, "  ",
-                Clock.systemUTC())).doesNotThrowAnyException();
+                "Asia/Beirut")).doesNotThrowAnyException();
+        assertThatCode(() -> new PlatformCalendar("Asia/Beirut", "", null, "  "))
+                .doesNotThrowAnyException();
     }
 
     @Test
     @DisplayName("a configuration that splits the calendar refuses to start")
     void aSplitCalendarRefusesToStart() {
         assertThatThrownBy(() -> new PlatformCalendar("Asia/Beirut", "UTC", "Asia/Beirut",
-                "Asia/Beirut", Clock.systemUTC()))
+                "Asia/Beirut"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("delivery.accounting.statements.zone")
                 .hasMessageContaining("one calendar");
-        assertThatThrownBy(() -> new PlatformCalendar("Asia/Beirut", null, "UTC", null,
-                Clock.systemUTC()))
+        assertThatThrownBy(() -> new PlatformCalendar("Asia/Beirut", null, "UTC", null))
                 .hasMessageContaining("delivery.rider-earnings.zone");
-        assertThatThrownBy(() -> new PlatformCalendar("Nowhere/Nothing", null, null, null,
-                Clock.systemUTC()))
+        assertThatThrownBy(() -> new PlatformCalendar("Nowhere/Nothing", null, null, null))
                 .hasMessageContaining("not a timezone");
     }
 
     @Test
     @DisplayName("00:16 on 9 September in Beirut is the 9th, three hours before UTC agrees")
     void theDayIsTheLocalDay() {
-        PlatformCalendar calendar = new PlatformCalendar("Asia/Beirut", null, null, null,
-                AT_MIDNIGHT_IN_BEIRUT);
+        ZoneId zone = new PlatformCalendar("Asia/Beirut", null, null, null).zone();
 
-        // The dev order of the deep test: delivered 2026-09-08T21:16:14Z, which is the 9th there.
-        assertThat(calendar.dayOf(Instant.parse("2026-09-08T21:16:14Z")))
+        assertThat(zone).isEqualTo(ZoneId.of("Asia/Beirut"));
+        // The dev order of the deep test: delivered 2026-09-08T21:16:14Z, which is the 9th there,
+        // and the day a statement, a rider's week and a pay period all now bucket it on.
+        assertThat(LocalDate.ofInstant(Instant.parse("2026-09-08T21:16:14Z"), zone))
                 .isEqualTo(LocalDate.parse("2026-09-09"));
         // And "today" on the carrier cash page at 00:16 Beirut is that day, not yesterday (PT-4).
-        assertThat(calendar.today()).isEqualTo(LocalDate.parse("2026-09-20"));
-        assertThat(calendar.zone()).isEqualTo(ZoneId.of("Asia/Beirut"));
-        assertThat(calendar.startOf(LocalDate.parse("2026-09-09")))
+        assertThat(LocalDate.now(AT_MIDNIGHT_IN_BEIRUT.withZone(zone)))
+                .isEqualTo(LocalDate.parse("2026-09-20"));
+        assertThat(LocalDate.parse("2026-09-09").atStartOfDay(zone).toInstant())
                 .isEqualTo(Instant.parse("2026-09-08T21:00:00Z"));
     }
 }

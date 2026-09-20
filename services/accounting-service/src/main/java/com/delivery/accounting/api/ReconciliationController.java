@@ -52,15 +52,21 @@ public class ReconciliationController {
     private final CashFloatService cashFloat;
     private final CoreBankingSyncLogRepository syncLog;
     private final CarrierCashService carrierCash;
+    private final com.delivery.accounting.service.SettlementFailures failures;
+    private final com.delivery.accounting.service.SettlementRecovery recovery;
 
     public ReconciliationController(AccountingTransactionRepository transactions,
                                     CashFloatService cashFloat,
                                     CoreBankingSyncLogRepository syncLog,
-                                    CarrierCashService carrierCash) {
+                                    CarrierCashService carrierCash,
+                                    com.delivery.accounting.service.SettlementFailures failures,
+                                    com.delivery.accounting.service.SettlementRecovery recovery) {
         this.transactions = transactions;
         this.cashFloat = cashFloat;
         this.syncLog = syncLog;
         this.carrierCash = carrierCash;
+        this.failures = failures;
+        this.recovery = recovery;
     }
 
     /**
@@ -341,6 +347,96 @@ public class ReconciliationController {
                 "byStatus", byStatus,
                 "unsettledCount", unsettled,
                 "amountAtRisk", atRisk);
+    }
+
+    /**
+     * Settlements this service could not make and will not retry (RECON-04).
+     *
+     * <p>The other half of the work list, and the half that used to be invisible: a message that
+     * cannot be settled is acknowledged, because one that comes back for ever blocks every good
+     * one behind it, and what is left is a delivered order with no legs anywhere. Now each one is a
+     * row here, with what stopped it and how many times it has arrived. The payload is deliberately
+     * not returned — it carries a customer's address — and stays in the table for whoever needs it.
+     */
+    @GetMapping("/settlement-failures")
+    public ResponseEntity<?> settlementFailures(@RequestParam(defaultValue = "50") int limit) {
+        ResponseEntity<?> refusal = Callers.requireRole("BACKOFFICE");
+        if (refusal != null) {
+            return refusal;
+        }
+        return ResponseEntity.ok(Map.of(
+                "open", failures.openCount(),
+                "failures", failures.open(limit).stream().map(failure -> {
+                    Map<String, Object> out = new LinkedHashMap<String, Object>();
+                    out.put("id", failure.getId());
+                    out.put("orderId", failure.getOrderId());
+                    out.put("eventType", failure.getEventType());
+                    out.put("reason", failure.getReason());
+                    out.put("attempts", failure.getAttempts());
+                    out.put("firstSeenAt", failure.getFirstSeenAt());
+                    out.put("lastSeenAt", failure.getLastSeenAt());
+                    return out;
+                }).toList()));
+    }
+
+    /**
+     * Delivered orders the ledger has never seen (RECON-04).
+     *
+     * <p>The check no view inside this service could make: a settlement lost on the bus leaves no
+     * legs, and every reconciliation view reads legs. So Order Manager's delivered orders are
+     * compared against the ledger, with the operator's own token — it is their right to read those
+     * orders, not this service's standing one. Read-only; settling is the next call.
+     */
+    @GetMapping("/unsettled-deliveries")
+    public ResponseEntity<?> unsettledDeliveries(@RequestParam(defaultValue = "100") int limit) {
+        ResponseEntity<?> refusal = Callers.requireRole("BACKOFFICE");
+        if (refusal != null) {
+            return refusal;
+        }
+        try {
+            return ResponseEntity.ok(recovery.unsettledDeliveries(
+                    Callers.jwt().getTokenValue(), limit));
+        } catch (com.delivery.accounting.service.OrderManagerOrdersClient.UnavailableException e) {
+            // Deliberately not an empty list: "nothing is missing" and "nobody could be asked" are
+            // different answers, and only one of them means there is nothing to do.
+            return ResponseEntity.status(503).body(Map.of(
+                    "error", "Order Manager could not be asked which orders were delivered.",
+                    "code", "ORDER_MANAGER_UNAVAILABLE"));
+        }
+    }
+
+    /**
+     * Settles one delivered order from Order Manager's record of it (RECON-04).
+     *
+     * <p>The safe way to clear a settlement that was lost: the order is read back, shaped into the
+     * event that went missing and settled through exactly the rules the listener applies — never a
+     * second implementation of them, and never figures typed by an operator. Idempotent: an order
+     * already in the ledger is left alone and answered as such.
+     */
+    @PostMapping("/orders/{orderId}/settle")
+    public ResponseEntity<?> settleFromOrderManager(@PathVariable UUID orderId) {
+        ResponseEntity<?> refusal = Callers.requireRole("BACKOFFICE");
+        if (refusal != null) {
+            return refusal;
+        }
+        try {
+            var settled = recovery.settle(Callers.jwt().getTokenValue(), orderId,
+                    Callers.jwt().getSubject());
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("orderId", settled.orderId());
+            out.put("settled", settled.settled());
+            out.put("legs", settled.legs());
+            if (settled.reason() != null) {
+                out.put("reason", settled.reason());
+            }
+            return ResponseEntity.ok(out);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (com.delivery.accounting.service.OrderManagerOrdersClient.UnavailableException e) {
+            return ResponseEntity.status(503).body(Map.of(
+                    "error", "Order Manager could not be asked about that order.",
+                    "code", "ORDER_MANAGER_UNAVAILABLE"));
+        }
     }
 
     /** Everything not in a terminal state — the work list. */

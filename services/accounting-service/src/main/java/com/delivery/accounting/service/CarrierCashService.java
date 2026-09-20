@@ -115,11 +115,13 @@ public class CarrierCashService {
                               int merchantOverdueAfterHours,
                               // A "day" on this page is a local-calendar day, in the platform's one
                               // calendar (RECON-08, PT-4): at 00:01 in Beirut this page used to
-                              // still be answering with yesterday's date.
-                              PlatformCalendar calendar,
+                              // still be answering with yesterday's date. One key, one default,
+                              // checked at start-up by PlatformCalendar.
+                              @Value("${" + PlatformCalendar.ZONE_PROPERTY + ":"
+                                      + PlatformCalendar.DEFAULT_ZONE + "}") String zone,
                               @Value("${delivery.accounting.currency:USD}") String currency) {
         this(floats, riderLedger, accounts, overdueAfterHours, platformOverdueAfterHours,
-                merchantOverdueAfterHours, calendar.zone().getId(), currency, calendar.clock());
+                merchantOverdueAfterHours, zone, currency, Clock.systemUTC());
     }
 
     /**
