@@ -345,7 +345,13 @@ final class ShopPageFixture {
         when(stores.findPublicPageSlugs(anyCollection(), any())).thenReturn(sitemapSlugs());
         when(stores.findPublicGoodsPageSlugs(any())).thenReturn(sitemapSlugs());
 
-        Page<Product> page = new PageImpl<>(List.copyOf(shelf),
+        // Truncated here because the query is: the service asks findActiveInStore for one page of
+        // MAX_ITEMS, and a mock that handed back every row whatever the Pageable said would let a
+        // test "prove" a cap the page does not have.
+        List<Product> drawn = shelf.size() > PublicShopPageService.MAX_ITEMS
+                ? List.copyOf(shelf.subList(0, PublicShopPageService.MAX_ITEMS))
+                : List.copyOf(shelf);
+        Page<Product> page = new PageImpl<>(drawn,
                 PageRequest.of(0, PublicShopPageService.MAX_ITEMS),
                 Math.max(shelfTotal, shelf.size()));
         when(products.findActiveInStore(any(), any(), anyString(), any())).thenReturn(page);

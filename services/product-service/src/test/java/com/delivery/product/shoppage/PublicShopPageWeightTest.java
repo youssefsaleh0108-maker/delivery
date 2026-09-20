@@ -45,6 +45,32 @@ class PublicShopPageWeightTest {
         return shop;
     }
 
+    /**
+     * The biggest page this service can produce: the whole cap drawn, with more behind it.
+     *
+     * <p>130 items on the shelf so the query's own limit does the cutting, which is the page a
+     * large grocer actually gets — the "forty things" shop above is the common case, not the worst
+     * one, and a budget asserted only on the common case is not a budget.
+     */
+    private static ShopPageFixture cappedShop() {
+        ShopPageFixture shop = new ShopPageFixture()
+                .areas("Hamra", "Ras Beirut", "Manara", "Ain El Mreisseh", "Verdun");
+        String[] sections = {"Bread and pastry", "Cold drinks", "Dairy", "Household", "Tinned"};
+        for (int s = 0; s < sections.length; s++) {
+            List<Item> items = new ArrayList<>();
+            for (int i = 0; i < 26; i++) {
+                items.add(Item.of(sections[s] + " item number " + (i + 1),
+                        "1." + String.format("%02d", (i * 7) % 100)));
+            }
+            shop.section(sections[s], items.toArray(Item[]::new));
+        }
+        return shop;
+    }
+
+    private static int occurrences(String html, String needle) {
+        return html.split(java.util.regex.Pattern.quote(needle), -1).length - 1;
+    }
+
     private static int gzipped(byte[] raw) throws Exception {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (GZIPOutputStream gzip = new GZIPOutputStream(out)) {
@@ -76,15 +102,23 @@ class PublicShopPageWeightTest {
     }
 
     @Test
-    @DisplayName("a shop with an enormous catalogue is capped, and says so honestly")
+    @DisplayName("a shop with an enormous catalogue draws the cap itself, and says so honestly")
     void anEnormousShelfIsBounded() throws Exception {
-        ShopPageFixture shop = busyShop().shelfTotal(4000);
-        byte[] html = shop.mvc().perform(get("/s/" + shop.slug()))
+        ShopPageFixture shop = cappedShop().shelfTotal(4000);
+        byte[] bytes = shop.mvc().perform(get("/s/" + shop.slug()))
                 .andReturn().getResponse().getContentAsByteArray();
+        String html = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
 
-        assertThat(new String(html, java.nio.charset.StandardCharsets.UTF_8))
-                .contains("and 3,960 more in the app");
-        assertThat(html.length).isLessThan(64 * 1024);
+        // The cap drawn, not merely configured: a hundred and twenty item names in the markup.
+        assertThat(occurrences(html, "<span class=\"n\">"))
+                .isEqualTo(PublicShopPageService.MAX_ITEMS);
+        assertThat(html).contains("and 3,880 more in the app");
+
+        System.out.printf("capped shop page: html %d B (gzip %d B), %d items%n",
+                bytes.length, gzipped(bytes), PublicShopPageService.MAX_ITEMS);
+        // The worst page this service can send still fits the budget the common one is held to.
+        assertThat(bytes.length).isLessThan(64 * 1024);
+        assertThat(gzipped(bytes)).isLessThan(16 * 1024);
     }
 
     @Test

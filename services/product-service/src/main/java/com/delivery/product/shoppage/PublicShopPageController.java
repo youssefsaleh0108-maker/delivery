@@ -155,7 +155,8 @@ public class PublicShopPageController {
      *
      * <p>Sent by the service rather than written into a Traefik middleware for the same reason. A
      * policy in YAML is a string nothing can test; this one is asserted by
-     * {@code PublicShopPageResponseTest} against the page it actually protects.
+     * {@code PublicShopPageApiTest.carriesItsOwnContentSecurityPolicy} against the page it actually
+     * protects.
      */
     private final String contentSecurityPolicy;
 
