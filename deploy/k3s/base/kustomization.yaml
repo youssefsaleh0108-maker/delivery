@@ -9,6 +9,7 @@ resources:
   - portal.yaml
   - network-policies.yaml
   - backup.yaml
+  - demo-storefront-gate.yaml
 
 configMapGenerator:
   - name: postgres-init
@@ -45,6 +46,9 @@ configMapGenerator:
       - assets/backup/postgres-backup.sh
       - assets/backup/minio-backup.sh
       - assets/backup/restore-test.sh
+  - name: demo-storefront-gate-script
+    files:
+      - assets/demo-data/purge-demo-storefront.sh
 
 # Generated ConfigMaps keep stable names: the Jobs and mounts reference them by name, and a
 # content change should roll the pods through the overlay apply, not create orphans.

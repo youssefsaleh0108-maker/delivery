@@ -1,0 +1,64 @@
+# Whether this environment's shops are real.
+#
+# V12__demo_storefront seeds eight demo shops and their products into every fresh database. A
+# Flyway migration cannot be gated — it runs what is in the jar, and one that has already run is
+# never re-evaluated — so the seeding stays and this decides, per environment, whether it survives.
+# That also means an environment PROMOTED to production is cleaned by the same code as one born
+# that way, which is what this platform is about to do.
+#
+# It reads ENVIRONMENT_TIER from the overlay's platform-env and refuses to guess: `production`
+# deletes them and proves they are gone, `development` and `test` count them and leave them, and an
+# unset tier fails with an explanation rather than assuming either.
+#
+# An Argo CD PostSync hook, so it runs after every sync rather than once: idempotent by
+# construction (a second run finds nothing to delete), and re-run without ceremony whenever the
+# environment changes. hook-delete-policy BeforeHookCreation removes the previous Job first, so the
+# name stays fixed and there is no suffix to bump. ttlSecondsAfterFinished covers the other path:
+# applied with `kubectl apply -k` there is no hook, and a Completed Job with a fixed name cannot be
+# applied over — the TTL makes it clean itself up instead. (Re-applying within those five minutes
+# reports the Job as immutable; delete it and apply again.)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: demo-storefront-gate
+  labels: { app: demo-storefront-gate }
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 300
+  # It waits up to ten minutes for product-service's migrations, then gives up.
+  activeDeadlineSeconds: 900
+  template:
+    metadata:
+      labels: { app: demo-storefront-gate }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: gate
+          image: postgres:17-alpine@sha256:f02121de6f74d30d8a94cd1d9584125e2178d7e6c377d8130112d4e52d867995
+          command: ["/bin/sh", "/gate/purge-demo-storefront.sh"]
+          env:
+            - name: NAMESPACE
+              valueFrom: { fieldRef: { fieldPath: metadata.namespace } }
+            # Not optional and with no default: whether a storefront is real is not something to
+            # infer. A missing key stops the pod before it can decide wrongly.
+            - name: ENVIRONMENT_TIER
+              valueFrom: { configMapKeyRef: { name: platform-env, key: ENVIRONMENT_TIER } }
+            - name: PGHOST
+              value: postgres
+            - name: PGUSER
+              value: delivery
+            - name: PGPASSWORD
+              valueFrom: { secretKeyRef: { name: platform-secrets, key: POSTGRES_PASSWORD } }
+          volumeMounts:
+            - { name: gate, mountPath: /gate, readOnly: true }
+          # A shell loop and psql. Small on purpose: in dev this pod has to be admitted through a
+          # ResourceQuota that the environment very nearly fills.
+          resources:
+            requests: { memory: 24Mi, cpu: 20m }
+            limits: { memory: 64Mi }
+      volumes:
+        - name: gate
+          configMap: { name: demo-storefront-gate-script, defaultMode: 0555 }

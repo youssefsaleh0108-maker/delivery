@@ -11,6 +11,20 @@ resources:
 configMapGenerator:
   - name: platform-env
     literals:
+      # What this environment IS, and the switch that turns it into production.
+      #
+      # `test` today. Changing this one line to `production` is what makes the cutover real:
+      # base/demo-storefront-gate.yaml then deletes the eight demo shops and proves they are gone,
+      # and scripts/verify.sh starts REFUSING every line below that is marked "test only" —
+      # TEST_CODE_SINK_ENABLED, SIMULATE_WALLETS, WHATSAPP_SIMULATOR_ENABLED. So the failing
+      # verify run is the checklist: it names, one by one, everything still to be changed.
+      - ENVIRONMENT_TIER=test
+      # TEST ONLY, and each must go when the line above says production (PD-1). They are here
+      # rather than in platform-common because a default in a shared file is a default production
+      # inherits silently — SIMULATE_WALLETS in particular offers a customer a wallet payment that
+      # never happens, for an order the platform then treats as paid.
+      - SIMULATE_WALLETS=true
+      - WHATSAPP_SIMULATOR_ENABLED=true
       - KEYCLOAK_PUBLIC_URL=https://iam-qa.youdrop.shop
       - KEYCLOAK_ISSUER_URI=https://iam-qa.youdrop.shop/realms/delivery-platform
       - MINIO_PUBLIC_ENDPOINT=https://api-qa.youdrop.shop

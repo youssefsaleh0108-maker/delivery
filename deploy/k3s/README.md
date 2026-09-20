@@ -247,6 +247,75 @@ in `platform-common`, and the ops basic-auth hash in `gen-secrets.sh`. None of t
   them means changing the roles, the Vault seed and two Deployments together — the production
   secrets refactor. The roles nothing logs in as cannot log in at all.
 
+## What makes an environment production
+
+One literal decides it: **`ENVIRONMENT_TIER`** in the overlay's `platform-env`, one of
+`development`, `test` or `production`. It has no default — an environment that has not said what it
+is fails rather than being guessed at, in either direction.
+
+```
+overlays/dev   ENVIRONMENT_TIER=development
+overlays/qa    ENVIRONMENT_TIER=test      <- change this one line at cutover
+```
+
+**Changing qa's to `production` is the cutover, and the failing `verify.sh` run is the checklist.**
+It names, one at a time, every test-only switch still set: `TEST_CODE_SINK_ENABLED`,
+`SIMULATE_WALLETS`, `WHATSAPP_SIMULATOR_ENABLED`, any `AUTO_APPROVE_*`, mail pointed at a sink, an
+`EMAIL_FROM` on a made-up domain, the rider service-area check turned off. Nothing has to be
+remembered; the script remembers.
+
+It also turns on `base/demo-storefront-gate.yaml`, which is what makes the storefront real.
+
+### The dev switches that used to be everywhere
+
+`platform-common` is shared by every environment, so a value on it is a default **production
+inherits silently**. Five were:
+
+| | was (everywhere) | now |
+| --- | --- | --- |
+| `SIMULATE_WALLETS` | `true` | `false`; dev and qa opt in |
+| `WHATSAPP_SIMULATOR_ENABLED` | `true` | `false`; dev and qa opt in |
+| `SMTP_*`, `EMAIL_FROM` | the mailpit sink, `no-reply@mydelivery.local` | **removed**; every overlay names its own relay, and `verify.sh` fails if one forgets |
+| `NOMINATIM_USER_AGENT` | `YouDrop-dev (…)` | `YouDrop (…)`; dev appends `-dev` |
+
+The mail one is the quietest failure on this platform: every verification code, receipt and rider
+invitation delivered *successfully* to a mailbox nobody reads, with no error anywhere, while
+customers waited. `SIMULATE_WALLETS` is the most expensive: a customer choosing a wallet at
+checkout is taken through a payment that never happened, for an order the platform then treats as
+paid. Neither environment changes — dev and qa already set all of these — but an environment that
+**forgets** now fails loudly instead of quietly running as a test system.
+
+### The demo storefront
+
+`V12__demo_storefront` seeds eight shops and their products, owned by the synthetic merchant
+`demo-merchant`, into every fresh database. A Flyway migration cannot be gated — it runs what is in
+the jar, and one that has already run is never re-evaluated — so the seeding stays and
+`base/demo-storefront-gate.yaml` decides afterwards whether it survives. That is also why an
+environment **promoted** to production is cleaned by the same code as one born that way.
+
+It is an Argo CD PostSync hook, so it runs after every sync and is idempotent. In `development` and
+`test` it counts the demo shops and leaves them; in `production` it deletes them and proves they
+are gone. Products go first (`products.store_id` is `ON DELETE RESTRICT`); everything else —
+hours, offers, reviews, zones, staff, scans — cascades. The **aisle categories stay**: they carry
+no merchant, and deleting them would mean typing the whole category tree back in before the first
+real merchant can list anything.
+
+**To check that a storefront is real:**
+
+```sh
+kubectl -n delivery-qa logs job/demo-storefront-gate        # what it decided, and why
+
+kubectl -n delivery-qa exec postgres-0 -- psql -U delivery -d delivery -At -c \
+  "select count(*) from stores where merchant_id = 'demo-merchant'"     # must be 0
+kubectl -n delivery-qa exec postgres-0 -- psql -U delivery -d delivery -At -c \
+  "select count(*) from products where merchant_id = 'demo-merchant'"   # must be 0
+kubectl -n delivery-qa exec postgres-0 -- psql -U delivery -d delivery -c \
+  "select name, slug, status from stores order by created_at"           # only real shops
+```
+
+Re-applying within five minutes of a run reports the Job as immutable (it deletes itself on a TTL
+for the non-Argo path); delete it and apply again.
+
 ## Backups
 
 Until now there were none: no CronJob, no WAL archive, and the k3s datastore that holds every
@@ -383,8 +452,8 @@ Three things now decide who survives, and they act in this order:
    what it may use (1536Mi = 1536Mi), so it scores as a process inside its budget rather than one
    800 MiB over it, and dev's lower priority breaks every remaining tie against dev.
 
-**dev is at 8.875 of its 9 GiB.** That is about 128 MiB of headroom — room for nothing. To fit,
-dev's fourteen Spring services run at a 416Mi limit rather than 512Mi, with `MaxRAMPercentage=60`
+**dev is at 8.84 of its 9 GiB.** That is about 160 MiB of headroom — room for one small pod. To
+fit, dev's fourteen Spring services run at a 416Mi limit rather than 512Mi, with `MaxRAMPercentage=60`
 instead of 70 so the space *outside* the heap grows (~166Mi, against ~154Mi today) while the heap
 ceiling falls (250Mi, from 358Mi). They idle at 160-350 MiB of RSS, so the trade is more frequent
 collection for more native headroom — the native side being what actually OOMKills a container.

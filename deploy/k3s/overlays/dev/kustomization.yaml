@@ -23,6 +23,16 @@ resources:
   # A value set from the portal's auto-approval screen wins over this one; dev has none for riders.
 configMapGenerator:
 - literals:
+  # What this environment IS. Read by base/demo-storefront-gate.yaml, which keeps the eight demo
+  # shops here and deletes them in a production environment, and by scripts/verify.sh, which
+  # refuses a `production` overlay that still carries any of the switches below.
+  - ENVIRONMENT_TIER=development
+  # The simulators, back ON — explicitly, here, rather than as a default in platform-common that
+  # every environment inherited including production (PD-1).
+  - SIMULATE_WALLETS=true
+  - WHATSAPP_SIMULATOR_ENABLED=true
+  # Nominatim sees this; dev's requests should not look like the live shop's.
+  - NOMINATIM_USER_AGENT=YouDrop-dev (youssef.saleh0108@gmail.com)
   - KEYCLOAK_PUBLIC_URL=https://iam-dev.youdrop.shop
   - KEYCLOAK_ISSUER_URI=https://iam-dev.youdrop.shop/realms/delivery-platform
   - MINIO_PUBLIC_ENDPOINT=https://api-dev.youdrop.shop
@@ -151,12 +161,12 @@ patches:
 - patch: |-
     - op: replace
       path: /spec/template/spec/containers/0/resources/limits/memory
-      value: 128Mi
+      value: 96Mi
   target: { kind: StatefulSet, name: redis }
 - patch: |-
     - op: replace
       path: /spec/template/spec/containers/0/resources/limits/memory
-      value: 384Mi
+      value: 352Mi
   target: { kind: StatefulSet, name: rabbitmq }
 - patch: |-
     - op: replace
@@ -177,14 +187,15 @@ patches:
       path: /spec/template/spec/containers/0/resources/limits/memory
       value: 64Mi
   target: { kind: Deployment, name: portal }
-# Two containers in one pod: the dev-mode server and the reseed sidecar.
+# Two containers in one pod: a dev-mode Vault holding about twenty KV entries, and a shell script
+# that re-seeds them from platform-secrets.
 - patch: |-
     - op: replace
       path: /spec/template/spec/containers/0/resources/limits/memory
-      value: 160Mi
+      value: 128Mi
     - op: replace
       path: /spec/template/spec/containers/1/resources/limits/memory
-      value: 128Mi
+      value: 96Mi
   target: { kind: Deployment, name: vault }
 
 # Which build each service runs. CI rewrites these lines after every image build on this

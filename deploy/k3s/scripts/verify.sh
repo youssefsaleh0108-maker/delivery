@@ -486,6 +486,95 @@ if [ -s "$tmp/render-qa.yaml" ]; then
     || fail "qa postgres requests $pg_req against a $pg_lim limit: it is evicted as if it were over budget"
 fi
 
+echo "== the safe value is the default (PD-1) =="
+# `env_literal <env> <KEY>` — what an overlay's platform-env sets, or empty.
+env_literal() { sed -n "s/^ *- \{0,4\}$2=//p" "overlays/$1/kustomization.yaml" | head -n1; }
+
+# A dev switch on platform-common is a dev switch in EVERY environment, production included, by
+# default and silently. These two are the ones that cost money or take an order: SIMULATE_WALLETS
+# offers a customer a wallet payment that never happens, for an order the platform then treats as
+# paid, and WHATSAPP_SIMULATOR_ENABLED replaces the Meta Cloud API with a loopback.
+for key in SIMULATE_WALLETS WHATSAPP_SIMULATOR_ENABLED; do
+  v=$(sed -n "s/^ *$key: *//p" base/configmap-common.yaml | tr -d '"')
+  [ "$v" = false ] \
+    && ok "platform-common defaults $key to false" \
+    || fail "platform-common has $key=$v: every environment inherits it, production included"
+done
+# The mail sink was the quietest one of all: a code delivered successfully to a mailbox nobody
+# reads, with no error anywhere. It is gone from the shared file, so an environment must name its
+# own relay — and if it forgets, this is what says so rather than a customer.
+for key in SMTP_HOST SMTP_PORT EMAIL_FROM; do
+  grep -qE "^ *$key:" base/configmap-common.yaml \
+    && fail "platform-common still carries $key: an environment that forgets mail config gets the sink" \
+    || ok "platform-common carries no $key"
+done
+case "$(sed -n 's/^ *NOMINATIM_USER_AGENT: *//p' base/configmap-common.yaml)" in
+  *-dev*) fail "platform-common's NOMINATIM_USER_AGENT still says -dev: that is what a live shop's geocoding would report" ;;
+  "") fail "platform-common sets no NOMINATIM_USER_AGENT; Nominatim refuses a request without one" ;;
+  *) ok "platform-common's Nominatim User-Agent is the honest one" ;;
+esac
+
+for env in dev qa; do
+  # Every environment must say what it is: the demo-storefront gate refuses to guess, and the
+  # production checks below have nothing to key on without it.
+  tier=$(env_literal "$env" ENVIRONMENT_TIER)
+  case "$tier" in
+    development|test|production) ok "$env declares ENVIRONMENT_TIER=$tier" ;;
+    "") fail "overlays/$env sets no ENVIRONMENT_TIER; the demo-storefront gate will refuse to run" ;;
+    *) fail "overlays/$env has ENVIRONMENT_TIER=$tier (expected development, test or production)" ;;
+  esac
+  # Six values, all of which used to come free from platform-common's mailpit defaults.
+  for key in SMTP_HOST SMTP_PORT SMTP_USER SMTP_AUTH SMTP_STARTTLS EMAIL_FROM; do
+    [ -n "$(env_literal "$env" "$key")" ] \
+      && ok "$env sets $key" \
+      || fail "overlays/$env sets no $key, and platform-common no longer provides one"
+  done
+
+  # THE PRODUCTION GATE. Everything here is allowed in a test environment and forbidden in a real
+  # one, and flipping ENVIRONMENT_TIER to production is what turns this from a list into a
+  # checklist: the failing run names, one by one, what is still to be changed.
+  [ "$tier" = production ] || continue
+  echo "-- $env is PRODUCTION"
+  # The test code sink keeps one-time codes in a table for the smoke tests to read. In production
+  # it is a table of live verification codes for anyone who reaches the database.
+  [ "$(env_literal "$env" TEST_CODE_SINK_ENABLED)" = true ] \
+    && fail "$env is production and TEST_CODE_SINK_ENABLED=true: live one-time codes would be kept in notification.test_code_sink" \
+    || ok "$env has no test code sink"
+  for key in SIMULATE_WALLETS WHATSAPP_SIMULATOR_ENABLED; do
+    [ "$(env_literal "$env" "$key")" = true ] \
+      && fail "$env is production and $key=true" \
+      || ok "$env has $key off"
+  done
+  for key in AUTO_APPROVE_RIDER AUTO_APPROVE_MERCHANT AUTO_APPROVE_CARRIER; do
+    [ "$(env_literal "$env" "$key")" = true ] \
+      && fail "$env is production and $key=true: applicants would be approved with nobody reading the documents" \
+      || ok "$env approves $key by hand"
+  done
+  case "$(env_literal "$env" SMTP_HOST)" in
+    mailpit|localhost|"") fail "$env is production and its mail goes to a sink" ;;
+    *) ok "$env mails through a real relay" ;;
+  esac
+  case "$(env_literal "$env" EMAIL_FROM)" in
+    *.local|*mydelivery*) fail "$env is production and EMAIL_FROM is a made-up domain: SPF and DKIM would both fail" ;;
+    *) ok "$env sends from a real domain" ;;
+  esac
+  [ "$(env_literal "$env" TRACKING_SERVICE_AREA_ENABLED)" = false ] \
+    && fail "$env is production with the rider service area off: a spoofed position from anywhere would be accepted" \
+    || ok "$env keeps the rider service area"
+done
+
+# The demo storefront: eight shops seeded into every fresh database by V12, which a migration
+# cannot gate.
+grep -q "demo-merchant" base/assets/demo-data/purge-demo-storefront.sh \
+  && ok "the demo storefront gate knows what to remove" \
+  || fail "base/assets/demo-data/purge-demo-storefront.sh does not identify the demo merchant"
+grep -q 'argocd.argoproj.io/hook: PostSync' base/demo-storefront-gate.yaml \
+  && ok "it runs after every sync, not once" \
+  || fail "the demo-storefront gate is not a PostSync hook, so it would run once and never again"
+grep -q 'ENVIRONMENT_TIER' base/demo-storefront-gate.yaml \
+  && ok "it is gated on the environment's tier" \
+  || fail "the demo-storefront gate is not gated: it would delete dev's demo shops too"
+
 echo "== backups (BK-1) =="
 for cj in postgres-backup minio-backup restore-test; do
   grep -q "^  name: $cj$" base/backup.yaml \
