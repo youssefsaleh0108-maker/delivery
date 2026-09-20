@@ -13084,6 +13084,50 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get actionCloseNotDelivered => 'إغلاق الطلب كغير مُسلَّم';
 
   @override
+  String get merchRejectConfirmTitle => 'رفض هذا الطلب؟';
+
+  @override
+  String get merchRejectConfirmBody =>
+      'سيُلغى طلب الزبون، ولا يمكن التراجع عن ذلك.';
+
+  @override
+  String get merchRejectReason => 'السبب، لفريق الدعم (اختياري)';
+
+  @override
+  String get invUnavailable => 'كميات المخزون غير متاحة بعد';
+
+  @override
+  String get invUnavailableHint =>
+      'لم يُفعَّل المخزون لمتجرك. هذا لا يؤثر على قائمة منتجاتك.';
+
+  @override
+  String get portalSignInWelcome => 'أهلاً بعودتك';
+
+  @override
+  String get portalSignInPrompt => 'سجّل الدخول بحسابك في YouDrop لفتح لوحتك.';
+
+  @override
+  String get portalSignInRedirect =>
+      'سننقلك إلى خدمة الهوية في YouDrop لتسجيل الدخول، ثم نعيدك إلى هنا مباشرة.';
+
+  @override
+  String get portalSignInApply =>
+      'تاجر جديد أو شركة توصيل؟ قدّم طلبك من تطبيق YouDrop، وتُفتح لوحتك فور الموافقة على الطلب.';
+
+  @override
+  String get portalBrandEyebrow => 'لوحة الشركاء';
+
+  @override
+  String get portalBrandHeadline => 'أدِر عملك كله من لوحة واحدة.';
+
+  @override
+  String get portalBrandBlurb =>
+      'المتاجر وشركات التوصيل وفريق المنصة يسجّلون الدخول من هنا. الطلبات المباشرة والإرسال والكتالوج والتسويات، بالحساب نفسه أيًّا كنت منهم.';
+
+  @override
+  String get portalBrandAudiences => 'التجّار · شركات التوصيل · الإدارة';
+
+  @override
   String reconOwedToCompany(String company) {
     return 'مستحق لشركة $company';
   }

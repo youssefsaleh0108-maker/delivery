@@ -18,13 +18,13 @@ ok()   { echo "  ok  $*"; }
 echo "== overlays are what the template renders =="
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
+# Rendered by the real script into a scratch directory, rather than by a copy of its sed list kept
+# here. The two drifted apart the moment the template grew a rule the copy did not know (the
+# dev-only CORS origins), and a drift check that renders differently from the renderer reports
+# drift that is not there — or worse, misses drift that is.
+sh scripts/render-overlays.sh "$tmp" >/dev/null
 for env in dev qa; do
-  sed -e "s/__API_HOST__/api-$env.youdrop.shop/g" \
-      -e "s/__IAM_HOST__/iam-$env.youdrop.shop/g" \
-      -e "s/__PORTAL_HOST__/portal-$env.youdrop.shop/g" \
-      -e "s/__MON_HOST__/monitoring-$env.youdrop.shop/g" \
-      overlays/ingress.template.yaml > "$tmp/$env.yaml"
-  if diff -q "$tmp/$env.yaml" "overlays/$env/ingress.yaml" >/dev/null; then
+  if diff -q "$tmp/$env/ingress.yaml" "overlays/$env/ingress.yaml" >/dev/null; then
     ok "overlays/$env/ingress.yaml"
   else
     fail "overlays/$env/ingress.yaml has drifted from the template — run scripts/render-overlays.sh"
@@ -127,6 +127,181 @@ for env in dev qa; do
     fi
   done
 done
+
+echo "== the two sites a human opens carry their headers (PT-1) =="
+sh scripts/test/public-site-headers.test.sh > "$tmp/headers.out" 2>&1 \
+  && ok "scripts/test/public-site-headers.test.sh" \
+  || { fail "scripts/test/public-site-headers.test.sh:"; grep FAIL "$tmp/headers.out"; }
+for env in dev qa; do
+  ing="overlays/$env/ingress.yaml"
+  # The middleware has to be ON the route, not merely defined in the file.
+  grep -F -A3 "Host(\`portal-$env.youdrop.shop\`)" "$ing" | grep -q 'name: portal-security-headers' \
+    && ok "$env portal route carries portal-security-headers" \
+    || fail "$env portal route does not carry portal-security-headers"
+  csp=$(awk 'BEGIN{RS="\n---"} /name: portal-security-headers/ {print}' "$ing" | tr -d '\n')
+  # 180 days. Not includeSubDomains (it would bind hostnames that do not exist yet) and not
+  # preload (browsers ship that list; it is very hard to undo).
+  case "$csp" in
+    *"stsSeconds: 15552000"*) ok "$env portal HSTS is 180 days" ;;
+    *) fail "$env portal HSTS is not 15552000 seconds" ;;
+  esac
+  case "$csp" in
+    *"stsIncludeSubdomains: false"*"stsPreload: false"*) ok "$env portal HSTS claims no subdomain and no preload" ;;
+    *) fail "$env portal HSTS must set stsIncludeSubdomains and stsPreload false explicitly" ;;
+  esac
+  case "$csp" in
+    *"referrerPolicy: strict-origin-when-cross-origin"*) ok "$env portal Referrer-Policy" ;;
+    *) fail "$env portal Referrer-Policy is not strict-origin-when-cross-origin" ;;
+  esac
+  case "$csp" in
+    *"frame-ancestors 'none'"*) ok "$env portal CSP refuses framing" ;;
+    *) fail "$env portal CSP has no frame-ancestors 'none'" ;;
+  esac
+  # Without this the CanvasKit wasm never compiles and the portal renders a blank page.
+  case "$csp" in
+    *"'wasm-unsafe-eval'"*) ok "$env portal CSP allows the CanvasKit wasm" ;;
+    *) fail "$env portal CSP has no 'wasm-unsafe-eval': the Flutter build would render nothing" ;;
+  esac
+  case "$csp" in
+    *"unsafe-eval"*) case "$csp" in *"'unsafe-eval'"*) fail "$env portal CSP allows 'unsafe-eval'" ;; esac ;;
+  esac
+  for host in "api-$env.youdrop.shop" "iam-$env.youdrop.shop"; do
+    case "$csp" in
+      *"https://$host"*) ok "$env portal CSP reaches $host" ;;
+      *) fail "$env portal CSP does not name $host" ;;
+    esac
+  done
+  # A CSP naming the OTHER environment's hosts would let the qa portal talk to dev.
+  other=qa; [ "$env" = qa ] && other=dev
+  case "$csp" in
+    *"-$other.youdrop.shop"*) fail "$env portal CSP names a $other host" ;;
+    *) ok "$env portal CSP names no $other host" ;;
+  esac
+  # The one third-party origin. The app reads it from a dart-define whose default lives in the
+  # client tree, so the policy and the app can drift apart silently; this is the tripwire.
+  tile=$(sed -n "s|.*defaultValue: 'https://\([a-z0-9.-]*\)/.*|\1|p" \
+    ../../clients/packages/delivery_core/lib/src/util/map_tiles.dart)
+  if [ -z "$tile" ]; then
+    fail "could not read MAP_TILE_URL's default host from map_tiles.dart"
+  else
+    case "$csp" in
+      *"https://$tile"*) ok "$env portal CSP allows the map tiles ($tile)" ;;
+      *) fail "$env portal CSP does not allow $tile, the MAP_TILE_URL default: every map would be blank" ;;
+    esac
+  fi
+
+  echo "-- $env CORS (PT-9)"
+  cors=$(awk 'BEGIN{RS="\n---"} /name: platform-cors/ {print}' "$ing")
+  # The regex list is what echoed any *.youdrop.shop back as an allowed origin.
+  case "$cors" in
+    *accessControlAllowOriginListRegex*) fail "$env CORS is back on a regex origin list" ;;
+    *) ok "$env CORS lists exact origins" ;;
+  esac
+  case "$cors" in
+    *"accessControlAllowCredentials: false"*) ok "$env CORS sends no credentials" ;;
+    *) fail "$env CORS allows credentials; no client in this repository needs them" ;;
+  esac
+  origins=$(printf '%s' "$cors" | sed -n 's|^ *- \(https\{0,1\}://[^ ]*\)$|\1|p' | sort | tr '\n' ' ')
+  want="https://portal-$env.youdrop.shop https://www.youdrop.shop "
+  [ "$env" = dev ] && want="http://127.0.0.1:5010 http://127.0.0.1:5012 http://localhost:5010 http://localhost:5012 https://portal-dev.youdrop.shop https://www.youdrop.shop "
+  [ "$origins" = "$want" ] \
+    && ok "$env CORS origins: $origins" \
+    || fail "$env CORS origins are [$origins], expected [$want]"
+  # app-notification checks the same origins on a browser WebSocket. Two lists that disagree fail
+  # in different places for different clients, which is the hardest kind of CORS problem to see.
+  spring=$(sed -n 's/^ *- \{0,4\}CORS_ALLOWED_ORIGINS=//p' "overlays/$env/kustomization.yaml" | tr ',' '\n' | sort | tr '\n' ' ')
+  [ "$spring" = "$want" ] \
+    && ok "$env CORS_ALLOWED_ORIGINS matches the edge" \
+    || fail "$env CORS_ALLOWED_ORIGINS is [$spring] but the edge admits [$want]"
+
+  echo "-- $env the Keycloak admin console is not public (PT-7)"
+  grep -F -A4 "Host(\`iam-$env.youdrop.shop\`) && PathPrefix(\`/admin\`)" "$ing" | grep -q 'name: deny-public' \
+    && ok "$env /admin on the public iam host is refused" \
+    || fail "$env has no route refusing /admin on iam-$env.youdrop.shop"
+  # ...and the endpoints every client needs are NOT behind it.
+  grep -q 'PathPrefix(`/realms`)' "$ing" \
+    && fail "$env has a /realms rule: the token, JWKS and login endpoints must stay on the catch-all" \
+    || ok "$env leaves /realms on the host's catch-all rule"
+done
+# One public site, one API host in its CSP, one API host in the file that configures its JS. They
+# move together at go-live, and this is what says so out loud if only one of them moves.
+site_csp=$(awk 'BEGIN{RS="\n---"} /name: site-security-headers/ {print}' cluster/website.yaml | tr -d '\n')
+for key in DELIVERY_API_BASE DELIVERY_IAM_BASE; do
+  host=$(sed -n "s|^window\.$key *= *'https://\([a-z0-9.-]*\)'.*|\1|p" ../../clients/website/config.js)
+  if [ -z "$host" ]; then
+    fail "could not read $key from clients/website/config.js"
+  else
+    case "$site_csp" in
+      *"https://$host"*) ok "the site's CSP reaches $host ($key)" ;;
+      *) fail "clients/website/config.js points at $host, which the site's CSP does not allow" ;;
+    esac
+  fi
+done
+case "$site_csp" in
+  *"style-src 'self';"*) ok "the site's CSP allows no inline style" ;;
+  *) fail "the site's CSP allows inline styles; admin.html's block belongs in admin.css" ;;
+esac
+grep -q 'add_header Cache-Control "no-cache"' ../../clients/website/nginx.conf \
+  && ok "the site revalidates its unhashed HTML, JS and config.js (PT-11)" \
+  || fail "clients/website/nginx.conf has no server-level Cache-Control: the site goes stale again"
+
+echo "== the realm a fresh import would build (PT-3, PT-7) =="
+# Greps rather than jq: jq is not assumed anywhere in this script, and every value below is alone
+# on its line in the realm file. These assert the FILE, which is what a fresh database imports; a
+# running environment is brought to the same place by `rotate-secrets.sh <ns> edge-identity`, and
+# that step re-checks every one of them against Keycloak itself.
+realm=base/assets/keycloak/realm-delivery-platform.json
+grep -q '"sslRequired": "external"' "$realm" \
+  && ok "sslRequired: external" \
+  || fail "sslRequired is not external: Keycloak would accept a plain-HTTP sign-in from outside"
+grep -q '"revokeRefreshToken": true' "$realm" && grep -q '"refreshTokenMaxReuse": 0' "$realm" \
+  && ok "refresh tokens rotate and cannot be reused" \
+  || fail "the realm does not rotate refresh tokens (revokeRefreshToken true, refreshTokenMaxReuse 0)"
+# The delivery-portal client, from its clientId line to the end of its object.
+portal=$(awk '/"clientId": "delivery-portal"/ {on=1} on {print} on && /^    },?$/ {exit}' "$realm")
+case "$portal" in
+  *'"directAccessGrantsEnabled": false'*) ok "delivery-portal has no password grant" ;;
+  *) fail "delivery-portal still allows the password grant: a phished password is a back-office session" ;;
+esac
+# Both lists have to be DECLARED. Leaving them out is not neutral — Keycloak then applies the
+# realm defaults, and offline_access is one of them, which is how the back office got a token
+# that never expires.
+case "$portal" in
+  *'"defaultClientScopes"'*'"optionalClientScopes"'*) ok "delivery-portal declares its own client scopes" ;;
+  *) fail "delivery-portal declares no client scopes, so the realm defaults apply and offline_access comes back" ;;
+esac
+case "$portal" in
+  *offline_access*) fail "delivery-portal still has the offline_access scope" ;;
+  *) ok "delivery-portal cannot ask for offline_access" ;;
+esac
+for pair in 'client.session.idle.timeout": "28800' 'client.session.max.lifespan": "86400'; do
+  case "$portal" in
+    *"$pair"*) ok "delivery-portal ${pair%%\"*}" ;;
+    *) fail "delivery-portal is missing $pair" ;;
+  esac
+done
+# The one client the scripts and the phones still sign in on directly.
+mobile=$(awk '/"clientId": "mobile-app"/ {on=1} on {print} on && /^    },?$/ {exit}' "$realm")
+case "$mobile" in
+  *'"directAccessGrantsEnabled": true'*) ok "mobile-app keeps the password grant the apps need" ;;
+  *) fail "mobile-app lost the password grant: the phone sign-in and every smoke script use it" ;;
+esac
+# ...and no script may ask delivery-portal for one, because it will be refused. The three files
+# excluded here name the client in order to ASSERT on it rather than to sign in with it: this
+# script, scripts/test/, and rotate-secrets.sh — which proves the refusal against the live realm
+# instead of against the text.
+stale=$(grep -rl 'client_id=.*delivery-portal\|token .* delivery-portal' --include='*.sh' . ../../infra 2>/dev/null \
+  | grep -v -e 'scripts/verify\.sh' -e 'scripts/rotate-secrets\.sh' -e 'scripts/test/' | sort -u | tr '\n' ' ')
+[ -z "$stale" ] \
+  && ok "no script signs in on delivery-portal's password grant" \
+  || fail "these still use delivery-portal's password grant, which is now refused: $stale"
+# The admin REST API is closed on the public hostname, so this script cannot reach it there.
+grep -q 'port-forward svc/keycloak' scripts/rotate-secrets.sh \
+  && ok "rotate-secrets.sh reaches the admin API inside the cluster" \
+  || fail "rotate-secrets.sh does not port-forward to keycloak: its admin calls would meet the edge's 403"
+grep -q '^ADMIN="\$IAM' scripts/rotate-secrets.sh \
+  && fail "rotate-secrets.sh builds the admin API URL from the public hostname again" \
+  || ok "no admin API URL is built from the public iam hostname"
 
 echo "== every YAML alias resolves =="
 # A ConfigMap's `data:` values are strings to Kubernetes, so a dangling `*alias` inside one is

@@ -64,8 +64,13 @@ PATH="$T/bin:$PATH" sh "$SMOKE" test > "$T/out" 2>&1
 for u in customer rider merchant carrier; do
   grep -q "ok   $u signs in" "$T/out" && ok "$u signs in with the Secret's password" || fail "$u did not sign in"
 done
-grep -q "ok   backoffice signs in on the portal client" "$T/out" && grep -q "ok   backoffice signs in$" "$T/out" \
-  && ok "backoffice signs in on both clients" || fail "backoffice sign-in"
+# One sign-in, not two. The second one went through delivery-portal's password grant, which the
+# realm no longer offers (PT-3); the back office reaches the API with the token it already has.
+grep -q "ok   backoffice signs in$" "$T/out" && [ "$(grep -c 'ok   backoffice signs in' "$T/out")" = 1 ] \
+  && ok "backoffice signs in once, on mobile-app" || fail "backoffice sign-in"
+grep -q 'client_id=delivery-portal' "$SMOKE" \
+  && fail "e2e-smoke.sh still asks delivery-portal for a password grant" \
+  || ok "no password grant is asked of delivery-portal"
 grep -q "get secret demo-logins -o json" "$T/argv.log" && [ "$(grep -c 'kubectl\|get secret' "$T/argv.log")" -ge 1 ] \
   && [ "$(grep -c 'get secret demo-logins' "$T/argv.log")" = 1 ] && ok "the Secret is read exactly once" \
   || fail "the Secret was read $(grep -c 'get secret demo-logins' "$T/argv.log") times"

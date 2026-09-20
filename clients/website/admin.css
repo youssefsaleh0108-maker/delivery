@@ -1,0 +1,39 @@
+/* The staff door's own layout, on top of site.css.
+ *
+ * A file rather than the <style> block this used to be in admin.html. The site's
+ * Content-Security-Policy (cluster/website.yaml) says style-src 'self', with no 'unsafe-inline':
+ * one inline block on one page was the only thing standing between the site and that policy, and
+ * a rule that allows inline styles allows every injected one too. Keep new styles in a file. */
+
+body {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.panel {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+  padding: clamp(28px, 4vw, 44px);
+  width: min(420px, 100%);
+  text-align: center;
+}
+
+.panel h1 { font-size: 25px; margin-bottom: 8px; }
+.panel p { color: var(--muted); margin: 0 0 26px; }
+
+.lock {
+  width: 46px; height: 46px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  background: var(--brand-soft);
+  display: grid;
+  place-items: center;
+  color: var(--brand);
+  font-size: 22px;
+}
+
+.back { display: block; margin-top: 18px; font-size: 13.5px; color: var(--muted); }

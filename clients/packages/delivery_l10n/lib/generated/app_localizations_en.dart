@@ -12926,6 +12926,52 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get actionCloseNotDelivered => 'Close as not delivered';
 
   @override
+  String get merchRejectConfirmTitle => 'Reject this order?';
+
+  @override
+  String get merchRejectConfirmBody =>
+      'The customer\'s order is cancelled, and this can\'t be undone.';
+
+  @override
+  String get merchRejectReason => 'Why, for support (optional)';
+
+  @override
+  String get invUnavailable => 'Stock levels are not available yet';
+
+  @override
+  String get invUnavailableHint =>
+      'Inventory isn\'t switched on for your shop. Your catalogue is unaffected.';
+
+  @override
+  String get portalSignInWelcome => 'Welcome back';
+
+  @override
+  String get portalSignInPrompt =>
+      'Sign in with your YouDrop account to open your console.';
+
+  @override
+  String get portalSignInRedirect =>
+      'You will be taken to the YouDrop identity service to sign in, then brought straight back here.';
+
+  @override
+  String get portalSignInApply =>
+      'New merchant or delivery partner? Apply in the YouDrop app — your console opens as soon as the application is approved.';
+
+  @override
+  String get portalBrandEyebrow => 'PARTNER CONSOLE';
+
+  @override
+  String get portalBrandHeadline =>
+      'Run your whole operation from one console.';
+
+  @override
+  String get portalBrandBlurb =>
+      'Shops, delivery companies and the platform team sign in here. Live orders, dispatch, catalogue and settlement — the same account, whichever of them you are.';
+
+  @override
+  String get portalBrandAudiences => 'Merchants · Carriers · Backoffice';
+
+  @override
   String reconOwedToCompany(String company) {
     return 'Owed to $company';
   }

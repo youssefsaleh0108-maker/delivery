@@ -19,6 +19,24 @@ class _WebOidcClient implements OidcClient {
   static const String _verifierKey = 'delivery.pkce_verifier';
   static const String _stateKey = 'delivery.oauth_state';
 
+  /// Set for as long as a silent resume has been tried in this tab and has not yet worked.
+  ///
+  /// The whole point of [resumeSession] is a redirect nobody sees, which is also what makes it
+  /// dangerous: a resume that comes back empty and is retried on the next load is an endless
+  /// bounce between two servers, and the user cannot even read the error. One attempt per tab,
+  /// cleared only by an exchange that actually produced tokens.
+  static const String _resumeKey = 'delivery.sso_resume_tried';
+
+  /// The answers Keycloak gives a `prompt=none` request it cannot satisfy in silence. None of
+  /// them is a failure: they all mean "not signed in", which is a thing the app already knows how
+  /// to show. Anything else IS an error and is thrown.
+  static const Set<String> _silentAuthRefusals = <String>{
+    'login_required',
+    'interaction_required',
+    'consent_required',
+    'account_selection_required',
+  };
+
   @override
   Future<TokenSet?> signIn(AuthConfig config, {Map<String, String>? extraParams}) async {
     final String verifier = Pkce.generateVerifier();
@@ -59,7 +77,17 @@ class _WebOidcClient implements OidcClient {
     // Keycloak reports failures as query parameters rather than a non-200, so check for them here.
     final String? error = current.queryParameters['error'];
     if (error != null) {
+      // The single-use PKCE pair belongs to the request that just failed either way.
+      web.window.sessionStorage.removeItem(_verifierKey);
+      web.window.sessionStorage.removeItem(_stateKey);
       _clearUrl();
+      if (_silentAuthRefusals.contains(error)) {
+        // A silent resume that found no SSO session. Not an error to report: it is the ordinary
+        // answer for somebody who is simply not signed in, and the app shows its own sign-in
+        // screen for it. _resumeKey deliberately stays set, so reloading this tab does not spend
+        // another round trip discovering the same thing.
+        return null;
+      }
       throw StateError(
           'Sign-in failed: $error ${current.queryParameters['error_description'] ?? ''}'.trim());
     }
@@ -85,13 +113,29 @@ class _WebOidcClient implements OidcClient {
       throw StateError('OAuth state mismatch — the sign-in was not started by this tab.');
     }
 
-    return _exchange(config, <String, String>{
+    final TokenSet tokens = await _exchange(config, <String, String>{
       'grant_type': 'authorization_code',
       'client_id': config.clientId,
       'redirect_uri': config.redirectUrl,
       'code': code,
       'code_verifier': verifier,
     });
+    // There is a session again, so the next reload of this tab may resume it in silence.
+    web.window.sessionStorage.removeItem(_resumeKey);
+    return tokens;
+  }
+
+  @override
+  Future<TokenSet?> resumeSession(AuthConfig config) async {
+    if (web.window.sessionStorage.getItem(_resumeKey) != null) {
+      return null;
+    }
+    web.window.sessionStorage.setItem(_resumeKey, '1');
+    // prompt=none: authorize if the browser's Keycloak session is alive, and answer
+    // `error=login_required` rather than rendering a login page if it is not. Without it a
+    // signed-out visitor would be thrown onto Keycloak's own form by a reload, instead of seeing
+    // this app's sign-in screen. signIn() navigates away and returns null.
+    return signIn(config, extraParams: const <String, String>{'prompt': 'none'});
   }
 
   @override

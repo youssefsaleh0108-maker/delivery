@@ -220,6 +220,9 @@ class _FakeOidc implements OidcClient {
   Future<TokenSet?> signIn(AuthConfig config, {Map<String, String>? extraParams}) async => null;
 
   @override
+  Future<TokenSet?> resumeSession(AuthConfig config) async => null;
+
+  @override
   Future<void> signOut(AuthConfig config, String? refreshToken) async {}
 }
 

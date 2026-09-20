@@ -68,9 +68,9 @@ echo
 echo '=== 0. Actors ===================================================================='
 
 CUSTOMER=$(token customer 100001)
-MERCHANT=$(token merchant 200002 delivery-portal)
+MERCHANT=$(token merchant 200002 mobile-app)
 RIDER=$(token rider 300003)
-BACKOFFICE=$(token backoffice 400004 delivery-portal)
+BACKOFFICE=$(token backoffice 400004 mobile-app)
 
 for t in CUSTOMER MERCHANT RIDER BACKOFFICE; do
   eval "v=\$$t"

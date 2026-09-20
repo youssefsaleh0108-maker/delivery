@@ -2,7 +2,7 @@
   "realm": "delivery-platform",
   "displayName": "Delivery Platform",
   "enabled": true,
-  "sslRequired": "none",
+  "sslRequired": "external",
   "registrationAllowed": false,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
@@ -16,6 +16,8 @@
   "ssoSessionIdleTimeout": 2592000,
   "ssoSessionMaxLifespan": 7776000,
   "offlineSessionIdleTimeout": 2592000,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
   "roles": {
     "realm": [
       {
@@ -129,7 +131,8 @@
         "http://127.0.0.1:5012/*"
       ],
       "webOrigins": [
-        "+"
+        "+",
+        "https://www.youdrop.shop"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
@@ -179,7 +182,7 @@
       "enabled": true,
       "publicClient": true,
       "standardFlowEnabled": true,
-      "directAccessGrantsEnabled": true,
+      "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
       "protocol": "openid-connect",
       "redirectUris": [
@@ -191,9 +194,24 @@
       "webOrigins": [
         "+"
       ],
+      "defaultClientScopes": [
+        "acr",
+        "basic",
+        "email",
+        "profile",
+        "roles",
+        "web-origins"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "microprofile-jwt",
+        "phone"
+      ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:5010/*##http://127.0.0.1:5010/*##https://portal-dev.youdrop.shop/*"
+        "client.session.idle.timeout": "28800",
+        "client.session.max.lifespan": "86400",
+        "post.logout.redirect.uris": "http://localhost:5010/*##http://127.0.0.1:5010/*##https://portal-dev.youdrop.shop/*##https://portal-qa.youdrop.shop/*"
       },
       "protocolMappers": [
         {

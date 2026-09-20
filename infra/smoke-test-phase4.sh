@@ -75,8 +75,8 @@ echo '=== 0. Actors and accounts ===============================================
 
 CUSTOMER=$(token customer 100001 mobile-app)
 RIDER=$(token rider 300003 mobile-app)
-MERCHANT=$(token merchant 200002 delivery-portal)
-BACKOFFICE=$(token backoffice 400004 delivery-portal)
+MERCHANT=$(token merchant 200002 mobile-app)
+BACKOFFICE=$(token backoffice 400004 mobile-app)
 
 for t in CUSTOMER RIDER MERCHANT BACKOFFICE; do
   eval "v=\$$t"
@@ -117,7 +117,7 @@ provision_merchant() { # provision_merchant <username> <accountRef>
 }
 
 provision_merchant frozenmerchant ACC-FROZEN
-FROZEN_MERCHANT=$(token frozenmerchant 200022 delivery-portal)
+FROZEN_MERCHANT=$(token frozenmerchant 200022 mobile-app)
 check 'frozen-account merchant provisioned' 'yes' \
   "$([ -n "$FROZEN_MERCHANT" ] && [ "$FROZEN_MERCHANT" != null ] && echo yes || echo no)"
 

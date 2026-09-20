@@ -21831,6 +21831,84 @@ abstract class DeliveryStrings {
   /// **'Close as not delivered'**
   String get actionCloseNotDelivered;
 
+  /// No description provided for @merchRejectConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject this order?'**
+  String get merchRejectConfirmTitle;
+
+  /// No description provided for @merchRejectConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The customer\'s order is cancelled, and this can\'t be undone.'**
+  String get merchRejectConfirmBody;
+
+  /// No description provided for @merchRejectReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Why, for support (optional)'**
+  String get merchRejectReason;
+
+  /// No description provided for @invUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock levels are not available yet'**
+  String get invUnavailable;
+
+  /// No description provided for @invUnavailableHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory isn\'t switched on for your shop. Your catalogue is unaffected.'**
+  String get invUnavailableHint;
+
+  /// No description provided for @portalSignInWelcome.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome back'**
+  String get portalSignInWelcome;
+
+  /// No description provided for @portalSignInPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with your YouDrop account to open your console.'**
+  String get portalSignInPrompt;
+
+  /// No description provided for @portalSignInRedirect.
+  ///
+  /// In en, this message translates to:
+  /// **'You will be taken to the YouDrop identity service to sign in, then brought straight back here.'**
+  String get portalSignInRedirect;
+
+  /// No description provided for @portalSignInApply.
+  ///
+  /// In en, this message translates to:
+  /// **'New merchant or delivery partner? Apply in the YouDrop app — your console opens as soon as the application is approved.'**
+  String get portalSignInApply;
+
+  /// No description provided for @portalBrandEyebrow.
+  ///
+  /// In en, this message translates to:
+  /// **'PARTNER CONSOLE'**
+  String get portalBrandEyebrow;
+
+  /// No description provided for @portalBrandHeadline.
+  ///
+  /// In en, this message translates to:
+  /// **'Run your whole operation from one console.'**
+  String get portalBrandHeadline;
+
+  /// No description provided for @portalBrandBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Shops, delivery companies and the platform team sign in here. Live orders, dispatch, catalogue and settlement — the same account, whichever of them you are.'**
+  String get portalBrandBlurb;
+
+  /// No description provided for @portalBrandAudiences.
+  ///
+  /// In en, this message translates to:
+  /// **'Merchants · Carriers · Backoffice'**
+  String get portalBrandAudiences;
+
   /// No description provided for @reconOwedToCompany.
   ///
   /// In en, this message translates to:

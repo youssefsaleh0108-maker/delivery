@@ -26,20 +26,39 @@ spec:
       - /rabbitmq
       - /minio
 ---
+# PT-9. The list is EXACT — one entry per browser origin that actually calls this API.
+#
+# It used to be three regexes, and the middle one (`^https://[a-z0-9-]+\.youdrop\.shop$`) echoed
+# ANY subdomain of youdrop.shop back as an allowed origin, with credentials on. A name that is not
+# ours today can become ours tomorrow — a stale DNS record, a forgotten demo host, a subdomain
+# takeover — and every one of them was pre-authorised to read this API's answers from a browser.
+# The localhost regex did the same for every port on a developer's machine, on a public host.
+#
+# accessControlAllowCredentials is now FALSE. No client in this repository sends one: nothing sets
+# withCredentials or `credentials: 'include'`, nothing reads document.cookie, and both browser
+# clients (the Flutter portal and clients/website/register.js) authenticate with a bearer token in
+# the Authorization header. With credentials off, `accessControlAllowHeaders: ["*"]` is a legal
+# wildcard rather than the illegal one it is beside credentials.
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
   name: platform-cors
 spec:
   headers:
-    accessControlAllowOriginListRegex:
-      - '^http://(localhost|127\.0\.0\.1)(:[0-9]+)?$'
-      - '^https://(www\.)?youdrop\.shop$'
-      - '^https://[a-z0-9-]+\.youdrop\.shop$'
+    accessControlAllowOriginList:
+      - https://portal-qa.youdrop.shop
+      # The public site: its /register page calls /api/onboarding, and its receipt panel calls the
+      # realm's token endpoint. There is ONE www (cluster/website.yaml), and clients/website/config.js
+      # points it at ONE environment's API — api-dev today. AT GO-LIVE, when www moves to the
+      # production hosts, config.js, the site's CSP in cluster/website.yaml and this line move
+      # together; scripts/verify.sh fails if config.js and that CSP disagree.
+      - https://www.youdrop.shop
+      # Dev only, and rendered away for qa: the ports `flutter run -d chrome` uses for the two web
+      # builds, which are the same ports the realm pins as redirect URIs (portal 5010, app 5012).
     accessControlAllowMethods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
     accessControlAllowHeaders: ["*"]
     accessControlExposeHeaders: [X-Correlation-Id]
-    accessControlAllowCredentials: true
+    accessControlAllowCredentials: false
     accessControlMaxAge: 3600
     addVaryHeader: true
 ---
@@ -88,6 +107,100 @@ spec:
     contentTypeNosniff: true
     frameDeny: true
     referrerPolicy: no-referrer
+---
+# PT-1. The portal is the back office, the merchant console and the carrier console in one Flutter
+# Web app, and until now it answered with none of these: any page on the internet could frame it and
+# click Approve, Suspend or Remit through a transparent overlay, and nothing limited what an injected
+# script could reach. The API already had `security-headers`; this is the same idea for the one
+# origin a human actually opens, plus HSTS and a CSP the API does not need.
+#
+# HSTS: 180 days, no includeSubDomains, no preload — deliberately. Every name under youdrop.shop
+# would inherit a subdomain-wide policy, including hosts that do not exist yet, and `preload` is a
+# decision that is very hard to undo (browsers ship the list). Traefik sends the header only on a
+# TLS connection, which is the only entrypoint this route has.
+#
+# The CSP is the working set of a CanvasKit Flutter Web build, checked against the code rather than
+# against a login page:
+#   script-src   'self' — CanvasKit and the fonts are served from this origin, never from a CDN
+#                (clients/apps/delivery_portal/web/flutter_bootstrap.js pins canvasKitBaseUrl, and
+#                the build passes --no-web-resources-cdn). 'wasm-unsafe-eval' is what lets the
+#                CanvasKit .wasm compile; without it the page renders nothing at all.
+#   style-src    'unsafe-inline' — Flutter's engine injects its own <style> elements at startup.
+#   img-src      the API host (every photo is a presigned MinIO URL on that host), data: and blob:
+#                (a picked file's preview, a generated CSV's download link).
+#   connect-src  the API host for REST and presigned PUTs, wss: on the same host for the socket the
+#                portal does not open today but shares the code for, the IAM host for the token and
+#                logout calls oidc_client_web.dart makes, and blob: because a picked file is read
+#                back through an object URL.
+#   fonts.gstatic.com is the ONE exception to all of that, and it is deliberate. Rubik is bundled
+#                and covers Latin, Arabic, Hebrew and Cyrillic (checked against the TTF cmap), and
+#                a local Roboto and the Material icons ship with the build — a probe of the real
+#                bundle under this policy fetched every font from 'self' and nothing from anywhere
+#                else. But CanvasKit's engine has a LAST-resort fallback for a glyph no loaded font
+#                has, and it downloads a Noto face from `fontFallbackBaseUrl`, which defaults to
+#                https://fonts.gstatic.com/s/. Emoji are the realistic case — a shop name, a chat
+#                message, a customer's name — and refusing it costs a visible tofu box in the back
+#                office. It is a font and a fetch, never a script. Point the engine's
+#                fontFallbackBaseUrl at a self-hosted Noto set and this line can go.
+#   the tile host is the app's ONE third-party origin. It is the default in
+#                clients/packages/delivery_core/lib/src/util/map_tiles.dart; a build that overrides
+#                MAP_TILE_URL must change this line too, and scripts/verify.sh fails if the two
+#                drift apart.
+# frame-ancestors 'none' is the real clickjacking control; frameDeny repeats it as X-Frame-Options
+# for anything that predates CSP.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: portal-security-headers
+spec:
+  headers:
+    stsSeconds: 15552000
+    stsIncludeSubdomains: false
+    stsPreload: false
+    contentTypeNosniff: true
+    frameDeny: true
+    referrerPolicy: strict-origin-when-cross-origin
+    contentSecurityPolicy: >-
+      default-src 'self';
+      script-src 'self' 'wasm-unsafe-eval';
+      style-src 'self' 'unsafe-inline';
+      img-src 'self' data: blob: https://api-qa.youdrop.shop https://tile.openstreetmap.org;
+      font-src 'self' https://fonts.gstatic.com;
+      connect-src 'self' blob: https://api-qa.youdrop.shop wss://api-qa.youdrop.shop https://iam-qa.youdrop.shop https://tile.openstreetmap.org https://fonts.gstatic.com;
+      worker-src 'self' blob:;
+      manifest-src 'self';
+      object-src 'none';
+      base-uri 'self';
+      form-action 'self';
+      frame-ancestors 'none'
+---
+# PT-7. The Keycloak admin console and the admin REST API, refused on the public hostname.
+#
+# Keycloak owns its whole origin, so until now `https://iam-qa.youdrop.shop/admin/master/console/` was a
+# login form for the realm administrator, open to the internet, protected by one password and
+# whatever brute-force settings the realm happens to carry. Nothing outside the cluster has any
+# business there: the portal, the apps and the site use /realms/** only (authorize, token, JWKS,
+# logout, the account console), and none of that is touched here.
+#
+# /admin/realms — the admin REST API — is refused by the same rule. scripts/rotate-secrets.sh was
+# the one caller that reached it over this hostname; it now port-forwards to the keycloak Service
+# and talks to 127.0.0.1 inside the box, so closing this costs it nothing. Every other script in
+# the repository already used the in-cluster address.
+#
+# Traefik has no "deny" middleware. An allow-list that only admits the loopback address is the
+# supported way to spell one: the Service preserves the caller's real address
+# (cluster/traefik-config.yaml), depth 0 says to trust that address rather than an X-Forwarded-For
+# the caller writes, and everything else gets a 403 before it reaches Keycloak.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: deny-public
+spec:
+  ipAllowList:
+    sourceRange:
+      - 127.0.0.1/32
+    ipStrategy:
+      depth: 0
 ---
 # The size limit a customer's file for a service order meets before storage. The file is PUT straight
 # to MinIO with a URL order-manager signed, and neither the signature nor MinIO can cap a body — while
@@ -267,6 +380,17 @@ spec:
   tls:
     certResolver: letsencrypt
   routes:
+    # The admin console and the admin REST API, refused from outside (see `deny-public` above).
+    # An explicit priority rather than the length this rule happens to have: the rule below owns
+    # the whole host and would win the moment somebody lengthened it, and a deny that silently
+    # stops applying is the worst kind. 1000 is the band this file already uses for "this rule
+    # must outrank its neighbour" — see the /api/notifications/direct note.
+    - kind: Rule
+      match: Host(`iam-qa.youdrop.shop`) && PathPrefix(`/admin`)
+      priority: 1000
+      services: [{ name: keycloak, port: 8080 }]
+      middlewares:
+        - { name: deny-public }
     - kind: Rule
       match: Host(`iam-qa.youdrop.shop`)
       services: [{ name: keycloak, port: 8080 }]
@@ -283,6 +407,8 @@ spec:
     - kind: Rule
       match: Host(`portal-qa.youdrop.shop`)
       services: [{ name: portal, port: 8200 }]
+      middlewares:
+        - { name: portal-security-headers }
 ---
 # The ops tools, all behind the shared basic auth: the mail sink holds every verification code
 # the platform issues, the broker console can purge queues, the object console can read and
@@ -318,3 +444,7 @@ spec:
       services: [{ name: portal, port: 8200 }]
       middlewares:
         - { name: ops-auth }
+        # The same app, so the same policy. Only this rule: the broker, mail and object consoles
+        # below are third-party pages with their own inline scripts, and a CSP written for Flutter
+        # would break all three.
+        - { name: portal-security-headers }
