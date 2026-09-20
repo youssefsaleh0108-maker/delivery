@@ -139,6 +139,10 @@ public class UnmetDemand {
      * rows. That is the same bargain {@code TrackingPartitionMaintenance} makes: make every step
      * repeatable instead of adding a lock to coordinate a job that runs once a day.
      *
+     * <p>Only this week and last can be computed at all, because only their "somebody asked" markers
+     * still exist — the same two weeks {@link #forgetOldSearches} keeps. An older week is refused
+     * rather than recomputed into an empty one.
+     *
      * @param weekStart Monday 00:00 in the platform's zone
      * @return how many terms the week has, across every area and both kinds
      */
@@ -152,8 +156,19 @@ public class UnmetDemand {
                     + "(DEMAND_SEEN_SECRET), and the floor counts distinct people", weekStart);
             return 0;
         }
-        Instant until = calendar.weekAfter(weekStart);
         Instant now = clock.instant();
+        Instant oldestRollable = calendar.weekBefore(calendar.weekOf(now));
+        if (weekStart.isBefore(oldestRollable)) {
+            // The markers that bound this week's floor were deleted with it (forgetOldSearches keeps
+            // this week and last), so the floor cannot be applied to it any more. Refuse rather than
+            // recompute: deleting the week and writing nothing back would quietly erase a roll-up
+            // that WAS computed under a floor, which is a worse answer than leaving it alone. The
+            // same rule as having no secret at all, for the same reason.
+            log.warn("The week of {} was not rolled up: its seen markers are past their retention, "
+                    + "so the floor of {} people cannot be applied to it", weekStart, MIN_PEOPLE);
+            return 0;
+        }
+        Instant until = calendar.weekAfter(weekStart);
         weeks.deleteWeek(weekStart);
         int written = 0;
         for (SearchDemandWeek.Kind kind : SearchDemandWeek.Kind.values()) {

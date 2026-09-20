@@ -509,6 +509,25 @@ class SearchDemandDatabaseTest {
         assertThat(weeks.findAll()).hasSize(1);
     }
 
+    /**
+     * A week whose markers have expired cannot be judged any more, so it is left as it was found.
+     * Recomputing it would delete a roll-up that WAS computed under a floor and write nothing back.
+     */
+    @Test
+    @DisplayName("a week older than its markers is refused, not recomputed into an empty one")
+    void an_old_week_is_left_alone() {
+        Instant old = calendar.weekBefore(calendar.weekBefore(calendar.weekOf(NOW)));
+        SearchDemandWeek alreadyComputed = new SearchDemandWeek(old, hamra, "حفاضات",
+                SearchDemandWeek.Kind.NONE, 9, 1, NOW);
+        tx.executeWithoutResult(status -> weeks.saveAndFlush(alreadyComputed));
+
+        int rolled = tx.execute(status -> unmet.rollUp(old));
+
+        assertThat(rolled).isZero();
+        assertThat(weeks.findAll()).singleElement()
+                .satisfies(row -> assertThat(row.getTerm()).isEqualTo("حفاضات"));
+    }
+
     /** A rotated secret starts the count again rather than counting the same person twice. */
     @Test
     @DisplayName("a rotated secret reads as nobody having asked yet")
