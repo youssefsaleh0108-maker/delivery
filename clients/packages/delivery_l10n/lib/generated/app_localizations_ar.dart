@@ -12833,4 +12833,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get dareaMapUnavailable =>
       'تعذّر تحميل الخريطة الآن. منطقة التوصيل موصوفة أدناه.';
+
+  @override
+  String get actionCloseNotDelivered => 'إغلاق الطلب كغير مُسلَّم';
 }

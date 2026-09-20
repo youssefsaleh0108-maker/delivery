@@ -21458,6 +21458,12 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'The map can\'t load right now. The delivery area is described below.'**
   String get dareaMapUnavailable;
+
+  /// No description provided for @actionCloseNotDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Close as not delivered'**
+  String get actionCloseNotDelivered;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

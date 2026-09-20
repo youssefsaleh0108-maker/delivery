@@ -12674,4 +12674,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get dareaMapUnavailable =>
       'The map can\'t load right now. The delivery area is described below.';
+
+  @override
+  String get actionCloseNotDelivered => 'Close as not delivered';
 }

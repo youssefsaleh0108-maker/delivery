@@ -44,7 +44,16 @@ enum OrderAction {
   claim('CLAIM', 'Claim'),
   pickUp('PICK_UP', 'Picked up'),
   deliver('DELIVER', 'Delivered'),
-  cancel('CANCEL', 'Cancel');
+  cancel('CANCEL', 'Cancel'),
+
+  /// Close an order a rider already has as not delivered — refused at the door, nobody at the
+  /// address, the goods gone.
+  ///
+  /// Offered to the back office alone, and only while the order is on the road, in place of
+  /// [cancel], which such an order cannot take. It carries two decisions about who is still paid,
+  /// so it is not sent through [OrderApi.act] like the others but through
+  /// `OrderApi.closeNotDelivered`.
+  closeNotDelivered('CLOSE_NOT_DELIVERED', 'Close as not delivered');
 
   const OrderAction(this.wire, this.label);
 
@@ -70,7 +79,35 @@ enum OrderAction {
         OrderAction.pickUp => 'pick-up',
         OrderAction.deliver => 'deliver',
         OrderAction.cancel => 'cancel',
+        OrderAction.closeNotDelivered => 'close-not-delivered',
       };
+}
+
+/// How far a cancelled order had got, mirroring `com.delivery.order.domain.CancelStage`.
+///
+/// Null on an order that was not cancelled. [beforePickup] is every cancellation there was before
+/// the back office could close an order on the road, and is what an order cancelled by a server
+/// that predates the field reads as.
+enum CancelStage {
+  /// Cancelled while it was still at the shop: nobody had done anything, and nobody is owed.
+  beforePickup('BEFORE_PICKUP', 'Cancelled'),
+
+  /// Closed by the back office while a rider had it, with its own decisions about who is paid.
+  afterPickup('AFTER_PICKUP', 'Closed as not delivered');
+
+  const CancelStage(this.wire, this.label);
+
+  final String wire;
+  final String label;
+
+  /// Null for anything this build does not know, so a newer stage reads as a plain cancellation
+  /// rather than crashing a screen.
+  static CancelStage? fromWire(Object? value) {
+    for (final CancelStage stage in CancelStage.values) {
+      if (stage.wire == value) return stage;
+    }
+    return null;
+  }
 }
 
 /// How fast the customer asked for it, mirroring `com.delivery.order.domain.DeliveryTier`.
@@ -234,6 +271,9 @@ class DeliveryOrder {
     required this.placedAt,
     required this.deliveredAt,
     required this.cancelReason,
+    this.cancelStage,
+    this.compensateMerchant = false,
+    this.compensateCarrier = false,
     this.kind = OrderKind.catalog,
     this.fulfilment = Fulfilment.delivery,
     this.serviceCategory,
@@ -330,6 +370,21 @@ class DeliveryOrder {
   final DateTime? placedAt;
   final DateTime? deliveredAt;
   final String? cancelReason;
+
+  /// How far a cancelled order had got. Null on an order that was not cancelled, and on a
+  /// cancellation from a server that predates the field — which was necessarily before pickup,
+  /// because nothing could close an order on the road until then.
+  final CancelStage? cancelStage;
+
+  /// On an order closed as not delivered: the shop was still paid its share of the goods.
+  final bool compensateMerchant;
+
+  /// On an order closed as not delivered: the delivery was still paid for.
+  final bool compensateCarrier;
+
+  /// Whether the back office closed this order while a rider had it. Still a cancellation in every
+  /// other respect: nothing was collected from the customer.
+  bool get closedAfterPickup => cancelStage == CancelStage.afterPickup;
 
   /// What kind of order this is. A basket on every order from a server that does not say.
   final OrderKind kind;
@@ -473,6 +528,9 @@ class DeliveryOrder {
         placedAt: _parseTime(json['placedAt']),
         deliveredAt: _parseTime(json['deliveredAt']),
         cancelReason: json['cancelReason'] as String?,
+        cancelStage: CancelStage.fromWire(json['cancelStage']),
+        compensateMerchant: json['compensateMerchant'] == true,
+        compensateCarrier: json['compensateCarrier'] == true,
         // Every service field is absent from a server that predates service orders, and each reads
         // then as what such an order was: a delivered basket with nothing to wait for.
         kind: OrderKind.fromWire(json['kind']),

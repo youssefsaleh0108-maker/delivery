@@ -6140,5 +6140,6 @@
   "dareaZoneLabelsNote": "Area names on the map mark roughly the middle of each area, not its edges.",
   "dareaInside": "Your address is inside the delivery area",
   "dareaOutside": "Your address is outside the delivery area",
-  "dareaMapUnavailable": "The map can't load right now. The delivery area is described below."
+  "dareaMapUnavailable": "The map can't load right now. The delivery area is described below.",
+  "actionCloseNotDelivered": "Close as not delivered"
 }

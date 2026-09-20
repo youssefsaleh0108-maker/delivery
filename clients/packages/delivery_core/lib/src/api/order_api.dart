@@ -422,11 +422,44 @@ class OrderApi {
   /// Driven by [OrderAction] rather than a free-text path so a screen cannot invent a transition
   /// the service never advertised.
   Future<DeliveryOrder> act(String orderId, OrderAction action, {String? reason}) async {
+    if (action == OrderAction.closeNotDelivered) {
+      // It decides who is paid for an order that never arrived, and the server requires both
+      // answers. Sending it from here would leave them out and be refused — so the screen is sent
+      // to the call that asks for them.
+      throw ArgumentError.value(action, 'action',
+          'Closing an order as not delivered needs its two decisions: call closeNotDelivered');
+    }
     final Response<dynamic> response = await _dio.post<dynamic>(
       '/api/orders/$orderId/${action.path}',
       data: action == OrderAction.cancel
           ? <String, dynamic>{'reason': reason ?? ''}
           : null,
+    );
+    return DeliveryOrder.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Closes an order a rider already has as not delivered — `POST /api/orders/{id}/close-not-delivered`.
+  ///
+  /// Back office only, and only while the order is on the road: the server offers
+  /// [OrderAction.closeNotDelivered] on exactly those orders. It becomes a cancellation that
+  /// collected nothing, and the two decisions say who is still paid for what they already did —
+  /// the shop its share of the goods, the delivery its fee. Both are sent every time; the server
+  /// refuses a request that leaves either out rather than paying by default.
+  ///
+  /// [reason] is required and kept on the order as its cancel reason.
+  Future<DeliveryOrder> closeNotDelivered(
+    String orderId, {
+    required String reason,
+    required bool compensateMerchant,
+    required bool compensateCarrier,
+  }) async {
+    final Response<dynamic> response = await _dio.post<dynamic>(
+      '/api/orders/$orderId/${OrderAction.closeNotDelivered.path}',
+      data: <String, dynamic>{
+        'reason': reason,
+        'compensateMerchant': compensateMerchant,
+        'compensateCarrier': compensateCarrier,
+      },
     );
     return DeliveryOrder.fromJson(response.data as Map<String, dynamic>);
   }
