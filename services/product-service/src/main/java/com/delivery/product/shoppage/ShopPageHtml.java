@@ -354,7 +354,8 @@ final class ShopPageHtml {
      * attack it makes possible is not markup at all — a shop that puts one in its name reverses the
      * text after it, so a price, an opening time or the name of another shop can be made to read
      * backwards on a page the platform publishes under its own domain, and in the preview card of
-     * every chat it is pasted into. The same goes for a stray {@code  } or {@code },
+     * every chat it is pasted into. The same goes for a stray {@code \u0000} or
+     * {@code \u001B},
      * which nothing on a page means and which only confuse whatever reads it next. So the explicit
      * bidi formatting characters go, the C0 controls and DEL go, and the three that are ordinary
      * whitespace become a space — HTML would have collapsed them anyway.
@@ -402,9 +403,9 @@ final class ShopPageHtml {
      */
     private static boolean invisible(char c) {
         return c < 0x20 || c == 0x7F
-                || c == '؜' || c == '‎' || c == '‏'
-                || (c >= '‪' && c <= '‮')
-                || (c >= '⁦' && c <= '⁩')
-                || c == '﻿';
+                || c == '\u061C' || c == '\u200E' || c == '\u200F'
+                || (c >= '\u202A' && c <= '\u202E')
+                || (c >= '\u2066' && c <= '\u2069')
+                || c == '\uFEFF';
     }
 }

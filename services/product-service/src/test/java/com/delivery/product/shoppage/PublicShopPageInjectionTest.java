@@ -42,7 +42,7 @@ class PublicShopPageInjectionTest {
      * The five characters that can end an attribute or open a tag, a sequence aimed at closing the
      * title and opening a script in the head, and an override that turns the text after it around.
      */
-    private static final String HOSTILE = "<>&\"'</title><script>‮";
+    private static final String HOSTILE = "<>&\"'</title><script>\u202E";
 
     /** What the merchant typed, in the field marked {@code marker}. */
     private static String typed(String marker) {
@@ -115,7 +115,7 @@ class PublicShopPageInjectionTest {
                 .doesNotContain("javascript:")
                 .doesNotContain("onerror=")
                 // Escaped, it would still be an override where it is drawn. It is dropped instead.
-                .doesNotContain("‮")
+                .doesNotContain("\u202E")
                 .doesNotContain("&#8238;")
                 .doesNotContain("&#x202E");
         // One title element, opened and closed once: the head is still the head.
