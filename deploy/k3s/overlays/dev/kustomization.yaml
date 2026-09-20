@@ -20,6 +20,8 @@ resources:
   # never copy it into a production overlay.
   # Riders are approved as soon as their email is verified (the owner's decision, 2026-09-19).
   # A value set from the portal's auto-approval screen wins over this one; dev has none for riders.
+  # Dev only: accept rider positions from anywhere. Emulators report Mountain View, and dev's
+  # riders are mostly emulators. Overrides platform-common's "true"; qa keeps it on.
 configMapGenerator:
 - literals:
   - KEYCLOAK_PUBLIC_URL=https://iam-dev.youdrop.shop
@@ -35,8 +37,6 @@ configMapGenerator:
   - SMS_TEST_INBOX=youssef.saleh0108@gmail.com
   - TEST_CODE_SINK_ENABLED=true
   - AUTO_APPROVE_RIDER=true
-  # Dev only: accept rider positions from anywhere. Emulators report Mountain View, and dev's
-  # riders are mostly emulators. Overrides platform-common's "true"; qa keeps it on.
   - TRACKING_SERVICE_AREA_ENABLED=false
   name: platform-env
 
@@ -92,7 +92,7 @@ images:
   newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
 - name: ghcr.io/youssefsaleh0108-maker/order-tracking
   newName: ghcr.io/youssefsaleh0108-maker/order-tracking
-  newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
+  newTag: sha-dea77d63d7a82ea9dab60e6d437cc688164211ff
 - name: ghcr.io/youssefsaleh0108-maker/product-service
   newName: ghcr.io/youssefsaleh0108-maker/product-service
   newTag: sha-4ddb9b92648b6db338800ce361910c1a1de79095
