@@ -327,7 +327,8 @@ public class ItemSearchService {
      * @param shops   how many shops matched in all
      * @param nearest metres to the nearest of them; null without a point, or with no match
      * @param pins    where they are. Public information about shops, held only long enough for the
-     *                recorder to ask which neighbourhood each is in
+     *                recorder to ask which neighbourhood each is in — and gathered only on the first
+     *                page, which is the only page that is recorded
      */
     public record Searched(String term, int shops, Double nearest, List<GeoPoint> pins) {
 
@@ -449,7 +450,7 @@ public class ItemSearchService {
                         Math.max(s.matched - s.dropped, s.hits.size())))
                 .toList();
         return new ItemSearchResult(pageOf(matches, pageable), truncated, maxCandidates, near,
-                searchedOf(term, listed));
+                searchedOf(term, listed, pageable.getPageNumber() == 0));
     }
 
     /**
@@ -458,13 +459,19 @@ public class ItemSearchService {
      * <p>Costs a pass over at most {@code max-candidates} shops already in memory and no query at
      * all, which is why the search is allowed to work it out: anything that needed a read would be
      * the demand log slowing a search, and the demand log is not allowed to do that.
+     *
+     * <p>The pins are built only for the first page, because only the first page is recorded —
+     * scrolling is the same search, so {@code ItemSearchController} discards everything this returns
+     * for a later page. Gathering a list of up to {@code max-candidates} coordinates to throw away
+     * is small, but it is work done on a request thread for a feature that has promised not to cost
+     * a search anything.
      */
-    private static Searched searchedOf(String term, List<Shop> listed) {
+    private static Searched searchedOf(String term, List<Shop> listed, boolean firstPage) {
         Double nearest = null;
-        List<GeoPoint> pins = new ArrayList<>(listed.size());
+        List<GeoPoint> pins = firstPage ? new ArrayList<>(listed.size()) : List.of();
         for (Shop shop : listed) {
             GeoPoint pin = shop.view.store().location();
-            if (pin != null) {
+            if (firstPage && pin != null) {
                 pins.add(pin);
             }
             if (shop.distanceMetres != null && (nearest == null || shop.distanceMetres < nearest)) {

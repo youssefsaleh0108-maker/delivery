@@ -29,6 +29,16 @@ public interface SearchDemandWeekRepository extends JpaRepository<SearchDemandWe
      * the search itself ran on, so "nescafe" finds "Nescafé Classic 200g". One query rather than one
      * per term: the terms are already rows in this database, so they can be joined against rather
      * than shipped back and forth.
+     *
+     * <p><strong>Every word, not only the whole phrase.</strong> A term is often several words — a
+     * photo search joins the name, the Arabic name and the brand into one — and looking for the
+     * phrase as typed missed shelves that really do stock it: a shop selling "Pampers Baby Dry Size
+     * 4" does not contain the string "pampers size 4", so it was told its neighbours could not find
+     * something sitting on its shelf, which is the most annoying thing this screen could say. So a
+     * product counts when the phrase appears OR when every word of the term appears in its name,
+     * which is exactly the rule the item search grades as tier 2 ({@code ItemSearchRepository}): a
+     * word of three characters or more anywhere in the name, a shorter one only as a whole word, so
+     * "رز" is rice rather than any word containing those two letters.
      */
     @Query(value = """
             SELECT w.id FROM search_demand_week w
@@ -37,7 +47,13 @@ public interface SearchDemandWeekRepository extends JpaRepository<SearchDemandWe
                 SELECT 1 FROM products p
                 WHERE p.store_id IN (:storeIds)
                   AND p.status = 'ACTIVE'
-                  AND strpos(p.search_name, ' ' || w.term) > 0)
+                  AND (strpos(p.search_name, ' ' || w.term) > 0
+                       OR (btrim(w.term) <> '' AND NOT EXISTS (
+                             SELECT 1 FROM unnest(string_to_array(w.term, ' ')) AS x(word)
+                             WHERE x.word <> ''
+                               AND strpos(p.search_name,
+                                          CASE WHEN char_length(x.word) >= 3 THEN x.word
+                                               ELSE ' ' || x.word || ' ' END) = 0))))
             """, nativeQuery = true)
     List<UUID> alreadySold(@Param("ids") Collection<UUID> ids,
                            @Param("storeIds") Collection<UUID> storeIds);

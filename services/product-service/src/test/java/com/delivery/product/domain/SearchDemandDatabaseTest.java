@@ -590,6 +590,31 @@ class SearchDemandDatabaseTest {
         assertThat(weeks.alreadySold(List.of(sold.getId()), List.of(UUID.randomUUID()))).isEmpty();
     }
 
+    /**
+     * A term is often several words — a photo search joins the name, the Arabic name and the brand —
+     * and the phrase as searched for is almost never the phrase on the packet. A shop selling
+     * "Pampers Baby Dry Size 4" does stock what "pampers size 4" was looking for, and telling them
+     * their neighbours could not find it would be the screen's most annoying possible mistake.
+     */
+    @Test
+    @DisplayName("a term of several words is recognised when the shelf has all of them, in any order")
+    void already_sold_matches_every_word_not_only_the_phrase() {
+        Instant week = calendar.weekOf(NOW);
+        UUID shop = aShopSelling("Pampers Baby Dry Size 4", "Nescafé Classic 200g");
+        SearchDemandWeek scattered = row(week, "pampers size 4");
+        SearchDemandWeek reordered = row(week, "classic nescafe");
+        SearchDemandWeek notOnTheShelf = row(week, "pampers wipes sensitive");
+        tx.executeWithoutResult(status ->
+                weeks.saveAll(List.of(scattered, reordered, notOnTheShelf)));
+
+        List<UUID> matched = weeks.alreadySold(
+                List.of(scattered.getId(), reordered.getId(), notOnTheShelf.getId()), List.of(shop));
+
+        assertThat(matched).containsExactlyInAnyOrder(scattered.getId(), reordered.getId());
+        // "wipes" is on no shelf of theirs, so this one really is something they do not sell.
+        assertThat(matched).doesNotContain(notOnTheShelf.getId());
+    }
+
     // ----------------------------------------------------------------------------- the digest ledger
 
     @Test
