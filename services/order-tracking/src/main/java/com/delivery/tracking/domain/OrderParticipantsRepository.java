@@ -56,16 +56,14 @@ public interface OrderParticipantsRepository extends JpaRepository<OrderParticip
                 finishedSince);
     }
 
-    /** Every order of one checkout, whoever placed it — the back office's read. */
-    List<OrderParticipants> findByCheckoutId(UUID checkoutId);
-
     /**
-     * Every order of one checkout that this customer placed — the customer's read.
+     * Every order of one checkout, whoever placed it.
      *
-     * <p>Scoped in the query rather than filtered afterwards, so "not yours" and "no such checkout"
-     * are the same empty answer by construction and the endpoint cannot tell them apart.
+     * <p>Whoever placed it, for the customer's read as well as the back office's: a checkout's map
+     * is served only when the whole checkout is the caller's, and a row of somebody else's under
+     * the same id has to be seen to be refused. See {@code CheckoutTrackingService#view}.
      */
-    List<OrderParticipants> findByCheckoutIdAndCustomerId(UUID checkoutId, String customerId);
+    List<OrderParticipants> findByCheckoutId(UUID checkoutId);
 
     /**
      * Whether this rider is carrying a live order that is not part of this checkout.

@@ -149,7 +149,6 @@ class CheckoutTrackingServiceTest {
     @SuppressWarnings("unchecked")
     void setUp() {
         participants = mock(OrderParticipantsRepository.class);
-        when(participants.findByCheckoutIdAndCustomerId(CHECKOUT, CUSTOMER)).thenReturn(rows);
         when(participants.findByCheckoutId(CHECKOUT)).thenReturn(rows);
         when(participants.findById(any())).thenAnswer(call -> all()
                 .filter(o -> o.getOrderId().equals(call.getArgument(0))).findFirst());
@@ -887,7 +886,72 @@ class CheckoutTrackingServiceTest {
         assertThat(later).isNotSameAs(first);
         assertThat(later.computedAt()).isEqualTo(clock.instant());
         verify(tracking, times(2)).sightingFor(any(OrderParticipants.class), any(), anyBoolean());
-        // The caller is still checked on every request, memo or not.
-        verify(participants, times(3)).findByCheckoutIdAndCustomerId(CHECKOUT, CUSTOMER);
+        // The caller is still checked against the rows on every request, memo or not.
+        verify(participants, times(3)).findByCheckoutId(CHECKOUT);
+    }
+
+    @Nested
+    @DisplayName("one answer per reader")
+    class PerReader {
+
+        /**
+         * The back office sees what the gate withholds from the customer, so its answer must never
+         * be handed to the customer by a memo they share — whichever of them asked first.
+         */
+        @Test
+        @DisplayName("never hands the back office's answer to the customer, or the other way round")
+        void the_memo_is_per_reader() {
+            order(A, "Hamra Bakery", SHOP_A, "READY", RIDER);
+            theirOrder(RIDER, "PICKED_UP");
+            // The rider is at the other customer's door: withheld from the customer, not from the
+            // back office, which reads the order's own last position.
+            riderAt(A, RIDER, offset(THEIR_DOOR, 50, 0), Duration.ofSeconds(10));
+
+            CheckoutView backoffice = service.view(CHECKOUT, "backoffice-sub", true);
+            CheckoutView customer = view();
+
+            assertThat(backoffice.riders().get(0).position()).isNotNull();
+            assertThat(customer.riders().get(0).position()).isNull();
+            assertThat(customer.riders().get(0).sighting()).isEqualTo(State.ON_ANOTHER_DELIVERY);
+            assertThat(customer).isNotSameAs(backoffice);
+
+            // And the other way round, inside the same window: still one answer each.
+            assertThat(view()).isSameAs(customer);
+            assertThat(service.view(CHECKOUT, "backoffice-sub", true)).isSameAs(backoffice);
+        }
+
+        /** Two customers, two answers: a memo is never read by anyone but the reader it is for. */
+        @Test
+        @DisplayName("keeps one customer's answer away from another caller")
+        void two_callers_share_nothing() {
+            order(A, "Hamra Bakery", SHOP_A, "READY", RIDER);
+            riderAt(A, RIDER, offset(SHOP_A, 500, 0), Duration.ofSeconds(10));
+            CheckoutView mine = view();
+
+            assertThatThrownBy(() -> service.view(CHECKOUT, SOMEONE_ELSE, false))
+                    .isInstanceOf(CheckoutNotFoundException.class);
+            assertThat(mine.riders().get(0).position()).isNotNull();
+        }
+
+        /**
+         * A checkout id links what a message said belongs together. One row of somebody else's
+         * under it and neither of them gets a map — the same 404 as a checkout that is not there.
+         */
+        @Test
+        @DisplayName("refuses a checkout carrying a row that is not the caller's")
+        void a_foreign_row_makes_it_not_found() {
+            order(A, "Hamra Bakery", SHOP_A, "READY", RIDER);
+            OrderParticipants mislabelled = new OrderParticipants(X, SOMEONE_ELSE, "merchant-x",
+                    null, "READY");
+            mislabelled.applyRoute(null, SHOP_B, THEIR_DOOR);
+            mislabelled.applyCheckout(CHECKOUT, "Corner Shop");
+            rows.add(mislabelled);
+
+            assertThatThrownBy(() -> view()).isInstanceOf(CheckoutNotFoundException.class);
+            assertThatThrownBy(() -> service.view(CHECKOUT, SOMEONE_ELSE, false))
+                    .isInstanceOf(CheckoutNotFoundException.class);
+            // The back office still reads it, which is how such a thing gets noticed.
+            assertThat(service.view(CHECKOUT, "backoffice-sub", true).orders()).hasSize(2);
+        }
     }
 }

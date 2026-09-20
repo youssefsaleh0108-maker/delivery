@@ -142,11 +142,6 @@ class CheckoutMapPrivacyTest {
         when(participants.findByCheckoutId(any())).thenAnswer(call -> orders.values().stream()
                 .filter(o -> call.getArgument(0).equals(o.getCheckoutId()))
                 .toList());
-        when(participants.findByCheckoutIdAndCustomerId(any(), anyString())).thenAnswer(call ->
-                orders.values().stream()
-                        .filter(o -> call.getArgument(0).equals(o.getCheckoutId()))
-                        .filter(o -> call.getArgument(1).equals(o.getCustomerId()))
-                        .toList());
         when(participants.riderHasOtherLiveOrders(anyString(), any())).thenAnswer(call ->
                 orders.values().stream().anyMatch(o ->
                         call.getArgument(0).equals(o.getRiderId()) && o.isTrackable()

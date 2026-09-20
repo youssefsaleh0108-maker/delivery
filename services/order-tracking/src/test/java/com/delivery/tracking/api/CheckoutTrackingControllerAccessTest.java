@@ -81,8 +81,8 @@ class CheckoutTrackingControllerAccessTest {
         b.applyCheckout(CHECKOUT, "Achrafieh Pharmacy");
 
         participants = mock(OrderParticipantsRepository.class);
-        // Exactly the query's scoping: checkout AND customer. Anyone else gets Mockito's empty list.
-        when(participants.findByCheckoutIdAndCustomerId(CHECKOUT, CUSTOMER)).thenReturn(List.of(a, b));
+        // The whole checkout, whoever asks: the service serves it only when every row is the
+        // caller's. An unknown checkout gets Mockito's empty list.
         when(participants.findByCheckoutId(CHECKOUT)).thenReturn(List.of(a, b));
 
         TrackingService tracking = mock(TrackingService.class);
@@ -160,7 +160,7 @@ class CheckoutTrackingControllerAccessTest {
 
     /**
      * A sibling's merchant who also shops on the platform holds CUSTOMER, gets past the role check,
-     * and still finds nothing — the rows are scoped to the checkout's own customer.
+     * and still finds nothing — the checkout is not theirs, row by row.
      */
     @Test
     @DisplayName("a sibling order's merchant never sees the customer's other shops")

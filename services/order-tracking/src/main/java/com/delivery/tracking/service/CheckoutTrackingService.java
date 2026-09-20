@@ -58,11 +58,12 @@ import com.delivery.tracking.service.TrackingService.Position;
  *       distance while the rider's position is withheld from the caller.</li>
  * </ul>
  *
- * <p><strong>Computed at most once every few seconds per checkout.</strong> The screen polls, the
- * customer may have it open on two devices, and every recomputation is a round of position reads
- * and — with a routing engine — routing requests; Mapbox's are billed and may not be cached. The
- * answer is the same for everyone allowed to see it, so it is shared: the caller is checked on
- * every request, and only then handed the answer computed within the window.
+ * <p><strong>Computed at most once every few seconds per checkout and reader.</strong> The screen
+ * polls, the customer may have it open on two devices, and every recomputation is a round of
+ * position reads and — with a routing engine — routing requests; Mapbox's are billed and may not
+ * be cached. What the answer contains depends on who asked — the gate above shows the back office
+ * what it withholds from the customer — so the answer is remembered per (checkout, reader), never
+ * shared between them, and the caller is checked against the rows on every request, memo or not.
  */
 @Service
 public class CheckoutTrackingService {
@@ -78,7 +79,7 @@ public class CheckoutTrackingService {
     private final Duration maxFixAge;
     private final Duration recomputeAfter;
     private final Clock clock;
-    private final Map<UUID, Memo> memo = new ConcurrentHashMap<>();
+    private final Map<ViewKey, Memo> memo = new ConcurrentHashMap<>();
 
     @Autowired
     public CheckoutTrackingService(OrderParticipantsRepository participants,
@@ -111,32 +112,38 @@ public class CheckoutTrackingService {
     }
 
     /**
-     * The checkout's map, for its own customer — or for the back office, which reads any.
+     * The checkout's map, for the customer whose checkout it is — or for the back office, which
+     * reads any.
      *
-     * <p>The customer's rows are selected by checkout <em>and</em> customer in one query, so a
-     * checkout that is someone else's and one that does not exist are the same empty answer and
-     * the same 404. That includes a sibling's merchant and the rider: each sees their own order
-     * elsewhere, and neither may see the customer's other shops.
+     * <p>A customer gets it only when <em>every</em> row of the checkout is theirs. The whole
+     * checkout is read and then judged, rather than the rows being selected by customer as well:
+     * a checkout id links orders that a message said belong together, and a mislabelled one — one
+     * row of somebody else's under this id — would otherwise quietly serve this customer the rest
+     * of it, and serve that other customer their own row as a checkout of their own. Neither is a
+     * map the platform can stand behind, so it is the same 404 as a checkout that does not exist,
+     * which is also what a sibling's merchant and the rider get.
      *
-     * @throws CheckoutNotFoundException when the caller has no order in this checkout
+     * @throws CheckoutNotFoundException when the checkout is not the caller's, whole and entire
      */
     @Transactional(readOnly = true)
     public CheckoutView view(UUID checkoutId, String callerId, boolean isBackoffice) {
-        List<OrderParticipants> orders = isBackoffice
-                ? participants.findByCheckoutId(checkoutId)
-                : participants.findByCheckoutIdAndCustomerId(checkoutId, callerId);
-        if (orders.isEmpty()) {
+        List<OrderParticipants> orders = participants.findByCheckoutId(checkoutId);
+        if (orders.isEmpty() || (!isBackoffice && (callerId == null || orders.stream()
+                .anyMatch(order -> !callerId.equals(order.getCustomerId()))))) {
             throw new CheckoutNotFoundException();
         }
 
+        // One remembered answer per reader: the back office's carries positions the customer's
+        // must not, so handing one to the other would hand over exactly what the gate withheld.
+        ViewKey key = new ViewKey(checkoutId, isBackoffice ? BACKOFFICE : callerId);
         Instant now = clock.instant();
-        Memo recent = memo.get(checkoutId);
+        Memo recent = memo.get(key);
         if (recent != null && now.isBefore(recent.computedAt().plus(recomputeAfter))) {
             return recent.view();
         }
 
         CheckoutView view = compute(checkoutId, orders, callerId, isBackoffice, now);
-        remember(checkoutId, new Memo(view, now), now);
+        remember(key, new Memo(view, now), now);
         return view;
     }
 
@@ -284,12 +291,24 @@ public class CheckoutTrackingService {
                 path.distanceMetres(), path.provider());
     }
 
-    private void remember(UUID checkoutId, Memo entry, Instant now) {
+    private void remember(ViewKey key, Memo entry, Instant now) {
         if (memo.size() >= MEMO_SWEEP_THRESHOLD) {
             memo.values().removeIf(old -> !now.isBefore(old.computedAt().plus(recomputeAfter)));
         }
-        memo.put(checkoutId, entry);
+        memo.put(key, entry);
     }
+
+    /**
+     * Which answer this is: one checkout, as seen by one reader.
+     *
+     * @param reader the caller's id, or {@link #BACKOFFICE} for the back office, whose readers
+     *               all see the same thing and are few
+     */
+    private record ViewKey(UUID checkoutId, String reader) {
+    }
+
+    /** The reader every back-office caller shares. Not a user id: those are Keycloak subjects. */
+    private static final String BACKOFFICE = "*";
 
     private record Memo(CheckoutView view, Instant computedAt) {
     }
