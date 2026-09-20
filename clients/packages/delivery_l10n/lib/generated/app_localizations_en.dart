@@ -12890,4 +12890,35 @@ class DeliveryStringsEn extends DeliveryStrings {
   String checkoutMapShopPinStop(String shop, int number) {
     return '$shop, stop $number';
   }
+
+  @override
+  String splitSimulatedPayment(String method) {
+    return '$method · simulated, no money moved';
+  }
+
+  @override
+  String get splitSimulatedChip => 'Simulated';
+
+  @override
+  String get splitWithTheOrder => 'With the order';
+
+  @override
+  String get splitSimulatedMethodNote =>
+      'Test payment: no money moves, and the rider collects it in cash';
+
+  @override
+  String get riderSplitOrderDifference => 'Difference from the order total';
+
+  @override
+  String get splitConfirmedChip => 'Confirmed';
+
+  @override
+  String splitNConfirmed(int confirmed, int total) {
+    return '$confirmed / $total confirmed';
+  }
+
+  @override
+  String splitAmountConfirmedOf(String confirmed, String total) {
+    return '$confirmed of $total confirmed';
+  }
 }

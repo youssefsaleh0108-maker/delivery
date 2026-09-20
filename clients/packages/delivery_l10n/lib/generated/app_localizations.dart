@@ -21776,6 +21776,54 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'{shop}, stop {number}'**
   String checkoutMapShopPinStop(String shop, int number);
+
+  /// No description provided for @splitSimulatedPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'{method} · simulated, no money moved'**
+  String splitSimulatedPayment(String method);
+
+  /// No description provided for @splitSimulatedChip.
+  ///
+  /// In en, this message translates to:
+  /// **'Simulated'**
+  String get splitSimulatedChip;
+
+  /// No description provided for @splitWithTheOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'With the order'**
+  String get splitWithTheOrder;
+
+  /// No description provided for @splitSimulatedMethodNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Test payment: no money moves, and the rider collects it in cash'**
+  String get splitSimulatedMethodNote;
+
+  /// No description provided for @riderSplitOrderDifference.
+  ///
+  /// In en, this message translates to:
+  /// **'Difference from the order total'**
+  String get riderSplitOrderDifference;
+
+  /// No description provided for @splitConfirmedChip.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmed'**
+  String get splitConfirmedChip;
+
+  /// No description provided for @splitNConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'{confirmed} / {total} confirmed'**
+  String splitNConfirmed(int confirmed, int total);
+
+  /// No description provided for @splitAmountConfirmedOf.
+  ///
+  /// In en, this message translates to:
+  /// **'{confirmed} of {total} confirmed'**
+  String splitAmountConfirmedOf(String confirmed, String total);
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

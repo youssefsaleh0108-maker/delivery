@@ -659,4 +659,54 @@ void main() {
           reason: 'The customer can look at the figures again and place it.');
     });
   });
+
+  /// RECON-14: the lira half of the cash split is the figure the transfer ledger records and the
+  /// rider collects. Computed in `double`, it fell a note short wherever the product landed on an
+  /// exact half: 1.15 x 90,000 is 103,499.99999999999, so the card said 103,000 where the ledger
+  /// says 104,000.
+  group('the lira half of a cash split', () {
+    Dio rateServer(num lbpPerUsd) {
+      final Dio dio = Dio(BaseOptions(baseUrl: 'http://127.0.0.1:1'));
+      dio.interceptors.add(InterceptorsWrapper(
+        onRequest: (RequestOptions options, RequestInterceptorHandler handler) =>
+            handler.resolve(Response<dynamic>(
+          requestOptions: options,
+          statusCode: 200,
+          data: <String, dynamic>{'lbpPerUsd': lbpPerUsd},
+        )),
+      ));
+      return dio;
+    }
+
+    // The singleton is fetched here, outside the test body: a real HTTP future never completes
+    // inside `testWidgets`'s fake async, which hangs the test rather than failing it.
+    setUp(() async => MarketRates.instance.load(rateServer(90000)));
+    tearDown(() async => MarketRates.instance.load(rateServer(0)));
+
+    testWidgets('is the note the ledger records, and cannot be typed past the cent',
+        (WidgetTester tester) async {
+      final ({Dio dio, List<RequestOptions> sent}) recorder = recordingDio();
+      await pumpCheckout(tester,
+          dio: recorder.dio,
+          addresses: await storeWithAddresses(),
+          cart: cartWithOneItem());
+
+      // A 9.75 basket, 9.40 of it in dollars: 0.35 left in lira, which the server fixes at 32,000.
+      // In doubles the same subtraction and product come to 31,499.99999999997, a note short.
+      final Finder usdField = find.descendant(
+        of: find.ancestor(of: find.text(en.custSplitPayment), matching: find.byType(YdCard)),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(usdField, '9.40');
+      await tester.pump();
+
+      expect(find.text('LBP 32,000'), findsOneWidget);
+
+      // A third decimal is rounded away where the intent is stored, so it cannot be typed here.
+      await tester.enterText(usdField, '9.405');
+      await tester.pump();
+      expect(tester.widget<TextField>(usdField).controller?.text, '9.40');
+      expect(find.text('LBP 32,000'), findsOneWidget);
+    });
+  });
 }

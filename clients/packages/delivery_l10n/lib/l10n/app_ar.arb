@@ -3978,5 +3978,16 @@
   "checkoutMapUnnamedShop": "متجر",
   "checkoutMapYourRider": "سائقك",
   "checkoutMapRiderMarkerLastSeen": "سائقك، آخر ظهور {ago}",
-  "checkoutMapShopPinStop": "{shop}، المحطة {number}"
+  "checkoutMapShopPinStop": "{shop}، المحطة {number}",
+  "splitSimulatedPayment": "{method} · محاكاة، لم تُحوَّل أي أموال",
+  "@splitSimulatedPayment": {"placeholders":{"method":{"type":"String"}}},
+  "splitSimulatedChip": "محاكاة",
+  "splitWithTheOrder": "مع الطلب",
+  "splitSimulatedMethodNote": "دفعة تجريبية: لا تُحوَّل أي أموال، ويحصّلها السائق نقداً",
+  "riderSplitOrderDifference": "الفرق عن إجمالي الطلب",
+  "splitConfirmedChip": "مؤكَّدة",
+  "splitNConfirmed": "{confirmed} / {total} مؤكَّدة",
+  "@splitNConfirmed": {"placeholders":{"confirmed":{"type":"int"},"total":{"type":"int"}}},
+  "splitAmountConfirmedOf": "{confirmed} من {total} مؤكَّدة",
+  "@splitAmountConfirmedOf": {"placeholders":{"confirmed":{"type":"String"},"total":{"type":"String"}}}
 }

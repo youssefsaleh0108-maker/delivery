@@ -13048,4 +13048,35 @@ class DeliveryStringsAr extends DeliveryStrings {
   String checkoutMapShopPinStop(String shop, int number) {
     return '$shop، المحطة $number';
   }
+
+  @override
+  String splitSimulatedPayment(String method) {
+    return '$method · محاكاة، لم تُحوَّل أي أموال';
+  }
+
+  @override
+  String get splitSimulatedChip => 'محاكاة';
+
+  @override
+  String get splitWithTheOrder => 'مع الطلب';
+
+  @override
+  String get splitSimulatedMethodNote =>
+      'دفعة تجريبية: لا تُحوَّل أي أموال، ويحصّلها السائق نقداً';
+
+  @override
+  String get riderSplitOrderDifference => 'الفرق عن إجمالي الطلب';
+
+  @override
+  String get splitConfirmedChip => 'مؤكَّدة';
+
+  @override
+  String splitNConfirmed(int confirmed, int total) {
+    return '$confirmed / $total مؤكَّدة';
+  }
+
+  @override
+  String splitAmountConfirmedOf(String confirmed, String total) {
+    return '$confirmed من $total مؤكَّدة';
+  }
 }

@@ -6202,5 +6202,16 @@
   "checkoutMapRiderMarkerLastSeen": "Your rider, last seen {ago}",
   "@checkoutMapRiderMarkerLastSeen": {"placeholders":{"ago":{"type":"String"}}},
   "checkoutMapShopPinStop": "{shop}, stop {number}",
-  "@checkoutMapShopPinStop": {"placeholders":{"shop":{"type":"String"},"number":{"type":"int"}}}
+  "@checkoutMapShopPinStop": {"placeholders":{"shop":{"type":"String"},"number":{"type":"int"}}},
+  "splitSimulatedPayment": "{method} · simulated, no money moved",
+  "@splitSimulatedPayment": {"placeholders":{"method":{"type":"String"}}},
+  "splitSimulatedChip": "Simulated",
+  "splitWithTheOrder": "With the order",
+  "splitSimulatedMethodNote": "Test payment: no money moves, and the rider collects it in cash",
+  "riderSplitOrderDifference": "Difference from the order total",
+  "splitConfirmedChip": "Confirmed",
+  "splitNConfirmed": "{confirmed} / {total} confirmed",
+  "@splitNConfirmed": {"placeholders":{"confirmed":{"type":"int"},"total":{"type":"int"}}},
+  "splitAmountConfirmedOf": "{confirmed} of {total} confirmed",
+  "@splitAmountConfirmedOf": {"placeholders":{"confirmed":{"type":"String"},"total":{"type":"String"}}}
 }
