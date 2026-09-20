@@ -10,7 +10,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.delivery.accounting.domain.AccountingTransaction;
 import com.delivery.accounting.domain.AccountingTransactionRepository;
@@ -42,8 +41,18 @@ public class SettlementRecovery {
 
     private static final Logger log = LoggerFactory.getLogger(SettlementRecovery.class);
 
-    /** The most orders one check compares. A work list of recent deliveries, not an audit. */
-    public static final int MAX_ORDERS = 500;
+    /**
+     * The most delivered orders one check compares against the ledger.
+     *
+     * <p>Every one of them, up to this: a settlement that went missing a month ago is not in this
+     * week's hundred, and a check that looked only at the newest orders answered "nothing missing"
+     * while two of them sat there. The cap is a bound on one request, and a scan that hits it says
+     * so rather than reporting a clean ledger.
+     */
+    public static final int MAX_ORDERS = 5_000;
+
+    /** How many order ids one ledger query asks about. */
+    private static final int LEDGER_BATCH = 200;
 
     private final OrderManagerOrdersClient orderManager;
     private final AccountingTransactionRepository transactions;
@@ -79,33 +88,50 @@ public class SettlementRecovery {
     }
 
     /**
-     * Delivered orders with no legs at all, newest first.
+     * What the check looked at and what it found.
+     *
+     * @param scanned  how many delivered orders were compared against the ledger
+     * @param complete whether that was all of them. False means the scan stopped at the cap, and
+     *                 an older order it never reached could still be missing
+     */
+    public record Check(int scanned, boolean complete, List<Missing> missing) {
+    }
+
+    /**
+     * Delivered orders with no legs at all.
+     *
+     * <p><strong>"No ledger rows" means exactly that.</strong> The only thing consulted is
+     * {@code transactions}: an order is settled when it has legs, and nothing else — not a points
+     * row, not a float row, not a failure record — counts as evidence that it was. The two orders
+     * stuck on dev have points from the run that failed and no legs, which is precisely the state
+     * this has to find.
      *
      * <p>Read-only and safe to run at any time: it writes nothing and settles nothing. An order
      * whose money was never collected is listed too, with the reason — it is not the platform's to
      * settle, and an operator chasing an unpaid card order is a better outcome than silence.
      */
-    public List<Missing> unsettledDeliveries(String bearerToken, int limit) {
-        List<JsonNode> delivered = orderManager.recentlyDelivered(bearerToken,
+    public Check unsettledDeliveries(String bearerToken, int limit) {
+        OrderManagerOrdersClient.Delivered delivered = orderManager.delivered(bearerToken,
                 Math.max(1, Math.min(limit, MAX_ORDERS)));
-        if (delivered.isEmpty()) {
-            return List.of();
-        }
 
-        List<UUID> ids = new ArrayList<>(delivered.size());
-        for (JsonNode order : delivered) {
+        List<UUID> ids = new ArrayList<>(delivered.orders().size());
+        for (JsonNode order : delivered.orders()) {
             UUID id = idOf(order);
             if (id != null) {
                 ids.add(id);
             }
         }
         Set<UUID> settled = new HashSet<>();
-        for (AccountingTransaction leg : transactions.findByOrderIdIn(ids)) {
-            settled.add(leg.getOrderId());
+        // In batches: one IN clause of two thousand ids is a query nobody planned for.
+        for (int from = 0; from < ids.size(); from += LEDGER_BATCH) {
+            List<UUID> batch = ids.subList(from, Math.min(from + LEDGER_BATCH, ids.size()));
+            for (AccountingTransaction leg : transactions.findByOrderIdIn(batch)) {
+                settled.add(leg.getOrderId());
+            }
         }
 
         List<Missing> missing = new ArrayList<>();
-        for (JsonNode order : delivered) {
+        for (JsonNode order : delivered.orders()) {
             UUID id = idOf(order);
             if (id == null || settled.contains(id)) {
                 continue;
@@ -120,11 +146,9 @@ public class SettlementRecovery {
                     collected ? null : "The money was never collected: the payment is "
                             + paymentStatus + "."));
         }
-        if (!missing.isEmpty()) {
-            log.info("{} of the {} most recent delivered orders have no ledger rows",
-                    missing.size(), delivered.size());
-        }
-        return missing;
+        log.info("{} of {} delivered orders have no ledger rows (scan complete: {})",
+                missing.size(), delivered.orders().size(), delivered.complete());
+        return new Check(delivered.orders().size(), delivered.complete(), missing);
     }
 
     /** What settling one order by hand did. */
@@ -134,11 +158,21 @@ public class SettlementRecovery {
     /**
      * Settles one delivered order from Order Manager's record of it.
      *
+     * <p><strong>Not one transaction, and that is the fix.</strong> Re-driving a settlement means
+     * completing what is missing and leaving alone what is already there, and the pieces are not
+     * all in the ledger: the two stuck orders on dev had their loyalty points awarded by the run
+     * that failed in September and only their legs missing. Wrapped in one transaction, the
+     * tolerated duplicate on those points aborted the whole re-drive — Postgres refuses every
+     * further statement on a transaction a failure has aborted — and the order stayed unsettled
+     * with a 500 for an answer. Each step now owns its own transaction, exactly as it does when the
+     * listener drives it, and each is idempotent on its own: the legs on {@code existsByOrderId},
+     * the cash float on its collection guard, the points and the rider's row on an existence check
+     * before the insert and their unique indexes behind it.
+     *
      * @param by the operator, for the audit trail on the failure it closes
      * @throws IllegalArgumentException the order is not one this service may settle: unknown, not
      *                                  delivered, or already in the ledger
      */
-    @Transactional
     public Settled settle(String bearerToken, UUID orderId, String by) {
         if (transactions.existsByOrderId(orderId)) {
             // Already settled — by a redelivery, or by somebody pressing the same button first.

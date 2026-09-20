@@ -36,6 +36,17 @@ public interface PointsEntryRepository extends JpaRepository<PointsEntry, UUID> 
             OwnerKind kind, String ref, Pageable pageable);
 
     /**
+     * Whether an order has already earned somebody their points.
+     *
+     * <p>The partial unique index on (order_id, owner_kind, owner_ref) for earned rows is what
+     * guarantees it; this is asked first so that re-driving a settlement whose points were awarded
+     * in a run that failed does not have to survive a constraint violation. It does not: Postgres
+     * refuses every further statement on a transaction one has aborted.
+     */
+    boolean existsByOrderIdAndOwnerKindAndOwnerRefAndReason(UUID orderId, OwnerKind kind,
+                                                            String ref, PointsEntry.Reason reason);
+
+    /**
      * Everything ever EARNED — the number a loyalty tier is judged on.
      *
      * <p>Not the balance: spending points must never demote anybody, or redeeming a reward would

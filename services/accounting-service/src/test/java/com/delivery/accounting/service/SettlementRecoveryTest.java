@@ -72,34 +72,72 @@ class SettlementRecoveryTest {
                 """.formatted(id, paymentStatus));
     }
 
+    private void orderManagerHas(boolean complete, JsonNode... orders) {
+        when(orderManager.delivered(eq(TOKEN), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(new OrderManagerOrdersClient.Delivered(List.of(orders), complete));
+    }
+
     @Test
     @DisplayName("lists a delivered order with no legs, and not one that has them")
     void listsOnlyWhatIsMissing() throws Exception {
-        when(orderManager.recentlyDelivered(eq(TOKEN), org.mockito.ArgumentMatchers.anyInt()))
-                .thenReturn(List.of(order(STUCK, "COLLECTED"), order(SETTLED, "COLLECTED")));
+        orderManagerHas(true, order(STUCK, "COLLECTED"), order(SETTLED, "COLLECTED"));
         AccountingTransaction leg = new AccountingTransaction(SETTLED,
                 AccountingTransaction.Leg.MERCHANT_CREDIT, "ACC-MERCHANT",
                 new java.math.BigDecimal("11.47"), "USD",
                 AccountingTransaction.Direction.CREDIT, "corr");
         when(transactions.findByOrderIdIn(anyCollection())).thenReturn(List.of(leg));
 
-        List<SettlementRecovery.Missing> missing = recovery().unsettledDeliveries(TOKEN, 100);
+        SettlementRecovery.Check check = recovery().unsettledDeliveries(TOKEN, 1000);
 
-        assertThat(missing).extracting(SettlementRecovery.Missing::orderId).containsExactly(STUCK);
-        assertThat(missing.get(0).settleable()).isTrue();
-        assertThat(missing.get(0).reason()).isNull();
+        assertThat(check.missing()).extracting(SettlementRecovery.Missing::orderId)
+                .containsExactly(STUCK);
+        assertThat(check.missing().get(0).settleable()).isTrue();
+        assertThat(check.missing().get(0).reason()).isNull();
+        // What was looked at, beside what was found.
+        assertThat(check.scanned()).isEqualTo(2);
+        assertThat(check.complete()).isTrue();
+    }
+
+    @Test
+    @DisplayName("only legs count as settled: points from a failed run do not")
+    void onlyLegsCountAsSettled() throws Exception {
+        // The two orders stuck on dev: their loyalty points were awarded by the run that failed in
+        // September and their legs never written. The ledger is the only thing asked.
+        orderManagerHas(true, order(STUCK, "COLLECTED"));
+        when(transactions.findByOrderIdIn(anyCollection())).thenReturn(List.of());
+
+        SettlementRecovery.Check check = recovery().unsettledDeliveries(TOKEN, 1000);
+
+        assertThat(check.missing()).extracting(SettlementRecovery.Missing::orderId)
+                .containsExactly(STUCK);
+        verify(transactions).findByOrderIdIn(anyCollection());
+    }
+
+    @Test
+    @DisplayName("a scan that stopped at the cap does not read as a clean ledger")
+    void anIncompleteScanSaysSo() throws Exception {
+        orderManagerHas(false, order(SETTLED, "COLLECTED"));
+        AccountingTransaction leg = new AccountingTransaction(SETTLED,
+                AccountingTransaction.Leg.MERCHANT_CREDIT, "ACC-MERCHANT",
+                new java.math.BigDecimal("11.47"), "USD",
+                AccountingTransaction.Direction.CREDIT, "corr");
+        when(transactions.findByOrderIdIn(anyCollection())).thenReturn(List.of(leg));
+
+        SettlementRecovery.Check check = recovery().unsettledDeliveries(TOKEN, 1000);
+
+        assertThat(check.missing()).isEmpty();
+        assertThat(check.complete()).isFalse();
     }
 
     @Test
     @DisplayName("an order whose money was never collected is listed, with why it cannot be settled")
     void saysWhyAnUnpaidOrderIsNotSettleable() throws Exception {
-        when(orderManager.recentlyDelivered(eq(TOKEN), org.mockito.ArgumentMatchers.anyInt()))
-                .thenReturn(List.of(order(UNPAID, "AUTHORIZATION_PENDING")));
+        orderManagerHas(true, order(UNPAID, "AUTHORIZATION_PENDING"));
         when(transactions.findByOrderIdIn(anyCollection())).thenReturn(List.of());
 
-        List<SettlementRecovery.Missing> missing = recovery().unsettledDeliveries(TOKEN, 100);
+        SettlementRecovery.Check check = recovery().unsettledDeliveries(TOKEN, 1000);
 
-        assertThat(missing).singleElement().satisfies(row -> {
+        assertThat(check.missing()).singleElement().satisfies(row -> {
             assertThat(row.settleable()).isFalse();
             assertThat(row.reason()).contains("never collected");
         });

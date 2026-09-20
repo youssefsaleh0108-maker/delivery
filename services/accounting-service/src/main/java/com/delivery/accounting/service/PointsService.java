@@ -99,8 +99,13 @@ public class PointsService {
      * <p>Idempotent by construction: a partial unique index on (order_id, owner_kind, owner_ref)
      * for earned rows means a redelivered {@code order.delivered} cannot pay anybody twice. The
      * bus is at-least-once, so this is not a theoretical concern.
+     *
+     * <p><strong>Deliberately not one transaction.</strong> The three awards are three independent
+     * facts, each guaranteed by its own index, and binding them together only means one duplicate
+     * takes the other two down with it — Postgres refuses every further statement on a transaction
+     * a failure has aborted. Each award stands or falls alone, and a caller that is mid-settlement
+     * is never dragged into it.
      */
-    @Transactional
     public void awardForDelivery(UUID orderId, String merchantRef, BigDecimal goodsAmount,
                                  String riderRef, String carrierRef, BigDecimal deliveryFee,
                                  String customerRef, BigDecimal totalAmount) {
@@ -207,12 +212,26 @@ public class PointsService {
      * and treat it as the no-op it is.
      */
     private void award(PointsEntry entry, UUID orderId) {
+        // Asked first, and not only caught. A violation is recoverable when this owns the
+        // transaction — the listener's redelivery always did — but not when somebody else does:
+        // Postgres refuses every further statement on a transaction one has failed in, so the
+        // caught duplicate took the whole caller down with it. Re-driving a settlement whose
+        // points were awarded in the run that failed is exactly that case (RECON-04).
+        if (entries.existsByOrderIdAndOwnerKindAndOwnerRefAndReason(
+                orderId, entry.getOwnerKind(), entry.getOwnerRef(),
+                PointsEntry.Reason.ORDER_EARNED)) {
+            log.debug("Order {} already earned points for {} {}; leaving them alone",
+                    orderId, entry.getOwnerKind(), entry.getOwnerRef());
+            return;
+        }
         try {
             entries.saveAndFlush(entry);
             log.debug("Awarded {} points to {} {} for order {}",
                     entry.getPoints(), entry.getOwnerKind(), entry.getOwnerRef(), orderId);
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
-            log.debug("Order {} already earned points for {} {}; ignoring the redelivery",
+            // Two deliveries of the same event at the same moment: the index is what decides, and
+            // the loser has nothing left to do.
+            log.debug("Order {} earned its points for {} {} in a parallel delivery",
                     orderId, entry.getOwnerKind(), entry.getOwnerRef());
         }
     }
