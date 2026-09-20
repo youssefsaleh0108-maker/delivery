@@ -63,6 +63,9 @@ class _StoreScreenState extends State<StoreScreen> {
   StoreVertical _vertical = StoreVertical.restaurant;
   List<OpeningWindow> _hours = <OpeningWindow>[];
 
+  /// Whether the server actually holds a week for this shop. See [_load].
+  bool _hoursOnServer = false;
+
   /// The frame shows opening hours as one summary line. Seven editable rows behind a summary is
   /// the same information one tap further away, and it keeps the frame's rhythm intact for the
   /// merchant who is not here to change their hours today.
@@ -114,6 +117,11 @@ class _StoreScreenState extends State<StoreScreen> {
       setState(() {
         _store = store;
         _hours = hours.isEmpty ? _defaultWeek() : hours;
+        // What the SERVER has, not what the form is showing. The default week below is staged in
+        // the editor for a shop that never set hours, so `_hours` is never empty here — and a week
+        // nobody has saved yet is not a week the storefront can read. Publishing on the strength of
+        // it would be refused by the server with the merchant looking at seven filled-in rows.
+        _hoursOnServer = hours.isNotEmpty;
         _loading = false;
       });
       _fillForm(store);
@@ -201,7 +209,7 @@ class _StoreScreenState extends State<StoreScreen> {
   /// Hours first, matching the server's order: a shop with neither is being set up rather than
   /// corrected, and one problem a merchant can act on beats a list of two.
   String? _publishBlocker(Store store) {
-    if (_hours.isEmpty) return StoreNotListable.hoursRequired;
+    if (!_hoursOnServer) return StoreNotListable.hoursRequired;
     if (store.latitude == null || store.longitude == null) return StoreNotListable.pinRequired;
     return null;
   }

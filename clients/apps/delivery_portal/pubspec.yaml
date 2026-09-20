@@ -37,6 +37,10 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  # Tests only. Back office's pin column opens delivery_merchant's own picker, and driving it means
+  # naming the map widget inside it — the same version that package depends on, so the two cannot
+  # resolve to different maps.
+  flutter_map: ^8.3.2
 
 flutter:
   uses-material-design: true
