@@ -84,6 +84,9 @@ class SettlementRedrivePostgresTest {
 
     private static final String TOKEN = "operator-token";
 
+    /** Where the carrier company is paid, as Order Manager tells the back office. */
+    private static final String COMPANY_ACCOUNT = "ACC-FLEET-7";
+
     @MockitoBean
     private OrderManagerOrdersClient orderManager;
     @MockitoBean
@@ -121,12 +124,13 @@ class SettlementRedrivePostgresTest {
     private JsonNode asOrderManagerHasIt() throws Exception {
         return objectMapper.readTree("""
                 {"id":"%s","kind":"CATALOG","customerId":"customer-1","merchantId":"%s",
-                 "riderId":"%s","deliveryProviderId":"%s","status":"DELIVERED",
+                 "riderId":"%s","deliveryProviderId":"%s","deliveryProviderAccount":"%s",
+                 "status":"DELIVERED",
                  "totalAmount":0.00,"subtotal":13.11,"deliveryFee":4.72,"expressSurcharge":0.00,
                  "deliveryFeeWaived":false,"merchantFeeWaived":false,"carrierFeeWaived":false,
                  "discountAmount":17.83,"paymentMethod":"CASH","paymentStatus":"COLLECTED",
                  "fulfilment":"DELIVERY","deliveredAt":"2026-09-08T21:16:14Z"}
-                """.formatted(order, shop, rider, company));
+                """.formatted(order, shop, rider, company, COMPANY_ACCOUNT));
     }
 
     /** What the failed run of 09-08 left behind: the points, and nothing else. */
@@ -165,7 +169,13 @@ class SettlementRedrivePostgresTest {
                 .satisfies(leg -> assertThat(leg.getAmount()).isEqualByComparingTo("11.47"));
         assertThat(legs).filteredOn(leg -> leg.getLeg() == AccountingTransaction.Leg.PROVIDER_CREDIT)
                 .singleElement()
-                .satisfies(leg -> assertThat(leg.getAmount()).isEqualByComparingTo("4.25"));
+                .satisfies(leg -> {
+                    assertThat(leg.getAmount()).isEqualByComparingTo("4.25");
+                    // And in the company's own account, not the placeholder: Order Manager tells
+                    // the back office where the company is paid, and this read is the back
+                    // office's. A re-drive lands where the first settlement would have.
+                    assertThat(leg.getAccountRef()).isEqualTo(COMPANY_ACCOUNT);
+                });
         // Nobody earned their points a second time.
         assertThat(earnedRowsFor(OwnerKind.MERCHANT, shop)).isEqualTo(1);
         assertThat(earnedRowsFor(OwnerKind.CARRIER, company)).isEqualTo(1);

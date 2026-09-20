@@ -60,16 +60,29 @@ class SettlementRecoveryTest {
                 "ACC-UNMAPPED");
     }
 
+    /** The dev shape: an order carrying no payout account, as Order Manager answered before. */
     private JsonNode order(UUID id, String paymentStatus) throws Exception {
+        return order(id, paymentStatus, null);
+    }
+
+    /**
+     * @param providerAccount where the carrier company is paid, as Order Manager now tells the
+     *                        back office, or null for an order that carries none
+     */
+    private JsonNode order(UUID id, String paymentStatus, String providerAccount) throws Exception {
         return mapper.readTree("""
                 {"id":"%s","kind":"CATALOG","customerId":"customer-1","merchantId":"merchant-1",
-                 "riderId":"rider-1","deliveryProviderId":"provider-77","status":"DELIVERED",
+                 "riderId":"rider-1","deliveryProviderId":"provider-77",%s"status":"DELIVERED",
                  "totalAmount":0.00,"subtotal":13.11,"deliveryFee":4.72,"expressSurcharge":0.00,
                  "deliveryFeeWaived":false,"merchantFeeWaived":false,"carrierFeeWaived":false,
                  "discountAmount":17.83,"paymentMethod":"CASH","paymentStatus":"%s",
                  "fulfilment":"DELIVERY","deliveredAt":"2026-09-08T21:16:14Z",
                  "gift":{"wrap":true,"wrapFee":3.00}}
-                """.formatted(id, paymentStatus));
+                """.formatted(id,
+                providerAccount == null
+                        ? ""
+                        : "\"deliveryProviderAccount\":\"" + providerAccount + "\",",
+                paymentStatus));
     }
 
     private void orderManagerHas(boolean complete, JsonNode... orders) {
@@ -168,11 +181,53 @@ class SettlementRecoveryTest {
         assertThat(event.getValue().path("discountAmount").decimalValue())
                 .isEqualByComparingTo("17.83");
         assertThat(event.getValue().path("giftWrapFee").decimalValue()).isEqualByComparingTo("3.00");
+        // This order carries no payout account, so the placeholder still stands in — see below.
         assertThat(event.getValue().path("deliveryProviderAccount").asText())
                 .isEqualTo("ACC-UNMAPPED");
         assertThat(event.getValue().path("deliveredAt").asText())
                 .isEqualTo("2026-09-08T21:16:14Z");
         verify(failures).resolve(eq(STUCK), eq("op-1"), any());
+    }
+
+    @Test
+    @DisplayName("a re-driven settlement credits the company where it is actually paid")
+    void booksToTheCompanysOwnAccount() throws Exception {
+        // Order Manager exposes deliveryProviderAccount to the back office, and this is the back
+        // office's token. Before it did, the company's PROVIDER_CREDIT went to the placeholder: a
+        // re-driven settlement and a settlement that worked first time did not land in the same
+        // place, and only the amount and the counterparty said so.
+        when(transactions.existsByOrderId(STUCK)).thenReturn(false);
+        when(orderManager.order(TOKEN, STUCK)).thenReturn(order(STUCK, "COLLECTED", "ACC-FLEET-7"));
+        when(settlements.settleDelivered(any(), any())).thenReturn(OrderEventListener.Outcome.ok());
+
+        recovery().settle(TOKEN, STUCK, "op-1");
+
+        ArgumentCaptor<JsonNode> event = ArgumentCaptor.forClass(JsonNode.class);
+        verify(settlements).settleDelivered(event.capture(), any());
+        assertThat(event.getValue().path("deliveryProviderAccount").asText())
+                .isEqualTo("ACC-FLEET-7");
+    }
+
+    @Test
+    @DisplayName("an order the platform's own riders carried names no company at all")
+    void namesNoCompanyForAnOwnFleetOrder() throws Exception {
+        // The account's PRESENCE is what decides whether the fee is a company's or the rider's own,
+        // so an order with no fleet must carry none — not the placeholder, which would pay a
+        // company that does not exist and leave the rider's own credit unwritten.
+        JsonNode ownFleet = mapper.readTree(order(STUCK, "COLLECTED", "ACC-FLEET-7").toString()
+                .replace("\"deliveryProviderId\":\"provider-77\"",
+                        "\"deliveryProviderId\":null")
+                .replace("\"deliveryProviderAccount\":\"ACC-FLEET-7\"",
+                        "\"deliveryProviderAccount\":null"));
+        when(transactions.existsByOrderId(STUCK)).thenReturn(false);
+        when(orderManager.order(TOKEN, STUCK)).thenReturn(ownFleet);
+        when(settlements.settleDelivered(any(), any())).thenReturn(OrderEventListener.Outcome.ok());
+
+        recovery().settle(TOKEN, STUCK, "op-1");
+
+        ArgumentCaptor<JsonNode> event = ArgumentCaptor.forClass(JsonNode.class);
+        verify(settlements).settleDelivered(event.capture(), any());
+        assertThat(event.getValue().has("deliveryProviderAccount")).isFalse();
     }
 
     @Test
