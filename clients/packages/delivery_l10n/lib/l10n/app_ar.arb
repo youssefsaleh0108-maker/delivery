@@ -4082,5 +4082,42 @@
   "boShopPinGone": "لم يعد هذا المتجر موجوداً",
   "boShopPinWhy": "المتجر بلا موقع على الخريطة ليست له مسافة ولا نطاق توصيل ولا مكان في «القريب منك».",
   "custAllSharesAgreed": "تم الاتفاق على كل الحصص!",
-  "custSharesAgreedAtDoor": "لم يُدفع شيء بعد — السائق يحصّل كل حصة عند الباب."
+  "custSharesAgreedAtDoor": "لم يُدفع شيء بعد — السائق يحصّل كل حصة عند الباب.",
+  "heatmapUnmetTitle": "ما لم يجده جيرانك",
+  "heatmapUnmetBlurb": "كلمات بحث عنها الناس قرب متجرك فلم تُرجع شيئاً، أو أرجعت متاجر بعيدة فقط.",
+  "heatmapUnmetThisWeek": "هذا الأسبوع",
+  "heatmapUnmetLastWeek": "الأسبوع الماضي",
+  "heatmapUnmetAbout": "{count, plural, zero{لا عمليات بحث} one{عملية بحث واحدة تقريباً} two{عمليتا بحث تقريباً} few{حوالي {count} عمليات بحث} many{حوالي {count} عملية بحث} other{حوالي {count} عملية بحث}}",
+  "@heatmapUnmetAbout": {
+    "description": "Roughly how many searches asked for a word. Rounded by the server; never the exact number.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "heatmapUnmetNothingNearby": "لا أحد قريب يبيعها",
+  "heatmapUnmetOnlyFar": "أقرب متجر يبيعها على بعد أكثر من {km} كم",
+  "@heatmapUnmetOnlyFar": {
+    "description": "The word was found, but only in shops further than the platform calls nearby.",
+    "placeholders": {
+      "km": {
+        "type": "String"
+      }
+    }
+  },
+  "heatmapUnmetYouSell": "أنت تبيع هذا أصلاً",
+  "heatmapUnmetQuietTitle": "لا جديد هذا الأسبوع",
+  "heatmapUnmetQuietMessage": "{count, plural, other{تظهر الكلمة بعد أن يبحث عنها {count} أشخاص مختلفون في المنطقة خلال أسبوع واحد، حتى لا يمكن تمييز منزل بعينه.}}",
+  "@heatmapUnmetQuietMessage": {
+    "description": "The privacy floor: how many different people must ask for a word before it is shown.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "heatmapUnmetCouldNotLoad": "تعذَّر تحميل عمليات البحث الآن",
+  "heatmapUnmetPrivacy": "الأعداد تقريبية، ولا شيء هنا يدل على من بحث.",
+  "notifCatMerchantInsights": "الطلب والرؤى"
 }

@@ -301,9 +301,44 @@ public class ItemSearchService {
      *                       answer means "none among those".
      * @param candidateLimit how many matching products one search reads
      * @param nearby         whether the search was around a point. Without one no distance is known.
+     * @param searched       what the search ran on and what the whole answer reached, not just this page
      */
     public record ItemSearchResult(Page<ShopMatch> page, boolean truncated, int candidateLimit,
-                                   boolean nearby) {
+                                   boolean nearby, Searched searched) {
+
+        /** An answer nobody asked the second question of. For tests and callers that do not need it. */
+        public ItemSearchResult(Page<ShopMatch> page, boolean truncated, int candidateLimit,
+                                boolean nearby) {
+            this(page, truncated, candidateLimit, nearby, Searched.NOTHING);
+        }
+    }
+
+    /**
+     * What the search actually ran on, and how far it had to go — the demand log's whole view of a
+     * search, and the only thing it is ever given.
+     *
+     * <p>Over every shop that matched rather than the page asked for. A page is what the customer is
+     * shown; this is what the answer was, and "nobody within two kilometres sells this" is a claim
+     * about every match — the nearest shop easily sits on page two when a further shop matched a word
+     * better.
+     *
+     * @param term    the terms as the database folded them, joined by a space in slot order; empty
+     *                when the search had no words (a barcode on its own)
+     * @param shops   how many shops matched in all
+     * @param nearest metres to the nearest of them; null without a point, or with no match
+     * @param pins    where they are. Public information about shops, held only long enough for the
+     *                recorder to ask which neighbourhood each is in — and gathered only on the first
+     *                page, which is the only page that is recorded
+     */
+    public record Searched(String term, int shops, Double nearest, List<GeoPoint> pins) {
+
+        /** No words, no shops: what a search that read nothing reached. */
+        public static final Searched NOTHING = new Searched("", 0, null, List.of());
+
+        public Searched {
+            term = term == null ? "" : term;
+            pins = pins == null ? List.of() : List.copyOf(pins);
+        }
     }
 
     /**
@@ -363,8 +398,12 @@ public class ItemSearchService {
         // is the weakest match of the farthest shop.
         boolean truncated = found.size() > maxCandidates;
         List<Candidate> candidates = truncated ? found.subList(0, maxCandidates) : found;
+        // The folded words, kept for the demand log: an answer with no shops in it is the row that
+        // matters most, so the term travels on the empty answer as much as on a full one.
+        String term = foldedTerm(slots);
         if (candidates.isEmpty()) {
-            return new ItemSearchResult(pageOf(List.of(), pageable), false, maxCandidates, near);
+            return new ItemSearchResult(pageOf(List.of(), pageable), false, maxCandidates, near,
+                    new Searched(term, 0, null, List.of()));
         }
 
         Map<UUID, Product> productsById = new HashMap<>();
@@ -410,7 +449,57 @@ public class ItemSearchService {
                         s.hits.stream().limit(ITEMS_PER_SHOP).map(Hit::product).toList(),
                         Math.max(s.matched - s.dropped, s.hits.size())))
                 .toList();
-        return new ItemSearchResult(pageOf(matches, pageable), truncated, maxCandidates, near);
+        return new ItemSearchResult(pageOf(matches, pageable), truncated, maxCandidates, near,
+                searchedOf(term, listed, pageable.getPageNumber() == 0));
+    }
+
+    /**
+     * What the whole answer reached, read off the shops that survived judging rather than the page.
+     *
+     * <p>Costs a pass over at most {@code max-candidates} shops already in memory and no query at
+     * all, which is why the search is allowed to work it out: anything that needed a read would be
+     * the demand log slowing a search, and the demand log is not allowed to do that.
+     *
+     * <p>The pins are built only for the first page, because only the first page is recorded —
+     * scrolling is the same search, so {@code ItemSearchController} discards everything this returns
+     * for a later page. Gathering a list of up to {@code max-candidates} coordinates to throw away
+     * is small, but it is work done on a request thread for a feature that has promised not to cost
+     * a search anything.
+     */
+    private static Searched searchedOf(String term, List<Shop> listed, boolean firstPage) {
+        Double nearest = null;
+        List<GeoPoint> pins = firstPage ? new ArrayList<>(listed.size()) : List.of();
+        for (Shop shop : listed) {
+            GeoPoint pin = shop.view.store().location();
+            if (firstPage && pin != null) {
+                pins.add(pin);
+            }
+            if (shop.distanceMetres != null && (nearest == null || shop.distanceMetres < nearest)) {
+                nearest = shop.distanceMetres;
+            }
+        }
+        return new Searched(term, listed.size(), nearest, pins);
+    }
+
+    /**
+     * The query's words as the database folded them, joined by a space in slot order.
+     *
+     * <p>One string for one search, because a search is one signal: a photo read as "pampers",
+     * "حفاضات" and "size 4" is one person looking for nappies, not three. Empty for a search of no
+     * words at all — a barcode on its own — which the demand log has nothing to say about.
+     */
+    private static String foldedTerm(List<SearchWords> slots) {
+        StringBuilder term = new StringBuilder();
+        for (SearchWords slot : slots) {
+            if (slot.isEmpty()) {
+                continue;
+            }
+            if (term.length() > 0) {
+                term.append(' ');
+            }
+            term.append(slot.phrase());
+        }
+        return term.toString();
     }
 
     /**

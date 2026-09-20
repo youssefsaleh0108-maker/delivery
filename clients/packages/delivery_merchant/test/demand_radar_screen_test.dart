@@ -21,20 +21,41 @@ import 'package:flutter_test/flutter_test.dart';
 /// with the LIVE badge withdrawn; a window change that asks again; tiles that get another try; and a
 /// minute refresh that runs only while somebody can see the screen.
 class _DensityAdapter implements HttpClientAdapter {
-  _DensityAdapter(this.answers);
+  _DensityAdapter(this.answers, {this.unmet});
 
-  /// One per request, in order; the last one repeats. A map is a 200 body, an int an error status.
+  /// One per density request, in order; the last one repeats. A map is a 200 body, an int an error
+  /// status.
   final List<Object> answers;
+
+  /// What the words read answers, once. Null stands for a failure, which this screen must survive
+  /// without disturbing the map above it — so the density tests below leave it null on purpose.
+  final Object? unmet;
+
+  /// The density requests alone, so a test can still say "one call, and it asked for this window".
   final List<RequestOptions> calls = <RequestOptions>[];
+
+  /// The reads of what the neighbourhood could not find.
+  final List<RequestOptions> unmetCalls = <RequestOptions>[];
 
   @override
   Future<ResponseBody> fetch(RequestOptions options, Stream<Uint8List>? requestStream,
       Future<void>? cancelFuture) async {
-    calls.add(options);
-    final Object answer = answers[(calls.length - 1).clamp(0, answers.length - 1)];
     final Map<String, List<String>> headers = <String, List<String>>{
       Headers.contentTypeHeader: <String>[Headers.jsonContentType],
     };
+    if (options.path.startsWith('/api/products/demand/unmet')) {
+      unmetCalls.add(options);
+      final Object? answer = unmet;
+      if (answer == null) {
+        return ResponseBody.fromString('{"detail":"unavailable"}', 503, headers: headers);
+      }
+      if (answer is int) {
+        return ResponseBody.fromString('{"detail":"unavailable"}', answer, headers: headers);
+      }
+      return ResponseBody.fromString(jsonEncode(answer), 200, headers: headers);
+    }
+    calls.add(options);
+    final Object answer = answers[(calls.length - 1).clamp(0, answers.length - 1)];
     if (answer is int) {
       return ResponseBody.fromString('{"detail":"unavailable"}', answer, headers: headers);
     }
@@ -91,12 +112,13 @@ Future<_DensityAdapter> _pump(
   String? storeId = 'store-1',
   Locale locale = const Locale('en'),
   double width = 390,
+  Object? unmet,
 }) async {
   tester.view.physicalSize = Size(width, 1000);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
 
-  final _DensityAdapter adapter = _DensityAdapter(answers);
+  final _DensityAdapter adapter = _DensityAdapter(answers, unmet: unmet);
   final Dio dio = Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = adapter;
 
   await tester.pumpWidget(MaterialApp(

@@ -93,6 +93,36 @@ public class NotificationsRabbitConfiguration {
     }
 
     @Bean
+    public Queue notificationsDemandEventsQueue(
+            @Value("${delivery.notifications.demand-events-queue:notifications.demand-events}") String name) {
+        return QueueBuilder.durable(name)
+                .deadLetterExchange("")
+                .deadLetterRoutingKey(name + ".dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue notificationsDemandEventsDlq(
+            @Value("${delivery.notifications.demand-events-queue:notifications.demand-events}") String name) {
+        return QueueBuilder.durable(name + ".dlq").build();
+    }
+
+    /**
+     * {@code demand.#} — the weekly merchant demand digest, and whatever joins it.
+     *
+     * <p>Its own queue for the reason the chat one has its own: a demand event carries no order
+     * snapshot, and a week's worth of digests raised in one burst on a Monday morning must not sit
+     * in front of the order notifications a customer is waiting on.
+     */
+    @Bean
+    public Binding notificationsDemandEventsBinding(Queue notificationsDemandEventsQueue,
+                                                    TopicExchange deliveryEventsExchange) {
+        return BindingBuilder.bind(notificationsDemandEventsQueue)
+                .to(deliveryEventsExchange)
+                .with("demand.#");
+    }
+
+    @Bean
     public Queue notificationReceiptsQueue(
             @Value("${delivery.notifications.receipts-queue:notifications.receipts}") String name) {
         return QueueBuilder.durable(name)

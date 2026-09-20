@@ -21,10 +21,12 @@ import com.delivery.product.api.dto.PhotoSearchDtos.PhotoSearchResponse;
 import com.delivery.product.api.dto.PhotoSearchDtos.UnderstoodResponse;
 import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.service.CatalogService;
+import com.delivery.product.service.ItemSearchService;
 import com.delivery.product.service.PhotoSearchException;
 import com.delivery.product.service.PhotoSearchService;
 import com.delivery.product.service.PhotoSearchService.PhotoSearchResult;
 import com.delivery.product.service.ProductImageService;
+import com.delivery.product.service.SearchDemandRecorder;
 import com.delivery.product.service.StoreService;
 import com.delivery.product.vision.Descriptions;
 
@@ -51,15 +53,18 @@ public class PhotoSearchController {
     private final StoreService storeService;
     private final CatalogService catalog;
     private final ProductImageService images;
+    private final SearchDemandRecorder demand;
     private final long maxPhotoBytes;
 
     public PhotoSearchController(PhotoSearchService photoSearch, StoreService storeService,
                                  CatalogService catalog, ProductImageService images,
+                                 SearchDemandRecorder demand,
                                  @Value("${spring.servlet.multipart.max-file-size:2MB}") DataSize maxPhotoSize) {
         this.photoSearch = photoSearch;
         this.storeService = storeService;
         this.catalog = catalog;
         this.images = images;
+        this.demand = demand;
         this.maxPhotoBytes = maxPhotoSize.toBytes();
     }
 
@@ -96,6 +101,7 @@ public class PhotoSearchController {
 
         PhotoSearchResult found = photoSearch.search(accountId, bytes, centre,
                 ItemSearchController.DEFAULT_PAGE_SIZE);
+        recordForTheNeighbourhood(accountId, centre, found);
         ItemSearchPageResponse page = ItemSearchPages.of(found.result(), storeService, catalog, images);
         Descriptions.Clean understood = found.understood();
         return new PhotoSearchResponse(page.content(), page.page(), page.size(), page.totalElements(),
@@ -106,6 +112,26 @@ public class PhotoSearchController {
                 found.nextQuery() == null ? null
                         : new NextQueryResponse(found.nextQuery().terms(), found.nextQuery().barcode()),
                 found.left());
+    }
+
+    /**
+     * Hands a photo search to the demand log, <strong>by the words the reader understood</strong>.
+     *
+     * <p>The photo is not the search. What reaches the log is the folded terms the item search
+     * actually ran on — "pampers size 4", not a picture of a pack in somebody's kitchen — which is the
+     * same string a customer typing those words would produce, and which therefore counts towards the
+     * same signal. The photo itself is read and dropped and never reaches storage, the database or a
+     * log, exactly as it did before this feature existed.
+     *
+     * <p>Once per request, over the answer the customer was actually given: the service may run the
+     * item search twice (the exact reading, then the looser keywords), and only the answer it returned
+     * is a search that happened. A photo of something that is not a product searched for nothing, and
+     * carries no term, so the recorder discards it.
+     */
+    private void recordForTheNeighbourhood(String accountId, GeoPoint centre, PhotoSearchResult found) {
+        ItemSearchService.Searched searched = found.result().searched();
+        demand.record(new SearchDemandRecorder.Recording(accountId, searched.term(), centre,
+                searched.shops(), searched.nearest(), searched.pins(), null));
     }
 
     /**

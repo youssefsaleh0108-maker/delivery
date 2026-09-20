@@ -38,10 +38,26 @@ const double _areaZoom = 14;
 /// not live: its neighbourhood is not served at all, and the 404 that brings is said as "not live
 /// yet" rather than offered as a retry that cannot work.
 ///
-/// **What the frame draws that is not here.** "Trending Searches Near You", with search counts and
-/// Add to Menu / Stock This buttons. Nothing on the platform records what customers search for, so
-/// every figure in that section would be invented; it is left out rather than drawn with numbers the
-/// platform does not have. Its place holds the list of areas around the shop.
+/// **What the frame's "Trending Searches Near You" became.** That section used to be left out
+/// entirely: nothing on the platform recorded what customers searched for, so every figure in it
+/// would have been invented. Customer item search now records each search against a neighbourhood —
+/// never an account, a session or a pin — so the section is drawn, as **what your neighbours could
+/// not find**: words searched for near this shop that came back with nothing, or only with shops
+/// more than a couple of kilometres away. Which is the more useful half anyway. A merchant does not
+/// need to be told what is selling; they need to be told what people wanted and nobody had.
+///
+/// It answers the way the density half does. A word appears only once at least
+/// [UnmetDemand.minimumPeople] different people asked for it in a week — one household's shopping
+/// list is not a market signal, and the floor is what keeps this from being surveillance — and the
+/// number beside it is rounded ("about 10"), never the count. Weekly, because the floor needs a week
+/// to be reached honestly; this week and last, so a merchant can see a word arrive.
+///
+/// Words the shop already sells are marked rather than hidden: "you stock this and your neighbours
+/// still could not find it" usually means out of stock, paused, or named something nobody types.
+///
+/// Fetched on a real refresh rather than on the minute poll. The weekly numbers move once a day at
+/// most, and the section keeps its own last good answer, so a failed search read never blanks the
+/// map above it and a failed density read never blanks the words.
 ///
 /// **The map.** flutter_map over the platform's one tile setting ([mapTileUrlTemplate]) — the
 /// dependency the merchant package already has for the shop pin, so nothing new is pulled in. Tiles
@@ -100,6 +116,19 @@ class _DemandRadarScreenState extends State<DemandRadarScreen> with WidgetsBindi
   /// The last good answer, for [_window].
   DemandDensity? _density;
 
+  /// The last good answer about what the neighbourhood could not find. Independent of [_window],
+  /// which is why it survives a window change and is not cleared with [_density].
+  UnmetDemand? _unmet;
+
+  /// True when the most recent read of the unmet words failed. The last good answer stays.
+  bool _unmetFailed = false;
+
+  /// Whether the unmet words are being read for the first time.
+  bool _unmetLoading = false;
+
+  /// Which week the words section is showing. False is the week that just finished.
+  bool _unmetThisWeek = true;
+
   bool _loading = false;
 
   /// True when the most recent request failed. The last good answer stays; the LIVE badge goes.
@@ -110,6 +139,9 @@ class _DemandRadarScreenState extends State<DemandRadarScreen> with WidgetsBindi
 
   /// Bumped by every request, so an answer for a window the merchant has since left is dropped.
   int _generation = 0;
+
+  /// The same, for the unmet words, which belong to no window.
+  int _unmetGeneration = 0;
 
   Timer? _poll;
 
@@ -136,6 +168,7 @@ class _DemandRadarScreenState extends State<DemandRadarScreen> with WidgetsBindi
     _appOnScreen = lifecycle == null || _isOnScreen(lifecycle);
     _loading = true;
     _load();
+    unawaited(_loadUnmet());
     // The minute refresh starts in didChangeDependencies, which runs next: the first moment the
     // route can be asked whether it is on top.
   }
@@ -187,6 +220,39 @@ class _DemandRadarScreenState extends State<DemandRadarScreen> with WidgetsBindi
     if (mounted) setState(() => _tilesFailed = true);
   }
 
+  /// Reads what the neighbourhood could not find.
+  ///
+  /// Deliberately not part of the minute poll: the numbers are weekly and move once a day at most,
+  /// and a screen left open would otherwise ask for them sixty times an hour. It keeps its own
+  /// failure flag, so a search read that fails leaves the map and its areas exactly as they were.
+  Future<void> _loadUnmet() async {
+    final String? storeId = widget.storeId;
+    if (storeId == null) return;
+    // Its own counter, not the density's: the words do not belong to a window, so a merchant
+    // switching from the hour to the week must not throw away the answer already on its way.
+    final int generation = ++_unmetGeneration;
+    if (_unmet == null && !_unmetLoading) {
+      setState(() => _unmetLoading = true);
+    }
+    try {
+      final UnmetDemand unmet = await widget.api.unmet(storeId: storeId);
+      if (!mounted || generation != _unmetGeneration) return;
+      setState(() {
+        _unmet = unmet;
+        _unmetLoading = false;
+        _unmetFailed = false;
+      });
+    } catch (_) {
+      if (!mounted || generation != _unmetGeneration) return;
+      // Including the 404 a shop that is not live answers: _notLive already says that once, and
+      // saying it twice on one screen reads as two faults.
+      setState(() {
+        _unmetLoading = false;
+        _unmetFailed = true;
+      });
+    }
+  }
+
   Future<void> _load({bool silent = false}) async {
     final String? storeId = widget.storeId;
     if (storeId == null) return;
@@ -224,6 +290,9 @@ class _DemandRadarScreenState extends State<DemandRadarScreen> with WidgetsBindi
   /// up again every minute.
   Future<void> _refresh() {
     if (_tilesFailed) setState(() => _tilesFailed = false);
+    // The words too: a refresh somebody asked for is the one moment they are worth re-reading,
+    // and the one moment a merchant whose last read failed can retry it.
+    unawaited(_loadUnmet());
     return _load();
   }
 
@@ -320,6 +389,10 @@ class _DemandRadarScreenState extends State<DemandRadarScreen> with WidgetsBindi
                         child: _AreaRow(zone: zone, strings: t),
                       ),
                   ],
+                  // Under the areas rather than above them: the map and its list are what the radar
+                  // has always been, and the words are read after a merchant has seen where their
+                  // neighbourhood is.
+                  ..._unmetSection(t),
                 ] else if (_loading)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: DeliverySpacing.xxl),
@@ -342,6 +415,88 @@ class _DemandRadarScreenState extends State<DemandRadarScreen> with WidgetsBindi
         ),
       ),
     );
+  }
+
+  /// "What your neighbours could not find" — the frame's Trending Searches slot, answered honestly.
+  ///
+  /// Drawn only for a shop whose neighbourhood the platform knows: with no placed area near the pin
+  /// there is nothing this could be about, and the map card above has already said so in its own
+  /// words. Everything else has a state of its own, because they mean different things — still
+  /// loading, could not be read, and a genuinely quiet week under the floor.
+  List<Widget> _unmetSection(DeliveryStrings t) {
+    final UnmetDemand? unmet = _unmet;
+    if (unmet != null && !unmet.hasNeighbourhood) return const <Widget>[];
+    if (unmet == null && !_unmetLoading && !_unmetFailed) return const <Widget>[];
+
+    final UnmetWeek? week =
+        unmet == null ? null : (_unmetThisWeek ? unmet.thisWeek : unmet.lastWeek);
+
+    return <Widget>[
+      const SizedBox(height: DeliverySpacing.lg),
+      YdSectionHeader(title: t.heatmapUnmetTitle, fontSize: 15),
+      const SizedBox(height: DeliverySpacing.xs),
+      Text(
+        t.heatmapUnmetBlurb,
+        style: const TextStyle(fontSize: 12, color: DeliveryColors.muted, height: 1.4),
+      ),
+      const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+      if (unmet != null) ...<Widget>[
+        Wrap(
+          spacing: DeliverySpacing.sm,
+          runSpacing: DeliverySpacing.sm,
+          children: <Widget>[
+            YdChip(
+              label: t.heatmapUnmetThisWeek,
+              selected: _unmetThisWeek,
+              onTap: () => setState(() => _unmetThisWeek = true),
+            ),
+            YdChip(
+              label: t.heatmapUnmetLastWeek,
+              selected: !_unmetThisWeek,
+              onTap: () => setState(() => _unmetThisWeek = false),
+            ),
+          ],
+        ),
+        const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+      ],
+      if (unmet == null && _unmetLoading)
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: DeliverySpacing.lg),
+          child: Center(child: CircularProgressIndicator(color: DeliveryColors.brand)),
+        )
+      else if (unmet == null)
+        YdEmptyState(
+          icon: Icons.cloud_off_rounded,
+          title: t.heatmapUnmetCouldNotLoad,
+          action: YdPillButton.secondary(
+            label: t.tryAgain,
+            onPressed: _loadUnmet,
+            size: YdPillButtonSize.compact,
+            expand: false,
+          ),
+        )
+      else if (week == null || week.isEmpty)
+        YdCard.bordered(
+          padding: const EdgeInsets.all(DeliverySpacing.md - DeliverySpacing.xs),
+          radius: DeliveryRadius.md,
+          child: _CardNotice(
+            icon: Icons.search_off_rounded,
+            title: t.heatmapUnmetQuietTitle,
+            message: t.heatmapUnmetQuietMessage(unmet.minimumPeople),
+          ),
+        )
+      else ...<Widget>[
+        for (final UnmetTerm term in week.terms)
+          Padding(
+            padding: const EdgeInsets.only(bottom: DeliverySpacing.md - DeliverySpacing.xs),
+            child: _UnmetRow(term: term, farMetres: unmet.farMetres, strings: t),
+          ),
+        Text(
+          t.heatmapUnmetPrivacy,
+          style: const TextStyle(fontSize: 12, color: DeliveryColors.faint, height: 1.4),
+        ),
+      ],
+    ];
   }
 
   Widget _windowChips(DeliveryStrings t) {
@@ -994,5 +1149,91 @@ class _AreaRow extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// One word the neighbourhood looked for and did not find: the word, where it was asked, why it
+/// counts as unmet, and roughly how many searches asked for it.
+///
+/// The word is shown as it was searched for — folded, lower case, whatever the customer typed. Not
+/// prettified: a merchant deciding what to stock is better served by the spelling people actually
+/// use than by one the platform invented for them.
+class _UnmetRow extends StatelessWidget {
+  const _UnmetRow({required this.term, required this.farMetres, required this.strings});
+
+  final UnmetTerm term;
+  final int farMetres;
+  final DeliveryStrings strings;
+
+  @override
+  Widget build(BuildContext context) {
+    final String? why = switch (term.kind) {
+      UnmetKind.none => strings.heatmapUnmetNothingNearby,
+      UnmetKind.far => strings.heatmapUnmetOnlyFar(_km(farMetres)),
+      UnmetKind.unknown => null,
+    };
+    final String caption = <String>[
+      if (term.areaName != null) term.areaName!,
+      strings.heatmapUnmetAbout(term.about),
+      if (why != null) why,
+      // In the caption rather than in a badge beside the word. A badge would be easier to scan, and
+      // in Arabic on a 320px phone "أنت تبيع هذا أصلاً" beside a five-word product name overflows the
+      // row — so the green tile carries the mark and the words go where they can wrap.
+      if (term.alreadySold) strings.heatmapUnmetYouSell,
+    ].join(' · ');
+
+    return YdCard.bordered(
+      padding: const EdgeInsets.all(DeliverySpacing.md - DeliverySpacing.xs),
+      radius: DeliveryRadius.md,
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: term.alreadySold ? DeliveryAccent.positive.tint : DeliveryColors.brandSoft,
+              borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+            ),
+            child: Icon(
+              term.alreadySold ? Icons.inventory_2_outlined : Icons.search_rounded,
+              size: 20,
+              color: term.alreadySold ? DeliveryAccent.positive.color : DeliveryColors.brand,
+            ),
+          ),
+          const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  term.term,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.ink,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  caption,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: DeliveryColors.muted),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Metres as a reader says them: "2" rather than "2.0", and "1.5" where it matters.
+  static String _km(int metres) {
+    final double km = metres / 1000;
+    return km == km.roundToDouble() ? km.round().toString() : km.toStringAsFixed(1);
   }
 }

@@ -1,35 +1,27 @@
 # What dev is allowed to take from a box it shares with production.
 #
-# The node is 8 vCPU / 23 GiB with NO SWAP. Before this file, the two environments' memory LIMITS
-# added up to 106% of it: nothing was over-committed at idle (12.7 GiB in use), but nothing stopped
-# them from being, and the kernel's answer to a 23 GiB box being asked for 24 GiB is to start
-# killing processes in an order nobody chose. dev is also the half that changes on every merge.
+# The node is 8 vCPU / 23 GiB with NO SWAP, and dev is the half that changes on every merge. The
+# first answer here was a 9 GiB ResourceQuota on the sum of this namespace's memory limits. It was
+# applied on 2026-09-20 and it took dev down.
 #
-# 9 GiB is the share the production plan allots dev (item 7). It is a ceiling on the sum of the
-# memory LIMITS of every pod in this namespace, and it is ENFORCED AT ADMISSION: a pod whose limit
-# would take the namespace past 9 GiB is refused outright, with the arithmetic in the event.
+# WHY, so nobody adds it back in the same shape: a quota sized for the steady state has no room
+# for a rolling update. Kubernetes starts the new pod before it stops the old one, so a rollout
+# needs the namespace to hold both for a minute. At 8.9 of 9 GiB it could not, admission refused
+# every new pod, and the rollouts deadlocked — including the StatefulSets, whose pods had already
+# been deleted. dev lost its database and its broker, and every service went unready behind them.
+# Nothing was lost (the volumes are separate) but the environment was down until the quota went.
 #
-# THIS IS TIGHT ON PURPOSE AND DEV IS NEARLY FULL. The rendered overlay comes to 8.875 GiB, so
-# there is about 128 MiB of headroom — room for nothing. That is the quota doing its job rather
-# than a mis-sizing: fourteen JVMs, Keycloak, Postgres, Redis, RabbitMQ, MinIO, Vault and mailpit
-# do not fit in 9 GiB with the margins any of them would prefer. The answer when dev next needs
-# something is the one the plan already gives (item 7, step 19): a second VPS for dev. Raising this
-# number instead takes the room back out of production.
+# What protects production now: the PriorityClasses in cluster/priority-classes.yaml. Under memory
+# pressure the kernel and the scheduler take from dev-standard before prod-critical, which is the
+# guarantee that actually matters, and it costs no headroom.
 #
-# scripts/verify.sh adds up the rendered overlay and fails if it exceeds this figure, so the two
-# cannot drift.
-apiVersion: v1
-kind: ResourceQuota
-metadata:
-  name: dev-memory
-spec:
-  hard:
-    limits.memory: 9Gi
-    # Requests are what the SCHEDULER reserves, and they are what decides whether a production pod
-    # can be placed at all. Capped well under the limit ceiling: dev's requests today are about
-    # 5.3 GiB, and nothing in dev should be able to reserve memory it does not use.
-    requests.memory: 6Gi
----
+# If a quota comes back it needs BOTH: a ceiling with room for the largest rollout on top of the
+# steady state (about 11 GiB today), and maxSurge: 0 on the deployments so a rollout replaces
+# rather than doubles. Prove it by rolling every deployment once before calling it done.
+#
+# The LimitRange below stays: it gives a pod that names no limits a sane one, which is a default,
+# not a ceiling, and cannot refuse anything.
+
 # The safety net under the quota above.
 #
 # A ResourceQuota that names limits.memory makes a memory limit COMPULSORY for every container in

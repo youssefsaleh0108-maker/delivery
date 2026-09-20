@@ -16,6 +16,7 @@ import com.delivery.product.service.ItemSearchService.ItemQuery;
 import com.delivery.product.service.ItemSearchService.ItemSearchResult;
 import com.delivery.product.service.ItemSearchThrottle;
 import com.delivery.product.service.ProductImageService;
+import com.delivery.product.service.SearchDemandRecorder;
 import com.delivery.product.service.StoreService;
 
 /**
@@ -44,15 +45,17 @@ public class ItemSearchController {
     private final CatalogService catalog;
     private final ProductImageService images;
     private final ItemSearchThrottle throttle;
+    private final SearchDemandRecorder demand;
 
     public ItemSearchController(ItemSearchService itemSearch, StoreService storeService,
                                 CatalogService catalog, ProductImageService images,
-                                ItemSearchThrottle throttle) {
+                                ItemSearchThrottle throttle, SearchDemandRecorder demand) {
         this.itemSearch = itemSearch;
         this.storeService = storeService;
         this.catalog = catalog;
         this.images = images;
         this.throttle = throttle;
+        this.demand = demand;
     }
 
     /**
@@ -77,10 +80,34 @@ public class ItemSearchController {
         ItemQuery query = ItemQuery.of(request.q(), request.terms(), request.barcode());
         // Built before anything is read, so half a point or (0, 0) is refused rather than searched.
         GeoPoint centre = GeoPoint.ofNullable(request.latitude(), request.longitude());
-        throttle.acquire(CurrentUser.requireId());
-        ItemSearchResult result = itemSearch.search(query, centre,
-                request.page() == null ? 0 : request.page(),
+        String accountId = CurrentUser.requireId();
+        throttle.acquire(accountId);
+        int page = request.page() == null ? 0 : request.page();
+        ItemSearchResult result = itemSearch.search(query, centre, page,
                 request.size() == null ? DEFAULT_PAGE_SIZE : request.size());
+        recordForTheNeighbourhood(accountId, centre, page, result);
         return ItemSearchPages.of(result, storeService, catalog, images);
+    }
+
+    /**
+     * Hands the search to the demand log, after it has answered.
+     *
+     * <p>Here rather than inside {@link ItemSearchService} for two reasons, and both are the point of
+     * the feature. A search that was refused or that timed out threw before this line, so it writes
+     * nothing — the log only ever holds searches that really happened. And the recorder returns
+     * immediately, doing its work on a thread of its own, so nothing between here and the customer's
+     * answer can be slowed by it ({@link SearchDemandRecorder}).
+     *
+     * <p><strong>Only the first page.</strong> Scrolling through the shops that answered is the same
+     * search, and counting it again would let one customer clear the five-search floor alone.
+     */
+    private void recordForTheNeighbourhood(String accountId, GeoPoint centre, int page,
+                                           ItemSearchResult result) {
+        if (page > 0) {
+            return;
+        }
+        ItemSearchService.Searched searched = result.searched();
+        demand.record(new SearchDemandRecorder.Recording(accountId, searched.term(), centre,
+                searched.shops(), searched.nearest(), searched.pins(), null));
     }
 }
