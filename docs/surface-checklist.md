@@ -13,7 +13,7 @@ that does not exist, and a screen listed here with no tick is one nobody has dri
 *The frame every carrier tab is drawn inside: company monogram + 'YouDrop Carrier' wordmark, a paused chip, five bottom tabs, and one shared refresh that fans out six concurrent calls (myCompany, myScore, carrierEarnings, carrierSummary, myRiders, forCarrier).*
 
 - file: `D:/workspace/delivery/clients/apps/mobile_app/lib/src/carrier_shell.dart`
-- reached by: Sign in as carrier/500005 on the mobile app — main.dart lands straight here; there is no intermediate screen.
+- reached by: Sign in as carrier/<its passcode from the demo-logins Secret> on the mobile app — main.dart lands straight here; there is no intermediate screen.
 - covered by: integration_test/carrier_test.dart — drives the real cold start, the sign-in form, arrival, and asserts the error state is absent. No widget test exists for this shell anywhere in mobile_app/test.
 - states: Loading: full-screen CircularProgressIndicator while _company is null. · Error: YdEmptyState icon cloud_off, title t.somethingWentWrong 'Something went wrong', message t.couldNotReachTheServer 'We could not reach the server. Check your connection and try again.' — reachable ONLY by breaking /api/delivery-providers/my-company. · Silent partial failure: score, earnings, summary, riders and orders each swallow their error — a 403 on riders renders identically to an empty fleet. No visible indication. · Header chip t.carrCompanyPaused 'Company paused — no new work is offered' when company.canTakeWork is false.
 
@@ -128,7 +128,7 @@ that does not exist, and a screen listed here with no tick is one nobody has dri
 *The fixed-width left rail: brand tile (Icons.local_shipping), wordmark 'Carrier Hub' (hard-coded English), seven destinations, and a footer user card whose menu carries language and sign-out.*
 
 - file: `D:/workspace/delivery/clients/apps/delivery_portal/lib/src/portal_shell.dart`
-- reached by: Sign in at https://portal-dev.youdrop.shop as carrier/500005. PortalArea.forSession puts the carrier area up; with only the CARRIER role there is exactly one area and the wordmark is not a menu.
+- reached by: Sign in at https://portal-dev.youdrop.shop as carrier/<its passcode from the demo-logins Secret>. PortalArea.forSession puts the carrier area up; with only the CARRIER role there is exactly one area and the wordmark is not a menu.
 - covered by: test/shell/console_shell_test.dart covers the shell generically, not the carrier destinations.
 - states: User card shows session.displayName over t.carrierPartner 'Carrier partner'. · Area switcher (onAreaSelected) is null unless the account holds more than one of MERCHANT/CARRIER/BACKOFFICE — the demo carrier will not see it. · There is no responsive collapse: the rail is a fixed ConsoleMetrics.sidebarWidth Row child, so a narrow window squeezes the content column rather than hiding the rail.
 
@@ -385,7 +385,7 @@ that does not exist, and a screen listed here with no tick is one nobody has dri
 - reached by: Open https://portal-dev.youdrop.shop with no session (or after Sign out). This is the pre-auth screen; everything else is behind it.
 - states: Bootstrap: full-screen CircularProgressIndicator while _authService.restore() runs · Error: _MessageScreen 'Sign-in failed: <error>' with a 'Try again' OutlinedButton · Busy: button disabled, label 'Sign in…' · SnackBar 'Sign-in failed' if signIn() throws · Responsive: below 1040px logical width the 480px crimson brand panel is dropped and the 416px card centres (constant _splitPanelBreakpoint, main.dart:266)
 
-  - [ ] t.signIn — "Sign in" (renders as "Sign in…" while busy) — AuthService.signIn() → navigates the browser away to Keycloak; the session comes back via AuthService.restore() on the next load. Type backoffice / 400004 on Keycloak's own page.  `ElevatedButton (full width, brand fill; disabled while busy)`
+  - [ ] t.signIn — "Sign in" (renders as "Sign in…" while busy) — AuthService.signIn() → navigates the browser away to Keycloak; the session comes back via AuthService.restore() on the next load. Type backoffice / its passcode from the demo-logins Secret on Keycloak's own page.  `ElevatedButton (full width, brand fill; disabled while busy)`
   - [ ] t.language tooltip — "Language"; items t.english "English" / t.arabic "العربية"; button face is the literal "AR / EN" — LocaleController.setLanguage; persisted to flutter_secure_storage key 'delivery.locale' and survives reload. Console screens themselves are English-only, so only the rail and shared widgets re-label.  `PopupMenuButton<String> wrapped in a bordered Container (position: under)`
 
 ### _MessageScreen (no-role / sign-in-failed screen)  — UNREACHABLE, no driving test
@@ -403,7 +403,7 @@ that does not exist, and a screen listed here with no tick is one nobody has dri
 
 - file: `D:/workspace/delivery/clients/apps/delivery_portal/lib/src/portal_shell.dart + lib/src/shell/console_sidebar.dart`
 - reached by: Immediately after sign-in. Present on every back office screen; it is the only navigation the app has.
-- **unreachable:** The console switcher is unreachable with backoffice/400004 — that user holds only the BACKOFFICE realm role, so areas.length == 1 and onAreaSelected is null (portal_shell.dart:667). To exercise it a Keycloak user needs two of MERCHANT/CARRIER/BACKOFFICE.
+- **unreachable:** The console switcher is unreachable with backoffice/<its passcode from the demo-logins Secret> — that user holds only the BACKOFFICE realm role, so areas.length == 1 and onAreaSelected is null (portal_shell.dart:667). To exercise it a Keycloak user needs two of MERCHANT/CARRIER/BACKOFFICE.
 - covered by: test/shell/console_shell_test.dart — DRIVES the sidebar: renders it at several widths and taps 'CARRIER HUB' → 'Backoffice' to prove the switcher swaps areas. Also mounts ConsolePage with header/KPIs/table.
 - states: Single-area account: wordmark is plain Text, no switcher · Multi-area account: wordmark becomes the popup · Long display name / long rail label: ellipsised · Rail scrolls when the window is shorter than 14 rows
 
@@ -995,7 +995,7 @@ that does not exist, and a screen listed here with no tick is one nobody has dri
 *Proves it is still the same person holding the phone before any rider screen is drawn.*
 
 - file: `D:\workspace\delivery\clients\apps\mobile_app\lib\src\biometric_lock_screen.dart`
-- reached by: Sign in as rider/300003 → Settings tab → App language row (or Notification preferences row) → shared Settings → turn ON Fingerprint unlock → kill and cold-start the app. main.dart:676-683 draws this before the rider shell on every restored session.
+- reached by: Sign in as rider/<its passcode from the demo-logins Secret> → Settings tab → App language row (or Notification preferences row) → shared Settings → turn ON Fingerprint unlock → kill and cold-start the app. main.dart:676-683 draws this before the rider shell on every restored session.
 - states: busy: spinner inside the circle, both controls disabled · error line under the glyph: couldNotVerifyYou "We could not verify you..." or fingerprintNotSetUp "No fingerprint or face is set up on this phone yet..." · enrolment removed since the setting was turned on: BiometricResult.unavailable lets the rider in rather than locking them out
 
   - [ ] t.unlockWithFingerprint — "Unlock with fingerprint" — Raises the OS biometric prompt; 45s timeout is treated as a refusal (main.dart:276-277). Shows a CircularProgressIndicator in place of the fingerprint glyph while busy.  `InkWell (112px circle, customBorder CircleBorder, Semantics button) — no Button subclass`
@@ -1005,7 +1005,7 @@ that does not exist, and a screen listed here with no tick is one nobody has dri
 *One four-tab app; the tabs share one 5s order poll and one 10s position ping.*
 
 - file: `D:\workspace\delivery\clients\apps\mobile_app\lib\src\rider_home_screen.dart`
-- reached by: Sign in screen → username field (hint authEmailOrPhoneHint) "rider" → passcode field (hint authPasscodeHint) "300003" → authLogIn "Log In". Lands on _tab = 0 (Available).
+- reached by: Sign in screen → username field (hint authEmailOrPhoneHint) "rider" → passcode field (hint authPasscodeHint) "the passcode from the demo-logins Secret" → authLogIn "Log In". Lands on _tab = 0 (Available).
 - covered by: integration_test/rider_earnings_test.dart (asserts the Available/Active/Earnings trio is the rider nav, then taps Earnings); integration_test/order_lifecycle_test.dart via integration_test/support/journey.dart:282 signOutRider (taps the Settings tab)
 - states: Timer.periodic 5s refresh of available+assigned runs on every tab, silently; a failed poll leaves the last list and says nothing · Timer.periodic 10s ping runs whenever an order is PICKED_UP or the rider declared duty; position is SIMULATED (rider_home_screen.dart:154-155, walked ±0.002° per tick from 51.5074/-0.1278) — there is no location plugin and no runtime permission prompt anywhere in this shell · No notification bell / inbox anywhere in the rider shell (the customer shell has one); push taps do not deep-link into any rider screen
 
@@ -1491,7 +1491,7 @@ that does not exist, and a screen listed here with no tick is one nobody has dri
 - reached by: TYPE /admin or /admin/ in the address bar. Nothing on the site links here, robots.txt deliberately does not name it, and the smoke test asserts the word 'admin' appears nowhere in any file a stranger can read. nginx serves it via `location = /admin { try_files /admin.html =404; }` so the address in the bar stays /admin.
 - states: API UNREACHABLE: no effect. This page loads config.js and portal-link.js and nothing else (no site.js, so no language switch), and makes no network calls: those two only resolve the Backoffice link from the deployment. · No language switch and no Arabic — the whole page is English-only, unlike every other page on this surface. · <meta name="robots" content="noindex, nofollow"> is the only thing keeping it out of search results; robots.txt stays silent on purpose so crawlers still fetch the page and see the tag. · Copy states 'Staff only. You will be asked to sign in.' — this page itself asks for nothing.
 
-  - [ ] no l10n on this page at all — "Open the Backoffice" — Leaves for the portal, which will demand a sign-in (backoffice/400004). Carries no href of its own: `portal-link.js` sets it from `window.DELIVERY_PORTAL_BASE` in config.js, so it follows the deployment. It read a dead 127.0.0.1:5011, then a hard-coded portal-dev; one file decides it now.  `<a class="primary wide" href="https://portal-dev.youdrop.shop">`
+  - [ ] no l10n on this page at all — "Open the Backoffice" — Leaves for the portal, which will demand a sign-in (backoffice/<its passcode from the demo-logins Secret>). Carries no href of its own: `portal-link.js` sets it from `window.DELIVERY_PORTAL_BASE` in config.js, so it follows the deployment. It read a dead 127.0.0.1:5011, then a hard-coded portal-dev; one file decides it now.  `<a class="primary wide" href="https://portal-dev.youdrop.shop">`
   - [ ] "Back to the site" — Returns to the landing page.  `<a class="back" href="/">`
 
 ### /app — the Android APK download route  — UNREACHABLE, no driving test
@@ -1521,7 +1521,7 @@ that does not exist, and a screen listed here with no tick is one nobody has dri
 *The five-tab frame: owns the one Cart, the DeliveryAddressStore (scoped to session.subject), the NotificationInbox poll, and the ProfileDrawer that slides over every tab.*
 
 - file: `D:/workspace/delivery/clients/apps/mobile_app/lib/src/customer_shell.dart`
-- reached by: Sign in as customer/100001 -> SplashScreen -> main.dart role branch (_customerShell, main.dart:437) -> lands on Home (index 0).
+- reached by: Sign in as customer/<its passcode from the demo-logins Secret> -> SplashScreen -> main.dart role branch (_customerShell, main.dart:437) -> lands on Home (index 0).
 - covered by: test/customer_nav_bar_test.dart — DRIVES all five destinations (taps each, asserts the reported index), the basket count, a 3-figure count, a small phone, and Arabic mirroring. integration_test/order_lifecycle_test.dart taps navBasket and navOrders for real.
 - states: Cart badge 0 (no badge) / 1..99 / 3-figure · IndexedStack keeps each tab's scroll position and in-flight requests — switching away and back must NOT refetch the catalog · Sign-out then sign-in as a different account: shell is keyed by session.subject, so basket/address/inbox must be empty for the new account
 
@@ -2149,7 +2149,7 @@ that does not exist, and a screen listed here with no tick is one nobody has dri
 *Decides who is standing at the phone (owner vs employee) and which of the five tabs they may see; carries the unaccepted-order badge.*
 
 - file: `D:/workspace/delivery/clients/apps/mobile_app/lib/src/merchant_shell.dart`
-- reached by: Sign in as merchant/200002 → main.dart role branch (carrier and delivery are checked FIRST, merchant lands here) → MerchantShell opens on the Dashboard tab.
+- reached by: Sign in as merchant/<its passcode from the demo-logins Secret> → main.dart role branch (carrier and delivery are checked FIRST, merchant lands here) → MerchantShell opens on the Dashboard tab.
 - covered by: integration_test/merchant_shell_test.dart 'a merchant signs in and reaches all five shop tabs' — DRIVES: real sign-in, taps all five nav items, asserts IndexedStack actually swapped. test/merchant_shell_wiring_test.dart taps the Settings tab and asserts the statement row appears/hides.
 - states: Owner (MERCHANT role): all 5 tabs · Employee (MERCHANT_STAFF): only POS/Inventory they are permitted + Settings; if current tab becomes invisible after the staff lookup it snaps to _visibleTabs().first · Badge absent until merchantSummary() answers; a failed badge poll is deliberately silent (line 186) · _storeId null (store lookup and myMembership both failed) ⇒ POS/Inventory/StockCount degrade · 30s badge poll; owner only
 
