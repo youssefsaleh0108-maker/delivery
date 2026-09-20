@@ -81,9 +81,10 @@ class _FriendSplitScreenState extends State<FriendSplitScreen> {
     }
   }
 
+  /// The share in lira, at the plan's locked rate and by the ledger's rule — in `double` this fell
+  /// a note short of what the rider collects wherever the product lands on a half (RECON-14).
   String _lbp(double usd) {
-    final int thousands = (usd * widget.plan.rateUsed / 1000).round();
-    final String digits = (thousands * 1000).toString();
+    final String digits = lbpFaceOf(usd, widget.plan.rateUsed).toString();
     final StringBuffer out = StringBuffer();
     for (int i = 0; i < digits.length; i++) {
       if (i > 0 && (digits.length - i) % 3 == 0) out.write(',');

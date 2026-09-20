@@ -3,6 +3,7 @@ package com.delivery.transfer.service;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -66,6 +67,27 @@ public class TransferService {
     public List<TransferMethod> availableMethods() {
         return registry.availableMethods();
     }
+
+    /**
+     * What an order still owes: its whole total while its payment is open, and nothing once the
+     * money has been taken, refunded, or the order died with it. An intent is how the customer
+     * proposes to settle the bill, so an order with no bill left takes none.
+     */
+    private static BigDecimal amountDue(OrderManagerClient.OrderSummary order) {
+        BigDecimal total = Money.usd(order.totalAmount());
+        if (total == null) {
+            // Order Manager answered without the one figure this check rests on.
+            throw new OrderManagerClient.OrderUnavailableException(
+                    "The order could not be confirmed; please try again");
+        }
+        return order.paymentStatus() == null || OPEN_PAYMENTS.contains(order.paymentStatus())
+                ? total
+                : BigDecimal.ZERO;
+    }
+
+    /** Payment states in which the bill is still standing. */
+    private static final Set<String> OPEN_PAYMENTS =
+            Set.of("DUE", "AUTHORIZATION_PENDING", "AUTHORIZED");
 
     /** The ready connector that would carry {@code method}, if any — the same one a POST would use. */
     public Optional<MoneyTransferConnector> connectorFor(TransferMethod method) {
@@ -131,6 +153,20 @@ public class TransferService {
         OrderManagerClient.OrderSummary order = orders.fetch(orderId);
         if (!payerRef.equals(order.customerId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your order");
+        }
+
+        // The obligation is the ORDER's, not the client's. Taken from the request, it recorded a
+        // 0.01 intent against a 9.75 order (RECON-14) — and the rider collects at the door from a
+        // plan, while the ledger books the order's total, so an intent for anything else is a
+        // second, contradictory account of the same money.
+        BigDecimal due = amountDue(order);
+        if (due.signum() == 0) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "That order has nothing left to pay");
+        }
+        if (quote.amountUsd().compareTo(due) != 0) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "amountUsd must be the order's amount due, " + due);
         }
 
         // One payment intent per order: re-choosing a method before the rider leaves replaces the

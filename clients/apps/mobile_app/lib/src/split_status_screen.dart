@@ -89,10 +89,8 @@ class _SplitStatusScreenState extends State<SplitStatusScreen> {
     return '$m:${s.toString().padLeft(2, '0')}';
   }
 
-  String _lbp(double usd) {
-    final int thousands = (usd * _plan.rateUsed / 1000).round();
-    return '${_group(thousands * 1000)} LBP';
-  }
+  /// At the plan's locked rate, by the ledger's rule: the figure the rider will ask for (RECON-14).
+  String _lbp(double usd) => '${_group(lbpFaceOf(usd, _plan.rateUsed))} LBP';
 
   static String _group(int amount) {
     final String digits = amount.toString();

@@ -191,6 +191,100 @@ class TransferServiceTest {
     }
 
     /**
+     * RECON-14: the intent is for what the order owes. The deep test recorded an intent of 0.01
+     * against a 9.75 order — the amount came straight from the request — and a re-post replaces the
+     * row, so the last word on an order's money could be a cent after the rider had collected it.
+     */
+    @Nested
+    class TheAmountTheOrderOwes {
+
+        private void orderOwes(String total, String paymentStatus) {
+            when(orders.fetch(ORDER)).thenReturn(new OrderSummary(ORDER, PAYER, null, "PLACED",
+                    new BigDecimal(total), "CASH", paymentStatus));
+        }
+
+        @Test
+        @DisplayName("a cent against a 9.75 order records nothing")
+        void aCentAgainstNineSeventyFive() {
+            orderOwes("9.75", "DUE");
+
+            assertThatThrownBy(() -> service.record(ORDER, PAYER, TransferMethod.CASH_ON_DELIVERY,
+                    new BigDecimal("0.01"), null))
+                    .isInstanceOf(ResponseStatusException.class)
+                    .hasFieldOrPropertyWithValue("statusCode", HttpStatus.UNPROCESSABLE_ENTITY)
+                    .hasMessageContaining("amountUsd must be the order's amount due, 9.75");
+
+            verify(transfers, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("more than the order owes records nothing either")
+        void moreThanTheOrderOwes() {
+            orderOwes("9.75", "DUE");
+
+            assertThatThrownBy(() -> service.record(ORDER, PAYER, TransferMethod.CASH_ON_DELIVERY,
+                    new BigDecimal("19.50"), null))
+                    .isInstanceOf(ResponseStatusException.class)
+                    .hasFieldOrPropertyWithValue("statusCode", HttpStatus.UNPROCESSABLE_ENTITY);
+
+            verify(transfers, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("the order's own total records, split and all")
+        void theOrdersOwnTotalRecords() {
+            orderOwes("9.75", "DUE");
+
+            MoneyTransfer transfer = service.record(ORDER, PAYER,
+                    TransferMethod.CASH_ON_DELIVERY, new BigDecimal("9.75"),
+                    new BigDecimal("5.00"));
+
+            assertThat(transfer.getAmountUsd()).isEqualByComparingTo("9.75");
+            assertThat(transfer.getSplitUsd()).isEqualByComparingTo("5.00");
+            assertThat(transfer.getSplitLbpInUsd()).isEqualByComparingTo("4.75");
+        }
+
+        @Test
+        @DisplayName("an order whose cash is already collected has nothing left to pay")
+        void alreadyCollected() {
+            orderOwes("9.75", "COLLECTED");
+
+            assertThatThrownBy(() -> service.record(ORDER, PAYER, TransferMethod.CASH_ON_DELIVERY,
+                    new BigDecimal("9.75"), null))
+                    .isInstanceOf(ResponseStatusException.class)
+                    .hasMessageContaining("nothing left to pay");
+
+            verify(transfers, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("a cancelled order's failed payment has nothing left to pay")
+        void cancelled() {
+            orderOwes("9.75", "FAILED");
+
+            assertThatThrownBy(() -> service.record(ORDER, PAYER, TransferMethod.CASH_ON_DELIVERY,
+                    new BigDecimal("9.75"), null))
+                    .isInstanceOf(ResponseStatusException.class)
+                    .hasMessageContaining("nothing left to pay");
+
+            verify(transfers, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("an order Order Manager prices at nothing is refused rather than recorded")
+        void noTotalAtAll() {
+            when(orders.fetch(ORDER)).thenReturn(new OrderSummary(ORDER, PAYER, null, "PLACED",
+                    null, "CASH", "DUE"));
+
+            assertThatThrownBy(() -> service.record(ORDER, PAYER, TransferMethod.CASH_ON_DELIVERY,
+                    new BigDecimal("9.75"), null))
+                    .isInstanceOf(OrderUnavailableException.class);
+
+            verify(transfers, never()).save(any());
+        }
+    }
+
+    /**
      * The rate is one number however the operator wrote it in configuration; a client that reads
      * it twice must not see two.
      */

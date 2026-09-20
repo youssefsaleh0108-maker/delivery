@@ -157,6 +157,20 @@ class TransferControllerTest {
                 .doesNotContain("90000.00");
     }
 
+    /** RECON-14: the amount is the order's, and the client is told which figure to send. */
+    @Test
+    @DisplayName("an intent for anything but the order's amount due is refused in its own words")
+    void intentMustMatchTheOrdersAmountDue() throws Exception {
+        String body = mvc.perform(post("/api/transfers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"orderId\":\"" + ORDER + "\",\"method\":\"CASH_ON_DELIVERY\","
+                                + "\"amountUsd\":0.01}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(body).contains("amountUsd must be the order's amount due, 10.01");
+    }
+
     @Test
     @DisplayName("the record reads back exactly as it was recorded")
     void moneyReadsBackTheSameWayItWasWritten() throws Exception {
