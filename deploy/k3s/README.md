@@ -19,19 +19,30 @@ All records point at the box's IP; TLS is ACME through the bundled Traefik
 ## Layout
 
 ```
-cluster/traefik-config.yaml   # HelmChartConfig: ACME resolver, 80->443 redirect, acme.json PVC
+cluster/traefik-config.yaml   # HelmChartConfig: ACME resolver, 80->443 redirect, metrics, acme.json
+cluster/priority-classes.yaml # prod-critical and dev-standard: who survives memory pressure
+cluster/monitoring.yaml       # Prometheus (+ the alert rules) and Grafana
+cluster/alerting.yaml         # Alertmanager, node-exporter, kube-state-metrics
 base/                         # everything both environments share
-  assets/                     # postgres init, keycloak realm+theme, minio/vault bootstrap
+  assets/                     # postgres init, keycloak realm+theme, minio/vault bootstrap,
+                              #   the backup scripts, the demo-storefront gate
   configmap-common.yaml       # platform-common: the environment identical in dev and qa
-  data-layer.yaml             # postgres, redis, rabbitmq, minio(+init Job), mailpit
+  data-layer.yaml             # postgres(+exporter), redis, rabbitmq, minio(+init Job), mailpit
   identity.yaml               # keycloak, vault(+init Job), config-server
   services.yaml               # the 13 Spring services (generated, replicas: 1)
   portal.yaml                 # nginx over /opt/delivery/sites/<env>/portal (hostPath)
+  network-policies.yaml       # default-deny ingress; the wall between the two environments
+  backup.yaml                 # the three backup CronJobs (suspended; an overlay opts in)
+  demo-storefront-gate.yaml   # whether V12's eight demo shops survive, per environment
 overlays/dev, overlays/qa     # namespace, platform-env ConfigMap, ingress with the env's hosts
+overlays/dev/resource-safety.yaml  # dev's ResourceQuota and LimitRange
 overlays/ingress.template.yaml  # single source for both ingress files
 scripts/render-overlays.sh    # regenerates both ingress.yaml files from the template
 scripts/gen-secrets.sh        # creates a new namespace's Secrets (run on the box)
 scripts/rotate-secrets.sh     # replaces credentials in a running namespace, and proves it (on the box)
+scripts/restore.sh            # brings a database or the object store back from a backup (on the box)
+scripts/setup-monitoring.sh   # installs Prometheus, Grafana and Alertmanager (on the box)
+scripts/verify.sh             # every assertion above that can be made without a cluster
 ```
 
 ## Deploying (on the box)
@@ -39,10 +50,56 @@ scripts/rotate-secrets.sh     # replaces credentials in a running namespace, and
 ```bash
 rsync -a deploy/k3s/ root@<box>:/opt/delivery/k3s/
 kubectl apply -f /opt/delivery/k3s/cluster/traefik-config.yaml
+# BEFORE any overlay. Every pod names a PriorityClass, and a pod naming one that does not exist is
+# REFUSED at admission — the whole namespace would fail to start.
+kubectl apply -f /opt/delivery/k3s/cluster/priority-classes.yaml
 sh /opt/delivery/k3s/scripts/gen-secrets.sh delivery-dev
 kubectl apply -k /opt/delivery/k3s/overlays/dev
-# and the same pair with delivery-qa / overlays/qa
+sh /opt/delivery/k3s/scripts/setup-monitoring.sh          # Prometheus, Grafana, Alertmanager
+# and the same three with delivery-qa / overlays/qa
 ```
+
+### Applying this branch to an environment that already exists
+
+Order matters in two places, and both fail the same way — every pod in the namespace refused at
+admission — so they are worth getting right rather than discovering.
+
+```bash
+# 1. CLUSTER-WIDE, and first. Nothing can reference a PriorityClass that does not exist yet.
+kubectl apply -f cluster/priority-classes.yaml
+kubectl apply -f cluster/traefik-config.yaml      # rolls Traefik: ~5s of 502s on every hostname
+
+# 2. dev. The quota is applied WITH the smaller limits that fit it, in one `apply -k`; applying
+#    the quota alone against today's 11.25 GiB would refuse every pod in the namespace.
+kubectl apply -k overlays/dev
+kubectl -n delivery-dev get pods -w             # expect a rolling restart of everything
+
+# 3. Watch dev for a day. This is the only unmeasured change on the branch (see "what happens
+#    under memory pressure").
+kubectl -n delivery-dev get events --field-selector reason=OOMKilling
+kubectl -n delivery-dev logs job/demo-storefront-gate     # "kept - this is not production"
+
+# 4. Monitoring, once dev is healthy.
+sh scripts/setup-monitoring.sh
+#    then prove an email arrives - see "Proving an alert really arrives"
+
+# 5. The live steps no manifest can perform, dev first.
+bash scripts/rotate-secrets.sh delivery-dev pv-retain
+bash scripts/rotate-secrets.sh delivery-dev netpol-proof
+
+# 6. qa, the same way. qa is NOT resized - it keeps 512Mi services and a 70% heap - so the only
+#    visible changes are the image pins, the NetworkPolicies, the priority and the backups.
+kubectl apply -k overlays/qa
+bash scripts/rotate-secrets.sh delivery-qa pv-retain
+bash scripts/rotate-secrets.sh delivery-qa netpol-proof
+
+# 7. Turn the backups on: create the Secrets (see "Backups"), then
+kubectl -n delivery-qa create job --from=cronjob/postgres-backup backup-first-run
+kubectl -n delivery-qa create job --from=cronjob/restore-test restore-test-first-run
+```
+
+Under Argo CD, steps 2 and 6 are a sync rather than an `apply -k`; step 1 is still by hand,
+because `cluster/` is not part of either Application.
 
 `gen-secrets.sh` mints fresh credentials per environment and refuses to overwrite existing ones —
 regenerating passwords under stateful volumes would strand the data. See *Secrets, and rotating
