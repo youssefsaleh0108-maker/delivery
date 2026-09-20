@@ -131,6 +131,21 @@ delivery:
   platform:
     zone: ${PLATFORM_ZONE:Asia/Beirut}
 
+  market:
+    # LBP per USD — the platform's one display-and-collection rate, served to every client by
+    # MarketController (GET /api/market/config).
+    #
+    # It MUST read the same environment variable transfer-service locks its quotes from. The key
+    # and the 90000 default were already spelled the same in both services, which read as "one
+    # rate" but was not: only transfer-service bound the key to ${MARKET_LBP_PER_USD}, so this
+    # service fell through to the hard-coded default of its @Value. An operator who moved the
+    # rate — the whole reason it is configuration — moved what checkout charges and left what the
+    # storefront displays at 90000, so a customer browsed "$3.50 / 315,000 LBP" and was quoted a
+    # different lira figure at the door, with nothing in either service disagreeing with itself.
+    #
+    # Zero still means "do not show LBP at all" (MarketController).
+    lbp-per-usd: ${MARKET_LBP_PER_USD:90000}
+
   outbox:
     exchange: delivery.events
     relay-enabled: true

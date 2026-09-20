@@ -1,7 +1,8 @@
 #!/bin/sh
 # Phase 3 end-to-end smoke test: the notification layer.
 #
-#   cd infra && docker run --rm --network delivery -v "$PWD/smoke-test-phase3.sh:/smoke.sh:ro" \
+#   cd infra && docker run --rm --network delivery \
+#     -e DEMO_CUSTOMER_PASSWORD -e DEMO_MERCHANT_PASSWORD -e DEMO_BACKOFFICE_PASSWORD -v "$PWD/smoke-test-phase3.sh:/smoke.sh:ro" \
 #     alpine:latest sh -c "apk add --no-cache curl jq >/dev/null && sh /smoke.sh"
 #
 # Runs inside the compose network on purpose. Half of what is under test - the connectors' send
@@ -45,8 +46,10 @@ check() {
 }
 
 token() {
-  curl -s -X POST "$KC" -d "client_id=${3:-mobile-app}" \
-    -d "username=$1" -d "password=$2" -d "grant_type=password" | jq -r '.access_token'
+  printf '%s' "$2" | curl -s -X POST "$KC" \
+    -d "client_id=${3:-mobile-app}" \
+    --data-urlencode "username=$1" --data-urlencode "password@-" \
+    -d "grant_type=password" | jq -r '.access_token'
 }
 
 claim_of() {
@@ -81,9 +84,13 @@ wait_for() { # wait_for <seconds> <shell-condition>
 echo
 echo '=== 0. Actors ==================================================================='
 
-CUSTOMER=$(token customer 100001 mobile-app)
-MERCHANT=$(token merchant 200002 mobile-app)
-BACKOFFICE=$(token backoffice 400004 mobile-app)
+# The demo logins' passwords, from the environment's demo-logins Secret, supplied by whoever runs
+# this — they were literals here, and the repository was public. On the box, for example:
+#   DEMO_CUSTOMER_PASSWORD=$(kubectl -n delivery-dev get secret demo-logins -o jsonpath='{.data.customer}' | base64 -d)
+: "${DEMO_CUSTOMER_PASSWORD:?set DEMO_CUSTOMER_PASSWORD from the demo-logins Secret}" "${DEMO_MERCHANT_PASSWORD:?set DEMO_MERCHANT_PASSWORD from the demo-logins Secret}" "${DEMO_BACKOFFICE_PASSWORD:?set DEMO_BACKOFFICE_PASSWORD from the demo-logins Secret}"
+CUSTOMER=$(token customer "$DEMO_CUSTOMER_PASSWORD" mobile-app)
+MERCHANT=$(token merchant "$DEMO_MERCHANT_PASSWORD" mobile-app)
+BACKOFFICE=$(token backoffice "$DEMO_BACKOFFICE_PASSWORD" mobile-app)
 
 for t in CUSTOMER MERCHANT BACKOFFICE; do
   eval "v=\$$t"

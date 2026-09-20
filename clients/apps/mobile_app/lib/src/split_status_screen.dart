@@ -122,6 +122,8 @@ class _SplitStatusScreenState extends State<SplitStatusScreen> {
       body: ListView(
         padding: const EdgeInsets.all(DeliverySpacing.md),
         children: <Widget>[
+          // "Waiting for the group to confirm", not for its payments: what the host is waiting on
+          // is an answer per share, and nobody's money moves before the door (RECON-01).
           Text(
             _plan.status == 'READY' ? t.custReadyToPlace : t.custWaitingGroupPayments,
             style: TextStyle(
@@ -178,7 +180,9 @@ class _SplitStatusScreenState extends State<SplitStatusScreen> {
               ),
             ),
           const SizedBox(height: DeliverySpacing.md),
-          // Payment progress.
+          // Split progress: how much of the bill is spoken for. Headed as progress through the
+          // SPLIT rather than through payment, because everything it counts — the count, the bar
+          // and the amount under it — is confirmations, not money taken.
           YdCard.bordered(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

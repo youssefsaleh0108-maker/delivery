@@ -433,7 +433,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           }
         }
       }
-      // A group split closes over its order and gets its All-Shares-Paid moment. Read before
+      // A group split closes over its order and gets its all-shares-agreed moment. Read before
       // clear() wipes it with the rest of the basket's order-scoped state. Only ever one order: a
       // basket from several shops is never split.
       final String? planId = widget.cart.splitPlanId;

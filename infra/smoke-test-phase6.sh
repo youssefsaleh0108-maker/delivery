@@ -1,7 +1,8 @@
 #!/bin/sh
 # Phase 6: the SMS vendor cutover mechanism.
 #
-#   cd infra && docker run --rm --network delivery -v "$PWD/smoke-test-phase6.sh:/smoke.sh:ro" \
+#   cd infra && docker run --rm --network delivery \
+#     -e DEMO_CUSTOMER_PASSWORD -e DEMO_BACKOFFICE_PASSWORD -v "$PWD/smoke-test-phase6.sh:/smoke.sh:ro" \
 #     alpine:latest sh -c "apk add --no-cache curl jq >/dev/null && sh /smoke.sh"
 #
 # The vendor choice itself is a commercial decision nobody here can make (Section 12, open decision
@@ -33,8 +34,10 @@ check() {
 }
 
 token() {
-  curl -s -X POST "$KC" -d "client_id=${3:-mobile-app}" \
-    -d "username=$1" -d "password=$2" -d "grant_type=password" | jq -r '.access_token'
+  printf '%s' "$2" | curl -s -X POST "$KC" \
+    -d "client_id=${3:-mobile-app}" \
+    --data-urlencode "username=$1" --data-urlencode "password@-" \
+    -d "grant_type=password" | jq -r '.access_token'
 }
 
 status() {
@@ -66,8 +69,12 @@ route_of() { # route_of <idempotency-key>
   curl -s "$SMS/api/connector/route/$1" | jq -r '.provider'
 }
 
-CUSTOMER=$(token customer 100001 mobile-app)
-BACKOFFICE=$(token backoffice 400004 mobile-app)
+# The demo logins' passwords, from the environment's demo-logins Secret, supplied by whoever runs
+# this — they were literals here, and the repository was public. On the box, for example:
+#   DEMO_CUSTOMER_PASSWORD=$(kubectl -n delivery-dev get secret demo-logins -o jsonpath='{.data.customer}' | base64 -d)
+: "${DEMO_CUSTOMER_PASSWORD:?set DEMO_CUSTOMER_PASSWORD from the demo-logins Secret}" "${DEMO_BACKOFFICE_PASSWORD:?set DEMO_BACKOFFICE_PASSWORD from the demo-logins Secret}"
+CUSTOMER=$(token customer "$DEMO_CUSTOMER_PASSWORD" mobile-app)
+BACKOFFICE=$(token backoffice "$DEMO_BACKOFFICE_PASSWORD" mobile-app)
 
 echo
 echo '=== 1. Delivery rates, the gate on a cutover ====================================='

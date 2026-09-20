@@ -9,8 +9,10 @@ sha-12a3b27; the accounting code is identical in both and in `main`.
   currency column except `accounting.*.currency` ("USD" from config). Points round DOWN.
 - **LBP** is only ever a conversion. transfer-service stores `split_lbp_in_usd` and `rate_used`
   (`MARKET_LBP_PER_USD`, 90000 on dev/qa). The lira face value is `round_half_up(usd × rate / 1000) × 1000`,
-  computed on read. product-service `/api/market/config` serves its own copy of the rate (key
-  `delivery.market.lbp-per-usd`, not bound to the env var). Clients convert with `double`
+  computed on read. product-service `/api/market/config` serves the display copy of the rate from
+  the same key and the same env var (`delivery.market.lbp-per-usd` ← `MARKET_LBP_PER_USD`), so
+  display and collection cannot drift; it was unbound and stuck at the 90000 default until
+  2026-09-20. Clients convert with `double`
   (`MarketRates.lbpRounded`). The ledger has no lira at all.
 - **Calendars.** `delivery.accounting.statements.zone` = **UTC** (statements, carrier cash page);
   `delivery.rider-earnings.zone` = **UTC**; `delivery.accounting.payroll.zone` = **Asia/Beirut**;

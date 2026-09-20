@@ -14,3 +14,14 @@ window.DELIVERY_API_BASE = 'https://api-dev.youdrop.shop';
 // browser. Nothing else on this site authenticates, and no token is ever written to storage.
 window.DELIVERY_IAM_BASE = 'https://iam-dev.youdrop.shop';
 window.DELIVERY_IAM_REALM = 'delivery-platform';
+
+// The portal, for every link that leaves this site to sign somebody in: /admin's "Open the
+// Backoffice", the footer's "Sign in", and the same on the application form. Each of those
+// spelled https://portal-dev.youdrop.shop in its own markup, so pointing the site at another
+// environment meant finding three files and hoping there was not a fourth. portal-link.js applies
+// this to anything marked data-portal-link.
+//
+// Unlike the two above it is a NAVIGATION target, not a fetch: nothing on this site calls the
+// portal, so it is deliberately not in the site's connect-src and scripts/verify.sh does not
+// check it against the CSP. It moves at go-live with the other two all the same.
+window.DELIVERY_PORTAL_BASE = 'https://portal-dev.youdrop.shop';

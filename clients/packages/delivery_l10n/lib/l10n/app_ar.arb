@@ -1455,11 +1455,11 @@
   "custYourShareYou": "حصتك (أنت)",
   "cust15MinNote": "أمام أصدقائك 15 دقيقة للدفع بعد الدعوة",
   "custSendInvites": "أرسل الدعوات",
-  "custWaitingGroupPayments": "بانتظار دفعات المجموعة",
+  "custWaitingGroupPayments": "بانتظار تأكيد المجموعة",
   "custTimeRemaining": "الوقت المتبقي",
   "custSplitNWays": "{amount} مقسومة على {n}",
   "@custSplitNWays": { "placeholders": { "amount": { "type": "String" }, "n": { "type": "int" } } },
-  "custPaymentProgress": "تقدم الدفع",
+  "custPaymentProgress": "تقدّم التقسيم",
   "custNPaid": "دفع {paid} من {total}",
   "@custNPaid": { "placeholders": { "paid": { "type": "int" }, "total": { "type": "int" } } },
   "custCollectedOf": "جُمع {collected} من {total}",
@@ -1489,7 +1489,6 @@
   "custPayMyShare": "ادفع حصتي ({amount})",
   "@custPayMyShare": { "placeholders": { "amount": { "type": "String" } } },
   "custDeclineInvitation": "ارفض الدعوة",
-  "custAllSharesPaid": "دُفعت كل الحصص!",
   "custGroupSplitSummary": "ملخص المجموعة",
   "custRiderCollectNote": "السائق سيحصّل {amount} من {name} عند التسليم",
   "@custRiderCollectNote": { "placeholders": { "amount": { "type": "String" }, "name": { "type": "String" } } },
@@ -4081,5 +4080,7 @@
   "boShopPinSaved": "تم حفظ الموقع",
   "boShopPinFailed": "تعذَّر حفظ الموقع",
   "boShopPinGone": "لم يعد هذا المتجر موجوداً",
-  "boShopPinWhy": "المتجر بلا موقع على الخريطة ليست له مسافة ولا نطاق توصيل ولا مكان في «القريب منك»."
+  "boShopPinWhy": "المتجر بلا موقع على الخريطة ليست له مسافة ولا نطاق توصيل ولا مكان في «القريب منك».",
+  "custAllSharesAgreed": "تم الاتفاق على كل الحصص!",
+  "custSharesAgreedAtDoor": "لم يُدفع شيء بعد — السائق يحصّل كل حصة عند الباب."
 }

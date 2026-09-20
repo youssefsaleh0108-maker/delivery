@@ -4018,7 +4018,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get custSendInvites => 'أرسل الدعوات';
 
   @override
-  String get custWaitingGroupPayments => 'بانتظار دفعات المجموعة';
+  String get custWaitingGroupPayments => 'بانتظار تأكيد المجموعة';
 
   @override
   String get custTimeRemaining => 'الوقت المتبقي';
@@ -4029,7 +4029,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   }
 
   @override
-  String get custPaymentProgress => 'تقدم الدفع';
+  String get custPaymentProgress => 'تقدّم التقسيم';
 
   @override
   String custNPaid(int paid, int total) {
@@ -4111,9 +4111,6 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get custDeclineInvitation => 'ارفض الدعوة';
-
-  @override
-  String get custAllSharesPaid => 'دُفعت كل الحصص!';
 
   @override
   String get custGroupSplitSummary => 'ملخص المجموعة';
@@ -13405,4 +13402,11 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get boShopPinWhy =>
       'المتجر بلا موقع على الخريطة ليست له مسافة ولا نطاق توصيل ولا مكان في «القريب منك».';
+
+  @override
+  String get custAllSharesAgreed => 'تم الاتفاق على كل الحصص!';
+
+  @override
+  String get custSharesAgreedAtDoor =>
+      'لم يُدفع شيء بعد — السائق يحصّل كل حصة عند الباب.';
 }

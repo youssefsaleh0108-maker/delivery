@@ -86,8 +86,17 @@ Phase 6 is the vendor cutover mechanism. The property worth naming is that the c
 **deterministic on the idempotency key** — route a message randomly and its retry can land on a
 vendor that has never seen that key, accept it as new, and send the customer a second billed text.
 
+The demo logins' passcodes are no longer written in these scripts — they come from the
+environment's `demo-logins` Secret, and each script refuses to start without the ones it needs.
+Read them once, pass them in, and they never reach a command line or the terminal:
+
 ```bash
-cd infra && for t in smoke-test.sh smoke-test-phase2.sh smoke-test-phase3.sh smoke-test-phase4.sh smoke-test-phase5.sh smoke-test-phase6.sh; do docker run --rm --network delivery -v "$PWD/$t:/smoke.sh:ro" alpine:latest sh -c "apk add --no-cache curl jq >/dev/null && sh /smoke.sh"; done
+for u in customer rider merchant backoffice; do
+  export "DEMO_$(echo "$u" | tr a-z A-Z)_PASSWORD=$(kubectl -n delivery-dev get secret demo-logins -o jsonpath="{.data.$u}" | base64 -d)"
+done
+cd infra && for t in smoke-test.sh smoke-test-phase2.sh smoke-test-phase3.sh smoke-test-phase4.sh smoke-test-phase5.sh smoke-test-phase6.sh; do docker run --rm --network delivery \
+  -e DEMO_CUSTOMER_PASSWORD -e DEMO_RIDER_PASSWORD -e DEMO_MERCHANT_PASSWORD -e DEMO_BACKOFFICE_PASSWORD \
+  -v "$PWD/$t:/smoke.sh:ro" alpine:latest sh -c "apk add --no-cache curl jq >/dev/null && sh /smoke.sh"; done
 ```
 
 ### Clients

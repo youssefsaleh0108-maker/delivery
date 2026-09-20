@@ -30,8 +30,10 @@ check() {
 }
 
 token() {
-  curl -s -X POST "$KC" -d "client_id=${3:-mobile-app}" \
-    -d "username=$1" -d "password=$2" -d "grant_type=password" | jq -r '.access_token'
+  printf '%s' "$2" | curl -s -X POST "$KC" \
+    -d "client_id=${3:-mobile-app}" \
+    --data-urlencode "username=$1" --data-urlencode "password@-" \
+    -d "grant_type=password" | jq -r '.access_token'
 }
 
 status() {
@@ -68,10 +70,14 @@ pushes_of() { # pushes_of <orderId>
 echo
 echo '=== 0. Actors ==================================================================='
 
-CUSTOMER=$(token customer 100001)
-MERCHANT=$(token merchant 200002 mobile-app)
-RIDER=$(token rider 300003)
-BACKOFFICE=$(token backoffice 400004 mobile-app)
+# The demo logins' passwords, from the environment's demo-logins Secret, supplied by whoever runs
+# this — they were literals here, and the repository was public. On the box, for example:
+#   DEMO_CUSTOMER_PASSWORD=$(kubectl -n delivery-dev get secret demo-logins -o jsonpath='{.data.customer}' | base64 -d)
+: "${DEMO_CUSTOMER_PASSWORD:?set DEMO_CUSTOMER_PASSWORD from the demo-logins Secret}" "${DEMO_MERCHANT_PASSWORD:?set DEMO_MERCHANT_PASSWORD from the demo-logins Secret}" "${DEMO_RIDER_PASSWORD:?set DEMO_RIDER_PASSWORD from the demo-logins Secret}" "${DEMO_BACKOFFICE_PASSWORD:?set DEMO_BACKOFFICE_PASSWORD from the demo-logins Secret}"
+CUSTOMER=$(token customer "$DEMO_CUSTOMER_PASSWORD")
+MERCHANT=$(token merchant "$DEMO_MERCHANT_PASSWORD" mobile-app)
+RIDER=$(token rider "$DEMO_RIDER_PASSWORD")
+BACKOFFICE=$(token backoffice "$DEMO_BACKOFFICE_PASSWORD" mobile-app)
 
 check 'customer signed in'   'yes' "$([ -n "$CUSTOMER" ]   && [ "$CUSTOMER" != null ]   && echo yes || echo no)"
 check 'merchant signed in'   'yes' "$([ -n "$MERCHANT" ]   && [ "$MERCHANT" != null ]   && echo yes || echo no)"

@@ -164,6 +164,7 @@ void main() {
     WidgetTester tester,
     _Gateway gateway, {
     ShelfPhotoSource? photos,
+    String? storeId,
     Size size = const Size(1200, 2200),
     Locale locale = const Locale('en'),
   }) async {
@@ -172,7 +173,7 @@ void main() {
     addTearDown(tester.view.reset);
     final Dio dio = Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = gateway;
     await tester.pumpWidget(app(
-      ProductListScreen(api: CatalogApi(dio), photoSource: photos),
+      ProductListScreen(api: CatalogApi(dio), storeId: storeId, photoSource: photos),
       locale: locale,
     ));
     await tester.pump();
@@ -415,6 +416,75 @@ void main() {
           gateway.bodies.firstWhere((String body) => body.contains('"price":1.25'));
       expect(sent, contains('"storeId":"shop-2"'));
       expect(sent, contains('"name":"Pepsi 1L"'));
+    });
+
+    /// The same merchant, the same two shops, standing in the Products page of the second one —
+    /// the portal scopes that page to a shop exactly as it scopes Inventory. The catalogue LIST is
+    /// every shop they own, which is right; what must name a shop is the product they add from it.
+    testWidgets('the catalogue scopes its find and its new product to the shop it is standing in',
+        (WidgetTester tester) async {
+      final _Gateway gateway = _Gateway(find: found(withMatch: false));
+      await pumpList(tester, gateway, storeId: 'shop-2', photos: _Photos(bytes: jpeg));
+
+      await findWithAPhoto(tester, t: en);
+      expect(gateway.bodies.first, contains('shop-2'));
+
+      await tester.tap(find.text(en.pfindAddNew));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      await tester.enterText(find.byType(TextFormField).at(2), '1.25');
+      await tester.tap(find.text(en.merchbSaveMenuItem));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final String sent =
+          gateway.bodies.firstWhere((String body) => body.contains('"price":1.25'));
+      expect(sent, contains('"storeId":"shop-2"'));
+    });
+
+    /// And the plain "Add Product" button, which is the way most products are added and reaches
+    /// the form without going anywhere near a photo.
+    testWidgets('Add Product on the catalogue creates in that shop too',
+        (WidgetTester tester) async {
+      final _Gateway gateway = _Gateway(find: found());
+      await pumpList(tester, gateway, storeId: 'shop-2');
+
+      await tester.tap(find.text(en.merchbAddProduct));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      await tester.enterText(find.byType(TextFormField).at(0), 'Pepsi 1L');
+      await tester.enterText(find.byType(TextFormField).at(2), '1.25');
+      await tester.tap(find.text(en.merchbSaveMenuItem));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final String sent =
+          gateway.bodies.firstWhere((String body) => body.contains('"price":1.25'));
+      expect(sent, contains('"storeId":"shop-2"'));
+    });
+
+    /// A host that is not standing in any shop sends nothing, and the server decides — which is
+    /// what the phone's merchant shell does, and what a merchant with one shop always gets.
+    testWidgets('a catalogue with no shop in hand names none, and lets the server decide',
+        (WidgetTester tester) async {
+      final _Gateway gateway = _Gateway(find: found());
+      await pumpList(tester, gateway);
+
+      await tester.tap(find.text(en.merchbAddProduct));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      await tester.enterText(find.byType(TextFormField).at(0), 'Pepsi 1L');
+      await tester.enterText(find.byType(TextFormField).at(2), '1.25');
+      await tester.tap(find.text(en.merchbSaveMenuItem));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final String sent =
+          gateway.bodies.firstWhere((String body) => body.contains('"price":1.25'));
+      expect(sent, isNot(contains('"storeId"')));
     });
 
     testWidgets('a sample leads to an empty form, with only the merchant\'s own photo on it',

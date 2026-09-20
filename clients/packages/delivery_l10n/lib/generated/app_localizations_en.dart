@@ -4043,7 +4043,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get custSendInvites => 'Send Invites';
 
   @override
-  String get custWaitingGroupPayments => 'Waiting for group payments';
+  String get custWaitingGroupPayments => 'Waiting for the group to confirm';
 
   @override
   String get custTimeRemaining => 'Time remaining';
@@ -4054,7 +4054,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   }
 
   @override
-  String get custPaymentProgress => 'Payment progress';
+  String get custPaymentProgress => 'Split progress';
 
   @override
   String custNPaid(int paid, int total) {
@@ -4136,9 +4136,6 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get custDeclineInvitation => 'Decline invitation';
-
-  @override
-  String get custAllSharesPaid => 'All Shares Paid!';
 
   @override
   String get custGroupSplitSummary => 'Group Split Summary';
@@ -13239,4 +13236,11 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get boShopPinWhy =>
       'A shop with no pin has no distance, no delivery circle and no place in \"near you\".';
+
+  @override
+  String get custAllSharesAgreed => 'All Shares Agreed!';
+
+  @override
+  String get custSharesAgreedAtDoor =>
+      'Nothing has been paid yet — the rider collects each share at the door.';
 }
