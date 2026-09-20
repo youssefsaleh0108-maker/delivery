@@ -1,0 +1,403 @@
+package com.delivery.product.shoppage;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalTime;
+import java.util.List;
+import java.util.Locale;
+
+import com.delivery.product.domain.Store;
+
+/**
+ * The public page in Arabic and English: the words, the direction, and the digits.
+ *
+ * <p>No properties bundle and no {@code MessageSource}. There are two languages and one page, the
+ * strings are read beside the markup that uses them, and a missing key here is a compile error
+ * rather than a {@code ???openNow???} on the one page a stranger reads.
+ *
+ * <p>Numbers are the part that is easy to get wrong. The Arabic app writes its numerals in
+ * Arabic-Indic digits — the ARB strings carry them literally ({@code "شارع الاختبار ١٢"}) and
+ * everything interpolated goes through {@code Intl} in {@code ar}, which renders U+0660..U+0669
+ * with U+066C between thousands and U+066B before a fraction. A page that set an Arabic shop's
+ * hours in Latin digits would be the only Arabic surface on the platform that did.
+ */
+enum ShopPageText {
+
+    EN("en", "ltr"),
+    AR("ar", "rtl");
+
+    private final String tag;
+    private final String dir;
+
+    ShopPageText(String tag, String dir) {
+        this.tag = tag;
+        this.dir = dir;
+    }
+
+    String tag() {
+        return tag;
+    }
+
+    String dir() {
+        return dir;
+    }
+
+    boolean arabic() {
+        return this == AR;
+    }
+
+    ShopPageText other() {
+        return this == AR ? EN : AR;
+    }
+
+    /**
+     * Which language to draw, from the query string first and the browser second.
+     *
+     * <p>{@code ?lang=} wins over {@code Accept-Language} because it is the one a person chose:
+     * the link at the bottom of the page is how a reader whose phone is set to English reads an
+     * Arabic shop's page in Arabic, and a header that overrode it would make that link do nothing.
+     *
+     * <p>The header is matched on the language subtag alone, anywhere in the list, and Arabic wins
+     * only if it is ranked at least as highly as English. Full RFC 4647 negotiation for a choice
+     * between two languages would be a lot of machinery to answer the same question.
+     */
+    static ShopPageText choose(String langParam, String acceptLanguage) {
+        if (langParam != null) {
+            String wanted = langParam.trim().toLowerCase(Locale.ROOT);
+            if (wanted.startsWith("ar")) {
+                return AR;
+            }
+            if (wanted.startsWith("en")) {
+                return EN;
+            }
+        }
+        return prefersArabic(acceptLanguage) ? AR : EN;
+    }
+
+    private static boolean prefersArabic(String acceptLanguage) {
+        if (acceptLanguage == null || acceptLanguage.isBlank()) {
+            return false;
+        }
+        double arabic = -1;
+        double english = -1;
+        for (String part : acceptLanguage.split(",")) {
+            String[] pieces = part.trim().split(";");
+            String tag = pieces[0].trim().toLowerCase(Locale.ROOT);
+            double quality = 1.0;
+            for (int i = 1; i < pieces.length; i++) {
+                String parameter = pieces[i].trim();
+                if (parameter.startsWith("q=")) {
+                    try {
+                        quality = Double.parseDouble(parameter.substring(2));
+                    } catch (NumberFormatException malformed) {
+                        quality = 0;
+                    }
+                }
+            }
+            if (tag.equals("ar") || tag.startsWith("ar-")) {
+                arabic = Math.max(arabic, quality);
+            } else if (tag.equals("en") || tag.startsWith("en-")) {
+                english = Math.max(english, quality);
+            }
+        }
+        return arabic > 0 && arabic >= english;
+    }
+
+    // ---------------------------------------------------------------- numbers
+
+    /**
+     * Digits, in the script this language writes them in.
+     *
+     * <p>Applied to everything numeric the page prints — prices, hours, distances, ratings, counts —
+     * by every formatter below, so there is no path from a number to the markup that skips it.
+     */
+    String digits(String latin) {
+        if (this == EN) {
+            return latin;
+        }
+        StringBuilder out = new StringBuilder(latin.length());
+        for (int i = 0; i < latin.length(); i++) {
+            char c = latin.charAt(i);
+            if (c >= '0' && c <= '9') {
+                out.append((char) (0x0660 + (c - '0')));
+            } else if (c == ',') {
+                out.append('٬');
+            } else if (c == '.') {
+                out.append('٫');
+            } else {
+                out.append(c);
+            }
+        }
+        return out.toString();
+    }
+
+    String number(long value) {
+        return digits(String.format(Locale.ROOT, "%,d", value));
+    }
+
+    /** A dollar price, always to the cent: it is a price, and "$3.5" is not one. */
+    String usd(BigDecimal amount) {
+        String latin = String.format(Locale.ROOT, "%,.2f", amount.setScale(2, RoundingMode.HALF_UP));
+        return this == AR ? digits(latin) + " $" : "$" + latin;
+    }
+
+    /** A lira face value: whole notes, never a fraction, because there is no coin to settle one. */
+    String lbp(BigDecimal amount) {
+        String latin = String.format(Locale.ROOT, "%,d", amount.longValue());
+        return this == AR ? digits(latin) + " ل.ل." : latin + " LBP";
+    }
+
+    /** 24-hour, because that is how a shop writes its hours on its own door here. */
+    String time(LocalTime at) {
+        return digits(String.format(Locale.ROOT, "%02d:%02d", at.getHour(), at.getMinute()));
+    }
+
+    /** A delivery circle in kilometres, to one place, because metres are not how anybody says it. */
+    String km(int metres) {
+        String latin = String.format(Locale.ROOT, "%.1f", metres / 1000.0);
+        return this == AR ? digits(latin) + " كم" : latin + " km";
+    }
+
+    String minutesRange(int from, int to) {
+        return this == AR
+                ? digits(from + "-" + to) + " دقيقة"
+                : from + "-" + to + " min";
+    }
+
+    /** How long ago the merchant said what the lights were doing. */
+    String ago(long minutes) {
+        if (minutes < 60) {
+            return this == AR
+                    ? "قبل " + number(Math.max(1, minutes)) + " دقيقة"
+                    : Math.max(1, minutes) + " min ago";
+        }
+        long hours = minutes / 60;
+        return this == AR ? "قبل " + number(hours) + " ساعة" : hours + " h ago";
+    }
+
+    // ---------------------------------------------------------------- words
+
+    private static final List<String> DAYS_EN = List.of(
+            "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday");
+    private static final List<String> DAYS_AR = List.of(
+            "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد");
+
+    String day(int isoDay) {
+        return (this == AR ? DAYS_AR : DAYS_EN).get(isoDay - 1);
+    }
+
+    String today() {
+        return this == AR ? "اليوم" : "Today";
+    }
+
+    String tomorrow() {
+        return this == AR ? "غدًا" : "tomorrow";
+    }
+
+    String openNow() {
+        return this == AR ? "مفتوح الآن" : "Open now";
+    }
+
+    String closedNow() {
+        return this == AR ? "مغلق الآن" : "Closed now";
+    }
+
+    String openUntil(LocalTime closesAt) {
+        return this == AR ? "مفتوح حتى " + time(closesAt) : "Open until " + time(closesAt);
+    }
+
+    String opensToday(LocalTime at) {
+        return this == AR ? "يفتح اليوم " + time(at) : "Opens today at " + time(at);
+    }
+
+    String opensTomorrow(LocalTime at) {
+        return this == AR ? "يفتح غدًا " + time(at) : "Opens tomorrow at " + time(at);
+    }
+
+    String opensOn(int isoDay, LocalTime at) {
+        return this == AR
+                ? "يفتح " + day(isoDay) + " " + time(at)
+                : "Opens " + day(isoDay) + " at " + time(at);
+    }
+
+    String closedAllDay() {
+        return this == AR ? "مغلق" : "Closed";
+    }
+
+    String openingHours() {
+        return this == AR ? "أوقات العمل" : "Opening hours";
+    }
+
+    String timesIn(String zone) {
+        return this == AR
+                ? "بتوقيت المتجر (" + zone + ")"
+                // A typographic apostrophe, not the ASCII one. Every value that reaches the markup
+                // goes through ShopPageHtml.esc, which escapes ' because these strings also land
+                // in attributes — so the straight quote would read as "Shop&#39;s" in the source a
+                // developer, a crawler's cache and a "view source" all see.
+                : "Shop’s own time (" + zone + ")";
+    }
+
+    String power(Store.PowerStatus status) {
+        return switch (status) {
+            case MAINS -> this == AR ? "على الكهرباء" : "On mains";
+            case GENERATOR -> this == AR ? "على المولّد" : "On generator";
+            case DARK -> this == AR ? "لا كهرباء الآن" : "No power right now";
+            case UNKNOWN -> "";
+        };
+    }
+
+    String delivery() {
+        return this == AR ? "التوصيل" : "Delivery";
+    }
+
+    String deliversWithin(int metres) {
+        return this == AR ? "يوصّل ضمن " + km(metres) : "Delivers within " + km(metres);
+    }
+
+    String areasServed() {
+        return this == AR ? "المناطق التي يوصّل إليها" : "Areas it delivers to";
+    }
+
+    String deliveryFee(BigDecimal fee, BigDecimal lbpFee) {
+        String label = this == AR ? "رسوم التوصيل" : "Delivery fee";
+        return label + " " + price(fee, lbpFee);
+    }
+
+    String minimumOrder(BigDecimal minimum, BigDecimal lbpMinimum) {
+        String label = this == AR ? "الحد الأدنى للطلب" : "Minimum order";
+        return label + " " + price(minimum, lbpMinimum);
+    }
+
+    String freeDelivery() {
+        return this == AR ? "توصيل مجاني" : "Free delivery";
+    }
+
+    String noMinimum() {
+        return this == AR ? "لا حد أدنى" : "No minimum order";
+    }
+
+    /** Dollars, and lira beside them when there is a rate to convert at. */
+    String price(BigDecimal usd, BigDecimal lbp) {
+        return lbp == null ? usd(usd) : usd(usd) + " · " + lbp(lbp);
+    }
+
+    String catalogue() {
+        return this == AR ? "المعروضات" : "What they sell";
+    }
+
+    String otherItems() {
+        return this == AR ? "أصناف أخرى" : "Other items";
+    }
+
+    String outOfStock() {
+        return this == AR ? "غير متوفر" : "Out of stock";
+    }
+
+    String andMoreInTheApp(int more) {
+        return this == AR
+                ? "و" + number(more) + " صنفًا آخر في التطبيق"
+                : "and " + number(more) + " more in the app";
+    }
+
+    String rateNote(BigDecimal lbpPerUsd) {
+        return this == AR
+                ? "الأسعار بالدولار، والليرة محوّلة على " + number(lbpPerUsd.longValue())
+                        + " ل.ل. للدولار"
+                : "Prices in US dollars; lira converted at " + number(lbpPerUsd.longValue())
+                        + " LBP to the dollar";
+    }
+
+    String howToOrder() {
+        return this == AR ? "كيف تطلب" : "How to order";
+    }
+
+    String orderInTheApp() {
+        return this == AR
+                ? "الطلب من هذا المتجر يتم في تطبيق YouDrop."
+                : "Orders from this shop are placed in the YouDrop app.";
+    }
+
+    String getTheApp() {
+        return this == AR ? "حمّل التطبيق" : "Get the app";
+    }
+
+    String printThisPage() {
+        return this == AR ? "رمز QR للطباعة" : "QR code to print";
+    }
+
+    String verifiedLocal() {
+        return this == AR ? "دكانة موثّقة" : "Verified local shop";
+    }
+
+    String rated(BigDecimal rating, int count) {
+        String stars = digits(rating.setScale(1, RoundingMode.HALF_UP).toPlainString());
+        return this == AR
+                ? stars + " من " + number(count) + " تقييم"
+                : stars + " from " + number(count) + " ratings";
+    }
+
+    String vertical(Store.Vertical vertical, Store.ServiceCategory category) {
+        if (vertical == Store.Vertical.SERVICES && category != null) {
+            return switch (category) {
+                case PRINTING -> this == AR ? "طباعة" : "Printing";
+                case TAILORING -> this == AR ? "خياطة وتعديل" : "Tailoring";
+                case REPAIRS -> this == AR ? "تصليح" : "Repairs";
+                case PHOTOGRAPHY -> this == AR ? "تصوير" : "Photography";
+                case CLEANING -> this == AR ? "تنظيف" : "Cleaning";
+                case BEAUTY -> this == AR ? "تجميل" : "Beauty";
+                case TUTORING -> this == AR ? "دروس خصوصية" : "Tutoring";
+            };
+        }
+        return switch (vertical) {
+            case RESTAURANT -> this == AR ? "مطعم" : "Restaurant";
+            case COFFEE -> this == AR ? "قهوة" : "Coffee";
+            case GROCERY -> this == AR ? "بقالة" : "Grocery";
+            case CONVENIENCE -> this == AR ? "دكانة" : "Convenience";
+            case PHARMACY -> this == AR ? "صيدلية" : "Pharmacy";
+            case ELECTRONICS -> this == AR ? "إلكترونيات" : "Electronics";
+            case FLOWERS_GIFTS -> this == AR ? "ورود وهدايا" : "Flowers and gifts";
+            case SERVICES -> this == AR ? "خدمات" : "Services";
+        };
+    }
+
+    /** The label on the link that switches language — written in the language it switches TO. */
+    String switchLanguage() {
+        return this == AR ? "English" : "العربية";
+    }
+
+    String onYouDrop() {
+        return this == AR ? "على YouDrop" : "on YouDrop";
+    }
+
+    /**
+     * The meta description a search result and a chat preview show.
+     *
+     * <p>Built from what the shop is and where it is rather than from its own tagline alone: a
+     * tagline is often blank, and "Al Fakhry Press" with no second line is not a reason to tap.
+     */
+    String metaDescription(String name, String what, String neighbourhood) {
+        if (neighbourhood == null || neighbourhood.isBlank()) {
+            return this == AR
+                    ? name + " — " + what + ". اطلب عبر YouDrop."
+                    : name + " — " + what + ". Order on YouDrop.";
+        }
+        return this == AR
+                ? name + " — " + what + " في " + neighbourhood + ". اطلب عبر YouDrop."
+                : name + " — " + what + " in " + neighbourhood + ". Order on YouDrop.";
+    }
+
+    String notFoundTitle() {
+        return this == AR ? "لا توجد صفحة هنا" : "No page here";
+    }
+
+    String notFoundBody() {
+        return this == AR
+                ? "هذا الرابط لا يشير إلى متجر على YouDrop."
+                : "This link does not point at a shop on YouDrop.";
+    }
+
+    String backToSite() {
+        return this == AR ? "الصفحة الرئيسية" : "Go to YouDrop";
+    }
+}

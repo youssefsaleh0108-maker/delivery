@@ -55,6 +55,10 @@ api /merchant-kyc/applications/8f2/8f2.jpg minio
 api /delivery-proof/8f2.jpg UNROUTED
 api /receipts/8f2.pdf UNROUTED
 api /webhooks/dlr sms-connector
+api /s/dekkanet-al-rawche-1a2b3c4d product-service
+api /s/dekkanet-al-rawche-1a2b3c4d/qr.png product-service
+api /s/assets/shop.css product-service
+api /sitemap.xml product-service
 '
 
 for env in dev qa; do
@@ -244,6 +248,64 @@ esac
 grep -q 'add_header Cache-Control "no-cache"' ../../clients/website/nginx.conf \
   && ok "the site revalidates its unhashed HTML, JS and config.js (PT-11)" \
   || fail "clients/website/nginx.conf has no server-level Cache-Control: the site goes stale again"
+
+echo "== the public shop page (/s/{slug}) =="
+# The one page on this platform a stranger opens with no app and no account. Three things about it
+# are decided here rather than in Java, so this is where they are checked.
+#
+# Every grep below reads a comment-STRIPPED copy of the rendered overlay. The route and its
+# middleware are documented at length in the template — including the sentence "there is no
+# contentSecurityPolicy here", which a check looking for that word would read as one.
+for env in dev qa; do
+  ing="$tmp/$env-ingress-nocomments.yaml"
+  sed 's/[[:space:]]*#.*$//' "overlays/$env/ingress.yaml" > "$ing"
+  shop_mw=$(awk 'BEGIN{RS="\n---"} /name: shop-page-headers/ {print}' "$ing" | tr -d '\n')
+  # THE LOAD-BEARING ONE. product-service sends the page's own Content-Security-Policy, built from
+  # the same setting that produced the image URLs in the markup and asserted by its own tests. A
+  # `headers` middleware that named a policy would REPLACE that header with a string nothing can
+  # test, and the first symptom would be every product photo silently blocked in the browser.
+  case "$shop_mw" in
+    *contentSecurityPolicy*) fail "$env shop-page-headers sets a CSP: it would replace the page's own" ;;
+    *) ok "$env shop-page-headers leaves the CSP to product-service" ;;
+  esac
+  case "$shop_mw" in
+    *"stsSeconds: 15552000"*"stsIncludeSubdomains: false"*"stsPreload: false"*)
+      ok "$env shop page HSTS matches the site's (180 days, no subdomains, no preload)" ;;
+    *) fail "$env shop page HSTS does not match the portal's and the site's" ;;
+  esac
+  grep -F -A9 "Host(\`api-$env.youdrop.shop\`) && (PathPrefix(\`/s/\`)" "$ing" \
+    | grep -q 'name: shop-page-compress' \
+    && ok "$env shop page is compressed on the way out" \
+    || fail "$env shop page is served uncompressed: it is read on a phone on 3G"
+done
+# www is ONE hostname and it points at ONE environment (clients/website/config.js). Rendering this
+# route into qa as well would put two identical routers on www in two namespaces and let whichever
+# synced last decide which environment's shops the public site serves.
+dev_ing="$tmp/dev-ingress-nocomments.yaml"
+qa_ing="$tmp/qa-ingress-nocomments.yaml"
+grep -q 'Host(`www.youdrop.shop`) && (PathPrefix(`/s/`)' "$dev_ing" \
+  && ok "dev serves the shop page on www, the address a shop prints" \
+  || fail "no www route for /s/: the canonical URL would 404 on the public site"
+grep -q 'Host(`www.youdrop.shop`)' "$qa_ing" \
+  && fail "qa also claims www: two routers on one public hostname, last sync wins" \
+  || ok "qa claims no www route"
+# The site's own router owns the whole of www (cluster/website.yaml). Traefik gives a rule with no
+# `priority` one equal to the LENGTH OF ITS RULE, so this route wins today by being the longer
+# string — which is not a thing to rely on across two files.
+grep -F -A2 'Host(`www.youdrop.shop`) && (PathPrefix(`/s/`)' "$dev_ing" | grep -q 'priority:' \
+  && ok "the www shop-page route outranks the site's catch-all explicitly" \
+  || fail "the www shop-page route has no explicit priority: the static site would answer /s/"
+# Both hostnames share one middleware list, by alias, so a change can never reach one and not the
+# other — the way a shop page with no compression on www and compression on the API host would.
+grep -F -A4 'Host(`www.youdrop.shop`) && (PathPrefix(`/s/`)' "$dev_ing" \
+  | grep -q 'middlewares: \*shop-page-mw' \
+  && ok "www and the API host serve the shop page through the same middlewares" \
+  || fail "the www shop-page route has a middleware list of its own: the two will drift"
+# A shop's page is the only thing on this platform a crawler can index, so the file that tells it
+# where to look has to name the sitemap the service serves.
+grep -q 'Sitemap: https://www.youdrop.shop/sitemap.xml' ../../clients/website/nginx.conf \
+  && ok "robots.txt points crawlers at the shop sitemap" \
+  || fail "clients/website/nginx.conf serves a robots.txt with no Sitemap line"
 
 echo "== the realm a fresh import would build (PT-3, PT-7) =="
 # Greps rather than jq: jq is not assumed anywhere in this script, and every value below is alone
