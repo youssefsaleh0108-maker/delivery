@@ -1,5 +1,6 @@
 package com.delivery.product.domain;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -10,6 +11,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -41,8 +43,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * V38 and the photo quota's SQL, against a real PostgreSQL: the counts, the windows, the sweep, and the
- * advisory lock that stops two photos sent at once from both taking the last one.
+ * Photo search's SQL, against a real PostgreSQL: V38 and the quota — the counts, the windows, the
+ * sweep, and the advisory lock that stops two photos sent at once from both taking the last one — and
+ * the merchant's find by photo, which matches a photo's words against one merchant's own products in
+ * every status ({@link ProductFindRepository}).
  *
  * <p>Runs only when {@code PRODUCT_TEST_DB_URL} names a database a superuser may use, as
  * {@code ItemSearchDatabaseTest} does, and CI runs it the same way. It migrates a schema of its own
@@ -51,8 +55,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @EnabledIfEnvironmentVariable(named = "PRODUCT_TEST_DB_URL", matches = ".+")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@DisplayName("the photo quota, against a real database")
+@DisplayName("photo search, against a real database")
 class PhotoSearchDatabaseTest {
+
+    /** A real EAN-13, as ItemSearchDatabaseTest uses. */
+    private static final String EAN = "5449000000996";
 
     private final String url = System.getenv("PRODUCT_TEST_DB_URL");
     private final String user = envOr("PRODUCT_TEST_DB_USER", "postgres");
@@ -62,6 +69,17 @@ class PhotoSearchDatabaseTest {
     private EntityManagerFactory entityManagerFactory;
     private EntityManager em;
     private PhotoSearchUseRepository uses;
+    private ProductFindRepository finder;
+
+    /** One merchant's two shops, and a rival's, with the products the find tests look for. */
+    private Store grocer;
+    private Store kiosk;
+    private Store rival;
+    private Product byCode;
+    private Product draft;
+    private Product archived;
+    private Product inTheKiosk;
+    private Product rivals;
     private final MovableClock clock = new MovableClock(Instant.parse("2026-09-20T10:00:00Z"));
 
     /** The configured limits: ten a day, three a minute, a thousand for the platform, thirty for a merchant. */
@@ -123,7 +141,44 @@ class PhotoSearchDatabaseTest {
 
         entityManagerFactory = entityManagerFactory();
         em = entityManagerFactory.createEntityManager();
-        uses = new JpaRepositoryFactory(em).getRepository(PhotoSearchUseRepository.class);
+        JpaRepositoryFactory repositories = new JpaRepositoryFactory(em);
+        uses = repositories.getRepository(PhotoSearchUseRepository.class);
+        finder = repositories.getRepository(ProductFindRepository.class);
+        seedTheCatalogue();
+    }
+
+    /**
+     * One merchant with two shops and a rival with one, and a handful of products across them — in
+     * every status, with an Arabic name and a barcode, so the find query can be asked what it keeps.
+     */
+    private void seedTheCatalogue() {
+        em.getTransaction().begin();
+        grocer = new Store("merchant-find", "Find Grocer", Store.Vertical.GROCERY);
+        kiosk = new Store("merchant-find", "Find Kiosk", Store.Vertical.GROCERY);
+        rival = new Store("merchant-rival", "Rival Grocer", Store.Vertical.GROCERY);
+        for (Store store : List.of(grocer, kiosk, rival)) {
+            em.persist(store);
+        }
+        // Named nothing like the photo, so only its barcode can find it.
+        byCode = product(grocer, "Fizzy drink, large bottle");
+        byCode.assignCodes(null, EAN);
+        draft = product(grocer, "Pepsi 1L");
+        archived = product(grocer, "بيبسي 2 لتر");
+        archived.archive();
+        inTheKiosk = product(kiosk, "Pepsi 1L kiosk stock");
+        rivals = product(rival, "Pepsi 1L");
+        for (int i = 0; i < 6; i++) {
+            product(grocer, "Pepsi 1L variant " + i);
+        }
+        em.getTransaction().commit();
+        em.clear();
+    }
+
+    private Product product(Store store, String name) {
+        Product product = new Product(store.getMerchantId(), store.getId(), name, null,
+                new BigDecimal("1.25"), null);
+        em.persist(product);
+        return product;
     }
 
     @AfterAll
@@ -351,6 +406,81 @@ class PhotoSearchDatabaseTest {
             first.close();
             second.close();
         }
+    }
+
+    // ------------------------------------------------------------------ the merchant's own catalogue
+
+    /** The find as the service asks it: the photo's three words, its barcode, and the shops to look in. */
+    private List<ProductFindRepository.Found> find(List<UUID> shopIds, String name, String nameAr,
+                                                   String brand, String barcode, int maxRows) {
+        return finder.findInStores(shopIds,
+                name, name, nameAr, nameAr, brand, brand, barcode, maxRows);
+    }
+
+    @Test
+    @DisplayName("a product whose barcode is equal comes first, whatever it is called")
+    void the_barcode_match_comes_first() {
+        List<ProductFindRepository.Found> found =
+                find(List.of(grocer.getId()), "pepsi 1l", "", "pepsi", EAN, 5);
+
+        assertThat(found).isNotEmpty();
+        assertThat(found.get(0).productId()).isEqualTo(byCode.getId());
+        assertThat(found.get(0).tier()).isZero();
+        assertThat(found.stream().skip(1)).allSatisfy(row -> assertThat(row.tier()).isPositive());
+    }
+
+    @Test
+    @DisplayName("every status is searched: a draft and an archived product are both matches")
+    void every_status_is_searched() {
+        List<UUID> shops = List.of(grocer.getId());
+
+        assertThat(find(shops, "pepsi 1l", "", "", "", 20))
+                .extracting(ProductFindRepository.Found::productId)
+                .contains(draft.getId());
+        // The Arabic name matches the Arabic words, and being archived does not hide it.
+        assertThat(find(shops, "", "بيبسي", "", "", 20))
+                .extracting(ProductFindRepository.Found::productId)
+                .contains(archived.getId());
+    }
+
+    @Test
+    @DisplayName("only the shops asked about are searched, never another merchant's")
+    void only_the_shops_asked_about() {
+        List<ProductFindRepository.Found> mine =
+                find(List.of(grocer.getId(), kiosk.getId()), "pepsi 1l", "", "", "", 50);
+
+        assertThat(mine).extracting(ProductFindRepository.Found::productId)
+                .contains(inTheKiosk.getId())
+                .doesNotContain(rivals.getId());
+        assertThat(mine).extracting(ProductFindRepository.Found::storeId)
+                .doesNotContain(rival.getId());
+    }
+
+    @Test
+    @DisplayName("at most the rows asked for come back, best first")
+    void the_cap_keeps_the_best() {
+        List<ProductFindRepository.Found> found =
+                find(List.of(grocer.getId()), "pepsi 1l", "", "", EAN, 5);
+
+        assertThat(found).hasSize(5);
+        assertThat(found).isSortedAccordingTo((a, b) -> {
+            int byTier = Integer.compare(a.tier(), b.tier());
+            return byTier != 0 ? byTier : Double.compare(b.score(), a.score());
+        });
+    }
+
+    @Test
+    @DisplayName("a photo with no words and no barcode matches nothing at all")
+    void nothing_to_match_matches_nothing() {
+        assertThat(find(List.of(grocer.getId()), "", "", "", "", 5)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a barcode is taken when one of these shops already carries it, and not by a rival's")
+    void barcode_taken_is_scoped_to_the_shops() {
+        assertThat(finder.barcodeTaken(List.of(grocer.getId()), EAN)).isTrue();
+        assertThat(finder.barcodeTaken(List.of(kiosk.getId()), EAN)).isFalse();
+        assertThat(finder.barcodeTaken(List.of(grocer.getId()), "96385074")).isFalse();
     }
 
     private EntityManagerFactory entityManagerFactory() {
