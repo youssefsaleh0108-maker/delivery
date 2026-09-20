@@ -124,6 +124,7 @@ class _DeliveryPortalAppState extends State<DeliveryPortalApp> {
     moderation: ChatModerationApi(_dio),
     attachments: OrderAttachmentApi(_dio),
     offerModeration: BackofficeCatalogApi(_dio),
+    geocoding: GeocodingApi(_dio),
   );
 
   /// The chosen language, remembered across sessions. There is nowhere else on web that survives

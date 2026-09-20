@@ -84,6 +84,7 @@ class PortalApis {
     required this.moderation,
     required this.attachments,
     required this.offerModeration,
+    this.geocoding,
   });
 
   final CatalogApi catalog;
@@ -155,6 +156,13 @@ class PortalApis {
   /// Back office's moderation of service offers: every service shop's offers, taking one down or
   /// restoring it with a reason, and the trail. BACKOFFICE-only on the server.
   final BackofficeCatalogApi offerModeration;
+
+  /// Turns a typed address into a point for the shop pin picker.
+  ///
+  /// Optional, and the picker is still a picker without it — it just has no search box, and a
+  /// merchant places their shop by panning across a country instead of typing where it is. Null
+  /// here draws no search box rather than a broken one.
+  final GeocodingApi? geocoding;
 }
 
 /// How a page in the rail is built.
@@ -341,7 +349,8 @@ class PortalArea {
         icon: Icons.store_outlined,
         selectedIcon: Icons.store,
         label: (DeliveryStrings t) => t.navMyShop,
-        build: (PortalApis a, _, __, ___) => StoreScreen(api: a.store),
+        build: (PortalApis a, _, __, ___) =>
+            StoreScreen(api: a.store, geocoding: a.geocoding),
       ),
       // The merchant suite, APPENDED after the seven above and never reordered: the dashboard's
       // "see all orders" link is `jump(2)` and must keep meaning Orders. The portal is owner-only

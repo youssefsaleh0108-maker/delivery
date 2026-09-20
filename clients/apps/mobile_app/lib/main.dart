@@ -1058,6 +1058,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
             return MerchantShell(
               orderApi: _orderApi,
               storeApi: _storeApi,
+              geocodingApi: _geocodingApi,
               catalogApi: _catalogApi,
               aggregatesApi: _aggregatesApi,
               documentsApi: _documentsApi,
