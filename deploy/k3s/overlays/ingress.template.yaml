@@ -136,6 +136,16 @@ spec:
 #                portal does not open today but shares the code for, the IAM host for the token and
 #                logout calls oidc_client_web.dart makes, and blob: because a picked file is read
 #                back through an object URL.
+#   fonts.gstatic.com is the ONE exception to all of that, and it is deliberate. Rubik is bundled
+#                and covers Latin, Arabic, Hebrew and Cyrillic (checked against the TTF cmap), and
+#                a local Roboto and the Material icons ship with the build — a probe of the real
+#                bundle under this policy fetched every font from 'self' and nothing from anywhere
+#                else. But CanvasKit's engine has a LAST-resort fallback for a glyph no loaded font
+#                has, and it downloads a Noto face from `fontFallbackBaseUrl`, which defaults to
+#                https://fonts.gstatic.com/s/. Emoji are the realistic case — a shop name, a chat
+#                message, a customer's name — and refusing it costs a visible tofu box in the back
+#                office. It is a font and a fetch, never a script. Point the engine's
+#                fontFallbackBaseUrl at a self-hosted Noto set and this line can go.
 #   the tile host is the app's ONE third-party origin. It is the default in
 #                clients/packages/delivery_core/lib/src/util/map_tiles.dart; a build that overrides
 #                MAP_TILE_URL must change this line too, and scripts/verify.sh fails if the two
@@ -159,8 +169,8 @@ spec:
       script-src 'self' 'wasm-unsafe-eval';
       style-src 'self' 'unsafe-inline';
       img-src 'self' data: blob: https://__API_HOST__ https://tile.openstreetmap.org;
-      font-src 'self';
-      connect-src 'self' blob: https://__API_HOST__ wss://__API_HOST__ https://__IAM_HOST__ https://tile.openstreetmap.org;
+      font-src 'self' https://fonts.gstatic.com;
+      connect-src 'self' blob: https://__API_HOST__ wss://__API_HOST__ https://__IAM_HOST__ https://tile.openstreetmap.org https://fonts.gstatic.com;
       worker-src 'self' blob:;
       manifest-src 'self';
       object-src 'none';

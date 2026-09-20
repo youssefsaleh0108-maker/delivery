@@ -338,6 +338,9 @@ class _NoBrowser implements OidcClient {
   Future<TokenSet?> completeRedirect(AuthConfig config) async => null;
 
   @override
+  Future<TokenSet?> resumeSession(AuthConfig config) async => null;
+
+  @override
   Future<TokenSet> refresh(AuthConfig config, String refreshToken) =>
       throw UnsupportedError('not signed in');
 
