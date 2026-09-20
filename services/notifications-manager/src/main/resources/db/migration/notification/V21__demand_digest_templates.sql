@@ -23,9 +23,17 @@
 --   {{area}}  the neighbourhood that asked, or the region, or "your area" when the register has
 --             neither. Never a coordinate and never a customer.
 --
--- The link target is DEMAND, whose id is the shop's, so a tap opens that shop's Demand Radar rather
--- than a listing. Adding a target is deliberately two steps — the enum and the CHECK constraints
--- below — so the app and the platform have to agree the route exists before a message can point at it.
+-- THE COPY DOES NOT PROMISE A TAP. It said "Open your Demand Radar" and "Tap to see the week", and
+-- no client routes a deep link anywhere today: the in-app row marks itself read, a push opens the
+-- app wherever it was, and there is no route table to add DEMAND to. So the message says where to
+-- look — Demand Radar on the shop's dashboard, where the merchant already has a door to it — which
+-- is true whatever the tap does. Wiring a real route means push-tap handling the app does not have
+-- at all, a deep-link parser, and a merchant shell that can pick the right shop; that is a change
+-- of its own, not a line in a template, and half of it would be worse than none.
+--
+-- The link target stays DEMAND, whose id is the shop's: it is the record of where this message
+-- points, and it travels as metadata for the client that will one day route it. The enum's own
+-- comment now says plainly that nothing routes it yet, rather than implying the route exists.
 
 alter table notification.notification_templates
     drop constraint chk_template_link_target;
@@ -48,18 +56,19 @@ insert into notification.notification_templates
     ('a0000000-0000-4000-8000-000000000140', 'demand.digest.weekly', 'IN_APP', 'en',
      'Your neighbours looked for {{first}}',
      'Near {{area}} last week: {{terms}}. About {{about}} searches for {{first}} found nothing '
-     'nearby. Open your Demand Radar to see the week.',
+     'nearby. The week is in Demand Radar, on your shop''s dashboard.',
      'DEMAND'),
     ('a0000000-0000-4000-8000-000000000141', 'demand.digest.weekly', 'PUSH', 'en',
      'Your neighbours looked for {{first}}',
-     'Near {{area}}: {{terms}}. Nobody nearby sells them. Tap to see the week.',
+     'Near {{area}}: {{terms}}. Nobody nearby sells them. Open Demand Radar on your dashboard '
+     'for the week.',
      'DEMAND'),
     ('a0000000-0000-4000-8000-000000000142', 'demand.digest.weekly', 'IN_APP', 'ar',
      'جيرانك بحثوا عن {{first}}',
      'قرب {{area}} الأسبوع الماضي: {{terms}}. حوالي {{about}} عملية بحث عن {{first}} لم تجد شيئاً '
-     'قريباً. افتح رادار الطلب لرؤية الأسبوع.',
+     'قريباً. الأسبوع كامل في رادار الطلب، في لوحة متابعة متجرك.',
      'DEMAND'),
     ('a0000000-0000-4000-8000-000000000143', 'demand.digest.weekly', 'PUSH', 'ar',
      'جيرانك بحثوا عن {{first}}',
-     'قرب {{area}}: {{terms}}. لا أحد قريب يبيعها. اضغط لرؤية الأسبوع.',
+     'قرب {{area}}: {{terms}}. لا أحد قريب يبيعها. افتح رادار الطلب في لوحة المتابعة لرؤية الأسبوع.',
      'DEMAND');

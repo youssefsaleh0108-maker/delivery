@@ -46,6 +46,14 @@ public enum NotificationLinkTarget {
      * <p>Takes the shop's id rather than no id, because a merchant may hold several and "your demand
      * radar" is a different screen for each of them. The weekly demand digest is the only message
      * that points here.
+     *
+     * <p><strong>NOT ROUTED BY ANY CLIENT YET</strong>, and the class comment above should be read
+     * with that in mind: the friction of adding a target did not, in this case, mean the app had a
+     * route. Nothing in the mobile app routes a deep link at all — an in-app row marks itself read,
+     * a push opens the app wherever it was — so this value travels as metadata and lands nowhere.
+     * That is why the digest's own copy tells a merchant where to look instead of promising a tap
+     * (see {@code V21__demand_digest_templates.sql}). When push taps and a route table exist, this
+     * is the value they will route on; until then, no template may write copy that assumes it.
      */
     DEMAND("demand", "storeId");
 
