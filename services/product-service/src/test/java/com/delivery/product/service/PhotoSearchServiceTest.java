@@ -23,6 +23,7 @@ import com.delivery.product.domain.Product;
 import com.delivery.product.domain.ProductRepository;
 import com.delivery.product.domain.Store;
 import com.delivery.product.domain.StoreHours;
+import com.delivery.product.domain.TestPin;
 import com.delivery.product.service.ItemSearchService.ItemQuery;
 import com.delivery.product.service.ItemSearchService.ItemSearchResult;
 import com.delivery.product.service.ItemSearchService.ShopMatch;
@@ -115,6 +116,7 @@ class PhotoSearchServiceTest {
         for (int i = 0; i < shops; i++) {
             Store store = new Store("merchant-" + i, "Shop " + i, Store.Vertical.GROCERY);
             store.replaceHours(List.of(new StoreHours(DayOfWeek.MONDAY, LocalTime.of(8, 0), LocalTime.of(22, 0))));
+            TestPin.pinned(store);
             store.publish(Instant.parse("2026-01-01T00:00:00Z"));
             Product product = new Product(store.getMerchantId(), store.getId(), "Pepsi 1L", null,
                     new BigDecimal("1.25"), null);
