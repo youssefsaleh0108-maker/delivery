@@ -1,7 +1,7 @@
 #!/bin/sh
 # E: a multi-shop checkout with a code, found by quoting first.
 . /dev/shm/recon/lib.sh
-CUST=$(tok customer); RIDER=$(tok rider); MERCH=$(tok merchant); BACK=$(tok backoffice delivery-portal)
+CUST=$(tok customer); RIDER=$(tok rider); MERCH=$(tok merchant); BACK=$(tok backoffice)
 DEMO=0dba1b5f-0543-4bfc-919d-cacc08308ecb
 P1=1acf044c-486f-4aee-b93b-f15daca667bd   # 9.75
 ADDR='"deliveryAddress":"Recon deep test, Hamra, Beirut","contactPhone":"+96170000001"'

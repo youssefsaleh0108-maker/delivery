@@ -2,7 +2,7 @@
 # S: a friend-split cash order, as the rider's cash checklist reads it, and a lira intent that
 # does not match the order. Prints ids, statuses and amounts only (the plan carries names).
 . /dev/shm/recon/lib.sh
-CUST=$(tok customer); RIDER=$(tok rider); MERCH=$(tok merchant); BACK=$(tok backoffice delivery-portal)
+CUST=$(tok customer); RIDER=$(tok rider); MERCH=$(tok merchant); BACK=$(tok backoffice)
 P1=1acf044c-486f-4aee-b93b-f15daca667bd   # 9.75
 ADDR='"deliveryAddress":"Recon deep test, Hamra, Beirut","contactPhone":"+96170000001"'
 

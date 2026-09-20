@@ -1,7 +1,7 @@
 #!/bin/sh
 # C: a merchant fee waiver. D: cancellations at every state (E, the checkout, is scen_e.sh).
 . /dev/shm/recon/lib.sh
-CUST=$(tok customer); RIDER=$(tok rider); MERCH=$(tok merchant); BACK=$(tok backoffice delivery-portal)
+CUST=$(tok customer); RIDER=$(tok rider); MERCH=$(tok merchant); BACK=$(tok backoffice)
 MSUB=$(sub_of "$MERCH")
 P1=1acf044c-486f-4aee-b93b-f15daca667bd   # 9.75
 P2=d4252ea2-1290-4f46-a9f7-1bc154af8f27   # 8.25

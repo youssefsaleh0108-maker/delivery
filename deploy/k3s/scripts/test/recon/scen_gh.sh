@@ -3,7 +3,7 @@
 # read or change whose money.
 . /dev/shm/recon/lib.sh
 CUST=$(tok customer); RIDER=$(tok rider); MERCH=$(tok merchant); CARR=$(tok carrier)
-BACK=$(tok backoffice delivery-portal)
+BACK=$(tok backoffice)
 MSUB=$(sub_of "$MERCH"); RSUB=$(sub_of "$RIDER")
 COMPANY=5857ac51-ef54-4c80-b50c-750998e50986
 INHOUSE=00000000-0000-4000-8000-00000000d001

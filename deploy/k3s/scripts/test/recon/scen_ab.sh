@@ -1,7 +1,7 @@
 #!/bin/sh
 # A: a cash order through its whole life. B: promo codes (partial and 100%) on an EXPRESS order.
 . /dev/shm/recon/lib.sh
-CUST=$(tok customer); RIDER=$(tok rider); MERCH=$(tok merchant); BACK=$(tok backoffice delivery-portal)
+CUST=$(tok customer); RIDER=$(tok rider); MERCH=$(tok merchant); BACK=$(tok backoffice)
 P1=1acf044c-486f-4aee-b93b-f15daca667bd   # 9.75, demo merchant's shop
 P2=d4252ea2-1290-4f46-a9f7-1bc154af8f27   # 8.25
 ADDR='"deliveryAddress":"Recon deep test, Hamra, Beirut","contactPhone":"+96170000001"'
