@@ -12983,4 +12983,8 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get pfindSampleNoPrefill =>
       'هذه القراءة مجرّد مثال، لذلك لا يُملأ لك أي حقل. تأتي معك صورتك وحدها.';
+
+  @override
+  String get pfindLimitPlatform =>
+      'البحث عن المنتجات بالصورة مزدحم جدًا اليوم. ابحث في كتالوجك بالاسم، أو حاول لاحقًا.';
 }

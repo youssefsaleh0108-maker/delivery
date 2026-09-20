@@ -292,6 +292,43 @@ void main() {
       expect(find.text(en.tryAgain), findsNothing);
     });
 
+    testWidgets('a burst is worded as a minute to wait, not as the day being spent',
+        (WidgetTester tester) async {
+      await pumpList(
+          tester,
+          _Gateway(findError: const <String, dynamic>{
+            'code': 'PHOTO_FIND_LIMIT',
+            'limit': 3,
+            'scope': 'MINUTE',
+            'retryAfterSeconds': 40,
+          }, findStatus: 429),
+          photos: _Photos(bytes: jpeg));
+
+      await findWithAPhoto(tester, t: en);
+
+      expect(find.text(en.psrchLimitMinute), findsOneWidget);
+      expect(find.text(en.pfindLimitDay(3)), findsNothing);
+    });
+
+    testWidgets("the whole platform's day is said as the platform's, never as this shop's allowance",
+        (WidgetTester tester) async {
+      await pumpList(
+          tester,
+          _Gateway(findError: const <String, dynamic>{
+            'code': 'PHOTO_FIND_LIMIT',
+            'limit': 500,
+            'scope': 'PLATFORM',
+            'retryAfterSeconds': 300,
+          }, findStatus: 429),
+          photos: _Photos(bytes: jpeg));
+
+      await findWithAPhoto(tester, t: en);
+
+      expect(find.text(en.pfindLimitPlatform), findsOneWidget);
+      // "You can look up 500 photos a day" would be a plain untruth: this shop may look up 30.
+      expect(find.text(en.pfindLimitDay(500)), findsNothing);
+    });
+
     testWidgets('a reader that failed can be tried again', (WidgetTester tester) async {
       await pumpList(
           tester,

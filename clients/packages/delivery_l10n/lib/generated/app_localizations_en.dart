@@ -12817,4 +12817,8 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get pfindSampleNoPrefill =>
       'This reading is an example, so nothing is filled in for you. Only your own photo comes along.';
+
+  @override
+  String get pfindLimitPlatform =>
+      'Finding products by photo is very busy today. Search your catalogue by name, or try again later.';
 }

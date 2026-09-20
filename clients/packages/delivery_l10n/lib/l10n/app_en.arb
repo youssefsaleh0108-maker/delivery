@@ -6179,5 +6179,6 @@
   "pfindBarcodeHint": "Scanned at the till",
   "pfindBlitzConsent": "Your photos are sent to Anthropic, our AI provider, to recognise the products. We delete them within two days.",
   "pfindAddBlank": "Add a product",
-  "pfindSampleNoPrefill": "This reading is an example, so nothing is filled in for you. Only your own photo comes along."
+  "pfindSampleNoPrefill": "This reading is an example, so nothing is filled in for you. Only your own photo comes along.",
+  "pfindLimitPlatform": "Finding products by photo is very busy today. Search your catalogue by name, or try again later."
 }

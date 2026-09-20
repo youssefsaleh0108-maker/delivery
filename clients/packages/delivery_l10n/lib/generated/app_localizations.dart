@@ -21674,6 +21674,12 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'This reading is an example, so nothing is filled in for you. Only your own photo comes along.'**
   String get pfindSampleNoPrefill;
+
+  /// No description provided for @pfindLimitPlatform.
+  ///
+  /// In en, this message translates to:
+  /// **'Finding products by photo is very busy today. Search your catalogue by name, or try again later.'**
+  String get pfindLimitPlatform;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

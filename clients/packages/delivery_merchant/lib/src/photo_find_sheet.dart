@@ -154,10 +154,15 @@ class _PhotoFindSheetState extends State<PhotoFindSheet> {
     if (error is PhotoSearchFailure) {
       canRetry = error.code == PhotoSearchFailure.busy || error.code == PhotoSearchFailure.failed;
       words = switch (error.code) {
-        PhotoSearchFailure.findLimit || PhotoSearchFailure.searchLimit =>
-          error.scope == PhotoSearchFailure.scopeMinute
-              ? t.psrchLimitMinute
-              : t.pfindLimitDay(error.limit ?? 0),
+        // Each limit in its own words, matched on the scope the server sent rather than on "not a
+        // minute, so it must be the day": a platform limit is not this merchant's allowance at all,
+        // and saying "you can look up 500 photos a day" over one would be a plain untruth. A scope
+        // this build does not know falls back to the day, which is what a limit usually is.
+        PhotoSearchFailure.findLimit || PhotoSearchFailure.searchLimit => switch (error.scope) {
+            PhotoSearchFailure.scopeMinute => t.psrchLimitMinute,
+            PhotoSearchFailure.scopePlatform => t.pfindLimitPlatform,
+            _ => t.pfindLimitDay(error.limit ?? 0),
+          },
         PhotoSearchFailure.busy => t.psrchBusy,
         PhotoSearchFailure.unavailable => t.psrchUnavailable,
         PhotoSearchFailure.tooLarge => t.psrchTooLarge,
