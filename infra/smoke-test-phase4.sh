@@ -1,7 +1,8 @@
 #!/bin/sh
 # Phase 4 end-to-end smoke test: accounting and Core Banking.
 #
-#   cd infra && docker run --rm --network delivery -v "$PWD/smoke-test-phase4.sh:/smoke.sh:ro" \
+#   cd infra && docker run --rm --network delivery \
+#     -e DEMO_CUSTOMER_PASSWORD -e DEMO_RIDER_PASSWORD -e DEMO_MERCHANT_PASSWORD -e DEMO_BACKOFFICE_PASSWORD -v "$PWD/smoke-test-phase4.sh:/smoke.sh:ro" \
 #     alpine:latest sh -c "apk add --no-cache curl jq >/dev/null && sh /smoke.sh"
 #
 # Runs inside the compose network: the simulator, the connector and the bank's own API are
@@ -40,8 +41,10 @@ check() {
 }
 
 token() {
-  curl -s -X POST "$KC" -d "client_id=${3:-mobile-app}" \
-    -d "username=$1" -d "password=$2" -d "grant_type=password" | jq -r '.access_token'
+  printf '%s' "$2" | curl -s -X POST "$KC" \
+    -d "client_id=${3:-mobile-app}" \
+    --data-urlencode "username=$1" --data-urlencode "password@-" \
+    -d "grant_type=password" | jq -r '.access_token'
 }
 
 status() { # status <method> <url> <token> [body]
@@ -73,10 +76,14 @@ wait_for() { # wait_for <seconds> <shell-condition>
 echo
 echo '=== 0. Actors and accounts ======================================================='
 
-CUSTOMER=$(token customer 100001 mobile-app)
-RIDER=$(token rider 300003 mobile-app)
-MERCHANT=$(token merchant 200002 mobile-app)
-BACKOFFICE=$(token backoffice 400004 mobile-app)
+# The demo logins' passwords, from the environment's demo-logins Secret, supplied by whoever runs
+# this — they were literals here, and the repository was public. On the box, for example:
+#   DEMO_CUSTOMER_PASSWORD=$(kubectl -n delivery-dev get secret demo-logins -o jsonpath='{.data.customer}' | base64 -d)
+: "${DEMO_CUSTOMER_PASSWORD:?set DEMO_CUSTOMER_PASSWORD from the demo-logins Secret}" "${DEMO_RIDER_PASSWORD:?set DEMO_RIDER_PASSWORD from the demo-logins Secret}" "${DEMO_MERCHANT_PASSWORD:?set DEMO_MERCHANT_PASSWORD from the demo-logins Secret}" "${DEMO_BACKOFFICE_PASSWORD:?set DEMO_BACKOFFICE_PASSWORD from the demo-logins Secret}"
+CUSTOMER=$(token customer "$DEMO_CUSTOMER_PASSWORD" mobile-app)
+RIDER=$(token rider "$DEMO_RIDER_PASSWORD" mobile-app)
+MERCHANT=$(token merchant "$DEMO_MERCHANT_PASSWORD" mobile-app)
+BACKOFFICE=$(token backoffice "$DEMO_BACKOFFICE_PASSWORD" mobile-app)
 
 for t in CUSTOMER RIDER MERCHANT BACKOFFICE; do
   eval "v=\$$t"
@@ -89,7 +96,18 @@ ADMIN=$(curl -s -X POST "$KC_ADMIN/realms/master/protocol/openid-connect/token" 
 
 # A second merchant whose payout account is FROZEN, so the compensation path can be reached
 # without breaking the working merchant for every other test in this file.
-provision_merchant() { # provision_merchant <username> <accountRef>
+#
+# Its passcode is drawn fresh each run and set on the account, like the accounts the onboarding
+# smokes create: frozenmerchant stays on the environment after this script ends, and a passcode
+# written in a public file would make it a login anybody could use. Nothing here prints it.
+#
+# It is also passed in rather than derived from the username, which is what the reset below used
+# to do while the sign-in under it sent something else entirely — so on any environment where this
+# account did not already exist, "frozen-account merchant provisioned" could only fail.
+pc() { printf '%06d' $(( $(od -An -N4 -tu4 /dev/urandom | tr -d ' ') % 1000000 )); }
+FROZEN_PC=$(pc)
+
+provision_merchant() { # provision_merchant <username> <accountRef> <passcode>
   curl -s -o /dev/null -X POST "$KC_ADMIN/admin/realms/delivery-platform/users" \
     -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' \
     -d "{\"username\":\"$1\",\"email\":\"$1@dev.local\",\"firstName\":\"Test\",\"lastName\":\"Merchant\",
@@ -98,7 +116,7 @@ provision_merchant() { # provision_merchant <username> <accountRef>
     -H "Authorization: Bearer $ADMIN" | jq -r '.[0].id')
   curl -s -o /dev/null -X PUT "$KC_ADMIN/admin/realms/delivery-platform/users/$uid/reset-password" \
     -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' \
-    -d "{\"type\":\"password\",\"value\":\"$1\",\"temporary\":false}"
+    -d "{\"type\":\"password\",\"value\":\"$3\",\"temporary\":false}"
   # Re-asserted after creation, because on a re-run the create above is a 409 no-op.
   #
   # The FULL representation, not just the attributes. A Keycloak PUT replaces the fields it is
@@ -116,8 +134,8 @@ provision_merchant() { # provision_merchant <username> <accountRef>
     -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' -d "[$role]"
 }
 
-provision_merchant frozenmerchant ACC-FROZEN
-FROZEN_MERCHANT=$(token frozenmerchant 200022 mobile-app)
+provision_merchant frozenmerchant ACC-FROZEN "$FROZEN_PC"
+FROZEN_MERCHANT=$(token frozenmerchant "$FROZEN_PC" mobile-app)
 check 'frozen-account merchant provisioned' 'yes' \
   "$([ -n "$FROZEN_MERCHANT" ] && [ "$FROZEN_MERCHANT" != null ] && echo yes || echo no)"
 
