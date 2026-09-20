@@ -631,9 +631,6 @@ class _MerchantBlitzScreenState extends State<MerchantBlitzScreen>
     return <Widget>[
       if (uploaded == 0) ...<Widget>[
         _Explainer(title: t.blitzIntroTitle, body: t.blitzIntroBody),
-        const SizedBox(height: DeliverySpacing.sm),
-        // Before the first photo is taken: the shelf photos go to the reader too, once it is on.
-        PhotoConsentLine(text: t.pfindBlitzConsent),
         const SizedBox(height: DeliverySpacing.md),
       ],
       if (scan != null && scan.photos.isNotEmpty) ...<Widget>[
@@ -656,6 +653,13 @@ class _MerchantBlitzScreenState extends State<MerchantBlitzScreen>
         const _Progress(),
         const SizedBox(height: DeliverySpacing.md),
       ],
+      // Above the buttons that add a photo, on every pass and not only the first: photos two to six
+      // go to the same reader as photo one, and a photo Android recovered while the app was gone is
+      // sent by _resume with no sheet in between — so this is the only place it can be read before
+      // it goes. It is drawn while the scan is still gathering, which is exactly while a photo can
+      // still be added or sent to be read.
+      PhotoConsentLine(text: t.pfindBlitzConsent),
+      const SizedBox(height: DeliverySpacing.md),
       if (uploaded == 0) ...<Widget>[
         if (camera) ...<Widget>[
           _PrimaryButton(icon: Icons.photo_camera_outlined, label: t.blitzTakePhoto, onPressed: take),
