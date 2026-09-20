@@ -46,6 +46,9 @@ import com.delivery.accounting.domain.CoreBankingSyncLogRepository;
 @PreAuthorize("hasRole('BACKOFFICE')")
 public class ReconciliationController {
 
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(ReconciliationController.class);
+
     private static final int MAX_PAGE = 200;
 
     private final AccountingTransactionRepository transactions;
@@ -414,20 +417,33 @@ public class ReconciliationController {
      * orders, not this service's standing one. Read-only; settling is the next call.
      */
     @GetMapping("/unsettled-deliveries")
-    public ResponseEntity<?> unsettledDeliveries(@RequestParam(defaultValue = "100") int limit) {
+    public ResponseEntity<?> unsettledDeliveries(
+            @RequestParam(defaultValue = "1000") int limit) {
         ResponseEntity<?> refusal = Callers.requireRole("BACKOFFICE");
         if (refusal != null) {
             return refusal;
         }
         try {
-            return ResponseEntity.ok(recovery.unsettledDeliveries(
-                    Callers.jwt().getTokenValue(), limit));
+            var check = recovery.unsettledDeliveries(Callers.jwt().getTokenValue(), limit);
+            Map<String, Object> out = new LinkedHashMap<>();
+            // How much was looked at, beside what was found: a list of nothing after a scan of
+            // nothing is not a clean ledger, and the two must not read the same.
+            out.put("scanned", check.scanned());
+            out.put("complete", check.complete());
+            out.put("missing", check.missing());
+            return ResponseEntity.ok(out);
         } catch (com.delivery.accounting.service.OrderManagerOrdersClient.UnavailableException e) {
             // Deliberately not an empty list: "nothing is missing" and "nobody could be asked" are
             // different answers, and only one of them means there is nothing to do.
             return ResponseEntity.status(503).body(Map.of(
                     "error", "Order Manager could not be asked which orders were delivered.",
                     "code", "ORDER_MANAGER_UNAVAILABLE"));
+        } catch (RuntimeException e) {
+            // Never a bare 500: whoever is working this list needs to know the check did not run.
+            log.error("The unsettled-deliveries check failed", e);
+            return ResponseEntity.status(500).body(Map.of(
+                    "error", "The check could not be run: " + message(e),
+                    "code", "CHECK_FAILED"));
         }
     }
 
@@ -457,12 +473,33 @@ public class ReconciliationController {
             }
             return ResponseEntity.ok(out);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage(), "code", "CANNOT_SETTLE"));
         } catch (com.delivery.accounting.service.OrderManagerOrdersClient.UnavailableException e) {
             return ResponseEntity.status(503).body(Map.of(
                     "error", "Order Manager could not be asked about that order.",
                     "code", "ORDER_MANAGER_UNAVAILABLE"));
+        } catch (RuntimeException e) {
+            // A re-drive that died halfway is the one thing an operator must not be left guessing
+            // about. Recorded where they can see it, and answered as what it is rather than as a
+            // bare 500 out of the framework.
+            log.error("Could not settle order {} by hand", orderId, e);
+            failures.record(orderId, "order.delivered",
+                    "A hand settlement could not be completed: " + message(e), null, null);
+            return ResponseEntity.status(500).body(Map.of(
+                    "error", "That order could not be settled: " + message(e),
+                    "code", "SETTLE_FAILED",
+                    "orderId", orderId.toString()));
         }
+    }
+
+    /** The most useful line of a failure, for an operator rather than for a log reader. */
+    private static String message(Throwable e) {
+        String message = e.getMessage();
+        if (message == null || message.isBlank()) {
+            return e.getClass().getSimpleName();
+        }
+        return message.length() > 300 ? message.substring(0, 300) : message;
     }
 
     /** Everything not in a terminal state — the work list. */

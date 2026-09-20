@@ -851,6 +851,17 @@ public class SettlementService {
     }
 
     private void saveRiderRow(RiderLedgerEntry entry, UUID orderId, String riderRef) {
+        // Asked before it is written, for the reason PointsService.award is: a tolerated violation
+        // is only tolerable when nothing else is riding on the same transaction, and Postgres
+        // refuses every further statement on one a failure has aborted. The index below is still
+        // what guarantees it; this is what keeps a settlement that must complete from dying on a
+        // row it did not need to write.
+        if (orderId != null && riderLedger.existsByOrderIdAndRiderRefAndEntryType(
+                orderId, riderRef, entry.getEntryType())) {
+            log.debug("Rider {} already has a {} row for order {}; leaving it alone",
+                    riderRef, entry.getEntryType(), orderId);
+            return;
+        }
         try {
             riderLedger.saveAndFlush(entry);
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
