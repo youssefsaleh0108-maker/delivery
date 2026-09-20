@@ -21794,6 +21794,18 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Why, for support (optional)'**
   String get merchRejectReason;
+
+  /// No description provided for @invUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock levels are not available yet'**
+  String get invUnavailable;
+
+  /// No description provided for @invUnavailableHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory isn\'t switched on for your shop. Your catalogue is unaffected.'**
+  String get invUnavailableHint;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

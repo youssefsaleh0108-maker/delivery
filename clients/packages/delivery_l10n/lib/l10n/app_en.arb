@@ -6205,5 +6205,7 @@
   "@checkoutMapShopPinStop": {"placeholders":{"shop":{"type":"String"},"number":{"type":"int"}}},
   "merchRejectConfirmTitle": "Reject this order?",
   "merchRejectConfirmBody": "The customer's order is cancelled, and this can't be undone.",
-  "merchRejectReason": "Why, for support (optional)"
+  "merchRejectReason": "Why, for support (optional)",
+  "invUnavailable": "Stock levels are not available yet",
+  "invUnavailableHint": "Inventory isn't switched on for your shop. Your catalogue is unaffected."
 }

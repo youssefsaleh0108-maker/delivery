@@ -12900,4 +12900,11 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get merchRejectReason => 'Why, for support (optional)';
+
+  @override
+  String get invUnavailable => 'Stock levels are not available yet';
+
+  @override
+  String get invUnavailableHint =>
+      'Inventory isn\'t switched on for your shop. Your catalogue is unaffected.';
 }

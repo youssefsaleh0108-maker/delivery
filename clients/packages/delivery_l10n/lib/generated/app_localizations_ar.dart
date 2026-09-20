@@ -13058,4 +13058,11 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get merchRejectReason => 'السبب، لفريق الدعم (اختياري)';
+
+  @override
+  String get invUnavailable => 'كميات المخزون غير متاحة بعد';
+
+  @override
+  String get invUnavailableHint =>
+      'لم يُفعَّل المخزون لمتجرك. هذا لا يؤثر على قائمة منتجاتك.';
 }
