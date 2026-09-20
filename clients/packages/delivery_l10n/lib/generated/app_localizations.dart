@@ -21806,6 +21806,54 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Inventory isn\'t switched on for your shop. Your catalogue is unaffected.'**
   String get invUnavailableHint;
+
+  /// No description provided for @portalSignInWelcome.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome back'**
+  String get portalSignInWelcome;
+
+  /// No description provided for @portalSignInPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with your YouDrop account to open your console.'**
+  String get portalSignInPrompt;
+
+  /// No description provided for @portalSignInRedirect.
+  ///
+  /// In en, this message translates to:
+  /// **'You will be taken to the YouDrop identity service to sign in, then brought straight back here.'**
+  String get portalSignInRedirect;
+
+  /// No description provided for @portalSignInApply.
+  ///
+  /// In en, this message translates to:
+  /// **'New merchant or delivery partner? Apply in the YouDrop app — your console opens as soon as the application is approved.'**
+  String get portalSignInApply;
+
+  /// No description provided for @portalBrandEyebrow.
+  ///
+  /// In en, this message translates to:
+  /// **'PARTNER CONSOLE'**
+  String get portalBrandEyebrow;
+
+  /// No description provided for @portalBrandHeadline.
+  ///
+  /// In en, this message translates to:
+  /// **'Run your whole operation from one console.'**
+  String get portalBrandHeadline;
+
+  /// No description provided for @portalBrandBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Shops, delivery companies and the platform team sign in here. Live orders, dispatch, catalogue and settlement — the same account, whichever of them you are.'**
+  String get portalBrandBlurb;
+
+  /// No description provided for @portalBrandAudiences.
+  ///
+  /// In en, this message translates to:
+  /// **'Merchants · Carriers · Backoffice'**
+  String get portalBrandAudiences;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

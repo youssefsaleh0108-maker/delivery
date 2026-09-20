@@ -6207,5 +6207,13 @@
   "merchRejectConfirmBody": "The customer's order is cancelled, and this can't be undone.",
   "merchRejectReason": "Why, for support (optional)",
   "invUnavailable": "Stock levels are not available yet",
-  "invUnavailableHint": "Inventory isn't switched on for your shop. Your catalogue is unaffected."
+  "invUnavailableHint": "Inventory isn't switched on for your shop. Your catalogue is unaffected.",
+  "portalSignInWelcome": "Welcome back",
+  "portalSignInPrompt": "Sign in with your YouDrop account to open your console.",
+  "portalSignInRedirect": "You will be taken to the YouDrop identity service to sign in, then brought straight back here.",
+  "portalSignInApply": "New merchant or delivery partner? Apply in the YouDrop app — your console opens as soon as the application is approved.",
+  "portalBrandEyebrow": "PARTNER CONSOLE",
+  "portalBrandHeadline": "Run your whole operation from one console.",
+  "portalBrandBlurb": "Shops, delivery companies and the platform team sign in here. Live orders, dispatch, catalogue and settlement — the same account, whichever of them you are.",
+  "portalBrandAudiences": "Merchants · Carriers · Backoffice"
 }
