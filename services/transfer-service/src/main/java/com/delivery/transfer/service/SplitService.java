@@ -164,19 +164,26 @@ public class SplitService {
                 .toList();
     }
 
+    /**
+     * A plan its host or an invitee reads. Anybody else is told there is no such split — the same
+     * 404 as for an id nobody made — rather than a 403 that would confirm it exists.
+     */
     @Transactional
     public SplitPlan read(UUID id, String callerRef, String callerUsername) {
         SplitPlan plan = plans.findById(id)
+                .filter(p -> isMember(p, callerRef, callerUsername))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "No such split"));
-        boolean host = plan.getHostRef().equals(callerRef);
-        boolean invited = plan.getShares().stream()
-                .anyMatch(s -> callerUsername.equals(s.getPayeeUsername()));
-        if (!host && !invited) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your split");
-        }
         plan.expireIfDue(Instant.now());
         return plan;
+    }
+
+    /** The host, or somebody the host invited by username. */
+    private static boolean isMember(SplitPlan plan, String callerRef, String callerUsername) {
+        return plan.getHostRef().equals(callerRef)
+                || plan.getShares().stream()
+                        .anyMatch(s -> callerUsername != null
+                                && callerUsername.equals(s.getPayeeUsername()));
     }
 
     /**
@@ -302,21 +309,80 @@ public class SplitService {
         return plan;
     }
 
-    /** The rider's cash checklist: the plan behind an order, shares and all. */
-    @Transactional(readOnly = true)
-    public SplitPlan forOrder(UUID orderId) {
-        return plans.findByOrderId(orderId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "No split behind that order"));
+    /** Who is reading an order's plan, which decides how much of it they are shown. */
+    public enum Reader {
+        /** The host or an invitee: the plan is theirs. */
+        MEMBER,
+        /** Support, reading any plan. */
+        BACKOFFICE,
+        /** The rider carrying the order: amounts and whom to collect them from, nothing more. */
+        RIDER
     }
 
+    /**
+     * An order's plan as one reader may see it. {@code cashOrder} is only known, and only matters,
+     * for the {@link Reader#RIDER}: it says whether the door collects the shares.
+     */
+    public record OrderPlan(SplitPlan plan, Reader reader, boolean cashOrder) {
+    }
+
+    /**
+     * The plan behind an order — the rider's cash checklist, and the members' summary.
+     *
+     * <p>It answered anybody who held an order id, and riders see the id of every order on the job
+     * board: a rider on another order got 404 for the order and 200 for its plan, with the host's
+     * name and username, each friend's, and what each of them pays (RECON-02). Now it answers only
+     * the host, an invitee, back office, and the rider Order Manager names on the order — asked
+     * with the caller's own token, so its visibility rule decides. Everybody else gets the 404 an
+     * order with no plan gets, so the answer does not even say that a plan exists.
+     *
+     * <p>Not transactional on purpose: the lookup is the repository's own read, the shares come
+     * with it (eager), and a rider's check then waits on Order Manager — which it must not do while
+     * holding one of this service's five pooled connections.
+     */
+    public OrderPlan forOrder(UUID orderId, String callerRef, String callerUsername,
+                              boolean backoffice) {
+        SplitPlan plan = plans.findByOrderId(orderId).orElseThrow(SplitService::noPlan);
+        if (backoffice) {
+            return new OrderPlan(plan, Reader.BACKOFFICE, false);
+        }
+        if (isMember(plan, callerRef, callerUsername)) {
+            return new OrderPlan(plan, Reader.MEMBER, false);
+        }
+        OrderManagerClient.OrderSummary order = carriedBy(orderId, callerRef);
+        if (order == null) {
+            throw noPlan();
+        }
+        return new OrderPlan(plan, Reader.RIDER, order.cash());
+    }
+
+    /**
+     * The order, when Order Manager names the caller as its rider; null otherwise — including when
+     * it will not show the caller the order at all, or cannot be reached. Refusing is the safe
+     * failure here: the rider's payout card still says what the order collects.
+     */
+    private OrderManagerClient.OrderSummary carriedBy(UUID orderId, String callerRef) {
+        try {
+            OrderManagerClient.OrderSummary order = transfers.order(orderId);
+            return order != null && callerRef.equals(order.riderId()) ? order : null;
+        } catch (OrderManagerClient.OrderUnavailableException e) {
+            return null;
+        }
+    }
+
+    private static ResponseStatusException noPlan() {
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, "No split behind that order");
+    }
+
+    /**
+     * A plan only its host may act on. Anybody else — an invitee included — is told there is no
+     * such split, as {@link #read} tells a stranger.
+     */
     private SplitPlan requireHost(UUID id, String hostRef) {
         SplitPlan plan = plans.findById(id)
+                .filter(p -> p.getHostRef().equals(hostRef))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "No such split"));
-        if (!plan.getHostRef().equals(hostRef)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your split");
-        }
         plan.expireIfDue(Instant.now());
         return plan;
     }

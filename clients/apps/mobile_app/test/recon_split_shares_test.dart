@@ -151,6 +151,37 @@ void main() {
       expect(find.text(en.custDeclinedChip), findsOneWidget);
     });
 
+    testWidgets('the rider\'s own view of the plan (RECON-02) draws the same checklist',
+        (WidgetTester tester) async {
+      // What transfer-service now answers the order's rider: amounts and names, no usernames,
+      // no host, and every share of a cash order as cash at this door.
+      await pumpRider(tester, order(total: 19.5), <String, dynamic>{
+        'id': 'plan-1',
+        'orderId': '42c91f1c-4883-4620-9842-f8b190f8c429',
+        'mode': 'EVEN',
+        'status': 'PLACED',
+        'totalUsd': 19.50,
+        'rateUsed': 90000,
+        'shares': <dynamic>[
+          <String, dynamic>{'id': 's-host', 'name': 'Host', 'amountUsd': 9.50,
+              'status': 'COMMITTED', 'method': 'CASH_AT_DOOR', 'simulated': false},
+          <String, dynamic>{'id': 's-friend', 'name': 'Friend', 'amountUsd': 5.00,
+              'status': 'COMMITTED', 'method': 'CASH_AT_DOOR', 'simulated': true,
+              'simulatedMethod': 'WHISH'},
+          <String, dynamic>{'id': 's-guest', 'name': 'Guest', 'amountUsd': 5.00,
+              'status': 'COMMITTED', 'method': 'CASH_AT_DOOR', 'simulated': false},
+        ],
+      });
+
+      expect(totalShown(tester), contains(r'$19.50'));
+      expect(find.text('Host'), findsOneWidget);
+      expect(find.text(r'$9.50'), findsOneWidget);
+      expect(find.text(r'$5.00'), findsNWidgets(2));
+      expect(find.text(en.riderSplitOrderDifference), findsNothing);
+      // The door takes it in cash, and the wallet it stood in for is still named.
+      expect(find.text(en.splitSimulatedPayment(en.custWhishShort)), findsOneWidget);
+    });
+
     testWidgets('a wallet order draws no cash checklist: nothing is collected at the door',
         (WidgetTester tester) async {
       await pumpRider(tester, order(total: 19.5, payment: 'WALLET'), plan(<Map<String, dynamic>>[

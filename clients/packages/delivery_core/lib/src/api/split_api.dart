@@ -143,6 +143,7 @@ class SplitShare {
     required this.status,
     this.method,
     this.simulated = false,
+    this.simulatedMethod,
   });
 
   final String id;
@@ -164,6 +165,11 @@ class SplitShare {
   /// The wallet [method] was the dev simulator's stand-in: nothing took the money.
   final bool simulated;
 
+  /// The wallet a simulated share stood in for, when [method] says something else: the order's
+  /// rider is told how the door receives each share (cash, on a cash order), and this keeps the
+  /// wallet's name for the label.
+  final String? simulatedMethod;
+
   bool get settled => status != 'PENDING';
 
   factory SplitShare.fromJson(Map<String, dynamic> json) => SplitShare(
@@ -175,6 +181,7 @@ class SplitShare {
         status: json['status'] as String? ?? 'PENDING',
         method: json['method'] as String?,
         simulated: json['simulated'] as bool? ?? false,
+        simulatedMethod: json['simulatedMethod'] as String?,
       );
 }
 

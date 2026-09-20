@@ -190,8 +190,11 @@ class _RiderOrderDetailScreenState extends State<RiderOrderDetailScreen> {
   /// wallet "payment" was only simulated, or that nobody has answered, somebody declined, or the
   /// host took the share on. How a promise travels is not said — at this door it is all cash.
   static String? _checklistCaption(DeliveryStrings t, SplitShare share) {
-    if (share.simulated && share.method != null) {
-      return t.splitSimulatedPayment(splitMethodLabel(t, share.method!));
+    // The rider's own view says how this door receives each share (cash) and names the wallet a
+    // simulated one stood in for separately; a member's view has the wallet as the method itself.
+    final String? wallet = share.simulatedMethod ?? share.method;
+    if (share.simulated && wallet != null) {
+      return t.splitSimulatedPayment(splitMethodLabel(t, wallet));
     }
     return switch (share.status) {
       'PENDING' => t.custPendingChip,

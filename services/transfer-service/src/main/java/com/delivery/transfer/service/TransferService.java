@@ -150,15 +150,17 @@ public class TransferService {
         return transfers.save(transfer);
     }
 
+    /**
+     * The caller's own intent for an order. Somebody else's reads as none at all: a 403 here told
+     * any customer holding an order id — and riders see every id on the job board — that the order
+     * had a payment intent behind it.
+     */
     @Transactional(readOnly = true)
     public MoneyTransfer mineForOrder(UUID orderId, String payerRef) {
-        MoneyTransfer transfer = transfers.findByOrderId(orderId)
+        return transfers.findByOrderId(orderId)
+                .filter(transfer -> transfer.getPayerRef().equals(payerRef))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "No transfer for that order"));
-        if (!transfer.getPayerRef().equals(payerRef)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your order");
-        }
-        return transfer;
     }
 
     @Transactional(readOnly = true)
