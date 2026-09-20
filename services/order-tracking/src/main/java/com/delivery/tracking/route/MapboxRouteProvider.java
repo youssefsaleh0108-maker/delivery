@@ -47,8 +47,11 @@ public class MapboxRouteProvider implements RouteProvider {
             RestClient.Builder builder,
             @Value("${delivery.tracking.routing.mapbox.base-url:https://api.mapbox.com}") String baseUrl,
             @Value("${delivery.tracking.routing.mapbox.access-token:}") String accessToken,
-            @Value("${delivery.tracking.routing.mapbox.profile:mapbox/driving-traffic}") String profile) {
-        this.client = builder.baseUrl(baseUrl).build();
+            @Value("${delivery.tracking.routing.mapbox.profile:mapbox/driving-traffic}") String profile,
+            @Value("${delivery.tracking.routing.connect-timeout:1s}") Duration connectTimeout,
+            @Value("${delivery.tracking.routing.read-timeout:2s}") Duration readTimeout) {
+        this.client = RoutingTimeouts.apply(builder.clone().baseUrl(baseUrl), connectTimeout,
+                readTimeout).build();
         this.accessToken = accessToken;
         this.profile = profile;
     }

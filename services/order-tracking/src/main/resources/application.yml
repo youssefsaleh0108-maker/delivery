@@ -227,6 +227,13 @@ delivery:
       # Effective door-to-door speed for the dev provider, including junctions and handovers — not
       # a vehicle's top speed. The one number here worth tuning against observed delivery times.
       average-speed-kmh: 18
+      # What a routing call is given, as CarrierDirectoryClient's roster call is. A customer's map
+      # makes several of them per refresh and a request thread waits on each, so a routing host
+      # that has stopped answering must fail in a second or two instead of holding the thread that
+      # should be taking rider pings. Past them the map draws straight lines and says they are
+      # approximate, and the ETA reports the outage rather than a different kind of number.
+      connect-timeout: 1s
+      read-timeout: 2s
       osrm:
         # Deliberately empty. The public demo server is rate-limited, carries no availability
         # guarantee, and would ship every customer's address to a volunteer's box; a self-hosted

@@ -14,16 +14,22 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.delivery.tracking.domain.OrderParticipants;
 import com.delivery.tracking.domain.OrderParticipantsRepository;
 import com.delivery.tracking.route.GeoPoint;
+import com.delivery.tracking.route.PathGeometry;
 import com.delivery.tracking.route.RoutePath;
 import com.delivery.tracking.route.RoutePaths;
 import com.delivery.tracking.service.CheckoutView.OrderView;
@@ -68,8 +74,17 @@ import com.delivery.tracking.service.TrackingService.Position;
 @Service
 public class CheckoutTrackingService {
 
+    private static final Logger log = LoggerFactory.getLogger(CheckoutTrackingService.class);
+
     /** Past this many remembered checkouts, expired answers are swept on the next write. */
     private static final int MEMO_SWEEP_THRESHOLD = 500;
+
+    /**
+     * How long a request waits for another request's computation of the same answer before making
+     * its own. Comfortably past a full round of routing calls at their own timeouts, so it is only
+     * ever reached by a computation that is stuck rather than slow.
+     */
+    private static final Duration WAIT_FOR_LEADER = Duration.ofSeconds(20);
 
     private final OrderParticipantsRepository participants;
     private final TrackingService tracking;
@@ -80,6 +95,7 @@ public class CheckoutTrackingService {
     private final Duration recomputeAfter;
     private final Clock clock;
     private final Map<ViewKey, Memo> memo = new ConcurrentHashMap<>();
+    private final Map<ViewKey, CompletableFuture<CheckoutView>> inFlight = new ConcurrentHashMap<>();
 
     @Autowired
     public CheckoutTrackingService(OrderParticipantsRepository participants,
@@ -123,9 +139,16 @@ public class CheckoutTrackingService {
      * map the platform can stand behind, so it is the same 404 as a checkout that does not exist,
      * which is also what a sibling's merchant and the rider get.
      *
+     * <p><strong>Deliberately not transactional.</strong> Computing a map calls out to a routing
+     * engine, several times, and a read-only transaction around the whole method would hold a
+     * connection from the service's pool for every one of those calls — the pool that every rider
+     * ping needs. Each read inside takes its own short transaction instead (the repository's, and
+     * {@link TrackingService#sightingFor}'s), so nothing is held while the routing host is
+     * thinking. The rows are read once, at the start, and the answer is built from that reading:
+     * a map is a snapshot of a moment either way.
+     *
      * @throws CheckoutNotFoundException when the checkout is not the caller's, whole and entire
      */
-    @Transactional(readOnly = true)
     public CheckoutView view(UUID checkoutId, String callerId, boolean isBackoffice) {
         List<OrderParticipants> orders = participants.findByCheckoutId(checkoutId);
         if (orders.isEmpty() || (!isBackoffice && (callerId == null || orders.stream()
@@ -137,14 +160,65 @@ public class CheckoutTrackingService {
         // must not, so handing one to the other would hand over exactly what the gate withheld.
         ViewKey key = new ViewKey(checkoutId, isBackoffice ? BACKOFFICE : callerId);
         Instant now = clock.instant();
-        Memo recent = memo.get(key);
-        if (recent != null && now.isBefore(recent.computedAt().plus(recomputeAfter))) {
-            return recent.view();
+        CheckoutView remembered = remembered(key, now);
+        if (remembered != null) {
+            return remembered;
         }
+        return computeOnce(key, checkoutId, orders, callerId, isBackoffice, now);
+    }
 
-        CheckoutView view = compute(checkoutId, orders, callerId, isBackoffice, now);
-        remember(key, new Memo(view, now), now);
-        return view;
+    private CheckoutView remembered(ViewKey key, Instant now) {
+        Memo recent = memo.get(key);
+        return recent != null && now.isBefore(recent.computedAt().plus(recomputeAfter))
+                ? recent.view()
+                : null;
+    }
+
+    /**
+     * Computes the answer for one key, or waits for the computation already running for it.
+     *
+     * <p>The screen polls, a customer may watch on two devices, and the memo window is a few
+     * seconds — so the requests that miss it arrive together. Without this, each of them would
+     * make its own round of position reads and routing calls for the same answer, the routing
+     * engine seeing a burst per checkout rather than a request. The first one in computes; the
+     * others wait for it and are handed the same answer.
+     *
+     * <p>A leader that is taking longer than any routing round should is given up on rather than
+     * waited out, and the caller computes its own: a slow answer beats a thread parked on someone
+     * else's.
+     */
+    private CheckoutView computeOnce(ViewKey key, UUID checkoutId,
+                                     List<OrderParticipants> orders, String callerId,
+                                     boolean isBackoffice, Instant now) {
+        CompletableFuture<CheckoutView> mine = new CompletableFuture<>();
+        CompletableFuture<CheckoutView> leader = inFlight.putIfAbsent(key, mine);
+        if (leader != null) {
+            try {
+                return leader.get(WAIT_FOR_LEADER.toMillis(), TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Interrupted waiting for a checkout map", e);
+            } catch (ExecutionException e) {
+                // The computation this one joined failed; fall through and make the attempt it
+                // would have made on its own.
+                log.debug("The checkout map computation this request joined failed", e);
+            } catch (TimeoutException e) {
+                log.warn("Waited {} for another request's checkout map; computing this one's own",
+                        WAIT_FOR_LEADER);
+            }
+            return compute(checkoutId, orders, callerId, isBackoffice, clock.instant());
+        }
+        try {
+            CheckoutView view = compute(checkoutId, orders, callerId, isBackoffice, now);
+            remember(key, new Memo(view, now), now);
+            mine.complete(view);
+            return view;
+        } catch (RuntimeException | Error e) {
+            mine.completeExceptionally(e);
+            throw e;
+        } finally {
+            inFlight.remove(key, mine);
+        }
     }
 
     private CheckoutView compute(UUID checkoutId, List<OrderParticipants> unsorted,
@@ -258,7 +332,15 @@ public class CheckoutTrackingService {
                         etas.get(order.getOrderId())))
                 .toList();
 
-        return new CheckoutView(checkoutId, paths.providerName(), paths.geometry(),
+        // How the answer is drawn is read off what was actually returned, not off who was asked:
+        // one line that fell back to straight segments (a routing engine that did not answer in
+        // time) makes the whole answer say "approximate", which is the claim it can always make
+        // honestly. With no lines at all it is what the live provider would have drawn.
+        PathGeometry geometry = lines.stream().allMatch(line -> line.polyline6() != null)
+                ? paths.geometry()
+                : PathGeometry.STRAIGHT;
+
+        return new CheckoutView(checkoutId, paths.providerName(), geometry,
                 door.map(Pin::of).orElse(null), rows, riders, lines, now);
     }
 

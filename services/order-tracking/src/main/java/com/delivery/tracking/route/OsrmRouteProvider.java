@@ -31,6 +31,11 @@ import com.fasterxml.jackson.databind.JsonNode;
  * doorstep to whatever host is configured. Self-hosted that is fine. Against someone else's server
  * it is a disclosure of customer location data and needs to be a decision, not a config typo — one
  * more reason there is no default here.
+ *
+ * <p>Timeouts are short and explicit ({@link RoutingTimeouts}). A customer watching a map waits on
+ * these calls, several per refresh, so a routing host that has stopped answering must fail the
+ * request in a second or two rather than hold a request thread — and the map then draws straight
+ * lines and says they are approximate.
  */
 @Component
 public class OsrmRouteProvider implements RouteProvider {
@@ -48,10 +53,16 @@ public class OsrmRouteProvider implements RouteProvider {
                              // "driving" suits scooters and cars; "cycling" and "foot" exist for a
                              // fleet that is not motorised. Configurable because which one is right
                              // is a property of the fleet, not of the code.
-                             @Value("${delivery.tracking.routing.osrm.profile:driving}") String profile) {
+                             @Value("${delivery.tracking.routing.osrm.profile:driving}") String profile,
+                             @Value("${delivery.tracking.routing.connect-timeout:1s}")
+                             Duration connectTimeout,
+                             @Value("${delivery.tracking.routing.read-timeout:2s}")
+                             Duration readTimeout) {
         this.baseUrl = baseUrl;
         this.profile = profile;
-        this.client = baseUrl.isBlank() ? null : builder.baseUrl(baseUrl).build();
+        this.client = baseUrl.isBlank() ? null
+                : RoutingTimeouts.apply(builder.clone().baseUrl(baseUrl), connectTimeout,
+                        readTimeout).build();
     }
 
     @Override

@@ -91,7 +91,7 @@ public class RoutePaths {
     public Optional<RoutePath> planned(List<GeoPoint> stops) {
         RouteProvider provider = providers.active();
         if (!provider.mayCachePaths()) {
-            return provider.path(stops);
+            return orStraight(provider.path(stops), stops);
         }
         String key = PLANNED_PREFIX + provider.name() + ":" + keyOf(stops);
         Optional<Stored> cached = read(key);
@@ -100,7 +100,7 @@ public class RoutePaths {
         }
         Optional<RoutePath> fresh = provider.path(stops);
         fresh.ifPresent(path -> write(key, Stored.of(path, null), plannedTtl));
-        return fresh;
+        return orStraight(fresh, stops);
     }
 
     /**
@@ -118,7 +118,7 @@ public class RoutePaths {
         stops.add(rider);
         stops.addAll(ahead);
         if (!provider.mayCachePaths()) {
-            return provider.path(stops);
+            return orStraight(provider.path(stops), stops);
         }
         String key = LEG_PREFIX + provider.name() + ":" + keyOf(ahead);
         Optional<Stored> cached = read(key);
@@ -134,7 +134,32 @@ public class RoutePaths {
         Optional<RoutePath> fresh = provider.path(stops);
         // The time half of the refresh rule is the entry's own expiry.
         fresh.ifPresent(path -> write(key, Stored.of(path, rider), legRefreshAfter));
-        return fresh;
+        return orStraight(fresh, stops);
+    }
+
+    /**
+     * The routed path, or straight segments between the same stops when the provider could not
+     * answer — a timeout, an outage, a stretch it has no route for.
+     *
+     * <p>Drawing something is right here and wrong for an ETA, and the difference is what each one
+     * claims. A straight path says out loud that it is straight: it carries no road geometry, so
+     * the client dashes it and labels the map approximate, and it names the provider that produced
+     * it. A number cannot say that; it would just be a different number, so {@code EtaService}
+     * still reports the outage instead (PROVIDER_UNAVAILABLE) and shows no time at all.
+     *
+     * <p>Never cached: a fallback is a fact about this moment, not about these two pins.
+     */
+    private Optional<RoutePath> orStraight(Optional<RoutePath> routed, List<GeoPoint> stops) {
+        if (routed.isPresent()) {
+            return routed;
+        }
+        RouteProvider straight = providers.straightLines();
+        if (straight == null || straight == providers.active()) {
+            return routed;
+        }
+        log.warn("The routing provider drew no path through {} stops; falling back to straight "
+                + "lines, which the map says are approximate", stops.size());
+        return straight.path(stops);
     }
 
     /** The stops rounded to five decimal places, in order: about a metre, which is one pin. */

@@ -65,6 +65,15 @@ public class RouteProviderRegistry {
         return active;
     }
 
+    /**
+     * The straight-line provider, whatever is active: what a map falls back to drawing when a
+     * routing engine cannot answer in time. Never an ETA — see {@code EtaService} on why a number
+     * that silently changed kind mid-delivery would be worse than none.
+     */
+    public RouteProvider straightLines() {
+        return byName.get(HaversineRouteProvider.NAME);
+    }
+
     /** Every provider on the classpath and whether it could serve traffic, for the health page. */
     public Map<String, Boolean> configurationStatus() {
         Map<String, Boolean> status = new LinkedHashMap<>();

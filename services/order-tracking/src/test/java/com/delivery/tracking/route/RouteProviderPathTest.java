@@ -7,6 +7,8 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import java.io.IOException;
+import java.net.ServerSocket;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -78,7 +80,8 @@ class RouteProviderPathTest {
         private final MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
 
         private OsrmRouteProvider provider() {
-            return new OsrmRouteProvider(builder, "http://osrm.test", "driving");
+            return new OsrmRouteProvider(builder, "http://osrm.test", "driving", Duration.ZERO,
+                    Duration.ZERO);
         }
 
         /**
@@ -133,7 +136,7 @@ class RouteProviderPathTest {
         @Test
         @DisplayName("with no base URL it declines without calling anybody")
         void unconfigured_declines() {
-            OsrmRouteProvider unconfigured = new OsrmRouteProvider(RestClient.builder(), "", "driving");
+            OsrmRouteProvider unconfigured = new OsrmRouteProvider(RestClient.builder(), "", "driving", Duration.ZERO, Duration.ZERO);
 
             assertThat(unconfigured.path(List.of(SHOP_A, DOOR))).isEmpty();
             assertThat(unconfigured.pathGeometry()).isEqualTo(PathGeometry.ROAD);
@@ -162,7 +165,7 @@ class RouteProviderPathTest {
                     .andRespond(withSuccess(OSRM_OK, MediaType.APPLICATION_JSON));
 
             MapboxRouteProvider mapbox = new MapboxRouteProvider(builder, "https://mapbox.test",
-                    "pk.test", "mapbox/driving-traffic");
+                    "pk.test", "mapbox/driving-traffic", Duration.ZERO, Duration.ZERO);
             Optional<RoutePath> path = mapbox.path(List.of(SHOP_A, DOOR));
 
             server.verify();
@@ -171,6 +174,43 @@ class RouteProviderPathTest {
             assertThat(path.get().geometry()).isEqualTo(PathGeometry.ROAD);
             // Its terms forbid storing Navigation API results.
             assertThat(mapbox.mayCachePaths()).isFalse();
+        }
+    }
+
+    /**
+     * A routing host that accepts the connection and then says nothing is the failure that costs
+     * most: every request thread waiting on it is one not taking rider pings. The read timeout
+     * ends the call, and the answer is an empty path — which is what the map turns into straight
+     * lines.
+     */
+    @Test
+    @DisplayName("gives up on a routing host that never answers, and draws nothing")
+    void a_silent_routing_host_times_out() throws Exception {
+        try (ServerSocket silent = new ServerSocket(0)) {
+            Thread accepting = new Thread(() -> {
+                try {
+                    while (!Thread.currentThread().isInterrupted()) {
+                        // Accepted and then ignored: the request is sent and no answer ever comes.
+                        silent.accept();
+                    }
+                } catch (IOException closed) {
+                    // The socket was closed; nothing left to accept.
+                }
+            });
+            accepting.setDaemon(true);
+            accepting.start();
+
+            OsrmRouteProvider provider = new OsrmRouteProvider(RestClient.builder(),
+                    "http://localhost:" + silent.getLocalPort(), "driving",
+                    Duration.ofMillis(300), Duration.ofMillis(300));
+
+            long startedAt = System.nanoTime();
+            Optional<RoutePath> path = provider.path(List.of(SHOP_A, DOOR));
+            Duration waited = Duration.ofNanos(System.nanoTime() - startedAt);
+
+            assertThat(path).isEmpty();
+            assertThat(waited).isLessThan(Duration.ofSeconds(5));
+            accepting.interrupt();
         }
     }
 

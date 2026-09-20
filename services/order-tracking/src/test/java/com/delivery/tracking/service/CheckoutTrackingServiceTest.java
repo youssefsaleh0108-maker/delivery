@@ -26,6 +26,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +50,7 @@ import com.delivery.tracking.route.GeoPoint;
 import com.delivery.tracking.route.HaversineRouteProvider;
 import com.delivery.tracking.route.PathGeometry;
 import com.delivery.tracking.route.RoutePaths;
+import com.delivery.tracking.route.RouteProvider;
 import com.delivery.tracking.route.RouteProviderRegistry;
 import com.delivery.tracking.service.CheckoutTrackingService.CheckoutNotFoundException;
 import com.delivery.tracking.service.CheckoutView.OrderView;
@@ -108,6 +115,7 @@ class CheckoutTrackingServiceTest {
     private EtaService eta;
     private CheckoutTrackingService service;
     private StringRedisTemplate latchRedis;
+    private OtherDeliveriesLatch latch;
 
     /** A clock the memo test can move past its window. */
     static final class MutableClock extends Clock {
@@ -197,10 +205,20 @@ class CheckoutTrackingServiceTest {
                 .when(latchValues).set(anyString(), anyString(), any(Duration.class));
         when(latchRedis.hasKey(anyString()))
                 .thenAnswer(call -> latchStore.containsKey(call.<String>getArgument(0)));
-        OtherDeliveriesLatch latch = new OtherDeliveriesLatch(participants, latchRedis,
-                Duration.ofHours(12));
+        latch = new OtherDeliveriesLatch(participants, latchRedis, Duration.ofHours(12));
         service = new CheckoutTrackingService(participants, tracking, eta, paths, latch,
                 Duration.ofMinutes(5), Duration.ofSeconds(5), clock);
+    }
+
+    /** The same service, with a routing provider a test drives. */
+    private CheckoutTrackingService serviceRoutedBy(RouteProvider provider) {
+        RouteProviderRegistry providers = new RouteProviderRegistry(
+                List.of(new HaversineRouteProvider(60), provider), provider.name());
+        RoutePaths routed = new RoutePaths(providers, mock(StringRedisTemplate.class),
+                new ObjectMapper(), Duration.ofHours(24), 150, Duration.ofSeconds(60));
+        return new CheckoutTrackingService(participants, tracking,
+                new EtaService(tracking, participants, providers, Duration.ofMinutes(5)), routed,
+                latch, Duration.ofMinutes(5), Duration.ofSeconds(5), clock);
     }
 
     private Stream<OrderParticipants> all() {
@@ -840,6 +858,134 @@ class CheckoutTrackingServiceTest {
                     .when(latchRedis).hasKey(anyString());
 
             assertThat(view().riders().get(0).hasOtherDeliveries()).isTrue();
+        }
+    }
+
+    @Nested
+    @DisplayName("when the routing engine is slow or silent")
+    class Routing {
+
+        /**
+         * A routing host that cannot answer must not take the map down with it: the lines become
+         * straight segments, and the whole answer says so, however the live provider usually
+         * draws. The estimate is a different matter — a number that quietly changed kind would be
+         * unexplainable — so it reports the outage instead.
+         */
+        @Test
+        @DisplayName("draws straight lines, says they are approximate, and gives no estimate")
+        void a_silent_router_falls_back_to_straight_lines() {
+            order(A, "Hamra Bakery", SHOP_A, "PICKED_UP", RIDER);
+            riderAt(A, RIDER, offset(SHOP_A, 200, 0), Duration.ofSeconds(5));
+
+            CheckoutView view = serviceRoutedBy(new SilentRouter()).view(CHECKOUT, CUSTOMER, false);
+
+            assertThat(view.provider()).isEqualTo("SILENT_ROAD");
+            assertThat(view.geometry()).as("what was drawn, not who was asked")
+                    .isEqualTo(PathGeometry.STRAIGHT);
+            assertThat(view.paths()).hasSize(1).allSatisfy(path -> {
+                assertThat(path.polyline6()).isNull();
+                assertThat(path.provider()).isEqualTo(HaversineRouteProvider.NAME);
+            });
+            assertThat(row(view, A).eta().available()).isFalse();
+            assertThat(row(view, A).eta().reason()).isEqualTo(Reason.PROVIDER_UNAVAILABLE);
+        }
+
+        /**
+         * The screen polls, on two devices, and the memo window is seconds — so the requests that
+         * miss it arrive together. One of them routes; the others are handed its answer.
+         */
+        @Test
+        @DisplayName("computes one answer for requests that arrive together")
+        void concurrent_requests_compute_once() throws Exception {
+            order(A, "Hamra Bakery", SHOP_A, "PICKED_UP", RIDER);
+            riderAt(A, RIDER, offset(SHOP_A, 200, 0), Duration.ofSeconds(5));
+            BlockingRouter router = new BlockingRouter();
+            CheckoutTrackingService slow = serviceRoutedBy(router);
+
+            ExecutorService threads = Executors.newFixedThreadPool(2);
+            try {
+                Future<CheckoutView> leader =
+                        threads.submit(() -> slow.view(CHECKOUT, CUSTOMER, false));
+                assertThat(router.inside.await(5, TimeUnit.SECONDS))
+                        .as("the first request is routing").isTrue();
+                Future<CheckoutView> joiner =
+                        threads.submit(() -> slow.view(CHECKOUT, CUSTOMER, false));
+                // Long enough that the second request has certainly asked for its answer.
+                Thread.sleep(200);
+                router.release.countDown();
+
+                assertThat(joiner.get(10, TimeUnit.SECONDS))
+                        .as("one answer, handed to both").isSameAs(leader.get(10, TimeUnit.SECONDS));
+                assertThat(router.calls.get()).isEqualTo(1);
+            } finally {
+                router.release.countDown();
+                threads.shutdownNow();
+            }
+        }
+
+        /**
+         * Computing a map calls out to a routing engine several times. Inside a transaction, every
+         * one of those seconds is a connection held from the pool the rider pings need, so the
+         * method must not be transactional — each read inside takes its own.
+         */
+        @Test
+        @DisplayName("holds no transaction across the routing calls")
+        void the_view_is_not_transactional() throws Exception {
+            assertThat(CheckoutTrackingService.class
+                    .getMethod("view", UUID.class, String.class, boolean.class)
+                    .isAnnotationPresent(org.springframework.transaction.annotation.Transactional.class))
+                    .isFalse();
+        }
+    }
+
+    /** A routing host that answers nothing, however it is asked. */
+    private static class SilentRouter implements RouteProvider {
+        @Override
+        public String name() {
+            return "SILENT_ROAD";
+        }
+
+        @Override
+        public boolean isConfigured() {
+            return true;
+        }
+
+        @Override
+        public Optional<com.delivery.tracking.route.RouteEstimate> estimate(GeoPoint from,
+                                                                            GeoPoint to) {
+            return Optional.empty();
+        }
+
+        @Override
+        public PathGeometry pathGeometry() {
+            return PathGeometry.ROAD;
+        }
+    }
+
+    /** A routing host that answers only once the test lets it. */
+    private static final class BlockingRouter extends SilentRouter {
+        private final CountDownLatch inside = new CountDownLatch(1);
+        private final CountDownLatch release = new CountDownLatch(1);
+        private final AtomicInteger calls = new AtomicInteger();
+
+        @Override
+        public Optional<com.delivery.tracking.route.RouteEstimate> estimate(GeoPoint from,
+                                                                            GeoPoint to) {
+            return Optional.of(new com.delivery.tracking.route.RouteEstimate(100,
+                    Duration.ofSeconds(10), name()));
+        }
+
+        @Override
+        public Optional<com.delivery.tracking.route.RoutePath> path(List<GeoPoint> stops) {
+            calls.incrementAndGet();
+            inside.countDown();
+            try {
+                release.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return Optional.of(new com.delivery.tracking.route.RoutePath(1_000,
+                    Duration.ofSeconds(60), name(), "road"));
         }
     }
 

@@ -125,19 +125,54 @@ class RoutePathsTest {
                 RoutePaths.PLANNED_PREFIX + "OSRM:33.89380,35.50180;33.89810,35.52140");
     }
 
-    /** A host that was briefly down is asked again on the next refresh, not a day later. */
+    /**
+     * A routing host that cannot answer — down, timed out, no route — leaves a line to draw all
+     * the same: straight segments between the same stops, named by the provider that produced
+     * them so the answer says what it is. Nothing of it is kept, so the host is asked again on the
+     * next refresh rather than a day later.
+     */
     @Test
-    @DisplayName("no answer is never kept")
-    void an_empty_answer_is_not_cached() {
+    @DisplayName("falls back to straight segments, and keeps neither the silence nor the fallback")
+    void no_answer_falls_back_to_straight_lines() {
         CountingProvider osrm = new CountingProvider("OSRM", true);
         osrm.answers = false;
         RoutePaths paths = pathsWith(osrm);
 
-        assertThat(paths.planned(List.of(SHOP, DOOR))).isEmpty();
-        osrm.answers = true;
-        assertThat(paths.planned(List.of(SHOP, DOOR))).isPresent();
+        RoutePath fallback = paths.planned(List.of(SHOP, DOOR)).orElseThrow();
 
+        assertThat(fallback.polyline6()).as("a road nobody returned is never drawn").isNull();
+        assertThat(fallback.geometry()).isEqualTo(PathGeometry.STRAIGHT);
+        assertThat(fallback.provider()).isEqualTo(HaversineRouteProvider.NAME);
+        assertThat(fallback.distanceMetres())
+                .isEqualTo(HaversineRouteProvider.distanceMetres(SHOP, DOOR));
+        assertThat(store).isEmpty();
+
+        osrm.answers = true;
+        assertThat(paths.planned(List.of(SHOP, DOOR)).orElseThrow().polyline6()).isNotNull();
         assertThat(osrm.asked).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("a rider's leg falls back the same way, and is not kept either")
+    void a_rider_leg_falls_back_to_straight_lines() {
+        CountingProvider osrm = new CountingProvider("OSRM", true);
+        osrm.answers = false;
+        RoutePaths paths = pathsWith(osrm);
+
+        RoutePath fallback = paths.riderLeg(RIDER, List.of(SHOP, DOOR)).orElseThrow();
+
+        assertThat(fallback.polyline6()).isNull();
+        assertThat(fallback.provider()).isEqualTo(HaversineRouteProvider.NAME);
+        assertThat(store).isEmpty();
+    }
+
+    /** The dev provider is already straight lines: there is nothing to fall back to. */
+    @Test
+    @DisplayName("the straight-line provider answering nothing draws nothing")
+    void the_dev_provider_has_no_fallback() {
+        RoutePaths paths = pathsWith(new HaversineRouteProvider(18));
+
+        assertThat(paths.planned(List.of(SHOP))).isEmpty();
     }
 
     @Test
