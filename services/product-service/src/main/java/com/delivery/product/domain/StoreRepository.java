@@ -363,4 +363,16 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
     Boolean deliversTo(@Param("id") UUID id,
                        @Param("latitude") double latitude,
                        @Param("longitude") double longitude);
+
+    /**
+     * Every live shop, the owner's together — who the weekly demand digest is for.
+     *
+     * <p>Live only, and that is the audience rule rather than a filter: a draft shop has no
+     * neighbourhood the platform will serve, and telling somebody what their future neighbours are
+     * looking for before they have opened is a message about other people's customers.
+     *
+     * <p>Ordered by merchant so the digest can walk the list once and send a merchant with four
+     * shops exactly one message.
+     */
+    List<Store> findByStatusOrderByMerchantIdAscCreatedAtAsc(Store.Status status);
 }

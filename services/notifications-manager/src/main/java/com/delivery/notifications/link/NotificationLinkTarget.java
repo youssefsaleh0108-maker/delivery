@@ -38,7 +38,16 @@ public enum NotificationLinkTarget {
      * a screen, not at a record, and inventing an id for it would make every consumer handle a
      * value that means nothing.
      */
-    ACCOUNT("account", null);
+    ACCOUNT("account", null),
+
+    /**
+     * One shop's Demand Radar — what its neighbourhood ordered and searched for.
+     *
+     * <p>Takes the shop's id rather than no id, because a merchant may hold several and "your demand
+     * radar" is a different screen for each of them. The weekly demand digest is the only message
+     * that points here.
+     */
+    DEMAND("demand", "storeId");
 
     private final String slug;
     private final String idPlaceholder;
