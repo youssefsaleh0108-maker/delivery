@@ -39,6 +39,21 @@ import com.delivery.product.domain.GeoPoint;
  * the back office edits them, which is rarely; every search would otherwise read the whole table on a
  * background thread. A stale cache can only mis-file a search into the neighbouring area for a
  * minute, which is a coarse answer being slightly coarser.
+ *
+ * <p><strong>WHERE A NEW AREA SHRINKS A FLOOR'S CATCHMENT.</strong> This method is the join between
+ * a person and a neighbourhood, and the back office moves that join whenever it places an area.
+ * Drop a new centre between two existing ones and every pin nearer to it stops being filed under the
+ * old name from that moment on — so the week in progress splits a term across two areas, five people
+ * become three and two, neither clears the digest's floor of {@value UnmetDemand#MIN_PEOPLE}, and a
+ * word that was going to be reported quietly is not. Rows already written keep the area they were
+ * written with (nothing is re-filed), so the split shows as a term thinning out mid-week rather than
+ * as a change anybody can see.
+ *
+ * <p>That is the right failure — the floor erring towards saying less — and it is not a bug to fix
+ * here: the areas ARE the platform's idea of a neighbourhood, and a search belongs to the one it is
+ * nearest to now. But it means a back office splitting a district on a Wednesday should expect that
+ * week's digest to be thinner for both halves, and the effect is invisible unless somebody knows to
+ * look for it. Placing areas between Monday's digest and the next day's roll-up costs the least.
  */
 @Component
 public class CoarseAreas {

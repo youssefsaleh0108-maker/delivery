@@ -54,6 +54,10 @@ import com.delivery.product.domain.SearchDemandWeekRepository;
  * <p>The count the merchant is shown is still searches — that is the market size — but only for
  * terms whose people floor has been cleared, and it is always rounded to a band ({@link #band}).
  *
+ * <p>What counts as one neighbourhood is the back office's to decide, and moving it moves this:
+ * {@link CoarseAreas} spells out how placing a new area mid-week splits a term's people between two
+ * of them, so that neither half clears the floor and the week quietly thins.
+ *
  * <p>Computed rather than queried on demand, and the reason is the merchant's screen: the Demand
  * Radar polls, and an aggregate over a quarter of a million searches on every poll would be the
  * demand feature making the platform slower. The roll-up runs on a schedule

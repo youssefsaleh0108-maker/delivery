@@ -94,6 +94,20 @@ public class DemandDigestService {
                     + "set (DEMAND_SEEN_SECRET), and the floor counts distinct people", weekStart);
             return 0;
         }
+        // WHERE THIS BECOMES N×M. Every live shop is read into memory and grouped, and then each
+        // merchant costs a handful of queries plus ONE PER SHOP THEY OWN: MerchantUnmetDemand.topFor
+        // asks DeliveryZoneService.around(shop) for every shop, and that is a PostGIS query each. So
+        // one Monday run is roughly (merchants × 4) + (shops × 1) statements, in a burst, on the
+        // connection pool the storefront shares — at a few hundred merchants it is seconds and
+        // nobody notices; at tens of thousands of shops it is the digest competing with Monday
+        // morning's orders for connections.
+        //
+        // When that day comes the shape is already known and none of it needs this class rewritten:
+        // read the merchants a page at a time rather than the whole table at once; resolve every
+        // shop's areas in ONE query (stores joined to zones) instead of one call per shop; and
+        // spread the run across the hour instead of firing it all at 09:00. Left undone on purpose
+        // — the platform is nowhere near that, and a batching layer nobody needs yet is a batching
+        // layer nobody tests.
         Map<String, List<Store>> byMerchant = new LinkedHashMap<>();
         for (Store shop : stores.findByStatusOrderByMerchantIdAscCreatedAtAsc(Store.Status.ACTIVE)) {
             byMerchant.computeIfAbsent(shop.getMerchantId(), id -> new ArrayList<>()).add(shop);
