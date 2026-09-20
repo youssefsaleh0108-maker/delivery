@@ -526,6 +526,9 @@ grep -q 'persistentVolumeReclaimPolicy' scripts/rotate-secrets.sh \
 
 # dev's rendered limits against dev's own quota, from the same two files the cluster reads.
 if [ -s "$tmp/render-dev.yaml" ]; then
+  # Only while dev has a quota. It had one on 2026-09-20 and it deadlocked every rollout: a ceiling
+  # sized for the steady state leaves no room for the second pod a rolling update makes. See the
+  # note in overlays/dev/resource-safety.yaml. With no quota, there is no such fact to check.
   quota=$(awk '/^ *limits\.memory:/ { print $2; exit }' overlays/dev/resource-safety.yaml)
   # A ResourceQuota counts RUNNING PODS, so this models the same thing: every Deployment,
   # StatefulSet and Job contributes its pod, and a CronJob contributes its pod only if it is not
@@ -555,7 +558,9 @@ if [ -s "$tmp/render-dev.yaml" ]; then
     END { printf "%d", total }
   ' "$tmp/render-dev.yaml")
   cap=$(printf '%s' "$quota" | awk '{ v = $0; n = v + 0; if (v ~ /Mi$/) n *= 1048576; else if (v ~ /Gi$/) n *= 1073741824; printf "%d", n }')
-  if [ "$used" -le "$cap" ]; then
+  if [ -z "$quota" ]; then
+    ok "dev has no ResourceQuota; production is protected by priority instead"
+  elif [ "$used" -le "$cap" ]; then
     ok "dev fits its own quota: $((used / 1048576))Mi of $quota ($(( (cap - used) / 1048576 ))Mi spare)"
   else
     fail "dev's rendered limits are $((used / 1048576))Mi, over its $quota ResourceQuota by $(( (used - cap) / 1048576 ))Mi: every pod in delivery-dev would be refused at admission"
