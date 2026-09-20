@@ -142,6 +142,22 @@ public class AccountingTransaction {
     @Column(name = "amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
 
+    /**
+     * What the platform charged the payee of this leg, out of what they sold or carried (V54).
+     *
+     * <p>The goods commission on a {@link Leg#MERCHANT_CREDIT}, the delivery cut on a
+     * {@link Leg#PROVIDER_CREDIT} or {@link Leg#RIDER_CREDIT}, and zero where a waiver meant
+     * nothing was charged. Null on a leg that pays nobody, and on every leg written before V54.
+     *
+     * <p><strong>Beside the arithmetic, never inside it.</strong> The legs sum to the order total
+     * on their own and this changes none of them; it exists because the platform's own leg is a
+     * RESIDUE — commission plus the express premium, less any promotion — and a statement that
+     * reads a residue cannot say what a shop was charged. Recorded at settlement, where the figure
+     * is known exactly, rather than re-derived later from a rate that may since have changed.
+     */
+    @Column(name = "commission_amount", precision = 12, scale = 2)
+    private BigDecimal commissionAmount;
+
     @Column(name = "currency", nullable = false, length = 3)
     private String currency;
 
@@ -264,6 +280,26 @@ public class AccountingTransaction {
         this.counterpartyKind = kind;
         this.counterpartyRef = ref;
         return this;
+    }
+
+    /**
+     * Records what the platform charged this leg's payee (V54, RECON-05).
+     *
+     * <p>Zero is a real answer — a waived commission is "we charged nothing", which is not the same
+     * as the null that means "this leg was written before anybody wrote the figure down".
+     *
+     * @return this, so it can be chained where the leg is constructed
+     */
+    public AccountingTransaction commissionCharged(BigDecimal amount) {
+        this.commissionAmount = amount == null
+                ? null
+                : amount.setScale(2, java.math.RoundingMode.HALF_UP);
+        return this;
+    }
+
+    /** What the platform charged this leg's payee, or null when the leg does not say. */
+    public BigDecimal getCommissionAmount() {
+        return commissionAmount;
     }
 
     public CounterpartyKind getCounterpartyKind() {

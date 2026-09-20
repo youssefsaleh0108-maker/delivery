@@ -496,29 +496,43 @@ public class SettlementService {
             legs.add(collectionLeg(orderId, amount, customerAccount, cashHolder, correlationId));
         }
         // Same rule as every other credit below: a zero-value posting is not sent.
+        //
+        // Each payee credit carries what the platform charged for it (V54, RECON-05). The figure is
+        // known exactly here and nowhere else: the platform's own leg is the residue of the whole
+        // order — this commission, plus the express premium the customer paid, less any promotion
+        // the platform funded — so a statement reading that residue told a shop its commission was
+        // the lot. It is written beside the credit, never into the arithmetic: the legs still sum
+        // to the total on their own.
         if (merchantShare.signum() > 0) {
             legs.add(new AccountingTransaction(orderId, Leg.MERCHANT_CREDIT, merchantAccount,
                     merchantShare, currency, Direction.CREDIT, correlationId)
-                    .attributedTo(CounterpartyKind.MERCHANT, parties.merchantRef()));
+                    .attributedTo(CounterpartyKind.MERCHANT, parties.merchantRef())
+                    .commissionCharged(commission));
         }
 
-        // The shop's wrapping, beside its goods and never inside them: see wrapShare above.
+        // The shop's wrapping, beside its goods and never inside them: see wrapShare above. No
+        // commission is taken on it, and that zero is recorded rather than left unsaid.
         if (wrapShare.signum() > 0) {
             legs.add(new AccountingTransaction(orderId, Leg.GIFT_WRAP_CREDIT, merchantAccount,
                     wrapShare, currency, Direction.CREDIT, correlationId)
-                    .attributedTo(CounterpartyKind.MERCHANT, parties.merchantRef()));
+                    .attributedTo(CounterpartyKind.MERCHANT, parties.merchantRef())
+                    .commissionCharged(BigDecimal.ZERO));
         }
 
         if (carrierShare.signum() > 0) {
             legs.add(new AccountingTransaction(orderId, Leg.PROVIDER_CREDIT, carrierAccount,
                     carrierShare, currency, Direction.CREDIT, correlationId)
-                    .attributedTo(CounterpartyKind.CARRIER, parties.carrierRef()));
+                    .attributedTo(CounterpartyKind.CARRIER, parties.carrierRef())
+                    .commissionCharged(deliveryFee.subtract(carrierShare)));
         }
 
         if (riderShare.signum() > 0) {
             legs.add(new AccountingTransaction(orderId, Leg.RIDER_CREDIT, rider.accountRef(),
                     riderShare, currency, Direction.CREDIT, correlationId)
-                    .attributedTo(CounterpartyKind.RIDER, rider.riderRef()));
+                    .attributedTo(CounterpartyKind.RIDER, rider.riderRef())
+                    // What the platform kept of the fee. Never negative: a configured rider share
+                    // above the fee is clamped to it (riderShareOf).
+                    .commissionCharged(deliveryFee.subtract(riderShare).max(BigDecimal.ZERO)));
         }
 
         // A zero-value posting (a fully-discounted order, or a rounding floor) must not be sent:
@@ -637,10 +651,13 @@ public class SettlementService {
         legs.add(collectionLeg(orderId, amount, customerAccount,
                 cashHolder == null ? null : cashHolder.owedToPlatform(), correlationId));
         // The rider is the payee here, so the rider record IS the attribution — there is no separate
-        // Parties argument on this path because an errand has no merchant and no carrier.
+        // Parties argument on this path because an errand has no merchant and no carrier. What the
+        // platform charged is its cut of the errand fee, and never a share of the goods the rider
+        // fronted (V54, RECON-05).
         legs.add(new AccountingTransaction(orderId, Leg.RIDER_CREDIT, riderAccount,
                 riderShare, currency, Direction.CREDIT, correlationId)
-                .attributedTo(CounterpartyKind.RIDER, rider == null ? null : rider.riderRef()));
+                .attributedTo(CounterpartyKind.RIDER, rider == null ? null : rider.riderRef())
+                .commissionCharged(commission));
 
         // A fee small enough to round the commission to zero produces no leg: the bank rejects a
         // zero posting, and that rejection would look like a real failure.
