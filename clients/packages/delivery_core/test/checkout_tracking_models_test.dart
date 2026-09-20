@@ -6,6 +6,87 @@ import 'package:flutter_test/flutter_test.dart';
 /// line kind this build does not know degrades to something the screen can say honestly, and a road
 /// that cannot be decoded is drawn as nothing rather than as straight lines.
 void main() {
+  group('a path the map cannot trust', () {
+    Map<String, dynamic> pathJson(List<Object?> points) => <String, dynamic>{
+          'orderIds': <String>['o-a'],
+          'kind': 'RIDER_LEG',
+          'points': points,
+          'polyline6': null,
+          'metres': 2700.0,
+          'provider': 'HAVERSINE_DEV',
+        };
+
+    Map<String, dynamic> viewWith(List<Object?> points) => <String, dynamic>{
+          'checkoutId': 'c-1',
+          'provider': 'HAVERSINE_DEV',
+          'geometry': 'STRAIGHT',
+          'door': <String, dynamic>{'lat': 33.8981, 'lng': 35.5214},
+          'orders': <Map<String, dynamic>>[],
+          'riders': <Map<String, dynamic>>[],
+          'paths': <Map<String, dynamic>>[pathJson(points)],
+          'computedAt': DateTime.now().toUtc().toIso8601String(),
+        };
+
+    /// Dropping the bad stop and keeping the rest joins its neighbours: the line would run
+    /// straight past a shop the rider is going to.
+    test('is dropped whole when any of its points is not a point', () {
+      final CheckoutTracking withBadStop = CheckoutTracking.fromJson(viewWith(<Object?>[
+        <String, dynamic>{'lat': 33.8930, 'lng': 35.5050},
+        <String, dynamic>{'lat': 'somewhere', 'lng': 35.5131},
+        <String, dynamic>{'lat': 33.8981, 'lng': 35.5214},
+      ]));
+
+      expect(withBadStop.paths, isEmpty);
+    });
+
+    test('is kept when every point is one', () {
+      final CheckoutTracking whole = CheckoutTracking.fromJson(viewWith(<Object?>[
+        <String, dynamic>{'lat': 33.8930, 'lng': 35.5050},
+        <String, dynamic>{'lat': 33.8981, 'lng': 35.5214},
+      ]));
+
+      expect(whole.paths, hasLength(1));
+      expect(whole.paths.first.line, hasLength(2));
+    });
+
+    /// The marker glides at sixty frames a second and every frame rebuilds the layers.
+    test('decodes its road once, not on every frame', () {
+      final CheckoutRoutePath road = CheckoutRoutePath.fromJson(<String, dynamic>{
+        'orderIds': <String>['o-a'],
+        'kind': 'RIDER_LEG',
+        'points': <Map<String, dynamic>>[
+          <String, dynamic>{'lat': 33.8930, 'lng': 35.5050},
+          <String, dynamic>{'lat': 33.8981, 'lng': 35.5214},
+        ],
+        'polyline6': '_c`|~AyzuoeAoAbCsEhK',
+        'metres': 2700.0,
+        'provider': 'OSRM',
+      })!;
+
+      expect(identical(road.line, road.line), isTrue);
+    });
+  });
+
+  group('what the service says of the rider', () {
+    test('carries its sighting state, and unknown from a service that predates it', () {
+      final CheckoutRider shown = CheckoutRider.fromJson(<String, dynamic>{
+        'orderIds': <String>['o-a'],
+        'run': false,
+        'sighting': 'HEADING_TO_SHOP',
+        'position': null,
+        'hasOtherDeliveries': true,
+      });
+      final CheckoutRider older = CheckoutRider.fromJson(<String, dynamic>{
+        'orderIds': <String>['o-a'],
+      });
+
+      expect(shown.sighting, RiderSightingState.headingToShop);
+      expect(shown.position, isNull);
+      expect(shown.hasOtherDeliveries, isTrue);
+      expect(older.sighting, RiderSightingState.unknown);
+    });
+  });
+
   Map<String, dynamic> eta(String orderId, {bool available = false, String? reason = 'NO_FIX'}) =>
       <String, dynamic>{
         'orderId': orderId,

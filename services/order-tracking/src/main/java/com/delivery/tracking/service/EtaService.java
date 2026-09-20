@@ -40,6 +40,11 @@ import com.delivery.tracking.service.TrackingService.TrackingNotFoundException;
  * substitution happens is at startup, when a provider is selected but unconfigured, and that is
  * logged loudly by {@code RouteProviderRegistry} and visible in {@link EtaResult#provider()} on
  * every single response.
+ *
+ * <p>The lines a map draws do fall back to straight segments ({@code RoutePaths}), and the
+ * difference is what each one can say about itself: a straight path carries no road geometry, so
+ * it is drawn dashed and labelled approximate. A number cannot say that — it would just be a
+ * different number.
  */
 @Service
 public class EtaService {

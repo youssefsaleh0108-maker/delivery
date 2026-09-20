@@ -192,6 +192,7 @@ class CheckoutRider {
   const CheckoutRider({
     required this.orderIds,
     this.run = false,
+    this.sighting = RiderSightingState.unknown,
     this.position,
     this.hasOtherDeliveries = false,
   });
@@ -202,7 +203,11 @@ class CheckoutRider {
   /// True when they carry two or more of the checkout's orders.
   final bool run;
 
-  /// Null before their first fix.
+  /// What the service lets this customer know of where the rider is — and so why there is no
+  /// marker when there is none. [RiderSightingState.unknown] from a service that predates it.
+  final RiderSightingState sighting;
+
+  /// Null before their first fix, and whenever the service withholds their position.
   final CheckoutRiderFix? position;
 
   /// Whether they are also carrying orders that are not this checkout's. A yes/no and nothing
@@ -212,6 +217,7 @@ class CheckoutRider {
   factory CheckoutRider.fromJson(Map<String, dynamic> json) => CheckoutRider(
         orderIds: _strings(json['orderIds']),
         run: json['run'] as bool? ?? false,
+        sighting: RiderSightingState.fromWire(json['sighting'] as String?),
         position: CheckoutRiderFix.fromJson(json['position']),
         hasOtherDeliveries: json['hasOtherDeliveries'] as bool? ?? false,
       );
@@ -219,7 +225,7 @@ class CheckoutRider {
 
 /// One expected route, mirroring `CheckoutView.PathView`.
 class CheckoutRoutePath {
-  const CheckoutRoutePath({
+  CheckoutRoutePath({
     required this.orderIds,
     required this.kind,
     required this.points,
@@ -243,25 +249,37 @@ class CheckoutRoutePath {
 
   /// The line to draw: the decoded road when the server sent one, else the stops themselves.
   ///
+  /// Decoded once, when the path arrives, rather than on every frame: the marker glides at 60 a
+  /// second and every one of them rebuilds the map's layers.
+  ///
   /// A road that fails to decode is drawn as nothing — never replaced by straight segments, which
   /// would put a line on the map that no provider returned under a "roads" label.
-  List<GeoPin> get line {
-    final String? encoded = polyline6;
-    if (encoded == null) return points;
-    return decodePolyline6(encoded) ?? const <GeoPin>[];
-  }
+  late final List<GeoPin> line = polyline6 == null
+      ? points
+      : (decodePolyline6(polyline6!) ?? const <GeoPin>[]);
 
-  factory CheckoutRoutePath.fromJson(Map<String, dynamic> json) => CheckoutRoutePath(
-        orderIds: _strings(json['orderIds']),
-        kind: CheckoutPathKind.fromWire(json['kind'] as String?),
-        points: <GeoPin>[
-          for (final Object? p in json['points'] as List<dynamic>? ?? const <dynamic>[])
-            if (GeoPin.fromJson(p) case final GeoPin pin) pin,
-        ],
-        polyline6: json['polyline6'] as String?,
-        metres: (json['metres'] as num?)?.toDouble(),
-        provider: json['provider'] as String?,
-      );
+  /// Null when any point of the path is not a point.
+  ///
+  /// The whole path, not the offending stop: dropping one point joins its neighbours, and the line
+  /// would then run straight past a stop the rider is going to — the one shape a map of a delivery
+  /// must never draw.
+  static CheckoutRoutePath? fromJson(Map<String, dynamic> json) {
+    final List<dynamic> raw = json['points'] as List<dynamic>? ?? const <dynamic>[];
+    final List<GeoPin> points = <GeoPin>[];
+    for (final Object? p in raw) {
+      final GeoPin? pin = GeoPin.fromJson(p);
+      if (pin == null) return null;
+      points.add(pin);
+    }
+    return CheckoutRoutePath(
+      orderIds: _strings(json['orderIds']),
+      kind: CheckoutPathKind.fromWire(json['kind'] as String?),
+      points: points,
+      polyline6: json['polyline6'] as String?,
+      metres: (json['metres'] as num?)?.toDouble(),
+      provider: json['provider'] as String?,
+    );
+  }
 }
 
 /// The whole map of one checkout, mirroring `CheckoutView`.
@@ -322,7 +340,8 @@ class CheckoutTracking {
         ],
         paths: <CheckoutRoutePath>[
           for (final Object? p in json['paths'] as List<dynamic>? ?? const <dynamic>[])
-            if (p is Map<String, dynamic>) CheckoutRoutePath.fromJson(p),
+            if (p is Map<String, dynamic>)
+              if (CheckoutRoutePath.fromJson(p) case final CheckoutRoutePath path) path,
         ],
         computedAt: _date(json['computedAt']),
       );

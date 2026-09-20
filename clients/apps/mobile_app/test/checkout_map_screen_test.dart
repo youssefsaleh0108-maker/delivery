@@ -102,10 +102,12 @@ void main() {
           Map<String, dynamic>? at,
           Duration ago = const Duration(seconds: 20),
           bool stale = false,
+          String? sighting,
           bool others = false}) =>
       <String, dynamic>{
         'orderIds': orderIds,
         'run': run,
+        'sighting': sighting ?? (at == null ? 'NO_FIX' : 'VISIBLE'),
         'position': at == null
             ? null
             : <String, dynamic>{
@@ -192,6 +194,7 @@ void main() {
     double textScale = 1.0,
     void Function(String orderId)? onOpenOrder,
     int? shopCount = 2,
+    bool justPlaced = false,
     UserQueueSocket? socket,
     bool settle = true,
   }) async {
@@ -206,6 +209,7 @@ void main() {
             api: CheckoutTrackingApi(server.dio),
             checkoutId: checkoutId,
             shopCount: shopCount,
+            justPlaced: justPlaced,
             liveSocket: socket,
             onOpenOrder: onOpenOrder,
           ),
@@ -509,6 +513,78 @@ void main() {
     });
   });
 
+  group('when the service withholds the rider', () {
+    /// Claims often happen at home, so a rider more than 2 km from the shop is not shown. The map
+    /// draws no marker and no line, and the row says when they will appear rather than leaving an
+    /// empty map to be read as a fault.
+    testWidgets('says the rider appears near the shop, and draws neither marker nor line',
+        (WidgetTester tester) async {
+      await pumpMap(
+          tester,
+          (_) => view(
+                orders: <Map<String, dynamic>>[
+                  order(orderA, 'Hamra Bakery', 'READY',
+                      shop: shopA, rider: true, etaJson: eta(orderA, available: true)),
+                ],
+                riders: <Map<String, dynamic>>[
+                  riderJson(<String>[orderA], sighting: 'HEADING_TO_SHOP'),
+                ],
+              ));
+
+      expect(find.text(en.custRiderShownNearShop), findsOneWidget);
+      expect(find.byType(CheckoutShopPin), findsOneWidget);
+      expect(markers(tester).length, 2, reason: 'The shop and the door, and no rider.');
+      expect(lines(tester), isEmpty);
+      await done(tester);
+    });
+
+    testWidgets('says the rider is finishing another delivery, and shows no number',
+        (WidgetTester tester) async {
+      await pumpMap(
+          tester,
+          (_) => view(
+                orders: <Map<String, dynamic>>[
+                  order(orderA, 'Hamra Bakery', 'PICKED_UP',
+                      shop: shopA,
+                      rider: true,
+                      etaJson: eta(orderA, reason: 'RIDER_ON_ANOTHER_DELIVERY')),
+                ],
+                riders: <Map<String, dynamic>>[
+                  riderJson(<String>[orderA], sighting: 'ON_ANOTHER_DELIVERY'),
+                ],
+              ));
+
+      expect(find.text(en.etaRiderOnAnotherDelivery), findsOneWidget);
+      expect(find.textContaining('Estimated arrival'), findsNothing);
+      expect(markers(tester).length, 2);
+      expect(lines(tester), isEmpty);
+      await done(tester);
+    });
+
+    /// The answer said the fix was fresh when it was computed. Minutes later, with refreshes
+    /// failing, it is not — and the screen has to say so on its own.
+    testWidgets('calls a fix that has aged on screen last seen, though the answer did not',
+        (WidgetTester tester) async {
+      await pumpMap(
+          tester,
+          (_) => view(
+                orders: <Map<String, dynamic>>[
+                  order(orderA, 'Hamra Bakery', 'PICKED_UP', shop: shopA, rider: true),
+                ],
+                riders: <Map<String, dynamic>>[
+                  riderJson(<String>[orderA],
+                      at: <String, dynamic>{'lat': 33.8930, 'lng': 35.5050},
+                      ago: const Duration(minutes: 6),
+                      stale: false),
+                ],
+              ));
+
+      expect(find.textContaining(en.checkoutMapRiderLastSeen('')), findsOneWidget);
+      expect(labelled(en.checkoutMapYourRider), findsNothing);
+      await done(tester);
+    });
+  });
+
   group('reaching the map', () {
     testWidgets('a checkout still on its way to the tracking service is waited for, briefly',
         (WidgetTester tester) async {
@@ -516,7 +592,7 @@ void main() {
       await pumpMap(tester, (_) {
         asked++;
         return asked < 3 ? const FakeReply(404) : beforeARider();
-      }, settle: false);
+      }, justPlaced: true, settle: false);
 
       await tester.pump();
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
@@ -531,8 +607,8 @@ void main() {
 
     testWidgets('a checkout that is not there says so, and can be asked for again',
         (WidgetTester tester) async {
-      final FakeServer server =
-          await pumpMap(tester, (_) => const FakeReply(404), settle: false);
+      final FakeServer server = await pumpMap(tester, (_) => const FakeReply(404),
+          justPlaced: true, settle: false);
       for (int i = 0; i <= CheckoutMapScreen.catchUpAttempts; i++) {
         await tester.pump(CheckoutMapScreen.catchUpInterval);
       }
@@ -543,6 +619,22 @@ void main() {
       await tester.tap(find.text(en.tryAgain));
       await tester.pump(const Duration(milliseconds: 100));
       expect(server.sent('GET', '/api/tracking/checkouts/$checkoutId'), hasLength(asked + 1));
+      await done(tester);
+    });
+
+    /// An order from before the service kept checkouts has no map and never will. Waiting on it
+    /// is ten seconds of spinner before the same answer.
+    testWidgets('an older order\'s checkout says so at once, without the catch-up wait',
+        (WidgetTester tester) async {
+      final FakeServer server =
+          await pumpMap(tester, (_) => const FakeReply(404), settle: false);
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text(en.checkoutMapNotFound), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(server.sent('GET', '/api/tracking/checkouts/$checkoutId'), hasLength(1));
       await done(tester);
     });
 

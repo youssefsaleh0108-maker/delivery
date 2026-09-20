@@ -281,6 +281,9 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
       api: api,
       checkoutId: checkoutId,
       shopCount: shopCount,
+      // Straight from checkout: its orders may still be on their way to the tracking service, so
+      // this is the one entry point worth waiting on a "not there yet" for.
+      justPlaced: true,
       liveSocket: widget.trackingSocket,
       onOpenOrder: (String orderId) => Navigator.of(context).push(MaterialPageRoute<void>(
         builder: (_) => OrderDetailsScreen(

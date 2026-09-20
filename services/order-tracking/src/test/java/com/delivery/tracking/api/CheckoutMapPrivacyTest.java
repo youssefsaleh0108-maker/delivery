@@ -317,7 +317,11 @@ class CheckoutMapPrivacyTest {
                 .doesNotContain(THEM)
                 .doesNotContain(THEIR_SHOP)
                 .doesNotContain(THEIR_SHOP_NAME)
-                .doesNotContain(RIDER);
+                .doesNotContain(RIDER)
+                // The gate's ETA basis is a position it may be measuring from and withholding:
+                // internal by name as well as by value.
+                .doesNotContain("etaBasis")
+                .doesNotContain("measuredFrom");
 
         JsonNode map = json.readTree(body);
         for (GeoPoint point : pointsIn(map)) {

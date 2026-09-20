@@ -19,6 +19,7 @@ Future<void> openCheckoutMap(
   required CheckoutTrackingApi api,
   required String checkoutId,
   int? shopCount,
+  bool justPlaced = false,
   UserQueueSocket? liveSocket,
   void Function(String orderId)? onOpenOrder,
 }) {
@@ -27,6 +28,7 @@ Future<void> openCheckoutMap(
       api: api,
       checkoutId: checkoutId,
       shopCount: shopCount,
+      justPlaced: justPlaced,
       liveSocket: liveSocket,
       onOpenOrder: onOpenOrder,
     ),
@@ -145,6 +147,7 @@ class CheckoutMapScreen extends StatefulWidget {
     required this.api,
     required this.checkoutId,
     this.shopCount,
+    this.justPlaced = false,
     this.liveSocket,
     this.onOpenOrder,
   });
@@ -156,6 +159,13 @@ class CheckoutMapScreen extends StatefulWidget {
   /// Used for the title before the first answer, and to look again quickly while the tracking
   /// service is still catching up with a checkout placed a moment ago.
   final int? shopCount;
+
+  /// Whether this checkout was placed seconds ago, which only the jump straight from checkout
+  /// knows. It is the one case where "not there" is worth waiting on: the orders are on their way
+  /// to the tracking service. Opened from an order instead, a checkout with no map has not got
+  /// one — the orders predate the map — and the answer is given at once rather than after ten
+  /// seconds of spinner.
+  final bool justPlaced;
 
   /// The tracking service's STOMP socket, for pushed rider positions. Optional: without it the map
   /// refreshes on the poll alone.
@@ -244,8 +254,11 @@ class _CheckoutMapScreenState extends State<CheckoutMapScreen>
       if (!mounted) return;
       final bool missing = e.response?.statusCode == 404;
       // A checkout placed a moment ago may not have reached the tracking service yet: look again
-      // shortly, a few times, before saying it is not there.
-      if (missing && _view == null && _catchUps < CheckoutMapScreen.catchUpAttempts) {
+      // shortly, a few times, before saying it is not there. Only then — an older order's
+      // checkout has no map to wait for, and waiting is ten seconds of spinner before the same
+      // answer.
+      if (missing && widget.justPlaced && _view == null
+          && _catchUps < CheckoutMapScreen.catchUpAttempts) {
         _catchUps++;
         _catchUp?.cancel();
         _catchUp = Timer(CheckoutMapScreen.catchUpInterval, _load);
@@ -287,7 +300,8 @@ class _CheckoutMapScreenState extends State<CheckoutMapScreen>
 
     // Still catching up with a checkout placed a moment ago: some of its orders are not here yet.
     final int? expected = widget.shopCount;
-    if (expected != null &&
+    if (widget.justPlaced &&
+        expected != null &&
         view.orders.length < expected &&
         _catchUps < CheckoutMapScreen.catchUpAttempts) {
       _catchUps++;
@@ -343,35 +357,44 @@ class _CheckoutMapScreenState extends State<CheckoutMapScreen>
 
   /// Where to draw a rider: the newest of the server's fix and anything pushed since, for any of
   /// their orders here. The newest wins whichever arrived last, so a poll answered from a view
-  /// computed a few seconds ago never drags a pushed marker back. A pushed fix is judged stale by
-  /// the server's own rule (the ETA's five minutes), which it will be only if the socket then
-  /// went quiet.
+  /// computed a few seconds ago never drags a pushed marker back.
+  ///
+  /// A pushed fix counts only while it is newer than the answer on screen. The service decides who
+  /// may see a rider and re-decides it on every answer — a rider who has moved on to somebody
+  /// else's delivery is withheld — and a frame from before that answer has already been judged by
+  /// it. Each frame the socket carries was judged as it was recorded, so a newer one stands.
+  ///
+  /// Staleness is re-checked here against the fix's own time, not taken from the answer alone: the
+  /// server's flag was true or false when it was computed, and a refresh that cannot reach the
+  /// network leaves the last answer on screen for as long as the customer watches. The marker has
+  /// to go on saying "last seen" by itself.
   ({LatLng point, bool stale, DateTime? at})? _riderPoint(CheckoutRider rider) {
     ({LatLng point, bool stale, DateTime? at})? best;
     final CheckoutRiderFix? server = rider.position;
     if (server != null) {
       best = (
         point: LatLng(server.pin.lat, server.pin.lng),
-        stale: server.stale,
+        stale: server.stale || _tooOld(server.recordedAt),
         at: server.recordedAt,
       );
     }
+    final DateTime? judgedAt = _view?.computedAt;
     for (final String orderId in rider.orderIds) {
       final RiderPosition? pushed = _pushed[orderId];
-      if (pushed == null) continue;
-      final DateTime? at = pushed.recordedAt;
-      final bool newer =
-          best == null || best.at == null || (at != null && at.isAfter(best.at!));
-      if (newer) {
-        best = (
-          point: LatLng(pushed.lat, pushed.lng),
-          stale: at != null && DateTime.now().difference(at) > _staleAfter,
-          at: at,
-        );
+      final DateTime? at = pushed?.recordedAt;
+      if (pushed == null || at == null) continue;
+      // Already covered by the answer on screen, which decided what may be shown.
+      if (judgedAt != null && !at.isAfter(judgedAt)) continue;
+      if (best == null || best.at == null || at.isAfter(best.at!)) {
+        best = (point: LatLng(pushed.lat, pushed.lng), stale: _tooOld(at), at: at);
       }
     }
     return best;
   }
+
+  /// Older than the platform will measure an estimate from — the server's own rule, applied to
+  /// the fix's time here so that it keeps being true while the screen is offline.
+  bool _tooOld(DateTime? at) => at != null && DateTime.now().difference(at) > _staleAfter;
 
   LatLng _gliding(String key, LatLng to) {
     final LatLng? from = _glideFrom[key];
@@ -972,6 +995,12 @@ class _CheckoutOrderRow extends StatelessWidget {
     final ({LatLng point, bool stale, DateTime? at})? where = riderPoint;
     if (where != null && where.stale && where.at != null) {
       return t.checkoutMapRiderLastSeen(_ago(t, where.at!));
+    }
+    // No marker because the service withholds one: claims often happen at home, and the rider
+    // appears once they are near the shop. Said here, so the empty map is not a mystery. (The
+    // other withheld state, on somebody else's delivery, is what the estimate line says.)
+    if (where == null && rider?.sighting == RiderSightingState.headingToShop) {
+      return t.custRiderShownNearShop;
     }
     return order.statusWire == OrderStatus.pickedUp.wire
         ? t.checkoutMapRiderHasIt
