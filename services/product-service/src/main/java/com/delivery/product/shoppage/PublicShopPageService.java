@@ -20,6 +20,7 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -61,6 +62,16 @@ public class PublicShopPageService {
      * the page is for.
      */
     static final int MAX_ITEMS = 120;
+
+    /**
+     * The most addresses one sitemap offers.
+     *
+     * <p>50,000 is the protocol's own limit, and the reason to obey it is that a file past it is
+     * rejected whole rather than trimmed: one shop too many would take every other shop's page out
+     * of the index with it. At this platform's size the cap is theory, which is exactly when to
+     * write it down — the day it is not, the file should still be a sitemap.
+     */
+    static final int MAX_SITEMAP_URLS = 50_000;
 
     /** Items with no section of their own. Named by the renderer, in the reader's language. */
     static final String UNSECTIONED = "";
@@ -169,14 +180,28 @@ public class PublicShopPageService {
      * <p>The same rule as {@link #read}, asked of the whole table: a shop that would 404 must not be
      * offered to a crawler, or the site publishes a list of addresses that answer 404 and asks
      * Google to keep checking them.
+     *
+     * <p><strong>Asked of the database, not of Java.</strong> This is the one read here that is
+     * about every shop there is, and it used to load the whole {@code stores} table as entities to
+     * throw most of them away. Now the rule is the {@code WHERE} clause and only slugs come back —
+     * which does put the rule in two places, so {@code PublicShopPageDatabaseTest} asserts against
+     * a real database that every slug this returns renders, and that the four kinds of hidden shop
+     * are in neither answer.
+     *
+     * <p>Capped at {@link #MAX_SITEMAP_URLS}. A shop past the cap is not lost: it is reachable, it
+     * is linked from the app, and it is one of 50,000 — whereas an oversized sitemap is one a
+     * crawler rejects whole, taking the other 50,000 with it.
      */
     @Transactional(readOnly = true)
     public List<String> listedSlugs() {
-        return stores.findAll().stream()
-                .filter(this::publiclyVisible)
-                .map(Store::getSlug)
-                .sorted()
-                .toList();
+        Pageable cap = PageRequest.of(0, MAX_SITEMAP_URLS);
+        Set<Store.ServiceCategory> open = serviceCategories.enabled();
+        // An empty IN list is the one thing this query cannot be given (StoreRepository
+        // #findServicesStorefront says why), and "every category is closed" is a state an operator
+        // can really configure.
+        return open.isEmpty()
+                ? stores.findPublicGoodsPageSlugs(cap)
+                : stores.findPublicPageSlugs(open, cap);
     }
 
     /**

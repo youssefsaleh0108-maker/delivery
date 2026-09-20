@@ -38,6 +38,7 @@ import com.delivery.product.service.ServiceCategories;
 import com.delivery.product.service.Thumbnailer;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -337,7 +338,12 @@ final class ShopPageFixture {
     PublicShopPageService service() {
         when(stores.findBySlug(anyString())).thenReturn(Optional.empty());
         when(stores.findBySlug(shop.getSlug())).thenReturn(Optional.of(shop));
-        when(stores.findAll()).thenReturn(List.of(shop));
+        // The sitemap's filter is SQL now, and a mock cannot prove SQL: which shops have a page is
+        // asserted against a real database in PublicShopPageDatabaseTest, over rows that really do
+        // include a draft, a suspended, a pinless and a closed-category shop. All this reproduces
+        // is enough for the renderer's own tests — this one shop, listed when it would render.
+        when(stores.findPublicPageSlugs(anyCollection(), any())).thenReturn(sitemapSlugs());
+        when(stores.findPublicGoodsPageSlugs(any())).thenReturn(sitemapSlugs());
 
         Page<Product> page = new PageImpl<>(List.copyOf(shelf),
                 PageRequest.of(0, PublicShopPageService.MAX_ITEMS),
@@ -365,6 +371,12 @@ final class ShopPageFixture {
 
         return new PublicShopPageService(stores, products, categories, zones, images,
                 serviceCategories, clock, Duration.ofHours(4), rate);
+    }
+
+    /** This shop's slug when it is live and pinned — what the sitemap's query would return. */
+    private List<String> sitemapSlugs() {
+        boolean listed = shop.getStatus() == Store.Status.ACTIVE && shop.location() != null;
+        return listed ? List.of(shop.getSlug()) : List.of();
     }
 
     /**

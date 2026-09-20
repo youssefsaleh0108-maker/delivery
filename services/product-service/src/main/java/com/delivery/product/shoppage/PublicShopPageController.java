@@ -119,6 +119,15 @@ public class PublicShopPageController {
     private final ShopPageCache<Document> renderedPages;
 
     /**
+     * The sitemap, under one key.
+     *
+     * <p>A cache of one, because there is one sitemap — the map is here so that the hour, the bound
+     * and the single-flight rebuild are the same code as everything else on this page, rather than
+     * a second, slightly different piece of caching written out by hand.
+     */
+    private final ShopPageCache<Document> sitemaps;
+
+    /**
      * The address this page believes it lives at.
      *
      * <p>Configuration rather than the request's {@code Host}, and that is the point: the canonical
@@ -167,6 +176,7 @@ public class PublicShopPageController {
         this.contentSecurityPolicy = policyFor(imageOrigin);
         this.qrCodes = new ShopPageCache<>(QR_MEMO_FOR, QR_MEMO_ENTRIES, nanoClock);
         this.renderedPages = new ShopPageCache<>(PAGE_MAX_AGE, PAGE_MEMO_ENTRIES, nanoClock);
+        this.sitemaps = new ShopPageCache<>(SITEMAP_MAX_AGE, 1, nanoClock);
     }
 
     // ---------------------------------------------------------------- the page
@@ -240,9 +250,19 @@ public class PublicShopPageController {
      * search engine to distrust the file. No {@code lastmod}: {@code stores.updated_at} moves when
      * a merchant edits anything at all, including things this page does not draw, so it would claim
      * a change the crawler could not find and would be worse than saying nothing.
+     *
+     * <p>Built once an hour, which is what the response has always told crawlers. It is the widest
+     * read this service has — every shop there is — and several crawlers fetching it within the
+     * same hour is the normal case, not the exception.
      */
     @GetMapping("/sitemap.xml")
     public ResponseEntity<byte[]> sitemap(HttpServletRequest request) {
+        Document sitemap = sitemaps.get("sitemap", this::renderSitemap);
+        return respond(sitemap.body(), sitemap.etag(), MediaType.APPLICATION_XML,
+                CacheControl.maxAge(SITEMAP_MAX_AGE).cachePublic(), null, request);
+    }
+
+    private Document renderSitemap() {
         List<String> slugs = pages.listedSlugs();
         StringBuilder xml = new StringBuilder(128 + slugs.size() * 96);
         xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
@@ -262,9 +282,7 @@ public class PublicShopPageController {
         }
         xml.append("</urlset>");
 
-        byte[] body = xml.toString().getBytes(StandardCharsets.UTF_8);
-        return respond(body, strongTag(body), MediaType.APPLICATION_XML,
-                CacheControl.maxAge(SITEMAP_MAX_AGE).cachePublic(), null, request);
+        return Document.of(xml.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     // ---------------------------------------------------------------- responses

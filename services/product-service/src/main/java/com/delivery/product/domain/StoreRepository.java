@@ -363,4 +363,43 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
     Boolean deliversTo(@Param("id") UUID id,
                        @Param("latitude") double latitude,
                        @Param("longitude") double longitude);
+
+    /**
+     * The slug of every shop that has a public page, for the sitemap.
+     *
+     * <p>Slugs, not stores, and the rule in the {@code WHERE} clause rather than in a stream after
+     * it: the sitemap is the one read on this platform that is about <em>every</em> shop there is,
+     * and loading each one as an entity to ask three questions about it would hydrate the whole
+     * table — hours included — for a file of addresses. {@code Pageable} is the cap the caller
+     * needs; see {@code PublicShopPageService.MAX_SITEMAP_URLS}.
+     *
+     * <p>Both pin columns must be present. {@code Store.location()} calls a shop with one
+     * coordinate pinned, which is a state the domain cannot produce and could not draw anyway.
+     *
+     * <p>{@code openCategories} is never empty, for the reason {@link #findServicesStorefront}
+     * gives; when nothing is open the caller asks {@link #findPublicGoodsPageSlugs} instead.
+     */
+    @Query("""
+            SELECT s.slug FROM Store s
+            WHERE s.status = com.delivery.product.domain.Store$Status.ACTIVE
+              AND s.latitude IS NOT NULL
+              AND s.longitude IS NOT NULL
+              AND (s.vertical <> com.delivery.product.domain.Store$Vertical.SERVICES
+                   OR s.serviceCategory IN :openCategories)
+            ORDER BY s.slug
+            """)
+    List<String> findPublicPageSlugs(
+            @Param("openCategories") java.util.Collection<Store.ServiceCategory> openCategories,
+            Pageable limit);
+
+    /** {@link #findPublicPageSlugs} when every service category is closed: goods shops only. */
+    @Query("""
+            SELECT s.slug FROM Store s
+            WHERE s.status = com.delivery.product.domain.Store$Status.ACTIVE
+              AND s.latitude IS NOT NULL
+              AND s.longitude IS NOT NULL
+              AND s.vertical <> com.delivery.product.domain.Store$Vertical.SERVICES
+            ORDER BY s.slug
+            """)
+    List<String> findPublicGoodsPageSlugs(Pageable limit);
 }

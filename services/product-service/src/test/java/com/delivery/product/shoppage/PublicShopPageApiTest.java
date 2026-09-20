@@ -5,6 +5,8 @@ import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -13,6 +15,7 @@ import com.delivery.product.shoppage.ShopPageFixture.Item;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -405,6 +408,10 @@ class PublicShopPageApiTest {
     @Test
     @DisplayName("a shop with no page is not offered to a crawler either")
     void sitemapLeavesOutWhatWouldBeA404() throws Exception {
+        // Which shops have a page is decided in SQL now and proved against a real database in
+        // PublicShopPageDatabaseTest, over a table that really holds a draft, a suspended, a
+        // pinless and a closed-category shop. What is checked here is the other half: whatever the
+        // query answers is what the file offers, and nothing is added on the way out.
         ShopPageFixture pinless = new ShopPageFixture().withoutPin();
         assertThat(body(pinless.mvc().perform(get("/sitemap.xml")).andReturn()))
                 .doesNotContain(pinless.slug());
@@ -412,6 +419,43 @@ class PublicShopPageApiTest {
         ShopPageFixture suspended = new ShopPageFixture().suspended();
         assertThat(body(suspended.mvc().perform(get("/sitemap.xml")).andReturn()))
                 .doesNotContain(suspended.slug());
+    }
+
+    @Test
+    @DisplayName("the sitemap asks the database, capped at the 50,000 a sitemap may hold")
+    void sitemapAsksTheDatabaseForOneCappedList() throws Exception {
+        ShopPageFixture shop = stocked();
+        shop.mvc().perform(get("/sitemap.xml")).andExpect(status().isOk());
+
+        ArgumentCaptor<Pageable> cap = ArgumentCaptor.forClass(Pageable.class);
+        verify(shop.stores()).findPublicPageSlugs(anyCollection(), cap.capture());
+        // Past 50,000 a crawler rejects the file whole rather than trimming it, so one shop too
+        // many would take every other shop's page out of the index with it.
+        assertThat(cap.getValue().getPageSize()).isEqualTo(50_000);
+        assertThat(cap.getValue().getPageNumber()).isZero();
+        // And no stores.findAll(): this read is about every shop there is, and hydrating the table
+        // to throw most of it away is the thing that changed.
+        verify(shop.stores(), never()).findAll();
+    }
+
+    @Test
+    @DisplayName("the sitemap is built once an hour, whatever a crawler does in between")
+    void sitemapIsBuiltOncePerHour() throws Exception {
+        ShopPageFixture shop = stocked();
+        java.util.concurrent.atomic.AtomicLong nanos =
+                new java.util.concurrent.atomic.AtomicLong(1_000_000_000L);
+        MockMvc mvc = shop.mvc(nanos::get);
+
+        MvcResult first = mvc.perform(get("/sitemap.xml")).andExpect(status().isOk()).andReturn();
+        for (int crawler = 0; crawler < 5; crawler++) {
+            mvc.perform(get("/sitemap.xml")).andExpect(status().isOk());
+        }
+        verify(shop.stores(), times(1)).findPublicPageSlugs(anyCollection(), any());
+        assertThat(body(mvc.perform(get("/sitemap.xml")).andReturn())).isEqualTo(body(first));
+
+        nanos.addAndGet(java.time.Duration.ofHours(1).toNanos() + 1);
+        mvc.perform(get("/sitemap.xml")).andExpect(status().isOk());
+        verify(shop.stores(), times(2)).findPublicPageSlugs(anyCollection(), any());
     }
 
     private static List<String> headerNames(MvcResult result) {
