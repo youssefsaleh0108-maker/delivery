@@ -237,6 +237,42 @@ spec:
     maxRequestBodyBytes: 10551296
     memRequestBodyBytes: 1048576
 ---
+# The public shop page (`/s/{slug}`, its QR code and /sitemap.xml), which product-service renders
+# as HTML. The one page on this platform a stranger opens with no app and no account: a shopkeeper
+# pastes it into a WhatsApp status and prints it as a QR for the counter.
+#
+# THERE IS NO contentSecurityPolicy HERE, AND THAT IS THE POINT. product-service sends the page's
+# own policy on every response — `default-src 'none'`, the stylesheet from 'self', pictures from
+# the object store's public endpoint, and nothing else — built from the very setting that produced
+# the image URLs in the markup, so the policy cannot drift from the page. A `headers` middleware
+# that named a policy here would REPLACE that header with a string no test can check; this one
+# adds the things a middleware is genuinely better at (HSTS on a TLS-only entrypoint) and leaves
+# the policy to the service. scripts/verify.sh fails if a policy is ever added to it.
+#
+# HSTS matches the portal's and the site's: 180 days, no includeSubDomains, no preload.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: shop-page-headers
+spec:
+  headers:
+    stsSeconds: 15552000
+    stsIncludeSubdomains: false
+    stsPreload: false
+    contentTypeNosniff: true
+    frameDeny: true
+    referrerPolicy: strict-origin-when-cross-origin
+---
+# The shop page is text, and it is read on a phone on 3G. Traefik's default floor of 1 KiB leaves
+# the QR PNG alone (already one-bit, and incompressible) and takes the HTML from about 14 kB to
+# about 2.8 kB, which is most of the difference between opening on a bus and not.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: shop-page-compress
+spec:
+  compress: {}
+---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
@@ -368,6 +404,56 @@ spec:
       middlewares:
         - { name: merchant-kyc-upload-limit }
         - { name: security-headers }
+---
+# The public shop page, on two hostnames for two different reasons.
+#
+# www.youdrop.shop/s/{slug} is THE address: what the canonical link says, what a chat app previews,
+# what a printed QR code encodes and what a crawler indexes. The rest of www is the static site in
+# the `youdrop-site` namespace (cluster/website.yaml); this router takes only `/s/` and
+# /sitemap.xml off that hostname, and the site keeps everything else. A Traefik router is not
+# scoped to a namespace — only the services and middlewares it names are — so the route lives HERE,
+# beside the product-service it points at, rather than reaching across namespaces from the site's
+# manifest.
+#
+# It is dev-only, like the loopback CORS origins above, and for the same reason the site itself
+# already is: there is ONE www, clients/website/config.js points it at ONE environment's API, and
+# that is api-dev today. Rendering this into qa as well would put two routers with identical rules
+# on the same hostname, in two namespaces, and let whichever synced last decide which environment's
+# shops the public site serves. AT GO-LIVE it moves with config.js and the site's CSP.
+#
+# The explicit priority is against the site's own router, which owns the whole of www. A rule with
+# no `priority` gets one equal to the LENGTH OF ITS RULE, and this rule is longer than
+# Host(`www.youdrop.shop`) today — but "longer than a rule in another file" is not a thing to rely
+# on, and a shop page that silently started serving the site's 404 would look like the feature
+# never deployed. 1000 is the band this file already uses for "this rule must outrank its
+# neighbour"; see the /api/notifications/direct note.
+#
+# The API hostname carries it too, unconditionally and in both environments. Not for customers —
+# nothing links there — but so that the page can be reached, smoke-tested and checked by
+# scripts/verify.sh in an environment whose www is somebody else's. The page's canonical URL and
+# its QR code still name www (`delivery.public.base-url`), so a page served on api-qa cannot
+# become a second indexable copy of a shop.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: shop-page
+spec:
+  entryPoints: [websecure]
+  tls:
+    certResolver: letsencrypt
+  routes:
+    # The API hostname first, so it is the one that DEFINES the middleware list: the www rule below
+    # is deleted outright when this file is rendered for qa, and an anchor declared on a line that
+    # does not exist in one environment is a YAML document that does not parse in that environment.
+    - kind: Rule
+      match: Host(`api-qa.youdrop.shop`) && (PathPrefix(`/s/`) || Path(`/sitemap.xml`))
+      services: [{ name: product-service, port: 8103 }]
+      middlewares: &shop-page-mw
+        # No platform-cors: this is a page a browser NAVIGATES to, not an API a script fetches.
+        - { name: platform-rate-limit }
+        - { name: strip-identity-headers }
+        - { name: shop-page-headers }
+        - { name: shop-page-compress }
 ---
 # Keycloak owns its whole origin: /realms, /resources, the account and admin consoles.
 # KEYCLOAK_PUBLIC_URL must match this hostname exactly or every token's issuer is refused.
