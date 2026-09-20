@@ -1,9 +1,14 @@
 \pset footer off
 -- The ledger's own answer for each statement, computed independently of the service's Java.
 -- psql -v f=<from instant> -v t=<to exclusive instant> -v m=<merchant sub> -v r=<rider sub> -v c=<company id>
+-- Each payee's figure is what they earned less what the platform has already paid them: a paid
+-- redemption or cash-out writes a PAYOUT leg (RECON-11), which their statement subtracts too.
 select 'merchant|' || (coalesce((select sum(amount) from accounting.transactions
          where counterparty_kind = 'MERCHANT' and counterparty_ref = :'m'
            and leg in ('MERCHANT_CREDIT', 'GIFT_WRAP_CREDIT')
+           and created_at >= :'f'::timestamptz and created_at < :'t'::timestamptz), 0)
+     - coalesce((select sum(amount) from accounting.transactions
+         where leg = 'PAYOUT' and counterparty_kind = 'MERCHANT' and counterparty_ref = :'m'
            and created_at >= :'f'::timestamptz and created_at < :'t'::timestamptz), 0))::numeric(12,2);
 select 'rider|' || (coalesce((select sum(amount) from accounting.rider_ledger
          where rider_ref = :'r' and payable_by = 'PLATFORM'
@@ -13,6 +18,9 @@ select 'rider|' || (coalesce((select sum(amount) from accounting.rider_ledger
            and created_at >= :'f'::timestamptz and created_at < :'t'::timestamptz), 0)
      - coalesce((select sum(amount) from accounting.cash_float where holder_ref = :'r' and holder_kind = 'RIDER'
            and entry_kind = 'COLLECTED'
+           and created_at >= :'f'::timestamptz and created_at < :'t'::timestamptz), 0)
+     - coalesce((select sum(amount) from accounting.transactions
+         where leg = 'PAYOUT' and counterparty_kind = 'RIDER' and counterparty_ref = :'r'
            and created_at >= :'f'::timestamptz and created_at < :'t'::timestamptz), 0))::numeric(12,2);
 select 'carrier|' || (coalesce((select sum(amount) from accounting.transactions
          where counterparty_kind = 'CARRIER' and counterparty_ref = :'c' and leg = 'PROVIDER_CREDIT'
@@ -21,6 +29,9 @@ select 'carrier|' || (coalesce((select sum(amount) from accounting.transactions
            and entry_kind = 'REMITTED' and created_at >= :'f'::timestamptz and created_at < :'t'::timestamptz), 0)
      - coalesce((select sum(amount) from accounting.cash_float where holder_ref = :'c' and holder_kind = 'PROVIDER'
            and entry_kind = 'COLLECTED' and handover_id is not null
+           and created_at >= :'f'::timestamptz and created_at < :'t'::timestamptz), 0)
+     - coalesce((select sum(amount) from accounting.transactions
+         where leg = 'PAYOUT' and counterparty_kind = 'CARRIER' and counterparty_ref = :'c'
            and created_at >= :'f'::timestamptz and created_at < :'t'::timestamptz), 0))::numeric(12,2);
 -- Commission earned, less what the platform gave away (PLATFORM_SUBSIDY), absorbed on an order
 -- closed after pickup (PLATFORM_LOSS, RECON-10) and paid out in redemptions and cash-outs (PAYOUT,
