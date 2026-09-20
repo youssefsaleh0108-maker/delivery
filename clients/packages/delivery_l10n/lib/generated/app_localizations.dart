@@ -21830,6 +21830,84 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Close as not delivered'**
   String get actionCloseNotDelivered;
+
+  /// No description provided for @merchPublishNeedsPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Drop your shop\'s pin first — without it, nobody nearby can find you'**
+  String get merchPublishNeedsPin;
+
+  /// No description provided for @merchPublishNeedsHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Set your opening hours first — without them, your shop is never open'**
+  String get merchPublishNeedsHours;
+
+  /// No description provided for @merchPublishNotReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Not ready to publish yet'**
+  String get merchPublishNotReady;
+
+  /// No description provided for @merchPublishRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'Your shop is not ready to be listed yet'**
+  String get merchPublishRefused;
+
+  /// No description provided for @boShopPinColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'On the map'**
+  String get boShopPinColumn;
+
+  /// No description provided for @boShopPinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned'**
+  String get boShopPinned;
+
+  /// No description provided for @boShopNoPin.
+  ///
+  /// In en, this message translates to:
+  /// **'No pin'**
+  String get boShopNoPin;
+
+  /// No description provided for @boShopSetPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the pin'**
+  String get boShopSetPin;
+
+  /// No description provided for @boShopMovePin.
+  ///
+  /// In en, this message translates to:
+  /// **'Move the pin'**
+  String get boShopMovePin;
+
+  /// No description provided for @boShopPinSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin saved'**
+  String get boShopPinSaved;
+
+  /// No description provided for @boShopPinFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The pin could not be saved'**
+  String get boShopPinFailed;
+
+  /// No description provided for @boShopPinGone.
+  ///
+  /// In en, this message translates to:
+  /// **'That shop is no longer there'**
+  String get boShopPinGone;
+
+  /// No description provided for @boShopPinWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'A shop with no pin has no distance, no delivery circle and no place in \"near you\".'**
+  String get boShopPinWhy;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

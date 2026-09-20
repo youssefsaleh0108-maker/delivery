@@ -3990,5 +3990,18 @@
   "@splitNConfirmed": {"placeholders":{"confirmed":{"type":"int"},"total":{"type":"int"}}},
   "splitAmountConfirmedOf": "{confirmed} من {total} مؤكَّدة",
   "@splitAmountConfirmedOf": {"placeholders":{"confirmed":{"type":"String"},"total":{"type":"String"}}},
-  "actionCloseNotDelivered": "إغلاق الطلب كغير مُسلَّم"
+  "actionCloseNotDelivered": "إغلاق الطلب كغير مُسلَّم",
+  "merchPublishNeedsPin": "حدِّد موقع متجرك على الخريطة أولاً — بدونه لن يعثر عليك أحد من القريبين",
+  "merchPublishNeedsHours": "حدِّد ساعات العمل أولاً — بدونها لن يكون متجرك مفتوحاً أبداً",
+  "merchPublishNotReady": "المتجر غير جاهز للنشر بعد",
+  "merchPublishRefused": "متجرك غير جاهز لعرضه في المتجر بعد",
+  "boShopPinColumn": "على الخريطة",
+  "boShopPinned": "محدَّد",
+  "boShopNoPin": "بلا موقع",
+  "boShopSetPin": "تحديد الموقع",
+  "boShopMovePin": "تغيير الموقع",
+  "boShopPinSaved": "تم حفظ الموقع",
+  "boShopPinFailed": "تعذَّر حفظ الموقع",
+  "boShopPinGone": "لم يعد هذا المتجر موجوداً",
+  "boShopPinWhy": "المتجر بلا موقع على الخريطة ليست له مسافة ولا نطاق توصيل ولا مكان في «القريب منك»."
 }

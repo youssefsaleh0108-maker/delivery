@@ -12924,4 +12924,46 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get actionCloseNotDelivered => 'Close as not delivered';
+
+  @override
+  String get merchPublishNeedsPin =>
+      'Drop your shop\'s pin first — without it, nobody nearby can find you';
+
+  @override
+  String get merchPublishNeedsHours =>
+      'Set your opening hours first — without them, your shop is never open';
+
+  @override
+  String get merchPublishNotReady => 'Not ready to publish yet';
+
+  @override
+  String get merchPublishRefused => 'Your shop is not ready to be listed yet';
+
+  @override
+  String get boShopPinColumn => 'On the map';
+
+  @override
+  String get boShopPinned => 'Pinned';
+
+  @override
+  String get boShopNoPin => 'No pin';
+
+  @override
+  String get boShopSetPin => 'Set the pin';
+
+  @override
+  String get boShopMovePin => 'Move the pin';
+
+  @override
+  String get boShopPinSaved => 'Pin saved';
+
+  @override
+  String get boShopPinFailed => 'The pin could not be saved';
+
+  @override
+  String get boShopPinGone => 'That shop is no longer there';
+
+  @override
+  String get boShopPinWhy =>
+      'A shop with no pin has no distance, no delivery circle and no place in \"near you\".';
 }

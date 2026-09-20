@@ -172,9 +172,38 @@ class _StoreScreenState extends State<StoreScreen> {
   /// the merchant guessing.
   /// Takes the strings as an argument: this is static, so there is no context to read them from.
   static String _message(Object error, DeliveryStrings t) {
+    // A shop the server would not list says which thing is missing, in a code. Translated here,
+    // because the `detail` below is the server's English and a merchant reading Arabic should not
+    // be shown it.
+    if (error is StoreNotListable) {
+      return _blockerText(t, error.code) ?? t.merchPublishRefused;
+    }
     final RegExpMatch? detail =
         RegExp(r'"detail"\s*:\s*"([^"]+)"').firstMatch(error.toString());
     return detail != null ? detail.group(1)! : t.thatDidNotWorkWith('$error');
+  }
+
+  /// The one sentence for a listing blocker, or null for a code this app does not know — a newer
+  /// server's rule, which falls back to a true-but-general line rather than to English prose.
+  static String? _blockerText(DeliveryStrings t, String code) => switch (code) {
+        StoreNotListable.pinRequired => t.merchPublishNeedsPin,
+        StoreNotListable.hoursRequired => t.merchPublishNeedsHours,
+        _ => null,
+      };
+
+  /// What is between this shop and the storefront, worked out from what the screen already has.
+  ///
+  /// The same two rules the server enforces, asked here so the Publish button can say what is
+  /// missing before it is pressed instead of turning a press into a red snackbar. The server is
+  /// still the authority — [_message] translates its refusal for the cases this misses, such as a
+  /// shop changed on another device.
+  ///
+  /// Hours first, matching the server's order: a shop with neither is being set up rather than
+  /// corrected, and one problem a merchant can act on beats a list of two.
+  String? _publishBlocker(Store store) {
+    if (_hours.isEmpty) return StoreNotListable.hoursRequired;
+    if (store.latitude == null || store.longitude == null) return StoreNotListable.pinRequired;
+    return null;
   }
 
   Future<void> _saveProfile() async {
@@ -388,7 +417,11 @@ class _StoreScreenState extends State<StoreScreen> {
                   label: t.publish,
                   icon: Icons.rocket_launch_rounded,
                   primary: true,
-                  onPressed: _saving
+                  // Disabled while something is missing, with the reason and its fix drawn
+                  // underneath. A button that can only fail is worse than one that says why it is
+                  // waiting: the refusal used to arrive as a red snackbar carrying the server's
+                  // English, after the merchant had already pressed it.
+                  onPressed: _saving || _publishBlocker(store) != null
                       ? null
                       : () => _run(
                             () => widget.api.publish(store.id).then((_) {}),
@@ -397,6 +430,7 @@ class _StoreScreenState extends State<StoreScreen> {
                 ),
             ],
           ),
+          if (!listed) _publishBlockerNote(t, store),
           const SizedBox(height: DeliverySpacing.md),
           const Divider(height: 1, color: DeliveryColors.borderFaint),
           const SizedBox(height: DeliverySpacing.md),
@@ -445,6 +479,73 @@ class _StoreScreenState extends State<StoreScreen> {
                           ),
                 ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Why Publish is waiting, and the one tap that fixes it.
+  ///
+  /// Drawn only for a shop that is not listed, and only while something is actually missing: a
+  /// ready shop sees nothing here, not a green tick, because a note that is always on screen stops
+  /// being read.
+  ///
+  /// The fix is the point. "Drop your pin" with no way to drop it from here is the state that
+  /// produced twelve live shops on dev with no coordinates at all — the picker existed, three taps
+  /// down the same page, and nothing ever said to use it.
+  Widget _publishBlockerNote(DeliveryStrings t, Store store) {
+    final String? blocker = _publishBlocker(store);
+    if (blocker == null) return const SizedBox.shrink();
+
+    final bool needsPin = blocker == StoreNotListable.pinRequired;
+    return Padding(
+      padding: const EdgeInsets.only(top: DeliverySpacing.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(
+            needsPin ? Icons.place_outlined : Icons.schedule,
+            size: 16,
+            color: DeliveryColors.brand,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              _blockerText(t, blocker) ?? t.merchPublishNotReady,
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: DeliveryColors.muted,
+                height: 1.35,
+              ),
+            ),
+          ),
+          const SizedBox(width: DeliverySpacing.sm),
+          TextButton(
+            onPressed: _saving
+                ? null
+                : () {
+                    if (needsPin) {
+                      _editPin(t, store);
+                    } else {
+                      // The week is on this same page, folded away. Opening it is the whole fix.
+                      setState(() => _hoursOpen = true);
+                    }
+                  },
+            style: TextButton.styleFrom(
+              padding: const EdgeInsetsDirectional.symmetric(
+                horizontal: DeliverySpacing.sm,
+                vertical: 4,
+              ),
+              minimumSize: const Size(0, 32),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              foregroundColor: DeliveryColors.brand,
+            ),
+            child: Text(
+              needsPin ? t.merchPinSetIt : t.merchbEditHours,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),

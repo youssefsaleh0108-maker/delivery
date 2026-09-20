@@ -6214,5 +6214,18 @@
   "@splitNConfirmed": {"placeholders":{"confirmed":{"type":"int"},"total":{"type":"int"}}},
   "splitAmountConfirmedOf": "{confirmed} of {total} confirmed",
   "@splitAmountConfirmedOf": {"placeholders":{"confirmed":{"type":"String"},"total":{"type":"String"}}},
-  "actionCloseNotDelivered": "Close as not delivered"
+  "actionCloseNotDelivered": "Close as not delivered",
+  "merchPublishNeedsPin": "Drop your shop's pin first — without it, nobody nearby can find you",
+  "merchPublishNeedsHours": "Set your opening hours first — without them, your shop is never open",
+  "merchPublishNotReady": "Not ready to publish yet",
+  "merchPublishRefused": "Your shop is not ready to be listed yet",
+  "boShopPinColumn": "On the map",
+  "boShopPinned": "Pinned",
+  "boShopNoPin": "No pin",
+  "boShopSetPin": "Set the pin",
+  "boShopMovePin": "Move the pin",
+  "boShopPinSaved": "Pin saved",
+  "boShopPinFailed": "The pin could not be saved",
+  "boShopPinGone": "That shop is no longer there",
+  "boShopPinWhy": "A shop with no pin has no distance, no delivery circle and no place in \"near you\"."
 }
