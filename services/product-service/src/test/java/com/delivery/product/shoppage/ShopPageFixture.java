@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.LongSupplier;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -318,6 +319,15 @@ final class ShopPageFixture {
 
     MockMvc mvc() {
         return MockMvcBuilders.standaloneSetup(controller()).build();
+    }
+
+    /**
+     * One controller whose memos age on the given clock, for the tests that ask what a second
+     * reader inside the window costs — and what happens once the window is over.
+     */
+    MockMvc mvc(LongSupplier nanoClock) {
+        return MockMvcBuilders.standaloneSetup(
+                new PublicShopPageController(service(), BASE, IMAGE_ORIGIN, nanoClock)).build();
     }
 
     PublicShopPageController controller() {

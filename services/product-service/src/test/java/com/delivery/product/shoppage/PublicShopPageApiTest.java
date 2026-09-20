@@ -293,6 +293,46 @@ class PublicShopPageApiTest {
     }
 
     @Test
+    @DisplayName("a second reader inside the window costs the database nothing, and gets the same bytes")
+    void rendersOncePerWindow() throws Exception {
+        ShopPageFixture shop = stocked();
+        java.util.concurrent.atomic.AtomicLong nanos =
+                new java.util.concurrent.atomic.AtomicLong(1_000_000_000L);
+        MockMvc mvc = shop.mvc(nanos::get);
+
+        MvcResult first = mvc.perform(get("/s/" + shop.slug())).andExpect(status().isOk())
+                .andReturn();
+        for (int reader = 0; reader < 9; reader++) {
+            mvc.perform(get("/s/" + shop.slug())).andExpect(status().isOk());
+        }
+
+        // Ten readers of a link in a group chat, one render. This is what the page's own
+        // Cache-Control already promised anybody in front of it; now the origin keeps it too.
+        verify(shop.stores(), times(1)).findBySlug(shop.slug());
+        verify(shop.products(), times(1)).findActiveInStore(any(), any(), anyString(), any());
+
+        MvcResult tenth = mvc.perform(get("/s/" + shop.slug())).andReturn();
+        assertThat(tenth.getResponse().getContentAsByteArray())
+                .isEqualTo(first.getResponse().getContentAsByteArray());
+        assertThat(tenth.getResponse().getHeader("ETag"))
+                .isEqualTo(first.getResponse().getHeader("ETag"));
+        // And the ETag still does its job: a phone that already has the page is told so.
+        mvc.perform(get("/s/" + shop.slug())
+                        .header("If-None-Match", first.getResponse().getHeader("ETag")))
+                .andExpect(status().isNotModified());
+
+        // The other language is another page, not the same one handed over twice.
+        mvc.perform(get("/s/" + shop.slug()).param("lang", "ar")).andExpect(status().isOk());
+        verify(shop.products(), times(2)).findActiveInStore(any(), any(), anyString(), any());
+
+        // Past the five minutes the response advertised, the shop is read again — which is how a
+        // corrected price arrives inside the window the merchant was promised.
+        nanos.addAndGet(java.time.Duration.ofMinutes(5).toNanos() + 1);
+        mvc.perform(get("/s/" + shop.slug())).andExpect(status().isOk());
+        verify(shop.products(), times(3)).findActiveInStore(any(), any(), anyString(), any());
+    }
+
+    @Test
     @DisplayName("a price change is visible within the cache window, and moves the ETag")
     void theEtagFollowsThePage() throws Exception {
         ShopPageFixture before = stocked();

@@ -80,6 +80,15 @@ public class PublicShopPageController {
 
     private static final int QR_MEMO_ENTRIES = 512;
 
+    /**
+     * How many rendered pages are held.
+     *
+     * <p>A page is about 18 kB, so this is a few megabytes on a pod with 512 MiB — enough for every
+     * shop on the platform twice over, once per language, and bounded so that a script asking for
+     * slugs that do not exist cannot grow it (a refusal is never stored).
+     */
+    private static final int PAGE_MEMO_ENTRIES = 256;
+
     private final PublicShopPageService pages;
 
     /**
@@ -91,6 +100,23 @@ public class PublicShopPageController {
      * image all afternoon. Drawing it once per slug is the whole of this.
      */
     private final ShopPageCache<byte[]> qrCodes;
+
+    /**
+     * The pages already rendered, by slug and language.
+     *
+     * <p>This is the origin's protection, and the page's traffic is the reason it needs one: a link
+     * in a WhatsApp status is opened by everyone in the group inside a minute, previewed by every
+     * chat app that draws a card for it, and walked by crawlers — and each of those cost six
+     * queries, a hundred and twenty products and a full render, for an answer that is the same for
+     * all of them. Nothing here reads the caller, so there is no page that is right for one reader
+     * and wrong for the next.
+     *
+     * <p>Held for the {@link #PAGE_MAX_AGE} the response already advertises, so this promises
+     * nothing new: a merchant who corrects a price sees it within the five minutes they were
+     * already told about, whether the copy they are looking at came from here, from a CDN or from
+     * their own phone.
+     */
+    private final ShopPageCache<Document> renderedPages;
 
     /**
      * The address this page believes it lives at.
@@ -140,6 +166,7 @@ public class PublicShopPageController {
         this.stylesheet = readStylesheet();
         this.contentSecurityPolicy = policyFor(imageOrigin);
         this.qrCodes = new ShopPageCache<>(QR_MEMO_FOR, QR_MEMO_ENTRIES, nanoClock);
+        this.renderedPages = new ShopPageCache<>(PAGE_MAX_AGE, PAGE_MEMO_ENTRIES, nanoClock);
     }
 
     // ---------------------------------------------------------------- the page
@@ -157,14 +184,21 @@ public class PublicShopPageController {
                                                required = false) String acceptLanguage,
                                        HttpServletRequest request) {
         ShopPageText text = ShopPageText.choose(lang, acceptLanguage);
-        String html;
+        Document page;
         try {
-            html = ShopPageHtml.render(pages.read(slug), text, baseUrl, pages.lbpPerUsd());
+            // One rendering per shop per language per window. The slug cannot contain a newline —
+            // it is lower-case letters, digits and hyphens — so the two parts cannot run together.
+            page = renderedPages.get(slug + "\n" + text.tag(), () -> render(slug, text));
         } catch (ShopPageNotFoundException absent) {
             return notFound(text);
         }
-        return document(html.getBytes(StandardCharsets.UTF_8), MediaType.TEXT_HTML,
+        return document(page, MediaType.TEXT_HTML,
                 CacheControl.maxAge(PAGE_MAX_AGE).cachePublic(), text, request);
+    }
+
+    private Document render(String slug, ShopPageText text) {
+        return Document.of(ShopPageHtml.render(pages.read(slug), text, baseUrl, pages.lbpPerUsd())
+                .getBytes(StandardCharsets.UTF_8));
     }
 
     /**
@@ -228,7 +262,8 @@ public class PublicShopPageController {
         }
         xml.append("</urlset>");
 
-        return respond(xml.toString().getBytes(StandardCharsets.UTF_8), MediaType.APPLICATION_XML,
+        byte[] body = xml.toString().getBytes(StandardCharsets.UTF_8);
+        return respond(body, strongTag(body), MediaType.APPLICATION_XML,
                 CacheControl.maxAge(SITEMAP_MAX_AGE).cachePublic(), null, request);
     }
 
@@ -260,15 +295,15 @@ public class PublicShopPageController {
     }
 
     /** A document a reader sees: cached briefly, revalidated with an ETag, language-aware. */
-    private ResponseEntity<byte[]> document(byte[] body, MediaType type, CacheControl cache,
+    private ResponseEntity<byte[]> document(Document document, MediaType type, CacheControl cache,
                                             ShopPageText text, HttpServletRequest request) {
-        return respond(body, type, cache, text, request);
+        return respond(document.body(), document.etag(), type, cache, text, request);
     }
 
     /** An immutable byte-for-byte asset: the QR code and the stylesheet. */
     private ResponseEntity<byte[]> asset(byte[] body, MediaType type, HttpServletRequest request) {
-        return respond(body, type, CacheControl.maxAge(ASSET_MAX_AGE).cachePublic().immutable(),
-                null, request);
+        return respond(body, strongTag(body), type,
+                CacheControl.maxAge(ASSET_MAX_AGE).cachePublic().immutable(), null, request);
     }
 
     /**
@@ -279,9 +314,9 @@ public class PublicShopPageController {
      * 304 with the caching headers and no body — a phone that already has the page spends a few
      * hundred bytes finding out it is still current.
      */
-    private ResponseEntity<byte[]> respond(byte[] body, MediaType type, CacheControl cache,
-                                           ShopPageText text, HttpServletRequest request) {
-        String tag = strongTag(body);
+    private ResponseEntity<byte[]> respond(byte[] body, String tag, MediaType type,
+                                           CacheControl cache, ShopPageText text,
+                                           HttpServletRequest request) {
         boolean unchanged = conditional(request, tag);
         ResponseEntity.BodyBuilder response = secured(unchanged
                 ? ResponseEntity.status(HttpStatus.NOT_MODIFIED)
@@ -387,6 +422,20 @@ public class PublicShopPageController {
             // It is packaged in the jar beside this class. Missing means a broken build, and a
             // service that starts without it would serve every shop page unstyled.
             throw new UncheckedIOException("shoppage/shop.css is missing from the build", e);
+        }
+    }
+
+    /**
+     * Bytes and the ETag for exactly those bytes, kept together.
+     *
+     * <p>So that a memoised page carries its own tag rather than being re-digested on every hit,
+     * and so that the two can never be told apart: the tag is derived here, once, from the body it
+     * will be sent with.
+     */
+    private record Document(byte[] body, String etag) {
+
+        static Document of(byte[] body) {
+            return new Document(body, strongTag(body));
         }
     }
 }
