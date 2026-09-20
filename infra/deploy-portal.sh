@@ -28,7 +28,14 @@ cd "$APP"
 #
 # OIDC_REDIRECT_URL is set explicitly instead of being derived from window.location, because
 # Keycloak matches redirect URIs exactly and a trailing slash is part of the match.
+#
+# --no-web-resources-cdn keeps CanvasKit on our own origin. web/flutter_bootstrap.js already
+# points the loader at the local copy, and this makes the build itself stop offering the gstatic
+# one — belt and braces, because the portal's CSP says script-src 'self' and the page renders
+# NOTHING at all if the renderer is fetched from an origin the policy does not allow. Rubik is
+# bundled as an asset (delivery_design_system/pubspec.yaml), so no font comes from a CDN either.
 flutter build web --release \
+  --no-web-resources-cdn \
   --dart-define=KEYCLOAK_ISSUER="https://${IAM_HOST}/realms/delivery-platform" \
   --dart-define=API_BASE_URL="https://${API_HOST}" \
   --dart-define=OIDC_REDIRECT_URL="https://${PORTAL_HOST}/"

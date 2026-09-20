@@ -286,6 +286,22 @@ case "$mobile" in
   *'"directAccessGrantsEnabled": true'*) ok "mobile-app keeps the password grant the apps need" ;;
   *) fail "mobile-app lost the password grant: the phone sign-in and every smoke script use it" ;;
 esac
+# ...and no script may ask delivery-portal for one, because it will be refused. The three files
+# excluded here name the client in order to ASSERT on it rather than to sign in with it: this
+# script, scripts/test/, and rotate-secrets.sh — which proves the refusal against the live realm
+# instead of against the text.
+stale=$(grep -rl 'client_id=.*delivery-portal\|token .* delivery-portal' --include='*.sh' . ../../infra 2>/dev/null \
+  | grep -v -e 'scripts/verify\.sh' -e 'scripts/rotate-secrets\.sh' -e 'scripts/test/' | sort -u | tr '\n' ' ')
+[ -z "$stale" ] \
+  && ok "no script signs in on delivery-portal's password grant" \
+  || fail "these still use delivery-portal's password grant, which is now refused: $stale"
+# The admin REST API is closed on the public hostname, so this script cannot reach it there.
+grep -q 'port-forward svc/keycloak' scripts/rotate-secrets.sh \
+  && ok "rotate-secrets.sh reaches the admin API inside the cluster" \
+  || fail "rotate-secrets.sh does not port-forward to keycloak: its admin calls would meet the edge's 403"
+grep -q '^ADMIN="\$IAM' scripts/rotate-secrets.sh \
+  && fail "rotate-secrets.sh builds the admin API URL from the public hostname again" \
+  || ok "no admin API URL is built from the public iam hostname"
 
 echo "== every YAML alias resolves =="
 # A ConfigMap's `data:` values are strings to Kubernetes, so a dangling `*alias` inside one is
