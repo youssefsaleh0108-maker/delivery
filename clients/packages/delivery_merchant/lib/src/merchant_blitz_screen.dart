@@ -39,117 +39,11 @@ import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:dio/dio.dart';
-import 'package:file_selector/file_selector.dart' show XFile, XTypeGroup, openFiles;
-import 'package:flutter/foundation.dart'
-    show TargetPlatform, debugPrint, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart' show ImagePicker, ImageSource, LostDataResponse;
 
 import 'catalog_scan_review_screen.dart';
 import 'order_detail_screen.dart';
-
-/// One shelf photo as it was picked, before anything has been sent.
-class PickedShelfPhoto {
-  const PickedShelfPhoto({required this.bytes, required this.contentType});
-
-  final Uint8List bytes;
-
-  /// `image/jpeg` or `image/png` — the only types the server can decode and read.
-  final String contentType;
-}
-
-/// Where shelf photos come from.
-///
-/// A seam rather than calls to the plugins inline, for two reasons. The camera exists only on a
-/// phone, so the screen has to ask whether to draw "Take photo" at all rather than draw a button
-/// that cannot work on the web. And a widget test cannot drive a platform picker, so the tests hand
-/// the screen photos directly through this.
-abstract class ShelfPhotoSource {
-  const ShelfPhotoSource();
-
-  /// Whether this device can take a photo. False on the web and on desktops.
-  bool get canUseCamera;
-
-  /// One photo from the camera, or null when the merchant backed out.
-  Future<PickedShelfPhoto?> takePhoto();
-
-  /// Photos from the gallery or the file system — several at once, one per shelf. Empty when the
-  /// merchant backed out.
-  Future<List<PickedShelfPhoto>> choosePhotos({required String label});
-
-  /// A photo the camera took while Android had destroyed this app, handed back once, the next time
-  /// the flow starts. Null when there is none, and everywhere but Android.
-  ///
-  /// Android may destroy the app's activity — often its whole process — while the camera app is in
-  /// front, and memory is shortest on exactly the phones shops use. The photo is still taken and the
-  /// picker keeps it for the app to ask for once it runs again; if nothing asks, it is gone.
-  Future<PickedShelfPhoto?> retrieveLostPhoto() async => null;
-}
-
-/// The real device: image_picker's camera on a phone, file_selector everywhere for the gallery.
-class DeviceShelfPhotoSource extends ShelfPhotoSource {
-  const DeviceShelfPhotoSource();
-
-  /// The long edge the camera is asked for — the same edge a shelf photo keeps if it has to be
-  /// shrunk for upload. The server sends the reader at most 2236 px on the long edge (the most of a
-  /// 4:3 photo Claude reads at full detail), so this sits a little above it: the server only ever
-  /// shrinks, and anything past it would only add upload time.
-  static final double _cameraMaxEdge = CatalogScanApi.shelfPhotoMaxEdge.toDouble();
-
-  @override
-  bool get canUseCamera =>
-      !kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS);
-
-  @override
-  Future<PickedShelfPhoto?> takePhoto() async {
-    final XFile? file = await ImagePicker().pickImage(
-      source: ImageSource.camera,
-      maxWidth: _cameraMaxEdge,
-      maxHeight: _cameraMaxEdge,
-      // Re-encoding at this quality also turns an iPhone's HEIC into a JPEG the server can read.
-      imageQuality: 88,
-    );
-    if (file == null) return null;
-    return PickedShelfPhoto(bytes: await file.readAsBytes(), contentType: _typeOf(file));
-  }
-
-  @override
-  Future<List<PickedShelfPhoto>> choosePhotos({required String label}) async {
-    // The accepted types mirror what the server's decoder reads; anything else would be refused
-    // at the presign with a 422, after the merchant had already waited for it.
-    final List<XFile> files = await openFiles(acceptedTypeGroups: <XTypeGroup>[
-      XTypeGroup(
-        label: label,
-        extensions: const <String>['jpg', 'jpeg', 'png'],
-        mimeTypes: const <String>['image/jpeg', 'image/png'],
-      ),
-    ]);
-    final List<PickedShelfPhoto> picked = <PickedShelfPhoto>[];
-    for (final XFile file in files) {
-      picked.add(PickedShelfPhoto(bytes: await file.readAsBytes(), contentType: _typeOf(file)));
-    }
-    return picked;
-  }
-
-  @override
-  Future<PickedShelfPhoto?> retrieveLostPhoto() async {
-    // Android only: image_picker keeps lost data nowhere else, and says so by throwing.
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return null;
-    final LostDataResponse lost = await ImagePicker().retrieveLostData();
-    final XFile? file = lost.file;
-    // A capture that failed comes back as an exception with no file: nothing to recover.
-    if (lost.isEmpty || file == null) return null;
-    return PickedShelfPhoto(bytes: await file.readAsBytes(), contentType: _typeOf(file));
-  }
-
-  static String _typeOf(XFile file) {
-    final String? mime = file.mimeType;
-    if (mime == 'image/png' || mime == 'image/jpeg') return mime!;
-    return file.name.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
-  }
-}
+import 'photo_source.dart';
 
 /// The Merchant Blitz screen. Pushed as its own route; see the library comment.
 class MerchantBlitzScreen extends StatefulWidget {

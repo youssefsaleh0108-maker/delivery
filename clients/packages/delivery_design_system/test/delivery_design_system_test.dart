@@ -643,4 +643,66 @@ void main() {
       expect(row.getMaxIntrinsicHeight(1000), 64);
     });
   });
+
+  group('the search field camera', () {
+    Widget field({VoidCallback? onCameraTap, String? label, TextDirection direction = TextDirection.ltr}) =>
+        MaterialApp(
+          home: Directionality(
+            textDirection: direction,
+            child: Scaffold(
+              body: Padding(
+                padding: const EdgeInsets.all(16),
+                child: YdSearchField(
+                  hintText: 'Search',
+                  onFilterTap: () {},
+                  filterSemanticLabel: 'Filters',
+                  onCameraTap: onCameraTap,
+                  cameraSemanticLabel: label,
+                ),
+              ),
+            ),
+          ),
+        );
+
+    testWidgets('is not drawn unless both the tap and its label are given', (WidgetTester tester) async {
+      await tester.pumpWidget(field());
+      expect(find.byIcon(Icons.photo_camera_outlined), findsNothing);
+      final double plain = tester.getSize(find.byType(YdSearchField)).height;
+
+      await tester.pumpWidget(field(onCameraTap: () {}));
+      expect(find.byIcon(Icons.photo_camera_outlined), findsNothing);
+      await tester.pumpWidget(field(label: 'Search by photo'));
+      expect(find.byIcon(Icons.photo_camera_outlined), findsNothing);
+      // Without the camera the field is exactly as drawn.
+      expect(tester.getSize(find.byType(YdSearchField)).height, plain);
+    });
+
+    testWidgets('is a labelled 48 dp button that answers a tap', (WidgetTester tester) async {
+      int taps = 0;
+      await tester.pumpWidget(field(onCameraTap: () => taps++, label: 'Search by photo'));
+
+      final Finder camera = find.bySemanticsLabel('Search by photo');
+      expect(camera, findsOneWidget);
+      final Size target = tester.getSize(find.ancestor(
+          of: find.byIcon(Icons.photo_camera_outlined), matching: find.byType(InkResponse)));
+      expect(target.width, greaterThanOrEqualTo(48));
+      expect(target.height, greaterThanOrEqualTo(48));
+      expect(tester.getSize(find.byType(YdSearchField)).height, 48);
+
+      await tester.tap(find.byIcon(Icons.photo_camera_outlined));
+      expect(taps, 1);
+    });
+
+    testWidgets('sits at the trailing end, after the filter, in either direction',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(field(onCameraTap: () {}, label: 'Search by photo'));
+      expect(tester.getCenter(find.byIcon(Icons.photo_camera_outlined)).dx,
+          greaterThan(tester.getCenter(find.byIcon(Icons.tune)).dx));
+
+      await tester.pumpWidget(
+          field(onCameraTap: () {}, label: 'Search by photo', direction: TextDirection.rtl));
+      expect(tester.getCenter(find.byIcon(Icons.photo_camera_outlined)).dx,
+          lessThan(tester.getCenter(find.byIcon(Icons.tune)).dx));
+    });
+  });
 }

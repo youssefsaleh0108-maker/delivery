@@ -12674,4 +12674,89 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get dareaMapUnavailable =>
       'The map can\'t load right now. The delivery area is described below.';
+
+  @override
+  String get psrchCamera => 'Search by photo';
+
+  @override
+  String get psrchSheetTitle => 'Search by photo';
+
+  @override
+  String get psrchSheetBody =>
+      'Take or choose a photo of a product to see the shops near you that sell it.';
+
+  @override
+  String get psrchTakePhoto => 'Take photo';
+
+  @override
+  String get psrchChoosePhoto => 'Choose photo';
+
+  @override
+  String get psrchConsent =>
+      'Your photo is sent to Anthropic, our AI provider, to recognise the product. We don\'t keep it.';
+
+  @override
+  String get psrchLooking => 'Looking at your photo…';
+
+  @override
+  String psrchLooksLike(String name) {
+    return 'Looks like: $name';
+  }
+
+  @override
+  String get psrchLooksLikeHint => 'Search these words instead';
+
+  @override
+  String get psrchSimilar => 'No exact match — similar items';
+
+  @override
+  String get psrchNotAProduct =>
+      'We couldn\'t find a product in this photo. Try a closer photo of the pack.';
+
+  @override
+  String psrchLimitDay(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'You can search by photo $count times a day, and you\'ve used them all today. Search by name, or try again tomorrow.',
+      one:
+          'You can search by photo once a day, and you\'ve done that today. Search by name, or try again tomorrow.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get psrchLimitMinute =>
+      'That\'s a lot of photos at once. Wait a minute, then try again.';
+
+  @override
+  String get psrchLimitPlatform =>
+      'Search by photo is very busy today. Search by name, or try again later.';
+
+  @override
+  String get psrchBusy =>
+      'Lots of people are searching by photo right now. Try again in a moment.';
+
+  @override
+  String get psrchUnavailable =>
+      'Search by photo isn\'t available right now. Search by name instead.';
+
+  @override
+  String get psrchFailed => 'We couldn\'t read your photo just now. Try again.';
+
+  @override
+  String get psrchRefused =>
+      'We can\'t search with this photo. Try another photo.';
+
+  @override
+  String get psrchUnreadable =>
+      'We couldn\'t open this photo. Try another photo.';
+
+  @override
+  String get psrchTooLarge => 'This photo is too large. Try another photo.';
+
+  @override
+  String get psrchWrongType =>
+      'This photo can\'t be used. Choose a JPEG or PNG photo.';
 }

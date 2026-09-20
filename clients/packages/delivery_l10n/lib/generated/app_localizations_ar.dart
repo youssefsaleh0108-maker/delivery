@@ -12833,4 +12833,93 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get dareaMapUnavailable =>
       'تعذّر تحميل الخريطة الآن. منطقة التوصيل موصوفة أدناه.';
+
+  @override
+  String get psrchCamera => 'البحث بالصورة';
+
+  @override
+  String get psrchSheetTitle => 'البحث بالصورة';
+
+  @override
+  String get psrchSheetBody =>
+      'التقط أو اختر صورة لمنتج لترى المتاجر القريبة منك التي تبيعه.';
+
+  @override
+  String get psrchTakePhoto => 'التقط صورة';
+
+  @override
+  String get psrchChoosePhoto => 'اختر صورة';
+
+  @override
+  String get psrchConsent =>
+      'تُرسَل صورتك إلى Anthropic، مزوّد الذكاء الاصطناعي لدينا، للتعرّف على المنتج، ولا نحتفظ بها.';
+
+  @override
+  String get psrchLooking => 'نتعرّف على صورتك…';
+
+  @override
+  String psrchLooksLike(String name) {
+    return 'يبدو أنه: $name';
+  }
+
+  @override
+  String get psrchLooksLikeHint => 'ابحث بهذه الكلمات بدلًا من الصورة';
+
+  @override
+  String get psrchSimilar => 'لا تطابق تامًا — أصناف مشابهة';
+
+  @override
+  String get psrchNotAProduct =>
+      'لم نجد منتجًا في هذه الصورة. جرّب صورة أقرب للعبوة.';
+
+  @override
+  String psrchLimitDay(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'يمكنك البحث بالصورة $count مرة في اليوم، وقد استخدمتها كلها اليوم. ابحث بالاسم، أو حاول غدًا.',
+      many:
+          'يمكنك البحث بالصورة $count مرة في اليوم، وقد استخدمتها كلها اليوم. ابحث بالاسم، أو حاول غدًا.',
+      few:
+          'يمكنك البحث بالصورة $count مرات في اليوم، وقد استخدمتها كلها اليوم. ابحث بالاسم، أو حاول غدًا.',
+      two:
+          'يمكنك البحث بالصورة مرتين في اليوم، وقد استخدمتهما اليوم. ابحث بالاسم، أو حاول غدًا.',
+      one:
+          'يمكنك البحث بالصورة مرة واحدة في اليوم، وقد فعلت ذلك اليوم. ابحث بالاسم، أو حاول غدًا.',
+      zero: 'لا يمكنك البحث بالصورة اليوم. ابحث بالاسم، أو حاول غدًا.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get psrchLimitMinute =>
+      'صور كثيرة دفعة واحدة. انتظر دقيقة ثم حاول مجددًا.';
+
+  @override
+  String get psrchLimitPlatform =>
+      'البحث بالصورة مزدحم جدًا اليوم. ابحث بالاسم، أو حاول لاحقًا.';
+
+  @override
+  String get psrchBusy => 'كثيرون يبحثون بالصور الآن. حاول مجددًا بعد قليل.';
+
+  @override
+  String get psrchUnavailable =>
+      'البحث بالصورة غير متاح الآن. ابحث بالاسم بدلًا من ذلك.';
+
+  @override
+  String get psrchFailed => 'تعذّرت قراءة صورتك الآن. حاول مجددًا.';
+
+  @override
+  String get psrchRefused => 'لا يمكن البحث بهذه الصورة. جرّب صورة أخرى.';
+
+  @override
+  String get psrchUnreadable => 'تعذّر فتح هذه الصورة. جرّب صورة أخرى.';
+
+  @override
+  String get psrchTooLarge => 'هذه الصورة كبيرة جدًا. جرّب صورة أخرى.';
+
+  @override
+  String get psrchWrongType =>
+      'لا يمكن استخدام هذه الصورة. اختر صورة بصيغة JPEG أو PNG.';
 }

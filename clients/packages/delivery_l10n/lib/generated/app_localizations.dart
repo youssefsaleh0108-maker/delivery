@@ -21458,6 +21458,132 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'The map can\'t load right now. The delivery area is described below.'**
   String get dareaMapUnavailable;
+
+  /// No description provided for @psrchCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by photo'**
+  String get psrchCamera;
+
+  /// No description provided for @psrchSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by photo'**
+  String get psrchSheetTitle;
+
+  /// No description provided for @psrchSheetBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Take or choose a photo of a product to see the shops near you that sell it.'**
+  String get psrchSheetBody;
+
+  /// No description provided for @psrchTakePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Take photo'**
+  String get psrchTakePhoto;
+
+  /// No description provided for @psrchChoosePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose photo'**
+  String get psrchChoosePhoto;
+
+  /// No description provided for @psrchConsent.
+  ///
+  /// In en, this message translates to:
+  /// **'Your photo is sent to Anthropic, our AI provider, to recognise the product. We don\'t keep it.'**
+  String get psrchConsent;
+
+  /// No description provided for @psrchLooking.
+  ///
+  /// In en, this message translates to:
+  /// **'Looking at your photo…'**
+  String get psrchLooking;
+
+  /// No description provided for @psrchLooksLike.
+  ///
+  /// In en, this message translates to:
+  /// **'Looks like: {name}'**
+  String psrchLooksLike(String name);
+
+  /// No description provided for @psrchLooksLikeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search these words instead'**
+  String get psrchLooksLikeHint;
+
+  /// No description provided for @psrchSimilar.
+  ///
+  /// In en, this message translates to:
+  /// **'No exact match — similar items'**
+  String get psrchSimilar;
+
+  /// No description provided for @psrchNotAProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t find a product in this photo. Try a closer photo of the pack.'**
+  String get psrchNotAProduct;
+
+  /// No description provided for @psrchLimitDay.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{You can search by photo once a day, and you\'ve done that today. Search by name, or try again tomorrow.} other{You can search by photo {count} times a day, and you\'ve used them all today. Search by name, or try again tomorrow.}}'**
+  String psrchLimitDay(int count);
+
+  /// No description provided for @psrchLimitMinute.
+  ///
+  /// In en, this message translates to:
+  /// **'That\'s a lot of photos at once. Wait a minute, then try again.'**
+  String get psrchLimitMinute;
+
+  /// No description provided for @psrchLimitPlatform.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by photo is very busy today. Search by name, or try again later.'**
+  String get psrchLimitPlatform;
+
+  /// No description provided for @psrchBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'Lots of people are searching by photo right now. Try again in a moment.'**
+  String get psrchBusy;
+
+  /// No description provided for @psrchUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by photo isn\'t available right now. Search by name instead.'**
+  String get psrchUnavailable;
+
+  /// No description provided for @psrchFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t read your photo just now. Try again.'**
+  String get psrchFailed;
+
+  /// No description provided for @psrchRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'We can\'t search with this photo. Try another photo.'**
+  String get psrchRefused;
+
+  /// No description provided for @psrchUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t open this photo. Try another photo.'**
+  String get psrchUnreadable;
+
+  /// No description provided for @psrchTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'This photo is too large. Try another photo.'**
+  String get psrchTooLarge;
+
+  /// No description provided for @psrchWrongType.
+  ///
+  /// In en, this message translates to:
+  /// **'This photo can\'t be used. Choose a JPEG or PNG photo.'**
+  String get psrchWrongType;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

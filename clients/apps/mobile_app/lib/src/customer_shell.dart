@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
+import 'package:delivery_merchant/delivery_merchant.dart' show ShelfPhotoSource;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -54,6 +55,7 @@ class CustomerShell extends StatefulWidget {
     this.offlineStore,
     this.catalogApi,
     this.serviceFiles,
+    this.photoSource,
     required this.session,
     required this.locale,
     required this.onSignOut,
@@ -122,6 +124,10 @@ class CustomerShell extends StatefulWidget {
   /// main.dart passes `OrderAttachmentFiles`. Null only in tests; an offer that needs a file is then
   /// not offered for ordering.
   final ServiceOrderFiles? serviceFiles;
+
+  /// Where a photo to search by comes from. Null leaves Home with the device's own camera and
+  /// gallery; a test stands in for them here.
+  final ShelfPhotoSource? photoSource;
   final AuthSession session;
 
   /// Passed to the home screen for the language toggle in the app bar.
@@ -468,6 +474,7 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
           onOpenBasket: _openBasket,
           onOpenGiftHub: _giftHubEntry,
           connectivity: _online,
+          photoSource: widget.photoSource,
           neighbourhoodChatApi: widget.neighbourhoodChatApi,
           chatSocket: widget.chatSocket,
           // Built here because this is where the chat client and its socket live; Home hands it to
