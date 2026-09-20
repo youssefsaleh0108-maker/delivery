@@ -731,7 +731,7 @@ class ItemSearchDatabaseTest {
                 repositories.getRepository(CategoryRepository.class),
                 new ServiceCategories(new MockEnvironment()),
                 org.mockito.Mockito.mock(com.delivery.product.service.OnboardingApplicationClient.class),
-                Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofHours(4));
+                Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofHours(4), "Asia/Beirut");
     }
 
     private ItemSearchService service(Duration statementTimeout) {

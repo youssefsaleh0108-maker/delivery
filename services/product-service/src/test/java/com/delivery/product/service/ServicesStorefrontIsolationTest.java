@@ -99,7 +99,7 @@ class ServicesStorefrontIsolationTest {
                     mock(StoreFavoriteRepository.class), mock(ProductRepository.class),
                     mock(CategoryRepository.class), new ServiceCategories(environment),
                     mock(OnboardingApplicationClient.class),
-                    Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofHours(4));
+                    Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofHours(4), "Asia/Beirut");
             when(stores.findStorefront(any(), any(), any(), any(), any(), any(), any()))
                     .thenReturn(Page.empty());
             when(stores.findServicesStorefront(any(), any(), any(), any(), any(), any(), any()))

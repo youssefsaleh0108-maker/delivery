@@ -111,7 +111,7 @@ class ItemSearchServiceTest {
                 mock(StoreFavoriteRepository.class), productRepository, mock(CategoryRepository.class),
                 new ServiceCategories(new MockEnvironment()),
                 mock(OnboardingApplicationClient.class),
-                Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofHours(4));
+                Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofHours(4), "Asia/Beirut");
 
         when(search.findCandidates(anyString(), anyString(), anyString(), anyString(), anyString(),
                 anyString(), anyString(), anyBoolean(), anyDouble(), anyDouble(), anyDouble(), anyDouble(),

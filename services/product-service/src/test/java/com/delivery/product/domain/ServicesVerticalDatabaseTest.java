@@ -350,7 +350,7 @@ class ServicesVerticalDatabaseTest {
                 new ServiceCategories(environment),
                 org.mockito.Mockito.mock(
                         com.delivery.product.service.OnboardingApplicationClient.class),
-                Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofHours(4));
+                Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofHours(4), "Asia/Beirut");
     }
 
     private String urlInSchema() {

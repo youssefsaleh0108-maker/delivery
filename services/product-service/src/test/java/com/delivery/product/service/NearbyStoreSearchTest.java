@@ -102,7 +102,7 @@ class NearbyStoreSearchTest {
         service = new StoreService(stores, offers, favorites, products, categories,
                 new ServiceCategories(environment),
                 org.mockito.Mockito.mock(OnboardingApplicationClient.class),
-                Clock.fixed(NOW, ZoneOffset.UTC), FRESH_FOR);
+                Clock.fixed(NOW, ZoneOffset.UTC), FRESH_FOR, "Asia/Beirut");
         world.clear();
         betweenTheQueries = () -> { };
 

@@ -77,7 +77,7 @@ class StoreAdministrationTest {
                 new ServiceCategories(new org.springframework.mock.env.MockEnvironment()),
                 org.mockito.Mockito.mock(OnboardingApplicationClient.class),
                 Clock.fixed(Instant.parse("2026-09-09T09:00:00Z"), ZoneOffset.UTC),
-                Duration.ofHours(4));
+                Duration.ofHours(4), "Asia/Beirut");
 
         store = new Store(MERCHANT, "Beirut Grill", Store.Vertical.RESTAURANT);
         when(stores.findByIdAndMerchantId(store.getId(), MERCHANT)).thenReturn(Optional.of(store));

@@ -83,7 +83,7 @@ class StoreServiceTest {
                 mock(StoreFavoriteRepository.class), mock(ProductRepository.class),
                 mock(CategoryRepository.class), new ServiceCategories(new MockEnvironment()),
                 applications, Clock.fixed(Instant.parse("2026-09-13T10:00:00Z"), ZoneOffset.UTC),
-                Duration.ofHours(4));
+                Duration.ofHours(4), "Asia/Beirut");
         when(stores.save(any(Store.class))).thenAnswer(call -> call.getArgument(0));
         when(stores.findByMerchantIdOrderByCreatedAtDesc(MERCHANT)).thenReturn(List.of());
     }

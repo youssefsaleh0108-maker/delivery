@@ -158,7 +158,7 @@ class ServiceOffersDatabaseTest {
                 repositories.getRepository(StoreFavoriteRepository.class), products, categories,
                 new ServiceCategories(new MockEnvironment()), mock(OnboardingApplicationClient.class),
                 Clock.fixed(NOW, ZoneOffset.UTC),
-                Duration.ofHours(4));
+                Duration.ofHours(4), "Asia/Beirut");
         catalog = new CatalogService(products, categories, storeService, mock(OutboxRecorder.class),
                 stores, serviceTerms, repositories.getRepository(StoreDeliveryZoneRepository.class),
                 repositories.getRepository(ProductOptionGroupRepository.class),
@@ -511,7 +511,7 @@ class ServiceOffersDatabaseTest {
                 repositories.getRepository(StoreFavoriteRepository.class), products,
                 repositories.getRepository(CategoryRepository.class), new ServiceCategories(environment),
                 mock(OnboardingApplicationClient.class), Clock.fixed(NOW, ZoneOffset.UTC),
-                Duration.ofHours(4));
+                Duration.ofHours(4), "Asia/Beirut");
         return new PopularServiceShops(stores, storeService, new ServiceCategories(environment),
                 Clock.fixed(NOW, ZoneOffset.UTC), 5000, 30, 3);
     }

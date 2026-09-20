@@ -81,7 +81,7 @@ class PopularServiceShopsTest {
                 mock(StoreFavoriteRepository.class), mock(ProductRepository.class),
                 mock(CategoryRepository.class), new ServiceCategories(environment),
                 mock(OnboardingApplicationClient.class), Clock.fixed(NOW, ZoneOffset.UTC),
-                Duration.ofHours(4));
+                Duration.ofHours(4), "Asia/Beirut");
 
         when(stores.findPopularServiceShopIdsNear(anyDouble(), anyDouble(), anyDouble(), anyString(),
                 any(Instant.class), anyLong(), anyInt()))

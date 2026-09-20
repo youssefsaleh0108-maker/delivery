@@ -107,6 +107,24 @@ public class ApiExceptionHandler {
     }
 
     /**
+     * A shop that cannot be listed yet: no opening hours, or no pin on the map.
+     *
+     * <p>422 with the {@code code} a client branches on ({@code STORE_HOURS_REQUIRED},
+     * {@code STORE_PIN_REQUIRED}). It is not folded into the rule violation above precisely because
+     * of the code: the merchant app has to send the merchant to the week's hours or to the map
+     * picker, and choosing between them by matching English prose is not something that survives
+     * translation. The detail is still a sentence, so an older client that ignores the code shows
+     * something true.
+     */
+    @ExceptionHandler(com.delivery.product.domain.Store.NotListableException.class)
+    public ProblemDetail onNotListable(com.delivery.product.domain.Store.NotListableException e) {
+        ProblemDetail detail =
+                problem(HttpStatus.UNPROCESSABLE_ENTITY, "Shop not ready to be listed", e.getMessage());
+        detail.setProperty("code", e.getCode());
+        return detail;
+    }
+
+    /**
      * A services applicant reaching a path that would open a shop for them — a first product, a
      * first scan — before their services shop is open.
      *

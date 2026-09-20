@@ -802,7 +802,7 @@ class OfferModerationDatabaseTest {
                 repositories.getRepository(StoreOfferRepository.class),
                 repositories.getRepository(StoreFavoriteRepository.class), productRepository, categories,
                 new ServiceCategories(new MockEnvironment()), mock(OnboardingApplicationClient.class),
-                Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofHours(4));
+                Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofHours(4), "Asia/Beirut");
         CatalogService catalogService = new CatalogService(productRepository, categories, shops,
                 mock(OutboxRecorder.class), storeRepository, serviceTerms,
                 repositories.getRepository(StoreDeliveryZoneRepository.class),
