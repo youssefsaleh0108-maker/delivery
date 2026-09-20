@@ -51,8 +51,8 @@ echo '=== 0. Actors ============================================================
 
 CUSTOMER=$(token customer 100001 mobile-app)
 RIDER=$(token rider 300003 mobile-app)
-MERCHANT=$(token merchant 200002 delivery-portal)
-BACKOFFICE=$(token backoffice 400004 delivery-portal)
+MERCHANT=$(token merchant 200002 mobile-app)
+BACKOFFICE=$(token backoffice 400004 mobile-app)
 
 MERCHANT_SUB=$(claim_of "$MERCHANT" '.sub')
 RIDER_SUB=$(claim_of "$RIDER" '.sub')

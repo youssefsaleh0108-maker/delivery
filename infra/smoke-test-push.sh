@@ -69,9 +69,9 @@ echo
 echo '=== 0. Actors ==================================================================='
 
 CUSTOMER=$(token customer 100001)
-MERCHANT=$(token merchant 200002 delivery-portal)
+MERCHANT=$(token merchant 200002 mobile-app)
 RIDER=$(token rider 300003)
-BACKOFFICE=$(token backoffice 400004 delivery-portal)
+BACKOFFICE=$(token backoffice 400004 mobile-app)
 
 check 'customer signed in'   'yes' "$([ -n "$CUSTOMER" ]   && [ "$CUSTOMER" != null ]   && echo yes || echo no)"
 check 'merchant signed in'   'yes' "$([ -n "$MERCHANT" ]   && [ "$MERCHANT" != null ]   && echo yes || echo no)"

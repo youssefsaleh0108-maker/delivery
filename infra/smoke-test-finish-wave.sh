@@ -25,10 +25,10 @@ pc() { printf '%06d' $(( $(od -An -N4 -tu4 /dev/urandom | tr -d ' ') % 1000000 )
 OLD_PC=$(pc); NEW_PC=$(pc); THIRD_PC=$(pc)
 
 CUST=$(tok customer "$DEMO_CUSTOMER_PASSWORD")
-MERCH=$(tok merchant "$DEMO_MERCHANT_PASSWORD" delivery-portal)
+MERCH=$(tok merchant "$DEMO_MERCHANT_PASSWORD" mobile-app)
 RIDER=$(tok rider "$DEMO_RIDER_PASSWORD")
-BO=$(tok backoffice "$DEMO_BACKOFFICE_PASSWORD" delivery-portal)
-CARRIER=$(tok carrier "$DEMO_CARRIER_PASSWORD" delivery-portal)
+BO=$(tok backoffice "$DEMO_BACKOFFICE_PASSWORD" mobile-app)
+CARRIER=$(tok carrier "$DEMO_CARRIER_PASSWORD" mobile-app)
 
 echo '=== 1. Delivery tiers ==========================================================='
 P=$(curl -s "$GW/api/products/mine?size=50" -H "Authorization: Bearer $MERCH" | jq -r '[(.content // .)[]|select(.status=="ACTIVE")][0].id')

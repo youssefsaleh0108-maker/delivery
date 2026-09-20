@@ -28,9 +28,14 @@ check() { # check <description> <expected> <actual>
   fi
 }
 
+# Every caller signs in on mobile-app, merchant and back office included. delivery-portal has no
+# password grant any more (PT-3): a public client with direct access grants turns a phished
+# back-office password straight into a session, with no browser, no SSO and nowhere to put a
+# second factor. Nothing is lost here — a token's roles come from the ACCOUNT, not from the client
+# it was minted for, so what these scripts are allowed to do is unchanged.
 token() { # token <username> <password> [client]
   curl -s -X POST "$KC" \
-    -d "client_id=${3:-delivery-portal}" -d "username=$1" -d "password=$2" \
+    -d "client_id=${3:-mobile-app}" -d "username=$1" -d "password=$2" \
     -d "grant_type=password" | jq -r '.access_token'
 }
 
@@ -63,7 +68,7 @@ echo '=== 1. Authentication ====================================================
 
 MERCHANT=$(token merchant 200002)
 CUSTOMER=$(token customer 100001 mobile-app)
-BACKOFFICE=$(token backoffice 400004 delivery-portal)
+BACKOFFICE=$(token backoffice 400004 mobile-app)
 
 [ -n "$MERCHANT" ] && [ "$MERCHANT" != null ] || { echo 'Could not obtain a merchant token'; exit 1; }
 
