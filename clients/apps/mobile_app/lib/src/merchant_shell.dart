@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 
 import 'notification_inbox.dart';
 import 'notifications_screen.dart' show NotificationPrefsScreen, NotificationsScreen;
+import 'platform_share.dart';
 import 'services_shop_bootstrap.dart';
 import 'settings_screen.dart';
 
@@ -518,6 +519,9 @@ class _MerchantShellState extends State<MerchantShell> {
           accountContact: widget.session.email ?? widget.session.username,
           onEditAccount: _openAccountPreferences,
           onShopProfile: _access.isOwner ? _openShopProfile : null,
+          // Owner-only for the same reason as the row above it: the page, the QR code and the
+          // poster are all read from "shops you own", so an employee would open an empty screen.
+          onShareShop: _access.isOwner ? _openShareShop : null,
           // Owner-only, like the shop profile above it: which shop's threads a merchant may read is
           // Product Service's "shops you own", so an employee's inbox would always be empty.
           onShopMessages:
@@ -611,6 +615,32 @@ class _MerchantShellState extends State<MerchantShell> {
         api: widget.storeApi,
         geocoding: widget.geocodingApi,
         onBack: navigator.pop,
+        // The phone has a share sheet; the portal mounting the same screen does not. See
+        // PlatformShare.
+        onShare: PlatformShare.text,
+      ),
+    ));
+  }
+
+  /// The shop's page, QR code and poster, from the Settings list.
+  ///
+  /// The same block that sits on Shop Profile, given a screen of its own here because on the phone
+  /// that profile is two taps in and behind a form — and this is the one thing a merchant opens
+  /// with a customer already standing in front of them.
+  void _openShareShop() {
+    final NavigatorState navigator = Navigator.of(context);
+    navigator.push(MaterialPageRoute<void>(
+      builder: (_) => ShopShareScreen(
+        api: widget.storeApi,
+        onShare: PlatformShare.text,
+        onBack: navigator.pop,
+        // "Place your shop on the map" leads to the screen that holds the map. This screen steps
+        // out of the way rather than stacking under it: a merchant who drops the pin is done, and
+        // backing out onto a share screen still showing "no page yet" would be a stale answer.
+        onShopProfile: () {
+          navigator.pop();
+          _openShopProfile();
+        },
       ),
     ));
   }

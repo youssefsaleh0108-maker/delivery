@@ -13301,4 +13301,52 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get notifCatMerchantInsights => 'Demand and insights';
+
+  @override
+  String get merchShareTitle => 'Share your shop';
+
+  @override
+  String get merchShareYourLink => 'Your shop\'s page';
+
+  @override
+  String get merchShareWhatTheySee =>
+      'Whoever opens it sees your shop\'s name, whether you\'re open, where you deliver, and your items with prices.';
+
+  @override
+  String get merchShareCopyLink => 'Copy link';
+
+  @override
+  String get merchShareLinkCopied => 'Link copied';
+
+  @override
+  String get merchShareShare => 'Share';
+
+  @override
+  String get merchSharePrintPoster => 'Print the poster';
+
+  @override
+  String get merchShareQrLabel => 'QR code for your shop\'s page';
+
+  @override
+  String get merchShareQrFailed => 'The QR code didn\'t load';
+
+  @override
+  String get merchShareCouldNotOpenPoster => 'Couldn\'t open the poster';
+
+  @override
+  String get merchShareNoPageTitle => 'Your shop has no page yet';
+
+  @override
+  String get merchShareNeedsPin =>
+      'Place your shop on the map, and its page and QR code are ready to share.';
+
+  @override
+  String get merchSharePlaceOnMap => 'Place your shop on the map';
+
+  @override
+  String get merchShareNeedsPublish =>
+      'Publish your shop, and its page and QR code are ready to share.';
+
+  @override
+  String get merchSharePublishYourShop => 'Publish your shop';
 }

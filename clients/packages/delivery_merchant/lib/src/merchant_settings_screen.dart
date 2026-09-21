@@ -46,6 +46,7 @@ class MerchantSettingsScreen extends StatelessWidget {
     this.accountContact,
     this.onEditAccount,
     this.onShopProfile,
+    this.onShareShop,
     this.onShopMessages,
     this.shopMessagesUnread,
     this.onServiceOrders,
@@ -78,6 +79,12 @@ class MerchantSettingsScreen extends StatelessWidget {
 
   /// Opens the shop's own configuration — `StoreScreen` in this package.
   final VoidCallback? onShopProfile;
+
+  /// Opens the shop's page, its QR code and its printable poster — `ShopShareScreen` in this
+  /// package. Absent, not disabled, when the host has not wired it, like the rows below: which
+  /// shop's page this is comes from "shops you own", so it is an owner's row and an employee
+  /// should not see a door they cannot open.
+  final VoidCallback? onShareShop;
 
   /// Opens the shop's conversations with customers ([ShopInboxScreen]). Right under the shop's own
   /// profile, because both are the shop as customers meet it. Absent, not disabled, when the host has
@@ -294,6 +301,18 @@ class MerchantSettingsScreen extends StatelessWidget {
             title: t.merchbShopProfile,
             onTap: onShopProfile,
           ),
+          // Beside Shop Profile, because it is about the same shop and a merchant looking for
+          // "where do customers find me" looks here first. Its own row rather than a corner of the
+          // profile screen: it is the one thing on this list a merchant opens to show somebody
+          // else, often with a customer standing in front of them.
+          if (onShareShop != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _MenuRow(
+              icon: Icons.qr_code_2,
+              title: t.merchShareTitle,
+              onTap: onShareShop,
+            ),
+          ],
           if (onShopMessages != null) ...<Widget>[
             const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
             _MenuRow(

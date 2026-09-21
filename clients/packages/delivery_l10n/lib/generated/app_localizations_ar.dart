@@ -13472,4 +13472,52 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get notifCatMerchantInsights => 'الطلب والرؤى';
+
+  @override
+  String get merchShareTitle => 'شارك متجرك';
+
+  @override
+  String get merchShareYourLink => 'صفحة متجرك';
+
+  @override
+  String get merchShareWhatTheySee =>
+      'من يفتح الرابط يرى اسم متجرك، وهل هو مفتوح الآن، وأين يوصّل، وأصنافه بأسعارها.';
+
+  @override
+  String get merchShareCopyLink => 'نسخ الرابط';
+
+  @override
+  String get merchShareLinkCopied => 'تم نسخ الرابط';
+
+  @override
+  String get merchShareShare => 'مشاركة';
+
+  @override
+  String get merchSharePrintPoster => 'اطبع الملصق';
+
+  @override
+  String get merchShareQrLabel => 'رمز QR لصفحة متجرك';
+
+  @override
+  String get merchShareQrFailed => 'تعذّر تحميل رمز QR';
+
+  @override
+  String get merchShareCouldNotOpenPoster => 'تعذّر فتح الملصق';
+
+  @override
+  String get merchShareNoPageTitle => 'ليس لمتجرك صفحة بعد';
+
+  @override
+  String get merchShareNeedsPin =>
+      'ضع متجرك على الخريطة، فتصبح صفحته ورمز QR جاهزين للمشاركة.';
+
+  @override
+  String get merchSharePlaceOnMap => 'ضع متجرك على الخريطة';
+
+  @override
+  String get merchShareNeedsPublish =>
+      'انشر متجرك، فتصبح صفحته ورمز QR جاهزين للمشاركة.';
+
+  @override
+  String get merchSharePublishYourShop => 'انشر متجرك';
 }
