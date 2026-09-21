@@ -306,6 +306,10 @@ enum ShopPageText {
         return this == AR ? "انتقل إلى" : "Jump to";
     }
 
+    /** The way back up a long menu, which is also the way back to the search box. */
+    String backToTop() {
+        return this == AR ? "العودة إلى أعلى القائمة" : "Back to the top of the menu";
+    }
 
     /**
      * Shipped in the markup rather than built by the script, so it is in the reader's own language

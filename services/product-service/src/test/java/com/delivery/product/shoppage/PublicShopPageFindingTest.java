@@ -134,9 +134,21 @@ class PublicShopPageFindingTest {
     }
 
     @Test
-    @DisplayName("the menu section is named, so an anchor can point back at it")
-    void theMenuHasAnIdOfItsOwn() throws Exception {
-        assertThat(render(aisled(), "en")).contains("<section class=\"block menu\" id=\"menu\">");
+    @DisplayName("a long menu offers a way back to the top, and a short one does not")
+    void aLongMenuCanBeClimbedBackUp() throws Exception {
+        ShopPageFixture longMenu = new ShopPageFixture();
+        List<Item> items = new ArrayList<>();
+        for (int i = 0; i < 13; i++) {
+            items.add(Item.of("Thing " + i, "1.25"));
+        }
+        longMenu.section("Bread", items.toArray(Item[]::new));
+
+        // A plain anchor at the menu's own id, so it works with no script — and it lands on the
+        // search box, which is the other thing a reader at the bottom of a long shelf wants.
+        assertThat(render(longMenu, "en"))
+                .contains("<section class=\"block menu\" id=\"menu\">")
+                .contains("<p class=\"top\"><a href=\"#menu\">Back to the top of the menu</a></p>");
+        assertThat(render(aisled(), "en")).doesNotContain("class=\"top\"");
     }
 
     @ParameterizedTest(name = "in {0}")
@@ -226,7 +238,7 @@ class PublicShopPageFindingTest {
                 .contains("class=\"find\"")
                 .contains("class=\"bar\"")
                 .contains("class=\"sec\"")
-                .contains("class=\"items\"")
+                .contains("<ul class=\"items")
                 .contains("class=\"n\"");
     }
 

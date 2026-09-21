@@ -104,7 +104,7 @@ class PublicShopPageApiTest {
         }
         // Nothing to find and nothing to jump to, so neither control is drawn.
         assertThat(html).doesNotContain("class=\"find\"").doesNotContain("class=\"bar\"")
-                .doesNotContain("class=\"items\"");
+                .doesNotContain("class=\"items");
     }
 
     /**

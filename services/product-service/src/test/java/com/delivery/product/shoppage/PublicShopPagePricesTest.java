@@ -36,6 +36,18 @@ class PublicShopPagePricesTest {
                 .section("Bread", Item.of("Kaak", "1.50"), Item.of("Markouk", "3.25"));
     }
 
+    /**
+     * A price on a row, as the menu draws it.
+     *
+     * <p>Two elements rather than one "$1.50 · 135,000 LBP" string: the price column on a 320 px
+     * screen is about eighty pixels wide and that sentence does not fit in it, so the dollar figure
+     * is the price and the lira sits under it in smaller type. The arithmetic below is unchanged —
+     * it is the same conversion, asked of the same markup in its new shape.
+     */
+    private static String priced(String usd, String lbp) {
+        return "<span class=\"p\">" + usd + "<span class=\"l\">" + lbp + "</span></span>";
+    }
+
     @Test
     @DisplayName("each item shows dollars and lira, converted at the configured rate")
     void showsBothCurrencies() throws Exception {
@@ -43,8 +55,8 @@ class PublicShopPagePricesTest {
 
         // 1.50 x 90,000 = 135,000 exactly. 3.25 x 90,000 = 292,500, which rounds up to 293,000.
         assertThat(html)
-                .contains("$1.50 · 135,000 LBP")
-                .contains("$3.25 · 293,000 LBP")
+                .contains(priced("$1.50", "135,000 LBP"))
+                .contains(priced("$3.25", "293,000 LBP"))
                 .contains("lira converted at 90,000 LBP to the dollar");
     }
 
@@ -57,8 +69,8 @@ class PublicShopPagePricesTest {
         assertThat(before).contains("135,000 LBP").doesNotContain("195,000 LBP");
         // 1.50 x 130,000 = 195,000. 3.25 x 130,000 = 422,500, rounded up to 423,000.
         assertThat(after)
-                .contains("$1.50 · 195,000 LBP")
-                .contains("$3.25 · 423,000 LBP")
+                .contains(priced("$1.50", "195,000 LBP"))
+                .contains(priced("$3.25", "423,000 LBP"))
                 .contains("lira converted at 130,000 LBP to the dollar");
     }
 

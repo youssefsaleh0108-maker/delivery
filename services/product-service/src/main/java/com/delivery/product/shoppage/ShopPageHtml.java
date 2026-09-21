@@ -380,6 +380,15 @@ final class ShopPageHtml {
                 .append(esc(t.timesIn(opening.timezone()))).append("</p></section>");
     }
 
+    /**
+     * How long a menu has to be before it is worth offering a way back up.
+     *
+     * <p>Twelve rows is roughly two phone screens of shelf. Below that the reader can see where
+     * they came from, and a "back to the top" link under a four-item shop is a control apologising
+     * for a scroll that never happened.
+     */
+    private static final int LONG_MENU = 12;
+
     private static void catalogue(StringBuilder b, PublicShopPage page, ShopPageText t) {
         PublicShopPage.Catalogue catalogue = page.catalogue();
         // Named, because the bar's own "back to the top" link points here: the top of the menu is
@@ -405,37 +414,14 @@ final class ShopPageHtml {
             // A wrapper with a positional id, so a chip on the bar has something to land on and
             // the filter has one element to hide when a search empties the whole aisle. Positional
             // rather than the section's own row id, which has no business being on this page.
+            // "pic" when anything in this aisle has a photo, and the stylesheet then holds the
+            // picture's column open for the rows that have none, so the names keep one edge. An
+            // aisle nobody photographed gets no class and no empty column to explain.
             b.append("<div class=\"sec\" id=\"s").append(++index).append("\">")
-                    .append("<h3>").append(esc(name)).append("</h3><ul class=\"items\">");
+                    .append("<h3>").append(esc(name)).append("</h3><ul class=\"items")
+                    .append(pictured(section) ? " pic" : "").append("\">");
             for (PublicShopPage.Item item : section.items()) {
-                b.append("<li").append(item.inStock() ? "" : " class=\"gone\"").append(">");
-                if (item.imageUrl() != null) {
-                    // Lazy below the fold: a hundred thumbnails fetched eagerly is the difference
-                    // between a page that opens on a bus and one that does not.
-                    b.append("<img src=\"").append(esc(item.imageUrl()))
-                            .append("\" alt=\"\" loading=\"lazy\" decoding=\"async\">");
-                }
-                // A row with something to say opens where it stands. <details> is the browser's
-                // own disclosure: it expands with no script, no page load and no scroll position
-                // lost, it carries its own keyboard and screen-reader behaviour, and the reader
-                // with scripting off gets exactly the same row as everybody else. The triangle is
-                // the signal — a row without one has nothing more behind it.
-                boolean expands = item.about() != null && !item.about().isBlank();
-                if (expands) {
-                    b.append("<details><summary>");
-                }
-                b.append("<span class=\"n\">").append(esc(item.name())).append("</span>");
-                if (expands) {
-                    b.append("</summary><p class=\"d\">").append(esc(item.about()))
-                            .append("</p></details>");
-                }
-                b.append("<span class=\"p\">")
-                        .append(esc(t.price(item.priceUsd(), item.priceLbp())))
-                        .append("</span>");
-                if (!item.inStock()) {
-                    b.append("<span class=\"x\">").append(esc(t.outOfStock())).append("</span>");
-                }
-                b.append("</li>");
+                item(b, item, t);
             }
             b.append("</ul></div>");
         }
@@ -444,7 +430,69 @@ final class ShopPageHtml {
                     .append(esc(t.andMoreInTheApp(catalogue.total() - catalogue.shown())))
                     .append("</p>");
         }
+        if (catalogue.shown() > LONG_MENU) {
+            // A plain anchor at the section's own id: the way back up works for the reader with no
+            // script exactly as it does for everybody else, and it lands on the search box.
+            b.append("<p class=\"top\"><a href=\"#menu\">").append(esc(t.backToTop()))
+                    .append("</a></p>");
+        }
         b.append("</section>");
+    }
+
+    /** Whether anything in this aisle has a photo, which decides the aisle's left edge. */
+    private static boolean pictured(PublicShopPage.Section section) {
+        for (PublicShopPage.Item item : section.items()) {
+            if (item.imageUrl() != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * One line of the menu: the picture, the name, what it costs.
+     *
+     * <p>The three are laid out by the stylesheet as a grid rather than in the order they are
+     * written here, so that the prices form a column a reader can run an eye down. What is written
+     * here is reading order — name, then whether it can be had at all, then the price — which is
+     * the order a screen reader announces and the order the row falls into when there is no
+     * stylesheet at all.
+     */
+    private static void item(StringBuilder b, PublicShopPage.Item item, ShopPageText t) {
+        b.append("<li").append(item.inStock() ? "" : " class=\"gone\"").append(">");
+        if (item.imageUrl() != null) {
+            // Lazy below the fold: a hundred thumbnails fetched eagerly is the difference between
+            // a page that opens on a bus and one that does not. The square it lands in is sized by
+            // the stylesheet, so the row is its final height before the picture arrives.
+            b.append("<img src=\"").append(esc(item.imageUrl()))
+                    .append("\" alt=\"\" loading=\"lazy\" decoding=\"async\">");
+        }
+        // A row with something to say opens where it stands. <details> is the browser's own
+        // disclosure: it expands with no script, no page load and no scroll position lost, it
+        // carries its own keyboard and screen-reader behaviour, and the reader with scripting off
+        // gets exactly the same row as everybody else. The triangle is the signal — a row without
+        // one has nothing more behind it.
+        boolean expands = item.about() != null && !item.about().isBlank();
+        if (expands) {
+            b.append("<details><summary>");
+        }
+        b.append("<span class=\"n\">").append(esc(item.name())).append("</span>");
+        if (expands) {
+            b.append("</summary><p class=\"d\">").append(esc(item.about()))
+                    .append("</p></details>");
+        }
+        if (!item.inStock()) {
+            b.append("<span class=\"x\">").append(esc(t.outOfStock())).append("</span>");
+        }
+        // The two currencies as two elements rather than one "$1.50 · 135,000 LBP" string, because
+        // the price column on a 320 px screen is about eighty pixels wide and that sentence does
+        // not fit in it. The dollar figure is the price; the lira is the same price converted, and
+        // it sits under it in smaller type saying so by its position.
+        b.append("<span class=\"p\">").append(esc(t.usd(item.priceUsd())));
+        if (item.priceLbp() != null) {
+            b.append("<span class=\"l\">").append(esc(t.lbp(item.priceLbp()))).append("</span>");
+        }
+        b.append("</span></li>");
     }
 
     /**
