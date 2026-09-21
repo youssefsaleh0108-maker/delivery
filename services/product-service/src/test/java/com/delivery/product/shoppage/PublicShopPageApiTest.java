@@ -112,20 +112,25 @@ class PublicShopPageApiTest {
     /**
      * It is still a document, not an app.
      *
-     * <p>There is one script now — the catalogue filter — and the shape of it is the promise: a
-     * file from this origin, deferred, with nothing inline and no handler attribute anywhere. The
-     * page is complete before it arrives and stays complete if it never does, which is what the
-     * whole design rests on: a chat app's preview runs no JavaScript at all.
+     * <p>Two {@code <script>} elements now, and neither one is code the page was handed: the
+     * catalogue filter, which is a file from this origin, and the structured-data block, which
+     * carries a JSON media type a browser parses as data and never executes — which is also why
+     * {@code script-src 'self'} does not have to allow anything inline for it. Nothing here is
+     * inline JavaScript, and there is no handler attribute anywhere. The page is complete before
+     * either arrives and stays complete if neither does, which is what the whole design rests on:
+     * a chat app's preview runs no JavaScript at all.
      */
     @Test
-    @DisplayName("one script, from this origin, and nothing inline")
-    void carriesOneExternalScriptAndNothingInline() throws Exception {
+    @DisplayName("no inline code: one script file from this origin, and one block of data")
+    void carriesNoInlineScript() throws Exception {
         ShopPageFixture shop = stocked();
         String html = body(shop.mvc().perform(get("/s/" + shop.slug())).andReturn());
 
-        assertThat(html.split("<script", -1).length - 1).isEqualTo(1);
+        // Every script element on the page is one of the two, by name.
+        assertThat(html.split("<script", -1).length - 1).isEqualTo(2);
         assertThat(html)
                 .contains("<script src=\"/s/assets/shop.js\" defer></script>")
+                .contains("<script type=\"application/ld+json\">")
                 .doesNotContain("javascript:")
                 .doesNotContain("onerror=")
                 .doesNotContain("onload=")

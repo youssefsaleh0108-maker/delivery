@@ -49,6 +49,54 @@ class ShopPageEscapingTest {
         assertThat(ShopPageHtml.esc("\uFEFFManakish")).isEqualTo("Manakish");
     }
 
+    // ---------------------------------------------------------------- the other one
+
+    /**
+     * The structured data is not markup, and the markup escaper is wrong for it in both
+     * directions: {@code &quot;} is six literal characters inside a JSON string rather than a
+     * quote mark, and a backslash — which HTML does not care about at all — ends the string early
+     * and turns the rest of a shop's name into JSON syntax.
+     */
+    @Test
+    @DisplayName("the JSON escaper escapes what JSON needs, which is not what HTML needs")
+    void escapesForJson() {
+        assertThat(ShopPageHtml.json("Tom \"Jerry's\" \\ shop"))
+                .isEqualTo("Tom \\\"Jerry's\\\" \\\\ shop");
+        assertThat(ShopPageHtml.json(null)).isEmpty();
+        // An apostrophe is not special in JSON, and escaping it would put a backslash into the
+        // name a search engine reads back.
+        assertThat(ShopPageHtml.json("Jerry's")).isEqualTo("Jerry's");
+    }
+
+    /**
+     * The block lives inside an HTML document, and the HTML parser reads it as raw text until it
+     * meets {@code </script>} — whatever the JSON around it says. So a shop is allowed to call
+     * itself that, and the three characters that could write a tag are escaped numerically: the
+     * JSON parser still sees them, and the HTML parser never does.
+     */
+    @Test
+    @DisplayName("a shop that closes the script tag cannot: the three tag characters are escaped")
+    void cannotCloseItsOwnDataBlock() {
+        String hostile = "</script><script>alert(1)</script>";
+
+        String safe = ShopPageHtml.json(hostile);
+
+        assertThat(safe).doesNotContain("<").doesNotContain(">").doesNotContain("&")
+                .isEqualTo("\\u003C/script\\u003E\\u003Cscript\\u003Ealert(1)"
+                        + "\\u003C/script\\u003E");
+    }
+
+    @Test
+    @DisplayName("the same invisible characters go, because a control character is invalid JSON")
+    void dropsTheSameInvisibleCharacters() {
+        // Not merely unwelcome: a raw control character makes the whole block unparseable, and an
+        // override that survived would reverse the shop's name in a search result.
+        assertThat(ShopPageHtml.json("Za\u0000ta\u001Br\u007F")).isEqualTo("Zatar");
+        assertThat(ShopPageHtml.json("Dekkane \u202Ereversed\u202C")).isEqualTo("Dekkane reversed");
+        assertThat(ShopPageHtml.json("Open\tall\nnight\r")).isEqualTo("Open all night ");
+        assertThat(ShopPageHtml.json("دكانة الروشة")).isEqualTo("دكانة الروشة");
+    }
+
     @Test
     @DisplayName("Arabic itself is untouched, including the joiners its spelling needs")
     void leavesRealTextAlone() {

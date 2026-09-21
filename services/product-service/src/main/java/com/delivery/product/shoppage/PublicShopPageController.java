@@ -152,8 +152,12 @@ public class PublicShopPageController {
      * font, frame, form, connect — is {@code 'none'}, because the page uses none of them and a
      * policy that allowed what it did not use would be a hole nobody was watching.
      *
-     * <p>{@code script-src 'self'} and no {@code 'unsafe-inline'}: the page has one script and it
-     * is a file this service serves, so the policy never has to allow a block of markup to run.
+     * <p>{@code script-src 'self'} and no {@code 'unsafe-inline'}: the page's one script is a file
+     * this service serves, so the policy never has to allow a block of markup to run. The
+     * structured data at the end of the body is a {@code <script>} element too, but it carries a
+     * JSON media type — a browser parses it as data and never executes it, which is why it needs
+     * nothing from this policy and why opening the policy up for it would have been the wrong way
+     * to ship it.
      *
      * <p>Built from {@code delivery.storage.minio.public-endpoint}, which is the very setting that
      * produced those image URLs ({@code StorageService.readUrl}), so the policy cannot drift from

@@ -73,7 +73,12 @@ final class ShopPageHtml {
         catalogue(b, page, t);
         order(b, t, base, url);
         footer(b, page, t, url, lbpPerUsd);
-        b.append("</main></body></html>");
+        b.append("</main>");
+        // After everything a person reads, not in the head. A crawler finds it either way, and up
+        // to twenty kilobytes of it between <head> and the shop's name is twenty kilobytes a
+        // reader on 3G waits through before anything appears.
+        ShopPageJsonLd.append(b, page, t, url, description);
+        b.append("</body></html>");
         return b.toString();
     }
 
@@ -473,6 +478,51 @@ final class ShopPageHtml {
     }
 
     /**
+     * The same values again, for the one block on this page that is not markup.
+     *
+     * <p>{@link #esc} is wrong inside {@code <script type="application/ld+json">} in both
+     * directions: {@code &amp;quot;} is six literal characters in a JSON string rather than a
+     * quote mark, and a backslash — which HTML does not care about at all — ends the string early
+     * and turns the rest of a shop's name into JSON syntax.
+     *
+     * <p>So this escapes what JSON requires, and then three characters JSON does not.
+     * {@code <}, {@code >} and {@code &} are written as their numeric JSON escapes (&#92;u003C
+     * and friends) because the block lives inside an HTML document: the parser reads it as raw
+     * text until it meets {@code </script>}, and a shop called {@code </script><script>} would
+     * otherwise close its own data block and open a real one. Escaped that way the JSON parser
+     * still sees the characters
+     * the merchant typed, and the HTML parser never sees a tag.
+     *
+     * <p>The invisible characters are dropped here exactly as they are dropped from the markup —
+     * {@link #invisible} is the one list — so a right-to-left override cannot reach a crawler's
+     * copy of a shop's name by the door the renderer left open. A control character is not
+     * merely unwelcome in JSON: it is invalid, and one would make the whole block unparseable.
+     */
+    static String json(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder(raw.length() + 16);
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            switch (c) {
+                case '"' -> out.append("\\\"");
+                case '\\' -> out.append("\\\\");
+                case '<' -> out.append("\\u003C");
+                case '>' -> out.append("\\u003E");
+                case '&' -> out.append("\\u0026");
+                case '\t', '\n', '\r' -> out.append(' ');
+                default -> {
+                    if (!invisible(c)) {
+                        out.append(c);
+                    }
+                }
+            }
+        }
+        return out.toString();
+    }
+
+    /**
      * Characters a merchant's text is not allowed to carry onto the page.
      *
      * <ul>
@@ -485,7 +535,7 @@ final class ShopPageHtml {
      *       in the middle of a name.
      * </ul>
      */
-    private static boolean invisible(char c) {
+    static boolean invisible(char c) {
         return c < 0x20 || c == 0x7F
                 || c == '\u061C' || c == '\u200E' || c == '\u200F'
                 || (c >= '\u202A' && c <= '\u202E')
