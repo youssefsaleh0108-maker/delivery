@@ -242,7 +242,7 @@ images:
   newTag: sha-5091f198aeb06165370e50151c0d06b2b81cc40a
 - name: ghcr.io/youssefsaleh0108-maker/onboarding-service
   newName: ghcr.io/youssefsaleh0108-maker/onboarding-service
-  newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
+  newTag: sha-5091f198aeb06165370e50151c0d06b2b81cc40a
 - name: ghcr.io/youssefsaleh0108-maker/order-tracking
   newName: ghcr.io/youssefsaleh0108-maker/order-tracking
   newTag: sha-5091f198aeb06165370e50151c0d06b2b81cc40a
