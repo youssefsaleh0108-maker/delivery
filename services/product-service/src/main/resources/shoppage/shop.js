@@ -1,19 +1,16 @@
 /*
   The only script on the shop page, and it may only ever hide things.
 
-  The whole catalogue is in the HTML the server sent: every section, every item, every price. A
-  phone with scripting off, a phone that gave up on this file, a chat app's preview and a crawler
-  all see the complete shelf, because nothing here builds a row — it reads the rows the document
-  already has and sets `hidden` on the ones that do not match. That is the rule to keep if this
-  file is ever edited: nothing fetched, no markup built, no row this document did not arrive with.
-  PublicShopPageFindingTest holds this file to it.
+  The whole catalogue is in the HTML the server sent, so a phone with scripting off, a phone that
+  gave up on this file, a chat app's preview and a crawler all see the complete shelf. The rule to
+  keep if this file is ever edited: nothing fetched, no markup built, no row the document did not
+  arrive with. PublicShopPageFindingTest holds it to that by reading the served file.
 
-  The search field itself starts `hidden` in the markup and is revealed here. A box that did
-  nothing when tapped would be worse than no box at all, and the jump links beside it are plain
-  anchors that work with no script at all.
+  The search field starts hidden in the markup and is revealed here, because a box that did nothing
+  when tapped is worse than no box. The jump links beside it are plain anchors and need none of it.
 
-  ES5 on purpose: this page is opened on whatever handset was to hand, and a syntax error in an
-  old WebView would take the search box down along with the arrow function that caused it.
+  ES5 on purpose: the handset is whatever was to hand, and a syntax error in an old WebView takes
+  the search box down along with the arrow function that caused it.
 */
 (function () {
   var find = document.querySelector('.find');
@@ -25,10 +22,9 @@
   if (!field || !box) { return; }
 
   /*
-    Arabic is typed several ways for the same word: with or without the hamza on an alef, with a
-    ta marbuta where a reader may type a ha, with the vowel marks a keyboard offers and most
-    people skip, and with a kashida stretching a letter for looks. Folding all of those away means
-    a customer finds the item whichever of the spellings they and the merchant each used.
+    Arabic is typed several ways for one word: with or without the hamza on an alef, a ta marbuta
+    where a reader types a ha, the vowel marks most people skip, a kashida stretching a letter for
+    looks. Folded away, so either side's spelling finds the other's.
   */
   function fold(text) {
     return text.toLowerCase()
@@ -48,8 +44,7 @@
     var rows = blocks[s].querySelectorAll('.items > li');
     var items = [];
     for (var r = 0; r < rows.length; r++) {
-      // The name and, where the merchant wrote one, the description the row expands to show —
-      // so "sesame" finds the kaak whose name never says so.
+      // Name and description both, so "sesame" finds the kaak whose name never says so.
       var name = rows[r].querySelector('.n');
       var about = rows[r].querySelector('.d');
       items.push({

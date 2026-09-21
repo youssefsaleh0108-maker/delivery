@@ -155,6 +155,14 @@ public class PublicShopPageController {
     private final byte[] script;
 
     /**
+     * The two asset URLs every rendering points at, fingerprinted by the bytes behind them.
+     *
+     * <p>Computed once from the files this build shipped. Both are served {@code immutable} for a
+     * year, so the address has to move when the bytes do — see {@link ShopPageHtml.Assets}.
+     */
+    private final ShopPageHtml.Assets assets;
+
+    /**
      * What the page's own Content-Security-Policy allows.
      *
      * <p>Exactly four things: the stylesheet, the catalogue filter and the shop's manifest from
@@ -195,6 +203,9 @@ public class PublicShopPageController {
         this.baseUrl = trimTrailingSlash(baseUrl);
         this.stylesheet = readAsset("shoppage/shop.css");
         this.script = readAsset("shoppage/shop.js");
+        this.assets = new ShopPageHtml.Assets(
+                ShopPageHtml.STYLESHEET + "?v=" + fingerprint(stylesheet),
+                ShopPageHtml.SCRIPT + "?v=" + fingerprint(script));
         this.contentSecurityPolicy = policyFor(imageOrigin);
         this.qrCodes = new ShopPageCache<>(QR_MEMO_FOR, QR_MEMO_ENTRIES, nanoClock);
         this.renderedPages = new ShopPageCache<>(PAGE_MAX_AGE, PAGE_MEMO_ENTRIES, nanoClock);
@@ -230,7 +241,8 @@ public class PublicShopPageController {
     }
 
     private Document render(String slug, ShopPageText text) {
-        return Document.of(ShopPageHtml.render(pages.read(slug), text, baseUrl, pages.lbpPerUsd())
+        return Document.of(ShopPageHtml
+                .render(pages.read(slug), text, baseUrl, pages.lbpPerUsd(), assets)
                 .getBytes(StandardCharsets.UTF_8));
     }
 
@@ -372,7 +384,8 @@ public class PublicShopPageController {
      * evening.
      */
     private ResponseEntity<byte[]> notFound(ShopPageText text) {
-        byte[] body = ShopPageHtml.renderNotFound(text, baseUrl).getBytes(StandardCharsets.UTF_8);
+        byte[] body = ShopPageHtml.renderNotFound(text, baseUrl, assets)
+                .getBytes(StandardCharsets.UTF_8);
         return secured(ResponseEntity.status(HttpStatus.NOT_FOUND))
                 .cacheControl(CacheControl.maxAge(Duration.ofMinutes(1)).cachePublic())
                 .header("X-Robots-Tag", "noindex")
@@ -448,6 +461,17 @@ public class PublicShopPageController {
             }
         }
         return false;
+    }
+
+    /**
+     * The short content fingerprint an asset's URL carries.
+     *
+     * <p>The same digest the ETag is made of, so the two can never disagree about whether a file
+     * changed. Ten characters of it: this only has to separate one build's stylesheet from the
+     * next's, not resist anybody.
+     */
+    private static String fingerprint(byte[] body) {
+        return strongTag(body).replace("\"", "").substring(0, 10);
     }
 
     /** A strong ETag over the exact bytes sent. Content-addressed, so it cannot go stale. */

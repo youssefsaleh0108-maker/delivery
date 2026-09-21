@@ -112,7 +112,9 @@ class PublicShopPageFindingTest {
 
         assertThat(html)
                 .contains("<p class=\"q\" hidden>")
-                .contains("<input id=\"q\" type=\"search\" autocomplete=\"off\" "
+                // dir="auto" so a customer on the Arabic page who types a Latin brand name sees
+                // it laid out left to right inside the field they are typing into.
+                .contains("<input id=\"q\" type=\"search\" dir=\"auto\" autocomplete=\"off\" "
                         + "enterkeyhint=\"search\">")
                 .contains("<p class=\"qn\" role=\"status\" hidden>");
         if ("ar".equals(language)) {

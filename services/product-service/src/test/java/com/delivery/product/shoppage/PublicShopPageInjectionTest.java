@@ -114,7 +114,7 @@ class PublicShopPageInjectionTest {
         assertThat(html)
                 // The page's own two: the filter this service serves, and a block of data. A
                 // merchant's "</title><script>" must not become a third.
-                .contains("<script src=\"/s/assets/shop.js\" defer></script>")
+                .contains("<script src=\"/s/assets/shop.js?v=")
                 .contains("<script type=\"application/ld+json\">")
                 .doesNotContain("</title><script")
                 .doesNotContain("javascript:")

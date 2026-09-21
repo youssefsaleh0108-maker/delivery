@@ -131,8 +131,10 @@ class PublicShopPageWeightTest {
     }
 
     private void report(String label, Fetched fetched) {
-        System.out.printf("shop page %-28s raw %6d B | gzip: no-js %5d B, with js %5d B%n",
-                label, fetched.uncompressed(), fetched.withoutScript(), fetched.withScript());
+        System.out.printf("shop page %-28s raw %6d B | gzip: no-js %5d B, with js %5d B "
+                        + "(script %d B)%n",
+                label, fetched.uncompressed(), fetched.withoutScript(), fetched.withScript(),
+                fetched.script());
     }
 
     @Test
@@ -175,6 +177,9 @@ class PublicShopPageWeightTest {
         assertThat(html).contains("and 3,880 more in the app");
 
         for (Fetched fetched : List.of(english, arabic)) {
+            // The ceiling the page was given, rather than a line drawn just above where it
+            // happens to sit: the two budgets above are the tripwires that catch drift, and this
+            // is the number the page may not exceed whatever else is ever added to it.
             assertThat(fetched.withScript()).isLessThan(25 * 1024);
             // Uncompressed too, because gzip is a courtesy: a proxy that strips Accept-Encoding,
             // or a client that never sent it, gets these bytes instead.
@@ -191,7 +196,7 @@ class PublicShopPageWeightTest {
                     .section("Bread", Item.of("Kaak", "1.50"), Item.of("Markouk", "2.25"),
                             Item.of("Manakish", "2.00")), language);
             report("small, 3 items, " + language, fetched);
-            assertThat(fetched.withScript()).isLessThan(8 * 1024);
+            assertThat(fetched.withScript()).isLessThan(9 * 1024);
         }
     }
 

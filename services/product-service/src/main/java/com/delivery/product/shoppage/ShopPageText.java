@@ -312,6 +312,22 @@ enum ShopPageText {
         return this == AR ? "غير متوفر" : "Out of stock";
     }
 
+    /**
+     * A shop is at its emptiest on the day it opens, which is the day this page matters most. It
+     * says what is happening rather than leaving a reader to guess whether the page is broken.
+     */
+    String nothingListedYet() {
+        return this == AR
+                ? "لم يضف هذا المتجر أي صنف بعد."
+                : "This shop has not listed anything here yet.";
+    }
+
+    String nothingListedHint() {
+        return this == AR
+                ? "أوقات العمل ومناطق التوصيل في الأعلى، وكل صنف يضيفه سيظهر هنا."
+                : "Its hours and delivery area are above, and anything it adds shows up here.";
+    }
+
     String andMoreInTheApp(int more) {
         return this == AR
                 ? "و" + number(more) + " صنفًا آخر في التطبيق"

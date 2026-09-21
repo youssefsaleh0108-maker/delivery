@@ -5,6 +5,8 @@ import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -77,6 +79,35 @@ class PublicShopPageApiTest {
     }
 
     /**
+     * The day a shop opens is the day this page matters most, and it is the day the shop has
+     * nothing on its shelf.
+     *
+     * <p>The catalogue section used to be removed from under such a shop, so its page stopped
+     * after the opening hours and a reader was left to guess whether the shop sells nothing,
+     * whether the page was broken, or whether they had missed something.
+     */
+    @ParameterizedTest(name = "in {0}")
+    @ValueSource(strings = {"en", "ar"})
+    @DisplayName("a shop that has listed nothing yet says so, rather than stopping mid-page")
+    void anEmptyShelfSaysSo(String language) throws Exception {
+        ShopPageFixture shop = new ShopPageFixture();
+        String html = body(shop.mvc().perform(get("/s/" + shop.slug()).param("lang", language))
+                .andExpect(status().isOk()).andReturn());
+
+        assertThat(html).contains("class=\"block menu\"").contains("class=\"empty\"");
+        if ("ar".equals(language)) {
+            assertThat(html).contains("لم يضف هذا المتجر أي صنف بعد.")
+                    .contains("أوقات العمل ومناطق التوصيل في الأعلى");
+        } else {
+            assertThat(html).contains("This shop has not listed anything here yet.")
+                    .contains("Its hours and delivery area are above");
+        }
+        // Nothing to find and nothing to jump to, so neither control is drawn.
+        assertThat(html).doesNotContain("class=\"find\"").doesNotContain("class=\"jump\"")
+                .doesNotContain("class=\"items\"");
+    }
+
+    /**
      * One call to action, and it is honest about both halves.
      *
      * <p>The page carries a shop's prices, which makes it look like a shop that takes money. It
@@ -129,14 +160,15 @@ class PublicShopPageApiTest {
         // Every script element on the page is one of the two, by name.
         assertThat(html.split("<script", -1).length - 1).isEqualTo(2);
         assertThat(html)
-                .contains("<script src=\"/s/assets/shop.js\" defer></script>")
+                .contains("<script src=\"/s/assets/shop.js?v=")
+                .contains("\" defer></script>")
                 .contains("<script type=\"application/ld+json\">")
                 .doesNotContain("javascript:")
                 .doesNotContain("onerror=")
                 .doesNotContain("onload=")
                 .doesNotContain("onclick=")
                 // One stylesheet, from this origin. No CDN, and no web font to wait on.
-                .contains("<link rel=\"stylesheet\" href=\"/s/assets/shop.css\">")
+                .contains("<link rel=\"stylesheet\" href=\"/s/assets/shop.css?v=")
                 .doesNotContain("<style")
                 .doesNotContain("fonts.googleapis.com")
                 .doesNotContain("cdn.");
@@ -437,6 +469,36 @@ class PublicShopPageApiTest {
         assertThat(css.getResponse().getHeader("Cache-Control"))
                 .contains("max-age=31536000").contains("immutable");
         assertThat(body(css)).contains("--brand").contains(".items");
+    }
+
+    /**
+     * Both assets are served {@code immutable} for a year, which is right — they are the same
+     * bytes for every shop page a reader ever opens — and which is exactly why the address has to
+     * move when the bytes do. It did not, so the next release's markup would have been drawn by a
+     * returning reader with the last release's stylesheet.
+     *
+     * <p>Asserted against the served file rather than against a constant: the fingerprint in the
+     * link has to be the fingerprint of the bytes behind it, or it is decoration.
+     */
+    @Test
+    @DisplayName("the asset links carry the fingerprint of the bytes they point at")
+    void assetLinksMoveWhenTheAssetsDo() throws Exception {
+        ShopPageFixture shop = stocked();
+        String html = body(shop.mvc().perform(get("/s/" + shop.slug())).andReturn());
+
+        for (String asset : List.of("/s/assets/shop.css", "/s/assets/shop.js")) {
+            byte[] served = shop.mvc().perform(get(asset))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+            String digest = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(
+                    java.util.Arrays.copyOf(java.security.MessageDigest.getInstance("SHA-256")
+                            .digest(served), 16));
+
+            assertThat(html).as("%s is linked with its own fingerprint", asset)
+                    .contains(asset + "?v=" + digest.substring(0, 10));
+        }
+        // The 404 page is drawn by the same stylesheet, so it carries the same link.
+        assertThat(body(shop.mvc().perform(get("/s/nothing-is-here-0000ffff")).andReturn()))
+                .contains("/s/assets/shop.css?v=");
     }
 
     // ---------------------------------------------------------------- the sitemap
