@@ -6343,5 +6343,29 @@
   },
   "heatmapUnmetCouldNotLoad": "Couldn't load searches right now",
   "heatmapUnmetPrivacy": "Counts are rounded, and nothing here says who searched.",
-  "notifCatMerchantInsights": "Demand and insights"
+  "notifCatMerchantInsights": "Demand and insights",
+  "merchShareTitle": "Share your shop",
+  "merchShareYourLink": "Your shop's page",
+  "merchShareWhatTheySee": "Whoever opens it sees your shop's name, whether you're open, where you deliver, and your items with prices.",
+  "@merchShareWhatTheySee": {
+    "description": "One line telling a merchant what a customer finds behind the link, so they know what they are sharing before they share it."
+  },
+  "merchShareCopyLink": "Copy link",
+  "merchShareLinkCopied": "Link copied",
+  "merchShareShare": "Share",
+  "merchSharePrintPoster": "Print the poster",
+  "merchShareQrLabel": "QR code for your shop's page",
+  "merchShareQrFailed": "The QR code didn't load",
+  "merchShareCouldNotOpenPoster": "Couldn't open the poster",
+  "merchShareNoPageTitle": "Your shop has no page yet",
+  "merchShareNeedsPin": "Place your shop on the map, and its page and QR code are ready to share.",
+  "@merchShareNeedsPin": {
+    "description": "Shown instead of the QR code when the shop has no map pin. A shop without a pin has no public page at all, so there is nothing to share and a QR code would lead nowhere."
+  },
+  "merchSharePlaceOnMap": "Place your shop on the map",
+  "merchShareNeedsPublish": "Publish your shop, and its page and QR code are ready to share.",
+  "@merchShareNeedsPublish": {
+    "description": "Shown instead of the QR code when the shop is pinned but still a draft or suspended, so its public page is not live."
+  },
+  "merchSharePublishYourShop": "Publish your shop"
 }

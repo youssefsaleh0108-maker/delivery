@@ -4119,5 +4119,29 @@
   },
   "heatmapUnmetCouldNotLoad": "تعذَّر تحميل عمليات البحث الآن",
   "heatmapUnmetPrivacy": "الأعداد تقريبية، ولا شيء هنا يدل على من بحث.",
-  "notifCatMerchantInsights": "الطلب والرؤى"
+  "notifCatMerchantInsights": "الطلب والرؤى",
+  "merchShareTitle": "شارك متجرك",
+  "merchShareYourLink": "صفحة متجرك",
+  "merchShareWhatTheySee": "من يفتح الرابط يرى اسم متجرك، وهل هو مفتوح الآن، وأين يوصّل، وأصنافه بأسعارها.",
+  "@merchShareWhatTheySee": {
+    "description": "One line telling a merchant what a customer finds behind the link, so they know what they are sharing before they share it."
+  },
+  "merchShareCopyLink": "نسخ الرابط",
+  "merchShareLinkCopied": "تم نسخ الرابط",
+  "merchShareShare": "مشاركة",
+  "merchSharePrintPoster": "اطبع الملصق",
+  "merchShareQrLabel": "رمز QR لصفحة متجرك",
+  "merchShareQrFailed": "تعذّر تحميل رمز QR",
+  "merchShareCouldNotOpenPoster": "تعذّر فتح الملصق",
+  "merchShareNoPageTitle": "ليس لمتجرك صفحة بعد",
+  "merchShareNeedsPin": "ضع متجرك على الخريطة، فتصبح صفحته ورمز QR جاهزين للمشاركة.",
+  "@merchShareNeedsPin": {
+    "description": "Shown instead of the QR code when the shop has no map pin. A shop without a pin has no public page at all, so there is nothing to share and a QR code would lead nowhere."
+  },
+  "merchSharePlaceOnMap": "ضع متجرك على الخريطة",
+  "merchShareNeedsPublish": "انشر متجرك، فتصبح صفحته ورمز QR جاهزين للمشاركة.",
+  "@merchShareNeedsPublish": {
+    "description": "Shown instead of the QR code when the shop is pinned but still a draft or suspended, so its public page is not live."
+  },
+  "merchSharePublishYourShop": "انشر متجرك"
 }

@@ -22424,6 +22424,96 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Demand and insights'**
   String get notifCatMerchantInsights;
+
+  /// No description provided for @merchShareTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Share your shop'**
+  String get merchShareTitle;
+
+  /// No description provided for @merchShareYourLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Your shop\'s page'**
+  String get merchShareYourLink;
+
+  /// One line telling a merchant what a customer finds behind the link, so they know what they are sharing before they share it.
+  ///
+  /// In en, this message translates to:
+  /// **'Whoever opens it sees your shop\'s name, whether you\'re open, where you deliver, and your items with prices.'**
+  String get merchShareWhatTheySee;
+
+  /// No description provided for @merchShareCopyLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy link'**
+  String get merchShareCopyLink;
+
+  /// No description provided for @merchShareLinkCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Link copied'**
+  String get merchShareLinkCopied;
+
+  /// No description provided for @merchShareShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get merchShareShare;
+
+  /// No description provided for @merchSharePrintPoster.
+  ///
+  /// In en, this message translates to:
+  /// **'Print the poster'**
+  String get merchSharePrintPoster;
+
+  /// No description provided for @merchShareQrLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'QR code for your shop\'s page'**
+  String get merchShareQrLabel;
+
+  /// No description provided for @merchShareQrFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The QR code didn\'t load'**
+  String get merchShareQrFailed;
+
+  /// No description provided for @merchShareCouldNotOpenPoster.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open the poster'**
+  String get merchShareCouldNotOpenPoster;
+
+  /// No description provided for @merchShareNoPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your shop has no page yet'**
+  String get merchShareNoPageTitle;
+
+  /// Shown instead of the QR code when the shop has no map pin. A shop without a pin has no public page at all, so there is nothing to share and a QR code would lead nowhere.
+  ///
+  /// In en, this message translates to:
+  /// **'Place your shop on the map, and its page and QR code are ready to share.'**
+  String get merchShareNeedsPin;
+
+  /// No description provided for @merchSharePlaceOnMap.
+  ///
+  /// In en, this message translates to:
+  /// **'Place your shop on the map'**
+  String get merchSharePlaceOnMap;
+
+  /// Shown instead of the QR code when the shop is pinned but still a draft or suspended, so its public page is not live.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish your shop, and its page and QR code are ready to share.'**
+  String get merchShareNeedsPublish;
+
+  /// No description provided for @merchSharePublishYourShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish your shop'**
+  String get merchSharePublishYourShop;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {
