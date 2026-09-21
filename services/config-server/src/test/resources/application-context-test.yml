@@ -1,0 +1,52 @@
+# What the Config Server is allowed to reach while a test boots its own context.
+#
+# Loaded only under the "context-test" profile, which only ApplicationContextBootTest activates, and
+# always alongside "composite" — the profile that decides this server has a composite backend at
+# all. Dropping it would boot a different server than the one that runs.
+#
+# This service is the one place in the estate whose application.yml deliberately gives several
+# settings NO default: CONFIG_SERVER_PASSWORD, CONFIG_DB_PASSWORD, RABBITMQ_PASSWORD, VAULT_ROLE_ID
+# and VAULT_SECRET_ID are secrets, and a default would be a secret written into the repository. The
+# context cannot start until they resolve, so this file answers them — by their placeholder names
+# rather than by the properties they land in, because the composite backend spells VAULT_ROLE_ID and
+# VAULT_SECRET_ID twice (once under spring.cloud.config.server.vault, once inside the composite
+# list) and one answer should satisfy both.
+#
+# Nothing here is a credential to anything: every address named below is a closed port.
+
+CONFIG_SERVER_PASSWORD: context-test-not-a-secret
+CONFIG_DB_PASSWORD: context-test-not-a-secret
+RABBITMQ_PASSWORD: context-test-not-a-secret
+
+# Half of the composite backend, and the half that holds real secrets in a real environment. The
+# repository bean is built and wired exactly as it is in the pod; it logs in to Vault on the first
+# request for configuration, which this context never makes. Aimed at a closed port so that stays
+# true by force rather than by trust.
+VAULT_HOST: 127.0.0.1
+VAULT_PORT: 1
+VAULT_ROLE_ID: context-test-not-a-secret
+VAULT_SECRET_ID: context-test-not-a-secret
+
+spring:
+  rabbitmq:
+    # The bus that carries /actuator/busrefresh to the estate. RabbitAutoConfiguration builds the
+    # connection factory without dialling it, and ApplicationContextBootTest.StubbedBroker replaces
+    # it anyway, so this address is never used to reach anything.
+    host: 127.0.0.1
+    port: 1
+    listener:
+      simple:
+        auto-startup: false
+      direct:
+        auto-startup: false
+
+  cloud:
+    bus:
+      # There is no second instance here to broadcast to, and the binder would declare its exchange
+      # against the broker on the way up.
+      enabled: false
+
+management:
+  otlp:
+    tracing:
+      endpoint: http://127.0.0.1:1/v1/traces
