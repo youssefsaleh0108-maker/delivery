@@ -93,6 +93,9 @@ final class ShopPageFixture {
     private int shelfTotal;
     private List<DeliveryZone> areas = List.of();
 
+    /** This shop's own service category, which the enabled set below must therefore contain. */
+    private final Store.ServiceCategory category;
+
     private Clock clock = Clock.fixed(Instant.parse("2026-09-20T15:00:00Z"), ZoneId.of("UTC"));
     private BigDecimal rate = new BigDecimal("90000");
 
@@ -109,9 +112,33 @@ final class ShopPageFixture {
      *               be a transition the platform does not have.
      */
     ShopPageFixture(boolean listed) {
-        shop = new Store(MERCHANT, "Dekkanet Al Rawche", Store.Vertical.GROCERY);
+        this(listed, Store.Vertical.GROCERY, null);
+    }
+
+    /**
+     * The same shop in another line of business.
+     *
+     * <p>A constructor rather than a setter because that is what the domain allows: the vertical is
+     * fixed when a shop is created, and {@code Store.updateProfile} refuses to move one across the
+     * line between goods and services.
+     */
+    ShopPageFixture(Store.Vertical vertical) {
+        this(true, vertical, null);
+    }
+
+    /** A service shop, in a category an operator has left open. */
+    ShopPageFixture(Store.ServiceCategory category) {
+        this(true, Store.Vertical.SERVICES, category);
+    }
+
+    private ShopPageFixture(boolean listed, Store.Vertical vertical,
+                            Store.ServiceCategory category) {
+        this.category = category;
+        shop = category == null
+                ? new Store(MERCHANT, "Dekkanet Al Rawche", vertical)
+                : new Store(MERCHANT, "Dekkanet Al Rawche", vertical, category);
         shop.updateProfile("Dekkanet Al Rawche", "Everything the corner shop should have",
-                "Open since 1974, two streets up from the rock.", Store.Vertical.GROCERY,
+                "Open since 1974, two streets up from the rock.", vertical,
                 List.of("grocery", "dekkane"), "Asia/Beirut", "Rawche, Beirut");
         shop.setNeighborhood("Ras Beirut");
         shop.updateCommercials(new BigDecimal("2.00"), new BigDecimal("5.00"), 20, 40);
@@ -197,6 +224,12 @@ final class ShopPageFixture {
         return this;
     }
 
+    /** A merchant who never uploaded a logo or a cover, which is most shops on their first day. */
+    ShopPageFixture withoutArtwork() {
+        shop.setImagery(null, null);
+        return this;
+    }
+
     ShopPageFixture areas(String... names) {
         List<DeliveryZone> built = new ArrayList<>();
         for (String name : names) {
@@ -278,24 +311,35 @@ final class ShopPageFixture {
         return rate;
     }
 
-    /** One thing on the shelf, as a merchant would have set it up. */
-    record Item(String name, String price, boolean inStock, boolean pictured) {
+    /**
+     * One thing on the shelf, as a merchant would have set it up.
+     *
+     * @param about what the merchant wrote about it. Null by default, because most rows in most
+     *              shops have nothing written about them and a fixture that gave every item a
+     *              description would make the page's byte budget look easier than it is.
+     */
+    record Item(String name, String about, String price, boolean inStock, boolean pictured) {
 
         static Item of(String name, String price) {
-            return new Item(name, price, true, true);
+            return new Item(name, null, price, true, true);
+        }
+
+        /** A merchant who said what the thing is. The row then expands to show it. */
+        Item describedAs(String about) {
+            return new Item(name, about, price, inStock, pictured);
         }
 
         Item outOfStock() {
-            return new Item(name, price, false, pictured);
+            return new Item(name, about, price, false, pictured);
         }
 
         Item withoutPicture() {
-            return new Item(name, price, inStock, false);
+            return new Item(name, about, price, inStock, false);
         }
 
         Product build(Store shop, java.util.UUID categoryId) {
             Product product = new Product(shop.getMerchantId(), shop.getId(), name,
-                    "A description nobody reads", new BigDecimal(price), categoryId);
+                    about, new BigDecimal(price), categoryId);
             product.assignCodes(SKU, BARCODE);
             // products/<productId>/<fileId>.jpg — ProductImageService.presign's prefix and
             // StorageService's own file id, so a product's id is in its photo's URL here exactly as
@@ -371,9 +415,16 @@ final class ShopPageFixture {
             return resolved;
         });
 
-        when(serviceCategories.enabled()).thenReturn(
+        // Four open and three closed, which is a state an operator can really configure — plus
+        // this shop's own category when it has one, so a fixture built for a service shop is not
+        // silently a 404 for a reason the test was not about.
+        Set<Store.ServiceCategory> open = new java.util.LinkedHashSet<>(
                 Set.of(Store.ServiceCategory.PRINTING, Store.ServiceCategory.TAILORING,
                         Store.ServiceCategory.REPAIRS, Store.ServiceCategory.PHOTOGRAPHY));
+        if (category != null) {
+            open.add(category);
+        }
+        when(serviceCategories.enabled()).thenReturn(Set.copyOf(open));
 
         return new PublicShopPageService(stores, products, categories, zones, images,
                 serviceCategories, clock, Duration.ofHours(4), rate);

@@ -20,6 +20,8 @@
   --r: 12px;
 }
 * { box-sizing: border-box; }
+/* Any display here beats the UA's own [hidden] rule, and the filter hides by that attribute. */
+[hidden] { display: none !important; }
 body {
   margin: 0;
   background: var(--bg);
@@ -36,7 +38,16 @@ ul { margin: 0; padding: 0; list-style: none; }
 a { color: var(--brand); }
 
 .hero .cover { display: block; width: 100%; height: 190px; object-fit: cover; background: var(--border); }
-.head { padding: 16px; border-bottom: 1px solid var(--border); }
+.head { padding: 16px; border-bottom: 1px solid var(--border); position: relative; }
+/*
+  The other language, in the header's corner. Out of flow, so the logo under it keeps the negative
+  margin that lifts it over the cover; logical inset, so it corners itself in both directions.
+*/
+.lang { position: absolute; inset-inline-end: 12px; top: 12px; margin: 0; z-index: 1; }
+.lang a {
+  display: inline-block; font-size: .85rem; text-decoration: none; padding: 5px 12px;
+  border-radius: 100px; border: 1px solid var(--border); background: var(--white);
+}
 .logo {
   width: 64px; height: 64px; border-radius: var(--r); object-fit: cover;
   border: 1px solid var(--border); background: var(--white); display: block;
@@ -46,13 +57,30 @@ a { color: var(--brand); }
 .tagline { font-weight: 600; }
 .about { color: var(--muted); }
 
+/*
+  The question this page is opened to answer, so it gets a line and a dot of its own rather than
+  being the first of six grey chips. flex puts the dot on the reading side in both directions.
+*/
+.status {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px;
+  font-weight: 600; margin-block-end: 10px;
+}
+.status::before {
+  content: ""; width: 9px; height: 9px; border-radius: 50%; flex: none;
+  align-self: center; background: var(--faint);
+}
+.status.open { color: #047857; }
+.status.open::before { background: var(--emerald); }
+.status.shut { color: #B91C1C; }
+.status.shut::before { background: #DC2626; }
+/* When it is shut, when it opens again — the half of the sentence that keeps the reader. */
+.status .next { font-weight: 400; font-size: .88rem; color: var(--muted); }
+
 .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-block-end: 10px; }
 .badges li {
   font-size: .8rem; padding: 4px 10px; border-radius: 100px;
   background: var(--bg); border: 1px solid var(--border); color: var(--muted);
 }
-.badges .open { background: #ECFDF5; border-color: #A7F3D0; color: #047857; font-weight: 600; }
-.badges .shut { background: #FEF2F2; border-color: #FECACA; color: #B91C1C; font-weight: 600; }
 .badges .power.generator { background: #FFFBEB; border-color: #FDE68A; color: var(--amber); }
 .badges .power.dark { background: #F1F5F9; border-color: #CBD5E1; color: #334155; }
 .badges .power.mains { background: #ECFDF5; border-color: #A7F3D0; color: #047857; }
@@ -76,6 +104,42 @@ a { color: var(--brand); }
 .hours .today th, .hours .today td { font-weight: 700; color: var(--ink); }
 .hours .now { color: var(--brand); font-size: .75rem; font-weight: 600; }
 
+/*
+  Finding one thing in a shop that sells a hundred and twenty. The jump links are plain anchors and
+  are all a reader with no script gets; the field arrives hidden and is revealed by shop.js. Sticky,
+  because a filter on a long shelf has to be reachable halfway down it.
+*/
+.find {
+  position: sticky; top: 0; z-index: 1; background: var(--white);
+  padding-block: 8px; margin-block-end: 4px; border-block-end: 1px solid var(--border);
+}
+/*
+  One row that scrolls sideways rather than wrapping. A shop with eight aisles would otherwise give
+  the sticky bar three rows of chips, which is a third of a phone screen permanently spent on
+  navigation — and it would make the bar's height depend on how many aisles the shop has, which is
+  the one thing scroll-margin-top below cannot know.
+*/
+.jump {
+  display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 6px; align-items: center;
+  margin: 0 0 8px; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.jump::-webkit-scrollbar { display: none; }
+.jump span { font-size: .78rem; color: var(--faint); flex: none; }
+.jump a {
+  font-size: .82rem; text-decoration: none; padding: 6px 12px; border-radius: 100px;
+  background: var(--bg); border: 1px solid var(--border); flex: none; white-space: nowrap;
+}
+/* The room the sticky finder takes, so an aisle jumped to does not land underneath it. */
+.sec { scroll-margin-top: 124px; }
+.q { display: flex; flex-direction: column; gap: 4px; margin: 0; }
+.q label { font-size: .78rem; color: var(--muted); }
+.q input {
+  font: inherit; font-size: 1rem; width: 100%; padding: 9px 12px; color: var(--ink);
+  border: 1px solid var(--border); border-radius: 100px; background: var(--bg);
+}
+.q input:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
+.qn { margin: 10px 0 0; color: var(--muted); font-size: .9rem; }
+
 .items { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .items li {
   border: 1px solid var(--border); border-radius: var(--r); padding: 8px;
@@ -86,6 +150,13 @@ a { color: var(--brand); }
   background: var(--bg); margin-block-end: 6px;
 }
 .items .n { font-size: .9rem; font-weight: 600; }
+/*
+  The <details> marker is left alone deliberately: it is the one signal for which rows have more
+  behind them, and it turns itself round under dir="rtl" without a second rule.
+*/
+.items summary { cursor: pointer; }
+.items summary::marker { color: var(--faint); }
+.items .d { font-size: .82rem; color: var(--muted); margin: 4px 0 0; }
 .items .p { font-size: .84rem; color: var(--muted); }
 .items .x { font-size: .75rem; color: #B91C1C; font-weight: 600; }
 .items .gone { opacity: .55; }
@@ -94,11 +165,27 @@ a { color: var(--brand); }
   display: inline-block; background: var(--brand); color: var(--white); text-decoration: none;
   padding: 11px 20px; border-radius: 100px; font-weight: 600;
 }
+/* The one button on the page, and on a phone the width of it: a pill is a target to aim for. */
+.order .cta { display: block; text-align: center; padding: 13px 20px; }
+.order .cta .sub { display: block; font-weight: 400; font-size: .78rem; opacity: .85; }
+/* The room the two store listings will take when they exist. Not links: neither one does yet. */
+.stores { display: flex; flex-wrap: wrap; gap: 6px; margin-block-start: 12px; }
+.stores li {
+  font-size: .8rem; padding: 4px 12px; border-radius: 100px; color: var(--faint);
+  border: 1px dashed var(--border);
+}
 .qr { font-size: .88rem; }
 .foot { padding: 16px; }
 .missing { padding: 48px 16px; text-align: center; }
+/* A shop with nothing on its shelf yet. Said, rather than left as a gap after the hours. */
+.empty { color: var(--muted); font-weight: 600; margin-block-start: 4px; }
 
 @media (min-width: 560px) {
   .items { grid-template-columns: repeat(3, 1fr); }
   .hero .cover { height: 260px; }
+}
+/* 320 px phones are still in use, and two cards across one is 140 px each. One column instead. */
+@media (max-width: 359px) {
+  .items { grid-template-columns: 1fr; }
+  .items img { aspect-ratio: 16 / 9; }
 }

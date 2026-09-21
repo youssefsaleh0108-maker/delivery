@@ -199,15 +199,21 @@ class ShopPosterApiTest {
                 .andExpect(status().isNotFound())
                 .andReturn().getResponse();
 
-        ShopPageFixture live = stocked();
-        MockHttpServletResponse page = live.mvc()
-                .perform(get("/s/a-slug-nobody-has-ever-had"))
+        MockHttpServletResponse unknown = mvcOf(pinless)
+                .perform(get("/s/a-slug-nobody-has-ever-had/poster"))
                 .andExpect(status().isNotFound())
                 .andReturn().getResponse();
 
-        // The same bytes and the same headers as a slug that never existed: a poster that refused
-        // differently would answer "does this shop exist" for anybody who asked it.
-        assertThat(poster.getContentAsByteArray()).isEqualTo(page.getContentAsByteArray());
+        // The same bytes as a slug that never existed: a poster that refused a real-but-pinless
+        // shop differently would answer "does this shop exist" for anybody who asked it.
+        //
+        // Against the POSTER, not against the page: the poster serves its refusal under its own
+        // policy, default-src 'none', which forbids the stylesheet the page's refusal links. The
+        // two endpoints answering in their own voice tells a stranger nothing; two answers from
+        // THIS endpoint differing would.
+        assertThat(poster.getContentAsByteArray()).isEqualTo(unknown.getContentAsByteArray());
+        assertThat(new String(poster.getContentAsByteArray(), java.nio.charset.StandardCharsets.UTF_8))
+                .doesNotContain("<link rel=\"stylesheet\"");
         assertThat(poster.getHeader("X-Robots-Tag")).isEqualTo("noindex");
         assertThat(poster.getHeader(HttpHeaders.VARY)).isEqualTo(HttpHeaders.ACCEPT_LANGUAGE);
         assertThat(poster.getHeader(HttpHeaders.ETAG)).isNull();

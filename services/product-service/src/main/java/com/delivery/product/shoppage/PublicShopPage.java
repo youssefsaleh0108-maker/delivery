@@ -145,12 +145,15 @@ public record PublicShopPage(
     /**
      * One thing on the shelf.
      *
+     * @param about    what the merchant wrote about it, trimmed to
+     *                 {@code PublicShopPageService.MAX_ITEM_DESCRIPTION}; null or blank when they
+     *                 wrote nothing, which is most rows in most shops
      * @param priceUsd the stored price, which is the only price anybody set
      * @param priceLbp the same money at the platform's one rate — a conversion, not a second price
      *                 (see {@code MarketController}); null when the rate is zero, which is how an
      *                 operator says "do not show lira at all"
      */
-    public record Item(String name, String imageUrl, BigDecimal priceUsd, BigDecimal priceLbp,
-                       boolean inStock) {
+    public record Item(String name, String about, String imageUrl, BigDecimal priceUsd,
+                       BigDecimal priceLbp, boolean inStock) {
     }
 }

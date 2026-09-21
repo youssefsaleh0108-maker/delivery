@@ -290,8 +290,42 @@ enum ShopPageText {
         return this == AR ? "أصناف أخرى" : "Other items";
     }
 
+    /** The label on the search field, which only appears once the script has revealed it. */
+    String searchThisShop() {
+        return this == AR ? "ابحث في المتجر" : "Search this shop";
+    }
+
+    /** The row of section anchors. Plain links: they are what a reader with no script gets. */
+    String jumpTo() {
+        return this == AR ? "انتقل إلى" : "Jump to";
+    }
+
+    /**
+     * Shipped in the markup rather than built by the script, so it is in the reader's own language
+     * without the script having to carry a second dictionary.
+     */
+    String nothingMatches() {
+        return this == AR ? "لا يوجد صنف يطابق بحثك." : "Nothing in this shop matches that.";
+    }
+
     String outOfStock() {
         return this == AR ? "غير متوفر" : "Out of stock";
+    }
+
+    /**
+     * A shop is at its emptiest on the day it opens, which is the day this page matters most. It
+     * says what is happening rather than leaving a reader to guess whether the page is broken.
+     */
+    String nothingListedYet() {
+        return this == AR
+                ? "لم يضف هذا المتجر أي صنف بعد."
+                : "This shop has not listed anything here yet.";
+    }
+
+    String nothingListedHint() {
+        return this == AR
+                ? "أوقات العمل ومناطق التوصيل في الأعلى، وكل صنف يضيفه سيظهر هنا."
+                : "Its hours and delivery area are above, and anything it adds shows up here.";
     }
 
     String andMoreInTheApp(int more) {
@@ -320,6 +354,28 @@ enum ShopPageText {
 
     String getTheApp() {
         return this == AR ? "حمّل التطبيق" : "Get the app";
+    }
+
+    /**
+     * The honest sentence. A page with a shop's prices on it looks like a shop that takes money,
+     * and a reader hunting for a basket that is not there has been misled by the layout.
+     */
+    String thisPageTakesNoOrders() {
+        return this == AR
+                ? "هذه الصفحة لا تستقبل الطلبات."
+                : "This page cannot take an order itself.";
+    }
+
+    /** What the button actually hands back: {@code /app} is the Android build, as a download. */
+    String androidDownload() {
+        return this == AR ? "أندرويد · تحميل مباشر" : "Android · direct download";
+    }
+
+    /** The two listings that do not exist yet, said plainly rather than linked to nothing. */
+    String storesSoon() {
+        return this == AR
+                ? "قريبًا على App Store و Google Play."
+                : "Coming soon to the App Store and Google Play.";
     }
 
     String printThisPage() {

@@ -183,7 +183,7 @@ public class ShopPosterController {
      * code that leads nowhere. This surface is anonymous and says nothing.
      */
     private ResponseEntity<byte[]> notFound(ShopPageText text) {
-        byte[] body = ShopPageHtml.renderNotFound(text, baseUrl).getBytes(StandardCharsets.UTF_8);
+        byte[] body = ShopPageHtml.renderNotFound(text, baseUrl, ShopPageHtml.Assets.none()).getBytes(StandardCharsets.UTF_8);
         return secured(ResponseEntity.status(HttpStatus.NOT_FOUND))
                 .cacheControl(CacheControl.maxAge(Duration.ofMinutes(1)).cachePublic())
                 .header("X-Robots-Tag", "noindex")

@@ -5,6 +5,8 @@ import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -76,19 +78,97 @@ class PublicShopPageApiTest {
                 .contains("/qr.png");
     }
 
+    /**
+     * The day a shop opens is the day this page matters most, and it is the day the shop has
+     * nothing on its shelf.
+     *
+     * <p>The catalogue section used to be removed from under such a shop, so its page stopped
+     * after the opening hours and a reader was left to guess whether the shop sells nothing,
+     * whether the page was broken, or whether they had missed something.
+     */
+    @ParameterizedTest(name = "in {0}")
+    @ValueSource(strings = {"en", "ar"})
+    @DisplayName("a shop that has listed nothing yet says so, rather than stopping mid-page")
+    void anEmptyShelfSaysSo(String language) throws Exception {
+        ShopPageFixture shop = new ShopPageFixture();
+        String html = body(shop.mvc().perform(get("/s/" + shop.slug()).param("lang", language))
+                .andExpect(status().isOk()).andReturn());
+
+        assertThat(html).contains("class=\"block menu\"").contains("class=\"empty\"");
+        if ("ar".equals(language)) {
+            assertThat(html).contains("لم يضف هذا المتجر أي صنف بعد.")
+                    .contains("أوقات العمل ومناطق التوصيل في الأعلى");
+        } else {
+            assertThat(html).contains("This shop has not listed anything here yet.")
+                    .contains("Its hours and delivery area are above");
+        }
+        // Nothing to find and nothing to jump to, so neither control is drawn.
+        assertThat(html).doesNotContain("class=\"find\"").doesNotContain("class=\"jump\"")
+                .doesNotContain("class=\"items\"");
+    }
+
+    /**
+     * One call to action, and it is honest about both halves.
+     *
+     * <p>The page carries a shop's prices, which makes it look like a shop that takes money. It
+     * cannot: it is anonymous, cached and crawled, and anything on it that took an address or a
+     * phone number would be collecting a stranger's details on a page that can authenticate
+     * nobody. So it says so, and points at the one place an order can actually be placed — naming
+     * what the button hands back, because {@code /app} is the Android build itself and a reader on
+     * an iPhone should learn that from the label rather than from a file they cannot open.
+     */
     @Test
-    @DisplayName("it is a document, not an app: no script of any kind")
-    void carriesNoScript() throws Exception {
+    @DisplayName("one way to order: the app, what the button downloads, and no basket here")
+    void offersOneWayToOrder() throws Exception {
         ShopPageFixture shop = stocked();
         String html = body(shop.mvc().perform(get("/s/" + shop.slug())).andReturn());
 
         assertThat(html)
-                .doesNotContain("<script")
+                .contains("Orders from this shop are placed in the YouDrop app. "
+                        + "This page cannot take an order itself.")
+                .contains("<a class=\"cta\" href=\"https://www.youdrop.shop/app\">Get the app"
+                        + "<span class=\"sub\">Android · direct download</span></a>")
+                // Room held for the two listings, without a link to either: neither exists, and a
+                // dead one on the page a shopkeeper prints on a sign is worse than saying "not
+                // yet".
+                .contains("<ul class=\"stores\"><li>App Store</li><li>Google Play</li></ul>")
+                .contains("Coming soon to the App Store and Google Play.");
+        // One button. Nothing here is a form, a field or a basket.
+        assertThat(html.split("class=\"cta\"", -1).length - 1).isEqualTo(1);
+        assertThat(html)
+                .doesNotContain("<form").doesNotContain("<button").doesNotContain("<textarea")
+                .doesNotContain("type=\"tel\"").doesNotContain("type=\"email\"");
+    }
+
+    /**
+     * It is still a document, not an app.
+     *
+     * <p>Two {@code <script>} elements now, and neither one is code the page was handed: the
+     * catalogue filter, which is a file from this origin, and the structured-data block, which
+     * carries a JSON media type a browser parses as data and never executes — which is also why
+     * {@code script-src 'self'} does not have to allow anything inline for it. Nothing here is
+     * inline JavaScript, and there is no handler attribute anywhere. The page is complete before
+     * either arrives and stays complete if neither does, which is what the whole design rests on:
+     * a chat app's preview runs no JavaScript at all.
+     */
+    @Test
+    @DisplayName("no inline code: one script file from this origin, and one block of data")
+    void carriesNoInlineScript() throws Exception {
+        ShopPageFixture shop = stocked();
+        String html = body(shop.mvc().perform(get("/s/" + shop.slug())).andReturn());
+
+        // Every script element on the page is one of the two, by name.
+        assertThat(html.split("<script", -1).length - 1).isEqualTo(2);
+        assertThat(html)
+                .contains("<script src=\"/s/assets/shop.js?v=")
+                .contains("\" defer></script>")
+                .contains("<script type=\"application/ld+json\">")
                 .doesNotContain("javascript:")
                 .doesNotContain("onerror=")
                 .doesNotContain("onload=")
+                .doesNotContain("onclick=")
                 // One stylesheet, from this origin. No CDN, and no web font to wait on.
-                .contains("<link rel=\"stylesheet\" href=\"/s/assets/shop.css\">")
+                .contains("<link rel=\"stylesheet\" href=\"/s/assets/shop.css?v=")
                 .doesNotContain("<style")
                 .doesNotContain("fonts.googleapis.com")
                 .doesNotContain("cdn.");
@@ -364,11 +444,15 @@ class PublicShopPageApiTest {
                 .contains("default-src 'none'")
                 .contains("style-src 'self'")
                 .contains("img-src 'self' " + ShopPageFixture.IMAGE_ORIGIN)
+                // The catalogue filter, and only from here. A merchant who types a script tag
+                // into a product name has nowhere for it to run.
+                .contains("script-src 'self'")
+                // The shop's own manifest, and nothing else: default-src 'none' would block it.
+                .contains("manifest-src 'self'")
                 .contains("frame-ancestors 'none'")
                 .contains("base-uri 'none'")
                 .contains("form-action 'none'")
-                // The three that would make this a page that could run or leak something.
-                .doesNotContain("script-src")
+                // The two that would make this a page that could run something it was handed.
                 .doesNotContain("unsafe-inline")
                 .doesNotContain("unsafe-eval");
         assertThat(response.getHeader("X-Content-Type-Options")).isEqualTo("nosniff");
@@ -385,6 +469,36 @@ class PublicShopPageApiTest {
         assertThat(css.getResponse().getHeader("Cache-Control"))
                 .contains("max-age=31536000").contains("immutable");
         assertThat(body(css)).contains("--brand").contains(".items");
+    }
+
+    /**
+     * Both assets are served {@code immutable} for a year, which is right — they are the same
+     * bytes for every shop page a reader ever opens — and which is exactly why the address has to
+     * move when the bytes do. It did not, so the next release's markup would have been drawn by a
+     * returning reader with the last release's stylesheet.
+     *
+     * <p>Asserted against the served file rather than against a constant: the fingerprint in the
+     * link has to be the fingerprint of the bytes behind it, or it is decoration.
+     */
+    @Test
+    @DisplayName("the asset links carry the fingerprint of the bytes they point at")
+    void assetLinksMoveWhenTheAssetsDo() throws Exception {
+        ShopPageFixture shop = stocked();
+        String html = body(shop.mvc().perform(get("/s/" + shop.slug())).andReturn());
+
+        for (String asset : List.of("/s/assets/shop.css", "/s/assets/shop.js")) {
+            byte[] served = shop.mvc().perform(get(asset))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+            String digest = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(
+                    java.util.Arrays.copyOf(java.security.MessageDigest.getInstance("SHA-256")
+                            .digest(served), 16));
+
+            assertThat(html).as("%s is linked with its own fingerprint", asset)
+                    .contains(asset + "?v=" + digest.substring(0, 10));
+        }
+        // The 404 page is drawn by the same stylesheet, so it carries the same link.
+        assertThat(body(shop.mvc().perform(get("/s/nothing-is-here-0000ffff")).andReturn()))
+                .contains("/s/assets/shop.css?v=");
     }
 
     // ---------------------------------------------------------------- the sitemap
