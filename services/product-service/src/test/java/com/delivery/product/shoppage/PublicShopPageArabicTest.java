@@ -107,7 +107,9 @@ class PublicShopPageArabicTest {
         assertThat(html)
                 .startsWith("<!doctype html><html lang=\"en\" dir=\"ltr\">")
                 .contains("Open until 23:00")
-                .contains("$1.50 · 135,000 LBP");
+                // The dollar figure and the lira it converts to, as the menu's price column draws
+                // them: one element each, the lira under the dollars rather than beside them.
+                .contains("<span class=\"p\">$1.50<span class=\"l\">135,000 LBP</span></span>");
         assertThat(html.substring(html.indexOf("<body>")).replaceAll("<[^>]*>", ""))
                 .doesNotContainPattern("[" + ARABIC_DIGITS + "]");
     }

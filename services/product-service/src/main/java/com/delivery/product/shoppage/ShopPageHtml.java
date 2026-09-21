@@ -380,9 +380,21 @@ final class ShopPageHtml {
                 .append(esc(t.timesIn(opening.timezone()))).append("</p></section>");
     }
 
+    /**
+     * How long a menu has to be before it is worth offering a way back up.
+     *
+     * <p>Twelve rows is roughly two phone screens of shelf. Below that the reader can see where
+     * they came from, and a "back to the top" link under a four-item shop is a control apologising
+     * for a scroll that never happened.
+     */
+    private static final int LONG_MENU = 12;
+
     private static void catalogue(StringBuilder b, PublicShopPage page, ShopPageText t) {
         PublicShopPage.Catalogue catalogue = page.catalogue();
-        b.append("<section class=\"block menu\"><h2>").append(esc(t.catalogue())).append("</h2>");
+        // Named, because the bar's own "back to the top" link points here: the top of the menu is
+        // where the search box lives, so going back up is also how a reader reaches it again.
+        b.append("<section class=\"block menu\" id=\"menu\"><h2>").append(esc(t.catalogue()))
+                .append("</h2>");
         // A shop that has not listed anything yet used to have this section removed from under it,
         // so its page simply stopped after the opening hours and a reader was left to guess
         // whether the shop sells nothing, whether the page was broken, or whether they had missed
@@ -394,44 +406,22 @@ final class ShopPageHtml {
                     .append("</p></section>");
             return;
         }
-        finder(b, catalogue, t);
+        searchBox(b, t);
+        sectionBar(b, catalogue, t);
         int index = 0;
         for (PublicShopPage.Section section : catalogue.sections()) {
             String name = section.name().isEmpty() ? t.otherItems() : section.name();
-            // A wrapper with a positional id, so a jump link has something to land on and the
-            // filter has one element to hide when a search empties the whole aisle. Positional
+            // A wrapper with a positional id, so a chip on the bar has something to land on and
+            // the filter has one element to hide when a search empties the whole aisle. Positional
             // rather than the section's own row id, which has no business being on this page.
+            // "pic" when anything in this aisle has a photo, and the stylesheet then holds the
+            // picture's column open for the rows that have none, so the names keep one edge. An
+            // aisle nobody photographed gets no class and no empty column to explain.
             b.append("<div class=\"sec\" id=\"s").append(++index).append("\">")
-                    .append("<h3>").append(esc(name)).append("</h3><ul class=\"items\">");
+                    .append("<h3>").append(esc(name)).append("</h3><ul class=\"items")
+                    .append(pictured(section) ? " pic" : "").append("\">");
             for (PublicShopPage.Item item : section.items()) {
-                b.append("<li").append(item.inStock() ? "" : " class=\"gone\"").append(">");
-                if (item.imageUrl() != null) {
-                    // Lazy below the fold: a hundred thumbnails fetched eagerly is the difference
-                    // between a page that opens on a bus and one that does not.
-                    b.append("<img src=\"").append(esc(item.imageUrl()))
-                            .append("\" alt=\"\" loading=\"lazy\" decoding=\"async\">");
-                }
-                // A row with something to say opens where it stands. <details> is the browser's
-                // own disclosure: it expands with no script, no page load and no scroll position
-                // lost, it carries its own keyboard and screen-reader behaviour, and the reader
-                // with scripting off gets exactly the same row as everybody else. The triangle is
-                // the signal — a row without one has nothing more behind it.
-                boolean expands = item.about() != null && !item.about().isBlank();
-                if (expands) {
-                    b.append("<details><summary>");
-                }
-                b.append("<span class=\"n\">").append(esc(item.name())).append("</span>");
-                if (expands) {
-                    b.append("</summary><p class=\"d\">").append(esc(item.about()))
-                            .append("</p></details>");
-                }
-                b.append("<span class=\"p\">")
-                        .append(esc(t.price(item.priceUsd(), item.priceLbp())))
-                        .append("</span>");
-                if (!item.inStock()) {
-                    b.append("<span class=\"x\">").append(esc(t.outOfStock())).append("</span>");
-                }
-                b.append("</li>");
+                item(b, item, t);
             }
             b.append("</ul></div>");
         }
@@ -440,46 +430,132 @@ final class ShopPageHtml {
                     .append(esc(t.andMoreInTheApp(catalogue.total() - catalogue.shown())))
                     .append("</p>");
         }
+        if (catalogue.shown() > LONG_MENU) {
+            // A plain anchor at the section's own id: the way back up works for the reader with no
+            // script exactly as it does for everybody else, and it lands on the search box.
+            b.append("<p class=\"top\"><a href=\"#menu\">").append(esc(t.backToTop()))
+                    .append("</a></p>");
+        }
         b.append("</section>");
     }
 
-    /**
-     * How a reader finds one thing in a shop that sells a hundred and twenty.
-     *
-     * <p>Two halves, and only one of them needs a script.
-     *
-     * <p>The <strong>jump links</strong> are plain anchors at the sections the document already
-     * contains. They work with scripting off, with the script still in flight, and in a reader
-     * mode that stripped it — which is the case this page is built for.
-     *
-     * <p>The <strong>search field</strong> ships {@code hidden} and is revealed by
-     * {@code shop.js}. It is the honest way round: filtering happens entirely in the browser
-     * ({@code form-action 'none'}, and there is no search endpoint to submit to), so a box left
-     * visible for a reader with no script would be a control that swallows what they type. The
-     * "nothing matches" line ships with it, in the markup, in the reader's own language, rather
-     * than being a string the script would have to carry in two languages.
-     */
-    private static void finder(StringBuilder b, PublicShopPage.Catalogue catalogue,
-                               ShopPageText t) {
-        b.append("<div class=\"find\">");
-        if (catalogue.sections().size() > 1) {
-            b.append("<p class=\"jump\"><span>").append(esc(t.jumpTo())).append("</span>");
-            int index = 0;
-            for (PublicShopPage.Section section : catalogue.sections()) {
-                b.append("<a href=\"#s").append(++index).append("\">")
-                        .append(esc(section.name().isEmpty() ? t.otherItems() : section.name()))
-                        .append("</a>");
+    /** Whether anything in this aisle has a photo, which decides the aisle's left edge. */
+    private static boolean pictured(PublicShopPage.Section section) {
+        for (PublicShopPage.Item item : section.items()) {
+            if (item.imageUrl() != null) {
+                return true;
             }
-            b.append("</p>");
         }
-        b.append("<p class=\"q\" hidden><label for=\"q\">").append(esc(t.searchThisShop()))
-                .append("</label>")
+        return false;
+    }
+
+    /**
+     * One line of the menu: the picture, the name, what it costs.
+     *
+     * <p>The three are laid out by the stylesheet as a grid rather than in the order they are
+     * written here, so that the prices form a column a reader can run an eye down. What is written
+     * here is reading order — name, then whether it can be had at all, then the price — which is
+     * the order a screen reader announces and the order the row falls into when there is no
+     * stylesheet at all.
+     */
+    private static void item(StringBuilder b, PublicShopPage.Item item, ShopPageText t) {
+        b.append("<li").append(item.inStock() ? "" : " class=\"gone\"").append(">");
+        if (item.imageUrl() != null) {
+            // Lazy below the fold: a hundred thumbnails fetched eagerly is the difference between
+            // a page that opens on a bus and one that does not. The square it lands in is sized by
+            // the stylesheet, so the row is its final height before the picture arrives.
+            b.append("<img src=\"").append(esc(item.imageUrl()))
+                    .append("\" alt=\"\" loading=\"lazy\" decoding=\"async\">");
+        }
+        // A row with something to say opens where it stands. <details> is the browser's own
+        // disclosure: it expands with no script, no page load and no scroll position lost, it
+        // carries its own keyboard and screen-reader behaviour, and the reader with scripting off
+        // gets exactly the same row as everybody else. The triangle is the signal — a row without
+        // one has nothing more behind it.
+        boolean expands = item.about() != null && !item.about().isBlank();
+        if (expands) {
+            b.append("<details><summary>");
+        }
+        b.append("<span class=\"n\">").append(esc(item.name())).append("</span>");
+        if (expands) {
+            b.append("</summary><p class=\"d\">").append(esc(item.about()))
+                    .append("</p></details>");
+        }
+        if (!item.inStock()) {
+            b.append("<span class=\"x\">").append(esc(t.outOfStock())).append("</span>");
+        }
+        // The two currencies as two elements rather than one "$1.50 · 135,000 LBP" string, because
+        // the price column on a 320 px screen is about eighty pixels wide and that sentence does
+        // not fit in it. The dollar figure is the price; the lira is the same price converted, and
+        // it sits under it in smaller type saying so by its position.
+        b.append("<span class=\"p\">").append(esc(t.usd(item.priceUsd())));
+        if (item.priceLbp() != null) {
+            b.append("<span class=\"l\">").append(esc(t.lbp(item.priceLbp()))).append("</span>");
+        }
+        b.append("</span></li>");
+    }
+
+    /**
+     * The search field, which only exists once the script has revealed it.
+     *
+     * <p>It ships {@code hidden} and is revealed by {@code shop.js}. That is the honest way round:
+     * filtering happens entirely in the browser ({@code form-action 'none'}, and there is no search
+     * endpoint to submit to), so a box left visible for a reader with no script would be a control
+     * that swallows what they type. The "nothing matches" line ships with it, in the markup, in the
+     * reader's own language, rather than being a string the script would have to carry twice.
+     *
+     * <p>It sits above the bar and scrolls away with the page, and that is a decision rather than
+     * an accident — see {@link #sectionBar}.
+     */
+    private static void searchBox(StringBuilder b, ShopPageText t) {
+        b.append("<div class=\"find\"><p class=\"q\" hidden><label for=\"q\">")
+                .append(esc(t.searchThisShop())).append("</label>")
                 // dir="auto" so a customer on the Arabic page who types Latin letters — a brand,
                 // a "7up" — sees them laid out left to right inside the field they are in.
                 .append("<input id=\"q\" type=\"search\" dir=\"auto\" autocomplete=\"off\" ")
                 .append("enterkeyhint=\"search\"></p>")
                 .append("<p class=\"qn\" role=\"status\" hidden>").append(esc(t.nothingMatches()))
                 .append("</p></div>");
+    }
+
+    /**
+     * The bar of sections that follows the reader down the menu.
+     *
+     * <p><strong>Plain anchors, and that is all it is.</strong> Every chip is an {@code <a>} at a
+     * section this document already contains, so with no script it is a row of working links that
+     * lands the reader below the bar — the offset is {@code scroll-margin-top} in the stylesheet,
+     * which the browser applies on its own. What the script adds is the mark on the section being
+     * read, the sideways scroll that keeps that chip in view, and arrow keys along the row. None of
+     * those is load-bearing: without them the bar still navigates.
+     *
+     * <p><strong>A landmark, not a paragraph.</strong> It was a {@code <p>} beginning with the
+     * words "Jump to"; those words are now the {@code <nav>}'s own label, which is what a screen
+     * reader announces and what a keyboard user skips the whole row by. On the screen it buys back
+     * the width of a label on a bar that is short of width.
+     *
+     * <p><strong>Only the bar sticks.</strong> On a 320 px screen the field and the bar together
+     * were a hundred pixels of permanent furniture on a 568 px screen — a fifth of it — and they
+     * answer different questions: search is used once, at the start, by a reader who already knows
+     * what they want, while the bar is used continuously by a reader being shown round. So the
+     * field stays at the top of the menu and scrolls away, the bar pins at fifty-four pixels, and
+     * the way back to the field is the same way back to the top of the menu.
+     *
+     * <p>Drawn only for a shop with more than one section, because a bar with one chip on it is a
+     * heading that has learnt to follow you.
+     */
+    private static void sectionBar(StringBuilder b, PublicShopPage.Catalogue catalogue,
+                                   ShopPageText t) {
+        if (catalogue.sections().size() < 2) {
+            return;
+        }
+        b.append("<nav class=\"bar\" aria-label=\"").append(esc(t.jumpTo())).append("\">");
+        int index = 0;
+        for (PublicShopPage.Section section : catalogue.sections()) {
+            b.append("<a href=\"#s").append(++index).append("\">")
+                    .append(esc(section.name().isEmpty() ? t.otherItems() : section.name()))
+                    .append("</a>");
+        }
+        b.append("</nav>");
     }
 
     /**
