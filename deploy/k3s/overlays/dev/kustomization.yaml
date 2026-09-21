@@ -245,7 +245,7 @@ images:
   newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
 - name: ghcr.io/youssefsaleh0108-maker/order-tracking
   newName: ghcr.io/youssefsaleh0108-maker/order-tracking
-  newTag: sha-dea77d63d7a82ea9dab60e6d437cc688164211ff
+  newTag: sha-5091f198aeb06165370e50151c0d06b2b81cc40a
 - name: ghcr.io/youssefsaleh0108-maker/product-service
   newName: ghcr.io/youssefsaleh0108-maker/product-service
   newTag: sha-0a1305fb2a1e2fada55abc03cbb1bb5687636a96
