@@ -382,7 +382,10 @@ final class ShopPageHtml {
 
     private static void catalogue(StringBuilder b, PublicShopPage page, ShopPageText t) {
         PublicShopPage.Catalogue catalogue = page.catalogue();
-        b.append("<section class=\"block menu\"><h2>").append(esc(t.catalogue())).append("</h2>");
+        // Named, because the bar's own "back to the top" link points here: the top of the menu is
+        // where the search box lives, so going back up is also how a reader reaches it again.
+        b.append("<section class=\"block menu\" id=\"menu\"><h2>").append(esc(t.catalogue()))
+                .append("</h2>");
         // A shop that has not listed anything yet used to have this section removed from under it,
         // so its page simply stopped after the opening hours and a reader was left to guess
         // whether the shop sells nothing, whether the page was broken, or whether they had missed
@@ -394,12 +397,13 @@ final class ShopPageHtml {
                     .append("</p></section>");
             return;
         }
-        finder(b, catalogue, t);
+        searchBox(b, t);
+        sectionBar(b, catalogue, t);
         int index = 0;
         for (PublicShopPage.Section section : catalogue.sections()) {
             String name = section.name().isEmpty() ? t.otherItems() : section.name();
-            // A wrapper with a positional id, so a jump link has something to land on and the
-            // filter has one element to hide when a search empties the whole aisle. Positional
+            // A wrapper with a positional id, so a chip on the bar has something to land on and
+            // the filter has one element to hide when a search empties the whole aisle. Positional
             // rather than the section's own row id, which has no business being on this page.
             b.append("<div class=\"sec\" id=\"s").append(++index).append("\">")
                     .append("<h3>").append(esc(name)).append("</h3><ul class=\"items\">");
@@ -444,42 +448,66 @@ final class ShopPageHtml {
     }
 
     /**
-     * How a reader finds one thing in a shop that sells a hundred and twenty.
+     * The search field, which only exists once the script has revealed it.
      *
-     * <p>Two halves, and only one of them needs a script.
+     * <p>It ships {@code hidden} and is revealed by {@code shop.js}. That is the honest way round:
+     * filtering happens entirely in the browser ({@code form-action 'none'}, and there is no search
+     * endpoint to submit to), so a box left visible for a reader with no script would be a control
+     * that swallows what they type. The "nothing matches" line ships with it, in the markup, in the
+     * reader's own language, rather than being a string the script would have to carry twice.
      *
-     * <p>The <strong>jump links</strong> are plain anchors at the sections the document already
-     * contains. They work with scripting off, with the script still in flight, and in a reader
-     * mode that stripped it — which is the case this page is built for.
-     *
-     * <p>The <strong>search field</strong> ships {@code hidden} and is revealed by
-     * {@code shop.js}. It is the honest way round: filtering happens entirely in the browser
-     * ({@code form-action 'none'}, and there is no search endpoint to submit to), so a box left
-     * visible for a reader with no script would be a control that swallows what they type. The
-     * "nothing matches" line ships with it, in the markup, in the reader's own language, rather
-     * than being a string the script would have to carry in two languages.
+     * <p>It sits above the bar and scrolls away with the page, and that is a decision rather than
+     * an accident — see {@link #sectionBar}.
      */
-    private static void finder(StringBuilder b, PublicShopPage.Catalogue catalogue,
-                               ShopPageText t) {
-        b.append("<div class=\"find\">");
-        if (catalogue.sections().size() > 1) {
-            b.append("<p class=\"jump\"><span>").append(esc(t.jumpTo())).append("</span>");
-            int index = 0;
-            for (PublicShopPage.Section section : catalogue.sections()) {
-                b.append("<a href=\"#s").append(++index).append("\">")
-                        .append(esc(section.name().isEmpty() ? t.otherItems() : section.name()))
-                        .append("</a>");
-            }
-            b.append("</p>");
-        }
-        b.append("<p class=\"q\" hidden><label for=\"q\">").append(esc(t.searchThisShop()))
-                .append("</label>")
+    private static void searchBox(StringBuilder b, ShopPageText t) {
+        b.append("<div class=\"find\"><p class=\"q\" hidden><label for=\"q\">")
+                .append(esc(t.searchThisShop())).append("</label>")
                 // dir="auto" so a customer on the Arabic page who types Latin letters — a brand,
                 // a "7up" — sees them laid out left to right inside the field they are in.
                 .append("<input id=\"q\" type=\"search\" dir=\"auto\" autocomplete=\"off\" ")
                 .append("enterkeyhint=\"search\"></p>")
                 .append("<p class=\"qn\" role=\"status\" hidden>").append(esc(t.nothingMatches()))
                 .append("</p></div>");
+    }
+
+    /**
+     * The bar of sections that follows the reader down the menu.
+     *
+     * <p><strong>Plain anchors, and that is all it is.</strong> Every chip is an {@code <a>} at a
+     * section this document already contains, so with no script it is a row of working links that
+     * lands the reader below the bar — the offset is {@code scroll-margin-top} in the stylesheet,
+     * which the browser applies on its own. What the script adds is the mark on the section being
+     * read, the sideways scroll that keeps that chip in view, and arrow keys along the row. None of
+     * those is load-bearing: without them the bar still navigates.
+     *
+     * <p><strong>A landmark, not a paragraph.</strong> It was a {@code <p>} beginning with the
+     * words "Jump to"; those words are now the {@code <nav>}'s own label, which is what a screen
+     * reader announces and what a keyboard user skips the whole row by. On the screen it buys back
+     * the width of a label on a bar that is short of width.
+     *
+     * <p><strong>Only the bar sticks.</strong> On a 320 px screen the field and the bar together
+     * were a hundred pixels of permanent furniture on a 568 px screen — a fifth of it — and they
+     * answer different questions: search is used once, at the start, by a reader who already knows
+     * what they want, while the bar is used continuously by a reader being shown round. So the
+     * field stays at the top of the menu and scrolls away, the bar pins at fifty-four pixels, and
+     * the way back to the field is the same way back to the top of the menu.
+     *
+     * <p>Drawn only for a shop with more than one section, because a bar with one chip on it is a
+     * heading that has learnt to follow you.
+     */
+    private static void sectionBar(StringBuilder b, PublicShopPage.Catalogue catalogue,
+                                   ShopPageText t) {
+        if (catalogue.sections().size() < 2) {
+            return;
+        }
+        b.append("<nav class=\"bar\" aria-label=\"").append(esc(t.jumpTo())).append("\">");
+        int index = 0;
+        for (PublicShopPage.Section section : catalogue.sections()) {
+            b.append("<a href=\"#s").append(++index).append("\">")
+                    .append(esc(section.name().isEmpty() ? t.otherItems() : section.name()))
+                    .append("</a>");
+        }
+        b.append("</nav>");
     }
 
     /**

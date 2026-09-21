@@ -103,7 +103,7 @@ class PublicShopPageApiTest {
                     .contains("Its hours and delivery area are above");
         }
         // Nothing to find and nothing to jump to, so neither control is drawn.
-        assertThat(html).doesNotContain("class=\"find\"").doesNotContain("class=\"jump\"")
+        assertThat(html).doesNotContain("class=\"find\"").doesNotContain("class=\"bar\"")
                 .doesNotContain("class=\"items\"");
     }
 
