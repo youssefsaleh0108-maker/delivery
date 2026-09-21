@@ -11,13 +11,16 @@
   --brand: #E11D48;
   --ink: #0F172A;
   --muted: #475569;
-  --faint: #94A3B8;
+  /* Was #94A3B8: 2.6:1 on white, under the 4.5:1 a reader needs. Same ramp, 4.7:1, still quiet. */
+  --faint: #64748B;
   --border: #E2E8F0;
   --bg: #F8FAFC;
   --white: #FFF;
   --emerald: #10B981;
   --amber: #B45309;
   --r: 12px;
+  /* The sticky bar's height. Its min-height and .sec's scroll-margin-top must agree on it. */
+  --bar: 54px;
 }
 * { box-sizing: border-box; }
 /* Any display here beats the UA's own [hidden] rule, and the filter hides by that attribute. */
@@ -104,33 +107,8 @@ a { color: var(--brand); }
 .hours .today th, .hours .today td { font-weight: 700; color: var(--ink); }
 .hours .now { color: var(--brand); font-size: .75rem; font-weight: 600; }
 
-/*
-  Finding one thing in a shop that sells a hundred and twenty. The jump links are plain anchors and
-  are all a reader with no script gets; the field arrives hidden and is revealed by shop.js. Sticky,
-  because a filter on a long shelf has to be reachable halfway down it.
-*/
-.find {
-  position: sticky; top: 0; z-index: 1; background: var(--white);
-  padding-block: 8px; margin-block-end: 4px; border-block-end: 1px solid var(--border);
-}
-/*
-  One row that scrolls sideways rather than wrapping. A shop with eight aisles would otherwise give
-  the sticky bar three rows of chips, which is a third of a phone screen permanently spent on
-  navigation — and it would make the bar's height depend on how many aisles the shop has, which is
-  the one thing scroll-margin-top below cannot know.
-*/
-.jump {
-  display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 6px; align-items: center;
-  margin: 0 0 8px; scrollbar-width: none; -webkit-overflow-scrolling: touch;
-}
-.jump::-webkit-scrollbar { display: none; }
-.jump span { font-size: .78rem; color: var(--faint); flex: none; }
-.jump a {
-  font-size: .82rem; text-decoration: none; padding: 6px 12px; border-radius: 100px;
-  background: var(--bg); border: 1px solid var(--border); flex: none; white-space: nowrap;
-}
-/* The room the sticky finder takes, so an aisle jumped to does not land underneath it. */
-.sec { scroll-margin-top: 124px; }
+/* Hidden in the markup, revealed by shop.js, and it does not stick: ShopPageHtml.sectionBar. */
+.find { margin-block-end: 10px; }
 .q { display: flex; flex-direction: column; gap: 4px; margin: 0; }
 .q label { font-size: .78rem; color: var(--muted); }
 .q input {
@@ -140,26 +118,83 @@ a { color: var(--brand); }
 .q input:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
 .qn { margin: 10px 0 0; color: var(--muted); font-size: .9rem; }
 
-.items { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* One row that scrolls sideways rather than wrapping, so --bar holds however many aisles a shop
+   has. Sticky inside .menu, so it arrives with the menu and leaves with it; full-bleed by a
+   negative inline margin, so the pinned strip reaches both edges. */
+.bar {
+  position: sticky; top: 0; z-index: 2;
+  display: flex; flex-wrap: nowrap; align-items: center; gap: 6px;
+  min-height: var(--bar);
+  margin-inline: -16px; padding-inline: 16px; margin-block-end: 2px;
+  background: var(--white); border-block-end: 1px solid var(--border);
+  overflow-x: auto; overscroll-behavior-x: contain;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.bar::-webkit-scrollbar { display: none; }
+/* One chip, whether it is a section on the bar or the way back up at the end of the menu. */
+.bar a, .top a {
+  text-decoration: none; font-size: .85rem; line-height: 1.4; font-weight: 600;
+  color: var(--ink); background: var(--bg);
+  border: 1px solid var(--border); border-radius: 100px; padding: 9px 14px;
+}
+.bar a { flex: none; white-space: nowrap; }
+/* The section being read: set by shop.js and nothing else, so with no script none is marked and
+   none is wrong. aria-current rather than a class of our own — one fact, not two. */
+.bar a[aria-current] { background: var(--brand); border-color: var(--brand); color: var(--white); }
+.bar a:focus-visible, .items summary:focus-visible, .top a:focus-visible {
+  outline: 2px solid var(--brand); outline-offset: 2px;
+}
+/* A section tapped lands under the bar, not behind it. The browser does this from a plain #anchor. */
+.sec { scroll-margin-top: calc(var(--bar) + 8px); padding-block-start: 14px; }
+.sec h3 { margin-block-start: 0; }
+
+/* One item to a line, because that is what a menu is. It was a two-up grid of bordered cards,
+   which put the prices in two ragged columns. A hairline is the whole decoration. */
+.items { --pic: 64px; }
 .items li {
-  border: 1px solid var(--border); border-radius: var(--r); padding: 8px;
-  display: flex; flex-direction: column; gap: 2px;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start;
+  padding-block: 10px; border-block-end: 1px solid var(--border);
 }
+.items li:last-child { border-block-end: 0; padding-block-end: 2px; }
+/* An aisle with any photo in it holds the column open for the rows without one, so the names keep
+   one left edge. An aisle nobody photographed gets no class and no empty column. */
+.items.pic li { grid-template-columns: calc(var(--pic) + 12px) minmax(0, 1fr) auto; }
+/* A square sized here rather than by the file, so the row is its final height before the picture
+   arrives. The gap belongs to the image, so a row with no picture is not indented past one. */
 .items img {
-  width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px;
-  background: var(--bg); margin-block-end: 6px;
+  grid-column: 1; grid-row: 1 / span 2;
+  width: var(--pic); height: var(--pic); object-fit: cover; border-radius: 10px;
+  background: var(--bg); margin-inline-end: 12px;
 }
-.items .n { font-size: .9rem; font-weight: 600; }
-/*
-  The <details> marker is left alone deliberately: it is the one signal for which rows have more
-  behind them, and it turns itself round under dir="rtl" without a second rule.
-*/
-.items summary { cursor: pointer; }
+.items li > details, .items li > .n { grid-column: 2; grid-row: 1; }
+.items .n { font-size: .95rem; font-weight: 600; line-height: 1.35; }
+/* The marker is left alone: it is the one signal for which rows have more behind them, and it
+   turns round under dir="rtl" by itself. The padding is the thumb's target, pulled back by an
+   equal margin so it costs the row no height. */
+.items summary { cursor: pointer; padding-block: 8px; margin-block: -8px; }
 .items summary::marker { color: var(--faint); }
-.items .d { font-size: .82rem; color: var(--muted); margin: 4px 0 0; }
-.items .p { font-size: .84rem; color: var(--muted); }
-.items .x { font-size: .75rem; color: #B91C1C; font-weight: 600; }
-.items .gone { opacity: .55; }
+/* What the merchant wrote, given the line height of something meant to be read. */
+.items .d { font-size: .86rem; line-height: 1.5; color: var(--muted); margin: 6px 0 2px; }
+/* Tabular figures, so the column lines up rather than shuffling on every 1. */
+.items .p {
+  grid-column: 3; grid-row: 1;
+  text-align: end; padding-inline-start: 12px; white-space: nowrap;
+  font-size: .92rem; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.items .l { display: block; font-size: .74rem; font-weight: 400; color: var(--muted); }
+/* Out of stock, said rather than shouted. It was red and bold on a row faded to 55%: an alarm on
+   something that has merely run out, printed too faintly to read. */
+.items .x {
+  grid-column: 2; grid-row: 2; justify-self: start; margin-block-start: 6px;
+  font-size: .75rem; color: var(--muted);
+  background: var(--bg); border: 1px solid var(--border); border-radius: 100px; padding: 1px 9px;
+}
+.items .gone .n, .items .gone .p { color: var(--muted); }
+.items .gone img { opacity: .5; }
+
+/* The way back up a long menu, which is also the way back to the search box. */
+.top { margin: 18px 0 0; }
+.top a { display: inline-block; }
 
 .cta {
   display: inline-block; background: var(--brand); color: var(--white); text-decoration: none;
@@ -181,11 +216,13 @@ a { color: var(--brand); }
 .empty { color: var(--muted); font-weight: 600; margin-block-start: 4px; }
 
 @media (min-width: 560px) {
-  .items { grid-template-columns: repeat(3, 1fr); }
   .hero .cover { height: 260px; }
+  /* Room for a bigger picture, not for a second column: a menu is still read one line at a time. */
+  .items { --pic: 84px; }
 }
-/* 320 px phones are still in use, and two cards across one is 140 px each. One column instead. */
+/* 320 px phones are still in use, and there the picture gives its width back to the name. */
 @media (max-width: 359px) {
-  .items { grid-template-columns: 1fr; }
-  .items img { aspect-ratio: 16 / 9; }
+  .items { --pic: 52px; }
+  .items .p { padding-inline-start: 8px; }
+  .bar a { padding-inline: 12px; }
 }

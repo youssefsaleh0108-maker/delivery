@@ -81,27 +81,74 @@ class PublicShopPageFindingTest {
                 .contains("<p class=\"qn\" role=\"status\" hidden>");
     }
 
+    /**
+     * The bar, as the reader with no script gets it.
+     *
+     * <p>Everything the bar does when it is being followed down a menu — the mark on the section
+     * being read, the sideways scroll, the arrow keys — is added by {@code shop.js} to markup that
+     * already works without it. What is asserted here is the part that must never depend on a
+     * script: a navigation landmark of ordinary anchors at sections that exist, arriving visible,
+     * in the order the shop filed them.
+     */
     @Test
-    @DisplayName("the jump links are plain anchors at sections that exist")
-    void jumpLinksNeedNoScript() throws Exception {
+    @DisplayName("the bar is a landmark of plain anchors at sections that exist")
+    void theBarNeedsNoScript() throws Exception {
         String html = render(aisled(), "en");
 
         assertThat(html)
-                .contains("<a href=\"#s1\">Bread</a>")
-                .contains("<a href=\"#s2\">Cold drinks</a>")
-                .contains("<a href=\"#s3\">Household</a>")
+                .contains("<nav class=\"bar\" aria-label=\"Jump to\">"
+                        + "<a href=\"#s1\">Bread</a>"
+                        + "<a href=\"#s2\">Cold drinks</a>"
+                        + "<a href=\"#s3\">Household</a></nav>")
                 .contains("<div class=\"sec\" id=\"s1\">")
                 .contains("<div class=\"sec\" id=\"s2\">")
-                .contains("<div class=\"sec\" id=\"s3\">");
+                .contains("<div class=\"sec\" id=\"s3\">")
+                // Nothing a browser has to be told to do, and nothing to undo if the script never
+                // arrives: no handler, no tabindex of ours, no chip marked by the server.
+                .doesNotContain("<nav class=\"bar\" hidden")
+                .doesNotContain("aria-current")
+                .doesNotContain("tabindex")
+                .doesNotContain("onclick");
         assertThat(occurrences(html, "<div class=\"sec\"")).isEqualTo(3);
     }
 
+    @ParameterizedTest(name = "in {0}")
+    @ValueSource(strings = {"en", "ar"})
+    @DisplayName("the bar names itself in the reader's language, and mirrors with the page")
+    void theBarIsLabelledInBothLanguages(String language) throws Exception {
+        String html = render(aisled(), language);
+
+        // The label is the <nav>'s own, not a line of text taking width from a bar that is short
+        // of it. Direction is the document's: one stylesheet, mirrored by dir.
+        assertThat(html).contains("<nav class=\"bar\" aria-label=\""
+                + ("ar".equals(language) ? "انتقل إلى" : "Jump to") + "\">");
+        assertThat(html).contains("dir=\"" + ("ar".equals(language) ? "rtl" : "ltr") + "\"");
+    }
+
     @Test
-    @DisplayName("a shop with one aisle gets no jump links: there is nowhere to jump to")
-    void oneSectionNeedsNoJumpLinks() throws Exception {
+    @DisplayName("a shop with one aisle gets no bar: there is nowhere to jump to")
+    void oneSectionNeedsNoBar() throws Exception {
         String html = render(new ShopPageFixture().section("Bread", Item.of("Kaak", "1.50")), "en");
 
-        assertThat(html).doesNotContain("class=\"jump\"").contains("id=\"s1\"");
+        assertThat(html).doesNotContain("class=\"bar\"").contains("id=\"s1\"");
+    }
+
+    @Test
+    @DisplayName("a long menu offers a way back to the top, and a short one does not")
+    void aLongMenuCanBeClimbedBackUp() throws Exception {
+        ShopPageFixture longMenu = new ShopPageFixture();
+        List<Item> items = new ArrayList<>();
+        for (int i = 0; i < 13; i++) {
+            items.add(Item.of("Thing " + i, "1.25"));
+        }
+        longMenu.section("Bread", items.toArray(Item[]::new));
+
+        // A plain anchor at the menu's own id, so it works with no script — and it lands on the
+        // search box, which is the other thing a reader at the bottom of a long shelf wants.
+        assertThat(render(longMenu, "en"))
+                .contains("<section class=\"block menu\" id=\"menu\">")
+                .contains("<p class=\"top\"><a href=\"#menu\">Back to the top of the menu</a></p>");
+        assertThat(render(aisled(), "en")).doesNotContain("class=\"top\"");
     }
 
     @ParameterizedTest(name = "in {0}")
@@ -137,21 +184,23 @@ class PublicShopPageFindingTest {
         assertThat(result.getResponse().getContentType()).startsWith("text/javascript");
         assertThat(result.getResponse().getHeader("Cache-Control"))
                 .contains("max-age=31536000").contains("immutable");
-        // A filter for a list that is already on the page. Anything approaching a framework here
-        // would be a second download standing between a reader and the shop's opening hours.
-        assertThat(result.getResponse().getContentAsByteArray().length).isLessThan(4 * 1024);
+        // A filter and a scroll-spy for a list that is already on the page. It was 4 kB when it
+        // only filtered; marking the section being read, scrolling its chip into view and walking
+        // the bar with the arrow keys is the other half. Anything approaching a framework here
+        // would still be a second download standing between a reader and the shop's opening hours.
+        assertThat(result.getResponse().getContentAsByteArray().length).isLessThan(8 * 1024);
     }
 
     /**
      * The one rule, asserted against the file rather than left in a comment.
      *
-     * <p>The script may hide rows the document already has. It may not fetch, and it may not build
-     * markup — the moment it did, a reader with no script would be looking at a different page
-     * from the one this service promises, and the merchant's own text would be going through a
-     * second, unescaped path onto the page.
+     * <p>The script may hide rows the document already has, and mark one of the links it arrived
+     * with. It may not fetch, and it may not build markup — the moment it did, a reader with no
+     * script would be looking at a different page from the one this service promises, and the
+     * merchant's own text would be going through a second, unescaped path onto the page.
      */
     @Test
-    @DisplayName("the script only hides what is already there: it fetches nothing and writes no markup")
+    @DisplayName("the script only hides and marks what is already there: it fetches nothing and writes no markup")
     void theScriptOnlyFilters() throws Exception {
         String js = script();
 
@@ -160,14 +209,19 @@ class PublicShopPageFindingTest {
                 .doesNotContain("outerHTML")
                 .doesNotContain("insertAdjacent")
                 .doesNotContain("createElement")
+                .doesNotContain("appendChild")
                 .doesNotContain("document.write")
                 .doesNotContain("fetch(")
                 .doesNotContain("XMLHttpRequest")
                 .doesNotContain("eval(")
                 .doesNotContain("localStorage")
                 .doesNotContain("cookie");
-        // What it does instead: read the rows, and set hidden on them.
-        assertThat(js).contains(".hidden =");
+        // What it does instead: read the rows and set hidden on them, and put one attribute — the
+        // standard one, which the stylesheet draws the mark from — on the chip being read.
+        assertThat(js).contains(".hidden =").contains("setAttribute('aria-current', 'true')");
+        // The only attribute it is allowed to write. A second setAttribute here would be a value
+        // reaching the page by a path that never went through ShopPageHtml.esc.
+        assertThat(occurrences(js, "setAttribute(")).isEqualTo(1);
     }
 
     @Test
@@ -176,15 +230,37 @@ class PublicShopPageFindingTest {
         String html = render(aisled(), "en");
         String js = script();
 
-        for (String hook : List.of(".find", ".q", ".qn", ".jump", ".menu .sec", ".items > li",
+        for (String hook : List.of(".menu", ".find", ".q", ".qn", ".bar", ".sec", ".items > li",
                 ".n", ".d")) {
             assertThat(js).as("the script looks for %s", hook).contains("'" + hook + "'");
         }
         assertThat(html)
                 .contains("class=\"find\"")
-                .contains("class=\"jump\"")
+                .contains("class=\"bar\"")
                 .contains("class=\"sec\"")
-                .contains("class=\"items\"")
+                .contains("<ul class=\"items")
                 .contains("class=\"n\"");
+    }
+
+    /**
+     * The stylesheet and the markup agree on where a section lands.
+     *
+     * <p>Two numbers have to match for a tapped chip to leave its heading visible: the height the
+     * bar is pinned at, and the room a section leaves above itself. They are one custom property
+     * so that they cannot drift, and this reads the served stylesheet to prove it is still so —
+     * it is the offset that works with no script at all, and nothing else on the page would fail
+     * loudly if it were wrong.
+     */
+    @Test
+    @DisplayName("the bar's height and a section's landing offset are the same one number")
+    void theBarAndTheSectionsAgreeOnTheOffset() throws Exception {
+        var result = new ShopPageFixture().mvc().perform(get("/s/assets/shop.css")).andReturn();
+        result.getResponse().setCharacterEncoding(StandardCharsets.UTF_8.name());
+        String css = result.getResponse().getContentAsString();
+
+        assertThat(css)
+                .containsPattern("--bar:\\s*\\d+px")
+                .contains("min-height: var(--bar)")
+                .contains("scroll-margin-top: calc(var(--bar)");
     }
 }

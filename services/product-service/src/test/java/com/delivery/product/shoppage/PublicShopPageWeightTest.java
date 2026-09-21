@@ -187,6 +187,19 @@ class PublicShopPageWeightTest {
         }
     }
 
+    /**
+     * The floor: a shop with three things on its shelf.
+     *
+     * <p>Almost all of this is the two shared files, which is why this number moved. The sticky
+     * section bar and the menu's rewritten rows cost about 2.1 kB gzipped between the stylesheet
+     * and the script, and a three-aisle shop pays it in full while a three-<em>item</em> shop pays
+     * it for a bar it never draws — one stylesheet and one script serve every shop page there is,
+     * cached for a year across all of them, and splitting them so the smallest shop could skip the
+     * bar's half would trade a kilobyte for a second request on every other page.
+     *
+     * <p>So 10 kB, not 9, and the two budgets that matter did not move: the busy shop below the
+     * 12 kB a reader actually opens, and the whole thing below the 25 kB ceiling.
+     */
     @Test
     @DisplayName("a small shop's page is small, in both languages")
     void aSmallShopIsSmall() throws Exception {
@@ -196,7 +209,10 @@ class PublicShopPageWeightTest {
                     .section("Bread", Item.of("Kaak", "1.50"), Item.of("Markouk", "2.25"),
                             Item.of("Manakish", "2.00")), language);
             report("small, 3 items, " + language, fetched);
-            assertThat(fetched.withScript()).isLessThan(9 * 1024);
+            assertThat(fetched.withScript()).isLessThan(10 * 1024);
+            // The reader with no script pays for neither the filter nor the bar's behaviour, and
+            // still gets the whole shelf and a row of working section links.
+            assertThat(fetched.withoutScript()).isLessThan(7 * 1024);
         }
     }
 

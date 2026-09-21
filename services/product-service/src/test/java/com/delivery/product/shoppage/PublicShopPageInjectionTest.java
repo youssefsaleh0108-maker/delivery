@@ -61,13 +61,22 @@ class PublicShopPageInjectionTest {
     private static final String DISTRICT = "district";
     private static final String POWER = "powernote";
     private static final String SECTION = "section";
+    private static final String SECTION2 = "secondsection";
     private static final String ITEM = "itemname";
     private static final String ITEM_ABOUT = "itemabout";
     private static final String AREA = "areaname";
 
-    private static final List<String> FIELDS =
-            List.of(NAME, TAGLINE, ABOUT, TAG, DISTRICT, POWER, SECTION, ITEM, ITEM_ABOUT, AREA);
+    private static final List<String> FIELDS = List.of(NAME, TAGLINE, ABOUT, TAG, DISTRICT, POWER,
+            SECTION, SECTION2, ITEM, ITEM_ABOUT, AREA);
 
+    /**
+     * Two sections, because a section name is now typed onto the page twice.
+     *
+     * <p>It was only a heading. It is now also a chip on the bar that follows the reader down the
+     * menu — a second path onto the page for a value the merchant typed, and one the bar only draws
+     * for a shop with more than one section. A hostile shop with a single aisle would never have
+     * rendered it, and this test would have passed over the new path without touching it.
+     */
     private static ShopPageFixture hostileShop() {
         return new ShopPageFixture()
                 .profile(typed(NAME), typed(TAGLINE), typed(ABOUT), List.of(typed(TAG)),
@@ -76,7 +85,8 @@ class PublicShopPageInjectionTest {
                 .power(Store.PowerStatus.GENERATOR, typed(POWER), "2026-09-20T14:30:00Z")
                 .areas(typed(AREA))
                 .section(typed(SECTION),
-                        Item.of(typed(ITEM), "1.50").describedAs(typed(ITEM_ABOUT)));
+                        Item.of(typed(ITEM), "1.50").describedAs(typed(ITEM_ABOUT)))
+                .section(typed(SECTION2), Item.of("Plain second item", "2.50"));
     }
 
     private static String page(String language) throws Exception {
@@ -161,12 +171,41 @@ class PublicShopPageInjectionTest {
                 .contains("<li>" + rendered(TAG) + "</li>")
                 .contains("<li>" + rendered(AREA) + "</li>")
                 .contains("<h3>" + rendered(SECTION) + "</h3>")
+                .contains("<h3>" + rendered(SECTION2) + "</h3>")
                 .contains("<span class=\"n\">" + rendered(ITEM) + "</span>")
                 // Inside the row that expands, which is a second path onto the page for text the
                 // merchant typed — and one <details> the payload must not have closed.
                 .contains("<p class=\"d\">" + rendered(ITEM_ABOUT) + "</p></details>")
                 .contains("<p class=\"tagline\">" + rendered(TAGLINE) + "</p>")
                 .contains("<p class=\"about\">" + rendered(ABOUT) + "</p>");
+    }
+
+    /**
+     * The bar that follows the reader, which is the newest place a merchant's text is printed.
+     *
+     * <p>A chip is the section's own name inside an anchor, and the bar's label is a string of the
+     * page's own — so both go through {@code esc}, and the chip's payload must not have closed the
+     * anchor, opened a tag, or turned the rest of the bar round. The {@code href} beside it is
+     * built from a counter and can carry nothing a merchant typed at all.
+     */
+    @ParameterizedTest(name = "in {0}")
+    @ValueSource(strings = {"en", "ar"})
+    @DisplayName("the bar's chips carry escaped section names, and the bar is still a bar")
+    void escapesTheSectionBar(String language) throws Exception {
+        String html = page(language);
+
+        assertThat(html)
+                .contains("<a href=\"#s1\">" + rendered(SECTION) + "</a>")
+                .contains("<a href=\"#s2\">" + rendered(SECTION2) + "</a>")
+                .doesNotContain(typed(SECTION))
+                .doesNotContain(typed(SECTION2));
+        // One nav, opened and closed once, with exactly the two anchors it meant to have: a
+        // section called "</a><a href=..." must not have added a third.
+        assertThat(html.split("<nav class=\"bar\"", -1).length - 1).isEqualTo(1);
+        assertThat(html.split("</nav>", -1).length - 1).isEqualTo(1);
+        String bar = html.substring(html.indexOf("<nav class=\"bar\""), html.indexOf("</nav>"));
+        assertThat(bar.split("<a ", -1).length - 1).isEqualTo(2);
+        assertThat(bar).doesNotContain("<script").doesNotContain("‮");
     }
 
     @Test

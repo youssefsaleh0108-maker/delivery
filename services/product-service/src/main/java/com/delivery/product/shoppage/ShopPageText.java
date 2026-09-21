@@ -295,9 +295,20 @@ enum ShopPageText {
         return this == AR ? "ابحث في المتجر" : "Search this shop";
     }
 
-    /** The row of section anchors. Plain links: they are what a reader with no script gets. */
+    /**
+     * The name of the bar of sections — its {@code aria-label} rather than a visible heading.
+     *
+     * <p>It was three words printed at the start of the row, on the one control that is short of
+     * width. A screen reader reaches the bar as a navigation landmark and needs it named; a reader
+     * looking at a row of section names does not need to be told they are section names.
+     */
     String jumpTo() {
         return this == AR ? "انتقل إلى" : "Jump to";
+    }
+
+    /** The way back up a long menu, which is also the way back to the search box. */
+    String backToTop() {
+        return this == AR ? "العودة إلى أعلى القائمة" : "Back to the top of the menu";
     }
 
     /**

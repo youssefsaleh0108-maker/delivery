@@ -102,6 +102,32 @@ class PublicShopPageItemDetailTest {
                 + "…");
     }
 
+    /**
+     * Where a row's name starts when the shop photographed only some of its shelf.
+     *
+     * <p>A menu is read down its left edge, and a name that jumps seventy pixels between one row
+     * and the next breaks that. So an aisle with any photo in it holds the picture's column open
+     * for the rows that have none — and an aisle nobody photographed does not, because an empty
+     * column in front of every row of a photo-less shop is a hole with nothing to explain it. The
+     * markup carries which case it is; the stylesheet does the rest.
+     */
+    @Test
+    @DisplayName("an aisle with photos keeps one left edge; an aisle without them has no empty column")
+    void theLeftEdgeFollowsTheAisle() throws Exception {
+        String html = render(new ShopPageFixture()
+                .section("Some photographed", Item.of("Kaak", "1.50"),
+                        Item.of("Markouk", "2.25").withoutPicture())
+                .section("None photographed", Item.of("Dish soap", "3.00").withoutPicture(),
+                        Item.of("Bleach", "2.00").withoutPicture()), "en");
+
+        assertThat(html)
+                .contains("<h3>Some photographed</h3><ul class=\"items pic\">")
+                .contains("<h3>None photographed</h3><ul class=\"items\">");
+        // One picture on the whole shelf — the one row that has one — so the class on the first
+        // aisle is about the aisle, not about the rows inside it that happen to carry a photo.
+        assertThat(html.split("<img src=", -1).length - 1).isEqualTo(1);
+    }
+
     @Test
     @DisplayName("Arabic gets the same row, and the page's own direction carries it")
     void arabicDescriptionsRenderTheSameWay() throws Exception {
