@@ -89,23 +89,38 @@
     }
   }
 
-  // Which section is being read: the last one whose top has gone under the bar, asked of the bar
-  // rather than from its height written down twice. A dozen rectangle reads per scroll and no
-  // write unless the answer changed — and a short section is not a special case, as it would be
-  // for an observer.
+  // Which section is being read: the one filling most of the TOP HALF of the screen — not the one
+  // under the bar, which on a short menu names an aisle the reader has left behind and can never
+  // name the last one at all. Why, at length, is in ShopPageHtml.SCRIPT, which nobody downloads.
   function spy() {
     if (!bar || bar.hidden) { return; }
-    // Twelve: a section tapped on the bar lands eight below it and has to count as arrived.
-    var line = bar.getBoundingClientRect().bottom + 12;
+    var line = bar.getBoundingClientRect().bottom;
+    var eye = (line + window.innerHeight) / 2;
+    var moved = window.pageYOffset > 0;
     var here = null;
+    var most = 0;
     for (var i = 0; i < sections.length; i++) {
       if (sections[i].block.hidden) { continue; }
-      // The first section standing, until one has gone under: above the menu there is no answer.
-      if (here === null || sections[i].block.getBoundingClientRect().top <= line) {
-        here = sections[i];
-      }
+      if (here === null) { here = sections[i]; }
+      if (!moved) { continue; }
+      var box = sections[i].block.getBoundingClientRect();
+      var seen = Math.min(box.bottom, eye) - Math.max(box.top, line);
+      // Strictly more, so equals fall to the earlier aisle and a steady scroll never oscillates.
+      if (seen > most) { most = seen; here = sections[i]; }
     }
     mark(here);
+  }
+
+  // A tap is the reader saying which aisle they want, so it is marked whatever the screen then
+  // looks like: a two-row aisle would otherwise hand the mark to the long one beneath it.
+  function jumped() {
+    for (var i = 0; i < sections.length; i++) {
+      if (!sections[i].block.hidden && '#' + sections[i].block.id === window.location.hash) {
+        mark(sections[i]);
+        return;
+      }
+    }
+    spy();
   }
 
   // Arrow keys along the row. Every chip keeps its own tab stop, because with no script they are
@@ -168,8 +183,7 @@
     bar.addEventListener('keydown', along);
     window.addEventListener('scroll', spy);
     window.addEventListener('resize', spy);
-    // A jump the browser may finish without a scroll event to notice it by.
-    window.addEventListener('hashchange', spy);
+    window.addEventListener('hashchange', jumped);
     spy();
   }
 })();

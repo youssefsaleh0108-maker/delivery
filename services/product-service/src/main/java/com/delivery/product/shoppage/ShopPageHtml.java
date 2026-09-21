@@ -63,6 +63,37 @@ final class ShopPageHtml {
      * with scripting off, a phone that gave up on this file, a chat app's preview and a crawler all
      * see the whole shelf. The search box it drives starts {@code hidden} in the markup and is
      * revealed by the script, because a box that did nothing when tapped is worse than no box.
+     *
+     * <p><strong>How the bar decides which aisle a reader is in</strong>, written here because this
+     * file is not the one that crosses a 3G network.
+     *
+     * <p>The obvious rule — the last aisle whose top has passed under the bar — is the one every
+     * scroll-spy uses, and it is wrong on a short menu. A page stops scrolling when its foot
+     * reaches the screen, so an aisle that is still below the bar at that moment can never be
+     * brought up to it: at no scroll position at all does it become the answer. Beirut Grill sells
+     * six things in three aisles, which is what a dekkane looks like; scrolled to the end, Mains and
+     * Sides filled the screen, Sides had never once been reachable, and the bar said Desserts — a
+     * twenty-pixel sliver the reader had all but left behind. A long restaurant menu hides this
+     * completely, because there every aisle eventually reaches the top.
+     *
+     * <p>Special-casing the foot of the document was the tempting fix and is the wrong one: it
+     * moves the mark on the last pixel of the scroll and leaves the whole descent before it saying
+     * the same wrong thing. So the question changed instead, from "what have I passed" to "what am
+     * I looking at": the aisle covering most of the screen. That has no end to run out of — some
+     * aisle always covers the most of it — and it is right by construction rather than by a
+     * correction bolted on.
+     *
+     * <p>Two qualifications, both earned by a case that broke without them. It is the <em>top
+     * half</em> of the screen, because measuring to the foot lets an aisle that has only just
+     * appeared at the bottom edge take the mark from the one being read. And until the reader has
+     * scrolled at all it is simply the first aisle, because nothing has been passed yet and a menu
+     * that fits on one screen would otherwise be introduced by whichever aisle happens to be
+     * longest. A chip that is tapped marks itself, whatever the screen then looks like: a two-row
+     * aisle lands under the bar with a long one beneath it, and the reader has just said in so many
+     * words which one they wanted.
+     *
+     * <p>{@code ShopPageScrollSpyTest} runs the real file over the rectangles this page actually
+     * measured, because none of the tests that read the served bytes could see any of it.
      */
     static final String SCRIPT = "/s/assets/shop.js";
 
