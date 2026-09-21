@@ -251,7 +251,7 @@ images:
   newTag: sha-5091f198aeb06165370e50151c0d06b2b81cc40a
 - name: ghcr.io/youssefsaleh0108-maker/push-connector
   newName: ghcr.io/youssefsaleh0108-maker/push-connector
-  newTag: sha-12a3b2775cd2a6c377482c7efcd2fdab9aa523f7
+  newTag: sha-5091f198aeb06165370e50151c0d06b2b81cc40a
 - name: ghcr.io/youssefsaleh0108-maker/sms-connector
   newName: ghcr.io/youssefsaleh0108-maker/sms-connector
   newTag: sha-5091f198aeb06165370e50151c0d06b2b81cc40a
