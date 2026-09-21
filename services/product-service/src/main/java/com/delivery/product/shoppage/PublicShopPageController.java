@@ -119,6 +119,16 @@ public class PublicShopPageController {
     private final ShopPageCache<Document> renderedPages;
 
     /**
+     * The manifests already built, by slug and language.
+     *
+     * <p>Held for the same five minutes as the page, and for the same reason: a browser fetches it
+     * on every page load, it is built from the same read, and it is the same few hundred bytes for
+     * everybody. The bound is smaller than the page memo's because a manifest is a twentieth of
+     * the size and is asked for once per reader rather than once per link in a group chat.
+     */
+    private final ShopPageCache<Document> manifests;
+
+    /**
      * The sitemap, under one key.
      *
      * <p>A cache of one, because there is one sitemap — the map is here so that the hour, the bound
@@ -147,10 +157,10 @@ public class PublicShopPageController {
     /**
      * What the page's own Content-Security-Policy allows.
      *
-     * <p>Exactly three things: the stylesheet and the catalogue filter from this origin, and
-     * pictures from the object store the URLs in the markup actually point at. Everything else —
-     * font, frame, form, connect — is {@code 'none'}, because the page uses none of them and a
-     * policy that allowed what it did not use would be a hole nobody was watching.
+     * <p>Exactly four things: the stylesheet, the catalogue filter and the shop's manifest from
+     * this origin, and pictures from the object store the URLs in the markup actually point at.
+     * Everything else — font, frame, form, connect — is {@code 'none'}, because the page uses none
+     * of them and a policy that allowed what it did not use would be a hole nobody was watching.
      *
      * <p>{@code script-src 'self'} and no {@code 'unsafe-inline'}: the page's one script is a file
      * this service serves, so the policy never has to allow a block of markup to run. The
@@ -188,6 +198,7 @@ public class PublicShopPageController {
         this.contentSecurityPolicy = policyFor(imageOrigin);
         this.qrCodes = new ShopPageCache<>(QR_MEMO_FOR, QR_MEMO_ENTRIES, nanoClock);
         this.renderedPages = new ShopPageCache<>(PAGE_MAX_AGE, PAGE_MEMO_ENTRIES, nanoClock);
+        this.manifests = new ShopPageCache<>(PAGE_MAX_AGE, PAGE_MEMO_ENTRIES, nanoClock);
         this.sitemaps = new ShopPageCache<>(SITEMAP_MAX_AGE, 1, nanoClock);
     }
 
@@ -247,6 +258,42 @@ public class PublicShopPageController {
         // whichever language the phone that scans it prefers.
         byte[] png = qrCodes.get(slug, () -> ShopQrCode.pngOf(baseUrl + "/s/" + slug));
         return asset(png, MediaType.IMAGE_PNG, request);
+    }
+
+    /**
+     * The shop's web manifest, so a regular can keep it on a home screen.
+     *
+     * <p>Under the shop's own address rather than a shared file with a query string, because a
+     * manifest's scope and {@code start_url} are this one shop's page and a browser keys what it
+     * installed by the manifest's URL.
+     *
+     * <p>Refused for a shop nobody may see, by the same rule and with the same page as everything
+     * else here: a manifest that outlived its shop is an icon on somebody's home screen pointing
+     * at a 404.
+     */
+    @GetMapping("/s/{slug}" + ShopPageManifest.PATH)
+    public ResponseEntity<byte[]> manifest(@PathVariable String slug,
+                                           @RequestParam(name = "lang", required = false)
+                                           String lang,
+                                           @RequestHeader(name = HttpHeaders.ACCEPT_LANGUAGE,
+                                                   required = false) String acceptLanguage,
+                                           HttpServletRequest request) {
+        ShopPageText text = ShopPageText.choose(lang, acceptLanguage);
+        Document manifest;
+        try {
+            manifest = manifests.get(slug + "\n" + text.tag(), () -> renderManifest(slug, text));
+        } catch (ShopPageNotFoundException absent) {
+            return notFound(text);
+        }
+        return document(manifest, MediaType.valueOf("application/manifest+json"),
+                CacheControl.maxAge(PAGE_MAX_AGE).cachePublic(), text, request);
+    }
+
+    private Document renderManifest(String slug, ShopPageText text) {
+        PublicShopPage page = pages.read(slug);
+        return Document.of(ShopPageManifest
+                .render(page, text, baseUrl + "/s/" + slug, ShopPageHtml.describe(page, text))
+                .getBytes(StandardCharsets.UTF_8));
     }
 
     /** The page's one stylesheet. Same origin, so the site's {@code style-src 'self'} allows it. */
@@ -428,6 +475,9 @@ public class PublicShopPageController {
                 + "img-src 'self'" + (origin == null ? "" : " " + origin) + "; "
                 + "style-src 'self'; "
                 + "script-src 'self'; "
+                // Exactly this service's own manifest, and nothing else: default-src 'none' would
+                // block it outright, and the only alternative to naming it was not shipping it.
+                + "manifest-src 'self'; "
                 + "base-uri 'none'; "
                 + "form-action 'none'; "
                 + "frame-ancestors 'none'";

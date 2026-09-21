@@ -56,15 +56,13 @@ final class ShopPageHtml {
         String title = page.neighbourhood() == null || page.neighbourhood().isBlank()
                 ? page.name() + " · YouDrop"
                 : page.name() + " — " + page.neighbourhood() + " · YouDrop";
-        String description = page.tagline() != null && !page.tagline().isBlank()
-                ? page.tagline()
-                : t.metaDescription(page.name(), what, page.neighbourhood());
+        String description = describe(page, t);
         // The derivative, not the original: a chat app has a size budget for the picture it
         // re-encodes, and over it the card comes back blank. See PublicShopPage.coverThumbUrl.
         String picture = page.coverThumbUrl() != null ? page.coverThumbUrl() : page.logoUrl();
 
         StringBuilder b = new StringBuilder(8192);
-        head(b, t, title, description, url, picture, page.name());
+        head(b, t, title, description, url, picture, page.name(), page.logoUrl());
 
         b.append("<body><main class=\"shop\">");
         hero(b, page, t, what);
@@ -80,6 +78,21 @@ final class ShopPageHtml {
         ShopPageJsonLd.append(b, page, t, url, description);
         b.append("</body></html>");
         return b.toString();
+    }
+
+    /**
+     * The one sentence this shop is described by, wherever a description is asked for.
+     *
+     * <p>The {@code <meta name="description">}, the Open Graph and Twitter cards, the structured
+     * data and the web manifest all take it from here, so a shop cannot be described one way to a
+     * search engine and another way on a home screen.
+     */
+    static String describe(PublicShopPage page, ShopPageText t) {
+        if (page.tagline() != null && !page.tagline().isBlank()) {
+            return page.tagline();
+        }
+        return t.metaDescription(page.name(),
+                t.vertical(page.vertical(), page.serviceCategory()), page.neighbourhood());
     }
 
     /**
@@ -111,7 +124,7 @@ final class ShopPageHtml {
     // ---------------------------------------------------------------- head
 
     private static void head(StringBuilder b, ShopPageText t, String title, String description,
-                             String url, String picture, String name) {
+                             String url, String picture, String name, String logo) {
         b.append("<!doctype html><html lang=\"").append(t.tag())
                 .append("\" dir=\"").append(t.dir()).append("\"><head>")
                 .append("<meta charset=\"utf-8\">")
@@ -151,7 +164,18 @@ final class ShopPageHtml {
         b.append("<meta name=\"twitter:title\" content=\"").append(esc(title)).append("\">")
                 .append("<meta name=\"twitter:description\" content=\"").append(esc(description))
                 .append("\">")
-                .append("<link rel=\"stylesheet\" href=\"").append(STYLESHEET).append("\">")
+                // So a regular can keep the shop on a home screen under its own name and logo.
+                // The language is named explicitly rather than left to Accept-Language: the
+                // manifest a reader keeps should be the rendering they were looking at.
+                .append("<link rel=\"manifest\" href=\"").append(esc(url))
+                .append(ShopPageManifest.PATH).append("?lang=").append(t.tag()).append("\">")
+                .append("<meta name=\"theme-color\" content=\"")
+                .append(ShopPageManifest.THEME).append("\">");
+        if (logo != null) {
+            // iOS takes its home-screen icon from here rather than from the manifest.
+            b.append("<link rel=\"apple-touch-icon\" href=\"").append(esc(logo)).append("\">");
+        }
+        b.append("<link rel=\"stylesheet\" href=\"").append(STYLESHEET).append("\">")
                 // Deferred, so it is fetched alongside the markup and runs after it: the shelf is
                 // already on the screen before this file arrives, and nothing waits on it.
                 .append("<script src=\"").append(SCRIPT).append("\" defer></script>")

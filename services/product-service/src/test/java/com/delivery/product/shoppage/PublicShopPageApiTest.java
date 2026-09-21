@@ -415,6 +415,8 @@ class PublicShopPageApiTest {
                 // The catalogue filter, and only from here. A merchant who types a script tag
                 // into a product name has nowhere for it to run.
                 .contains("script-src 'self'")
+                // The shop's own manifest, and nothing else: default-src 'none' would block it.
+                .contains("manifest-src 'self'")
                 .contains("frame-ancestors 'none'")
                 .contains("base-uri 'none'")
                 .contains("form-action 'none'")

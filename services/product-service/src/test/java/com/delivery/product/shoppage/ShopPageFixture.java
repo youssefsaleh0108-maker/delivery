@@ -224,6 +224,12 @@ final class ShopPageFixture {
         return this;
     }
 
+    /** A merchant who never uploaded a logo or a cover, which is most shops on their first day. */
+    ShopPageFixture withoutArtwork() {
+        shop.setImagery(null, null);
+        return this;
+    }
+
     ShopPageFixture areas(String... names) {
         List<DeliveryZone> built = new ArrayList<>();
         for (String name : names) {
