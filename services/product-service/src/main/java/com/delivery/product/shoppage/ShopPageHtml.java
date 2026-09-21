@@ -312,8 +312,21 @@ final class ShopPageHtml {
                     b.append("<img src=\"").append(esc(item.imageUrl()))
                             .append("\" alt=\"\" loading=\"lazy\" decoding=\"async\">");
                 }
-                b.append("<span class=\"n\">").append(esc(item.name())).append("</span>")
-                        .append("<span class=\"p\">")
+                // A row with something to say opens where it stands. <details> is the browser's
+                // own disclosure: it expands with no script, no page load and no scroll position
+                // lost, it carries its own keyboard and screen-reader behaviour, and the reader
+                // with scripting off gets exactly the same row as everybody else. The triangle is
+                // the signal — a row without one has nothing more behind it.
+                boolean expands = item.about() != null && !item.about().isBlank();
+                if (expands) {
+                    b.append("<details><summary>");
+                }
+                b.append("<span class=\"n\">").append(esc(item.name())).append("</span>");
+                if (expands) {
+                    b.append("</summary><p class=\"d\">").append(esc(item.about()))
+                            .append("</p></details>");
+                }
+                b.append("<span class=\"p\">")
                         .append(esc(t.price(item.priceUsd(), item.priceLbp())))
                         .append("</span>");
                 if (!item.inStock()) {

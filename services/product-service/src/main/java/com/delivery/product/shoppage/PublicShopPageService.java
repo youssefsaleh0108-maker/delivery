@@ -76,6 +76,17 @@ public class PublicShopPageService {
     /** Items with no section of their own. Named by the renderer, in the reader's language. */
     static final String UNSECTIONED = "";
 
+    /**
+     * How much of a merchant's own description one row may carry.
+     *
+     * <p>The column is {@code text}, and a merchant who pastes three paragraphs about one jar of
+     * honey is pasting it onto the page a stranger opens on 3G — a hundred and twenty of those is
+     * the page's whole byte budget spent on prose nobody scrolled to. 160 characters is a line or
+     * two, which is what a row that expands is for: enough to say what the thing is, and a reason
+     * to open the app for the rest.
+     */
+    static final int MAX_ITEM_DESCRIPTION = 160;
+
     private final StoreRepository stores;
     private final ProductRepository products;
     private final CategoryRepository categories;
@@ -380,6 +391,7 @@ public class PublicShopPageService {
             bySection.computeIfAbsent(section, ignored -> new ArrayList<>())
                     .add(new PublicShopPage.Item(
                             product.getName(),
+                            shortened(product.getDescription()),
                             ImageUrl.thumbOf(picture),
                             product.getPrice(),
                             lbpFaceOf(product.getPrice()),
@@ -391,6 +403,30 @@ public class PublicShopPageService {
                 .map(entry -> new PublicShopPage.Section(entry.getKey(), List.copyOf(entry.getValue())))
                 .toList();
         return new PublicShopPage.Catalogue(sections, shelf.size(), (int) page.getTotalElements());
+    }
+
+    /**
+     * A merchant's description, cut to something a row can hold.
+     *
+     * <p>Null for anything blank, so the renderer has one question to ask rather than two. Cut at
+     * the last space before the limit rather than mid-word, and marked with an ellipsis so a
+     * reader can tell a sentence that was trimmed from one that simply ended — the whole of it is
+     * in the app, which is where this page has been sending people all along.
+     */
+    private static String shortened(String description) {
+        if (description == null || description.isBlank()) {
+            return null;
+        }
+        String trimmed = description.strip();
+        if (trimmed.length() <= MAX_ITEM_DESCRIPTION) {
+            return trimmed;
+        }
+        String cut = trimmed.substring(0, MAX_ITEM_DESCRIPTION);
+        int lastSpace = cut.lastIndexOf(' ');
+        // A description with no space in the first 160 characters is one long token, and cutting it
+        // at the limit is the only honest thing left.
+        return (lastSpace > MAX_ITEM_DESCRIPTION / 2 ? cut.substring(0, lastSpace) : cut).strip()
+                + "…";
     }
 
     /**

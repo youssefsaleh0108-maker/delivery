@@ -175,7 +175,7 @@ class PublicShopPageFindingTest {
         String js = script();
 
         for (String hook : List.of(".find", ".q", ".qn", ".jump", ".menu .sec", ".items > li",
-                ".n")) {
+                ".n", ".d")) {
             assertThat(js).as("the script looks for %s", hook).contains("'" + hook + "'");
         }
         assertThat(html)

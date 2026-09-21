@@ -48,8 +48,14 @@
     var rows = blocks[s].querySelectorAll('.items > li');
     var items = [];
     for (var r = 0; r < rows.length; r++) {
+      // The name and, where the merchant wrote one, the description the row expands to show —
+      // so "sesame" finds the kaak whose name never says so.
       var name = rows[r].querySelector('.n');
-      items.push({ row: rows[r], text: fold(name ? name.textContent : '') });
+      var about = rows[r].querySelector('.d');
+      items.push({
+        row: rows[r],
+        text: fold((name ? name.textContent : '') + ' ' + (about ? about.textContent : ''))
+      });
     }
     sections.push({ block: blocks[s], items: items });
   }

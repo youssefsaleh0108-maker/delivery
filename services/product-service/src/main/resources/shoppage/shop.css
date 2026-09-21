@@ -117,6 +117,14 @@ a { color: var(--brand); }
   background: var(--bg); margin-block-end: 6px;
 }
 .items .n { font-size: .9rem; font-weight: 600; }
+/*
+  A row with a description opens where it stands, using the browser's own <details>. The marker is
+  left alone deliberately: it is the one signal that tells a reader which rows have more behind
+  them, and it turns itself round under dir="rtl" without a second rule.
+*/
+.items summary { cursor: pointer; }
+.items summary::marker { color: var(--faint); }
+.items .d { font-size: .82rem; color: var(--muted); margin: 4px 0 0; }
 .items .p { font-size: .84rem; color: var(--muted); }
 .items .x { font-size: .75rem; color: #B91C1C; font-weight: 600; }
 .items .gone { opacity: .55; }

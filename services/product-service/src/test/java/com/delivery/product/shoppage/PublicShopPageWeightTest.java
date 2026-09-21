@@ -22,9 +22,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  * once people start adding to it — so these numbers fail the build rather than appearing in a
  * report nobody reads afterwards.
  *
- * <p>The budgets are for the <em>document</em>: the HTML and the one stylesheet, which is
- * everything needed to render the page's text. Pictures are separate requests, every catalogue
- * thumbnail is {@code loading="lazy"}, and none of them blocks the answer.
+ * <p>The budgets cover everything the page needs to be itself: the HTML, the one stylesheet and
+ * the one script. Pictures are separate requests, every catalogue thumbnail is
+ * {@code loading="lazy"}, and none of them blocks the answer.
+ *
+ * <p>Measured twice, with the script and without it, because those are two real readers. The page
+ * is complete either way — the catalogue is in the markup and the script only filters it — so the
+ * reader who never gets the script downloads less, not less of the shop.
  */
 @DisplayName("what the page weighs")
 class PublicShopPageWeightTest {
@@ -51,6 +55,11 @@ class PublicShopPageWeightTest {
      * <p>130 items on the shelf so the query's own limit does the cutting, which is the page a
      * large grocer actually gets — the "forty things" shop above is the common case, not the worst
      * one, and a budget asserted only on the common case is not a budget.
+     *
+     * <p>And every one of them described, at the full length a row will carry, in words that
+     * differ from row to row. Both halves of that matter: a merchant who describes everything is
+     * the worst case the service can be asked for, and a hundred and twenty <em>identical</em>
+     * descriptions would compress to almost nothing and make this budget look easier than it is.
      */
     private static ShopPageFixture cappedShop() {
         ShopPageFixture shop = new ShopPageFixture()
@@ -60,11 +69,24 @@ class PublicShopPageWeightTest {
             List<Item> items = new ArrayList<>();
             for (int i = 0; i < 26; i++) {
                 items.add(Item.of(sections[s] + " item number " + (i + 1),
-                        "1." + String.format("%02d", (i * 7) % 100)));
+                                "1." + String.format("%02d", (i * 7) % 100))
+                        .describedAs(describedAtLength(sections[s], i)));
             }
             shop.section(sections[s], items.toArray(Item[]::new));
         }
         return shop;
+    }
+
+    /** A description longer than a row will carry, and different from every other one. */
+    private static String describedAtLength(String section, int index) {
+        String[] words = {"jarred", "pressed", "baked", "salted", "smoked", "bottled", "milled",
+            "cured", "dried", "roasted", "brined", "stoneground", "sun-dried", "hand-wrapped"};
+        StringBuilder about = new StringBuilder(section).append(" number ").append(index + 1)
+                .append(", ");
+        while (about.length() < PublicShopPageService.MAX_ITEM_DESCRIPTION + 24) {
+            about.append(words[(index * 7 + about.length()) % words.length]).append(' ');
+        }
+        return about.toString().strip();
     }
 
     private static int occurrences(String html, String needle) {
@@ -79,46 +101,98 @@ class PublicShopPageWeightTest {
         return out.size();
     }
 
-    @Test
-    @DisplayName("a forty-item shop's document fits in what a 3G phone can fetch quickly")
-    void theDocumentIsSmall() throws Exception {
-        ShopPageFixture shop = busyShop();
-        byte[] html = shop.mvc().perform(get("/s/" + shop.slug()))
+    /**
+     * Everything a browser fetches before this page is finished: the markup, the stylesheet and
+     * the catalogue filter. Gzipped, because that is what crosses the network.
+     *
+     * <p>The filter is counted although a reader with scripting off never fetches it — a budget
+     * that left out the one optional file would be a budget for the cheaper reader.
+     */
+    private Fetched fetch(ShopPageFixture shop, String language) throws Exception {
+        byte[] html = shop.mvc().perform(get("/s/" + shop.slug()).param("lang", language))
                 .andReturn().getResponse().getContentAsByteArray();
         byte[] css = shop.mvc().perform(get("/s/assets/shop.css"))
                 .andReturn().getResponse().getContentAsByteArray();
+        byte[] js = shop.mvc().perform(get("/s/assets/shop.js"))
+                .andReturn().getResponse().getContentAsByteArray();
+        return new Fetched(html.length + css.length + js.length,
+                gzipped(html) + gzipped(css), gzipped(js), html);
+    }
 
-        int total = html.length + css.length;
-        int compressed = gzipped(html) + gzipped(css);
-        System.out.printf("shop page: html %d B (gzip %d B), css %d B (gzip %d B), "
-                        + "document %d B (gzip %d B)%n",
-                html.length, gzipped(html), css.length, gzipped(css), total, compressed);
+    /**
+     * @param withoutScript what a reader with JavaScript off downloads: markup and stylesheet
+     * @param script        the one file only a reader with JavaScript on ever asks for
+     */
+    private record Fetched(int uncompressed, int withoutScript, int script, byte[] html) {
 
-        // 64 kB uncompressed and 16 kB over the wire. A 3G handset at a realistic 400 kbit/s
-        // fetches 16 kB in about a third of a second; the budget is deliberately close to what the
-        // page weighs today, so the next thing added to it has to be a decision.
-        assertThat(total).isLessThan(64 * 1024);
-        assertThat(compressed).isLessThan(16 * 1024);
+        int withScript() {
+            return withoutScript + script;
+        }
+    }
+
+    private void report(String label, Fetched fetched) {
+        System.out.printf("shop page %-28s raw %6d B | gzip: no-js %5d B, with js %5d B%n",
+                label, fetched.uncompressed(), fetched.withoutScript(), fetched.withScript());
     }
 
     @Test
-    @DisplayName("a shop with an enormous catalogue draws the cap itself, and says so honestly")
-    void anEnormousShelfIsBounded() throws Exception {
-        ShopPageFixture shop = cappedShop().shelfTotal(4000);
-        byte[] bytes = shop.mvc().perform(get("/s/" + shop.slug()))
-                .andReturn().getResponse().getContentAsByteArray();
-        String html = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+    @DisplayName("a forty-item shop's page fits in what a 3G phone can fetch quickly")
+    void theDocumentIsSmall() throws Exception {
+        Fetched english = fetch(busyShop(), "en");
+        Fetched arabic = fetch(busyShop(), "ar");
+        report("busy, 40 items, en", english);
+        report("busy, 40 items, ar", arabic);
 
+        // 12 kB over the wire for the shop a reader actually opens. A 3G handset at a realistic
+        // 400 kbit/s fetches that in about a quarter of a second, and the budget sits close enough
+        // to what the page weighs that the next thing added to it has to be a decision.
+        for (Fetched fetched : List.of(english, arabic)) {
+            assertThat(fetched.withScript()).isLessThan(12 * 1024);
+            assertThat(fetched.uncompressed()).isLessThan(64 * 1024);
+        }
+    }
+
+    /**
+     * The ceiling, on the worst page this service can send.
+     *
+     * <p>A hundred and twenty items, every one of them described at the full length a row carries,
+     * in words that differ from row to row, with a structured-data block naming all of them — and
+     * in Arabic as well, which is the longer of the two renderings. 25 kB gzipped is the whole
+     * budget for everything the page needs, and nothing that lands here may take it past that.
+     */
+    @Test
+    @DisplayName("the worst page this service can send still fits the whole 25 kB budget")
+    void anEnormousShelfIsBounded() throws Exception {
+        Fetched english = fetch(cappedShop().shelfTotal(4000), "en");
+        Fetched arabic = fetch(cappedShop().shelfTotal(4000), "ar");
+        report("capped, 120 items, en", english);
+        report("capped, 120 items, ar", arabic);
+
+        String html = new String(english.html(), java.nio.charset.StandardCharsets.UTF_8);
         // The cap drawn, not merely configured: a hundred and twenty item names in the markup.
         assertThat(occurrences(html, "<span class=\"n\">"))
                 .isEqualTo(PublicShopPageService.MAX_ITEMS);
         assertThat(html).contains("and 3,880 more in the app");
 
-        System.out.printf("capped shop page: html %d B (gzip %d B), %d items%n",
-                bytes.length, gzipped(bytes), PublicShopPageService.MAX_ITEMS);
-        // The worst page this service can send still fits the budget the common one is held to.
-        assertThat(bytes.length).isLessThan(64 * 1024);
-        assertThat(gzipped(bytes)).isLessThan(16 * 1024);
+        for (Fetched fetched : List.of(english, arabic)) {
+            assertThat(fetched.withScript()).isLessThan(25 * 1024);
+            // Uncompressed too, because gzip is a courtesy: a proxy that strips Accept-Encoding,
+            // or a client that never sent it, gets these bytes instead.
+            assertThat(fetched.uncompressed()).isLessThan(128 * 1024);
+        }
+    }
+
+    @Test
+    @DisplayName("a small shop's page is small, in both languages")
+    void aSmallShopIsSmall() throws Exception {
+        for (String language : List.of("en", "ar")) {
+            Fetched fetched = fetch(new ShopPageFixture()
+                    .areas("Hamra")
+                    .section("Bread", Item.of("Kaak", "1.50"), Item.of("Markouk", "2.25"),
+                            Item.of("Manakish", "2.00")), language);
+            report("small, 3 items, " + language, fetched);
+            assertThat(fetched.withScript()).isLessThan(8 * 1024);
+        }
     }
 
     @Test

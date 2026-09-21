@@ -278,24 +278,35 @@ final class ShopPageFixture {
         return rate;
     }
 
-    /** One thing on the shelf, as a merchant would have set it up. */
-    record Item(String name, String price, boolean inStock, boolean pictured) {
+    /**
+     * One thing on the shelf, as a merchant would have set it up.
+     *
+     * @param about what the merchant wrote about it. Null by default, because most rows in most
+     *              shops have nothing written about them and a fixture that gave every item a
+     *              description would make the page's byte budget look easier than it is.
+     */
+    record Item(String name, String about, String price, boolean inStock, boolean pictured) {
 
         static Item of(String name, String price) {
-            return new Item(name, price, true, true);
+            return new Item(name, null, price, true, true);
+        }
+
+        /** A merchant who said what the thing is. The row then expands to show it. */
+        Item describedAs(String about) {
+            return new Item(name, about, price, inStock, pictured);
         }
 
         Item outOfStock() {
-            return new Item(name, price, false, pictured);
+            return new Item(name, about, price, false, pictured);
         }
 
         Item withoutPicture() {
-            return new Item(name, price, inStock, false);
+            return new Item(name, about, price, inStock, false);
         }
 
         Product build(Store shop, java.util.UUID categoryId) {
             Product product = new Product(shop.getMerchantId(), shop.getId(), name,
-                    "A description nobody reads", new BigDecimal(price), categoryId);
+                    about, new BigDecimal(price), categoryId);
             product.assignCodes(SKU, BARCODE);
             // products/<productId>/<fileId>.jpg — ProductImageService.presign's prefix and
             // StorageService's own file id, so a product's id is in its photo's URL here exactly as

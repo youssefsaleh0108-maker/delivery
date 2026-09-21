@@ -62,10 +62,11 @@ class PublicShopPageInjectionTest {
     private static final String POWER = "powernote";
     private static final String SECTION = "section";
     private static final String ITEM = "itemname";
+    private static final String ITEM_ABOUT = "itemabout";
     private static final String AREA = "areaname";
 
     private static final List<String> FIELDS =
-            List.of(NAME, TAGLINE, ABOUT, TAG, DISTRICT, POWER, SECTION, ITEM, AREA);
+            List.of(NAME, TAGLINE, ABOUT, TAG, DISTRICT, POWER, SECTION, ITEM, ITEM_ABOUT, AREA);
 
     private static ShopPageFixture hostileShop() {
         return new ShopPageFixture()
@@ -74,7 +75,8 @@ class PublicShopPageInjectionTest {
                 // 14:30Z against the fixture's 15:00Z clock: recent enough that the page draws it.
                 .power(Store.PowerStatus.GENERATOR, typed(POWER), "2026-09-20T14:30:00Z")
                 .areas(typed(AREA))
-                .section(typed(SECTION), Item.of(typed(ITEM), "1.50"));
+                .section(typed(SECTION),
+                        Item.of(typed(ITEM), "1.50").describedAs(typed(ITEM_ABOUT)));
     }
 
     private static String page(String language) throws Exception {
@@ -159,6 +161,9 @@ class PublicShopPageInjectionTest {
                 .contains("<li>" + rendered(AREA) + "</li>")
                 .contains("<h3>" + rendered(SECTION) + "</h3>")
                 .contains("<span class=\"n\">" + rendered(ITEM) + "</span>")
+                // Inside the row that expands, which is a second path onto the page for text the
+                // merchant typed — and one <details> the payload must not have closed.
+                .contains("<p class=\"d\">" + rendered(ITEM_ABOUT) + "</p></details>")
                 .contains("<p class=\"tagline\">" + rendered(TAGLINE) + "</p>")
                 .contains("<p class=\"about\">" + rendered(ABOUT) + "</p>");
     }
