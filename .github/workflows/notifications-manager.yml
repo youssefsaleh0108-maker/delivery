@@ -58,25 +58,32 @@ jobs:
           distribution: temurin
           cache: maven
 
-      - name: One-time codes against PostgreSQL
+      - name: One-time codes and the context boot against PostgreSQL
         env:
           NOTIFICATIONS_TEST_DB_URL: jdbc:postgresql://localhost:5432/postgres
         run: >-
           mvn -B -U -pl services/notifications-manager -am test
-          -Dtest=OneTimeCodesDatabaseTest
+          -Dtest=OneTimeCodesDatabaseTest,ApplicationContextBootTest
           -Dsurefire.failIfNoSpecifiedTests=false
 
+      # A loop now that two classes run here, and fully qualified, because they do not share a
+      # package: a guard that guessed would look for a report that never existed and pass the
+      # moment it was wrong.
       - name: Fail if the database tests did not run
         run: |
-          report=services/notifications-manager/target/surefire-reports/TEST-com.delivery.notifications.domain.OneTimeCodesDatabaseTest.xml
-          if [ ! -f "$report" ]; then
-            echo "::error::No report at $report, so the database tests did not run."
-            exit 1
-          fi
-          if ! grep -q 'tests="[1-9]' "$report" || grep -q 'skipped="[1-9]' "$report"; then
-            echo "::error::The database tests were skipped. Is NOTIFICATIONS_TEST_DB_URL set?"
-            exit 1
-          fi
+          for test in \
+            com.delivery.notifications.domain.OneTimeCodesDatabaseTest \
+            com.delivery.notifications.ApplicationContextBootTest; do
+            report=services/notifications-manager/target/surefire-reports/TEST-$test.xml
+            if [ ! -f "$report" ]; then
+              echo "::error::No report at $report, so the database tests did not run."
+              exit 1
+            fi
+            if ! grep -q 'tests="[1-9]' "$report" || grep -q 'skipped="[1-9]' "$report"; then
+              echo "::error::$test was skipped. Is NOTIFICATIONS_TEST_DB_URL set?"
+              exit 1
+            fi
+          done
 
   ci:
     needs: database-tests
