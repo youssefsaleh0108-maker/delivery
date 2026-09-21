@@ -145,11 +145,18 @@ class PublicShopPageWeightTest {
         report("busy, 40 items, en", english);
         report("busy, 40 items, ar", arabic);
 
-        // 12 kB over the wire for the shop a reader actually opens. A 3G handset at a realistic
+        // 13 kB over the wire for the shop a reader actually opens. A 3G handset at a realistic
         // 400 kbit/s fetches that in about a quarter of a second, and the budget sits close enough
         // to what the page weighs that the next thing added to it has to be a decision.
+        //
+        // It was 12 kB, with about forty bytes to spare, and the decision it forced was this one:
+        // the bar named the wrong aisle on any menu short enough to stop scrolling before its last
+        // aisle reached the top — which is most shops on this platform — and the rule that fixes it
+        // measures what is on the screen instead. That cost 165 bytes gzipped. Correctness is what
+        // this budget is for spending; the ceiling below, which is the promise to the reader, has
+        // not moved and still has six kilobytes in hand.
         for (Fetched fetched : List.of(english, arabic)) {
-            assertThat(fetched.withScript()).isLessThan(12 * 1024);
+            assertThat(fetched.withScript()).isLessThan(13 * 1024);
             assertThat(fetched.uncompressed()).isLessThan(64 * 1024);
         }
     }
