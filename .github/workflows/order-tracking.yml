@@ -72,12 +72,23 @@ jobs:
 
       # -am builds the platform libraries this module depends on, as the build job does. The test
       # filter matches nothing in them, which failIfNoSpecifiedTests=false allows.
-      - name: Tracking queries and migrations against PostGIS
+      # ApplicationContextBootTest runs here too, and wants the same throwaway PostGIS: it boots this
+      # service's real Spring context — Flyway, Hibernate on validate, the AMQP listeners, the STOMP
+      # endpoint and the Redis template — which nothing else in the suite does. DemandWeeks reached
+      # dev in product-service with two constructors Spring could not choose between, and no unit
+      # test anywhere could have caught it, because unit tests build their subject with `new`.
+      #
+      # It reads TRACKING_TEST_DB_URL rather than this job's older TRACKING_IT_DB_URL: every context
+      # test in the estate is spelled <SERVICE>_TEST_DB_URL, and renaming the variable the two
+      # existing tests already read would be a change to tests this one has nothing to do with. Both
+      # name the same container.
+      - name: Tracking queries, migrations and the context boot against PostGIS
         env:
           TRACKING_IT_DB_URL: jdbc:postgresql://localhost:5432/postgres
+          TRACKING_TEST_DB_URL: jdbc:postgresql://localhost:5432/postgres
         run: >-
           mvn -B -U -pl services/order-tracking -am test
-          -Dtest=OrderParticipantsPostgresTest,TrackingRetentionPostgresTest
+          -Dtest=OrderParticipantsPostgresTest,TrackingRetentionPostgresTest,ApplicationContextBootTest
           -Dsurefire.failIfNoSpecifiedTests=false
 
       # Summed across the reports rather than read from one: JUnit's nested classes get a report
@@ -96,6 +107,21 @@ jobs:
           echo "Database tests: $ran run, $skipped skipped."
           if [ "$ran" -lt 1 ] || [ "$skipped" -gt 0 ]; then
             echo "::error::The database tests were skipped. Is TRACKING_IT_DB_URL set?"
+            exit 1
+          fi
+
+      # Checked on its own rather than added to the glob above, which would not have caught it: that
+      # check sums whatever reports exist, so a context test whose report was missing entirely would
+      # have passed on the other two.
+      - name: Fail if the context test did not run
+        run: |
+          report=services/order-tracking/target/surefire-reports/TEST-com.delivery.tracking.ApplicationContextBootTest.xml
+          if [ ! -f "$report" ]; then
+            echo "::error::No report at $report, so the context test did not run."
+            exit 1
+          fi
+          if ! grep -q 'tests="[1-9]' "$report" || grep -q 'skipped="[1-9]' "$report"; then
+            echo "::error::The context test was skipped, so nothing proved this service still starts. Is TRACKING_TEST_DB_URL set?"
             exit 1
           fi
 

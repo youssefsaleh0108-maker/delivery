@@ -54,7 +54,12 @@ class PublicShopPageArabicTest {
                 .contains("التوصيل")
                 .contains("المناطق التي يوصّل إليها")
                 .contains("كيف تطلب")
-                .contains("حمّل التطبيق");
+                .contains("حمّل التطبيق")
+                // The call to action carries its own second line and its honest sentence, both in
+                // Arabic: a reader who switched language should not meet an English button.
+                .contains("أندرويد · تحميل مباشر")
+                .contains("هذه الصفحة لا تستقبل الطلبات.")
+                .contains("قريبًا على App Store و Google Play.");
 
         // The hours, the prices and the rating, in the digits the Arabic app uses.
         assertThat(html)
@@ -145,6 +150,33 @@ class PublicShopPageArabicTest {
         // RTL paragraph, which is a different pair of hours rather than a cosmetic problem.
         assertThat(render(shop, get("/s/" + shop.slug()).param("lang", "ar")))
                 .contains("<span dir=\"ltr\">٠٨:٠٠–٢٣:٠٠</span>");
+    }
+
+    /**
+     * The other language used to be reachable only by knowing to add {@code ?lang=ar} to the
+     * address, or by scrolling a hundred and twenty items to find it in the footer. On the one
+     * page a shopkeeper hands to anybody, in a country where the two languages are used
+     * interchangeably, that is a control that may as well not exist.
+     */
+    @Test
+    @DisplayName("the language switch is in the header, and carries the direction it switches to")
+    void theLanguageSwitchIsVisible() throws Exception {
+        ShopPageFixture shop = stocked();
+
+        // Written in the language it switches TO, so it needs that language's own lang and dir:
+        // without them a browser reads "العربية" out in an English voice and lays it out with the
+        // surrounding paragraph's direction rather than its own.
+        assertThat(render(shop, get("/s/" + shop.slug())))
+                .contains("<div class=\"head\"><p class=\"lang\"><a rel=\"alternate\" "
+                        + "hreflang=\"ar\" lang=\"ar\" dir=\"rtl\" href=\"" + shop.url()
+                        + "?lang=ar\">العربية</a></p>");
+        assertThat(render(shop, get("/s/" + shop.slug()).param("lang", "ar")))
+                .contains("<div class=\"head\"><p class=\"lang\"><a rel=\"alternate\" "
+                        + "hreflang=\"en\" lang=\"en\" dir=\"ltr\" href=\"" + shop.url()
+                        + "?lang=en\">English</a></p>");
+        // And it is in the header now rather than at the foot of the page: one switch, not two.
+        assertThat(render(shop, get("/s/" + shop.slug()))
+                .split("\\?lang=ar\">العربية</a>", -1).length - 1).isEqualTo(1);
     }
 
     @Test

@@ -118,6 +118,37 @@ class PublicShopPageOpeningTest {
                 .contains("Closed");
     }
 
+    /**
+     * Open or closed is the question this page is opened to answer, so it is its own line with its
+     * own dot rather than the first of six grey chips — and when the shop is shut, the next
+     * opening is on that same line. "Closed" on its own sends a reader away; "closed, opens at
+     * eight tomorrow" is the half of the sentence that keeps them.
+     */
+    @Test
+    @DisplayName("the answer is one line of its own, and says until when — or until then")
+    void theStatusIsItsOwnLine() throws Exception {
+        String open = pageAt(new ShopPageFixture()
+                .timezone("Asia/Beirut").at("2026-09-20T15:00:00Z"));
+        String shut = pageAt(new ShopPageFixture()
+                .timezone("Asia/Beirut").at("2026-09-20T20:30:00Z"));
+
+        assertThat(open).contains("<p class=\"status open\">Open until 23:00</p>")
+                .doesNotContain("class=\"status shut\"");
+        assertThat(shut).contains("<p class=\"status shut\">Closed now"
+                + "<span class=\"next\">Opens tomorrow at 08:00</span></p>");
+    }
+
+    @Test
+    @DisplayName("a brand-new shop gets no row of empty badges under its name")
+    void noBadgesIsNoList() throws Exception {
+        ShopPageFixture bare = new ShopPageFixture().noRating();
+        bare.shop().setVerifiedLocal(false);
+
+        assertThat(pageAt(bare)).doesNotContain("class=\"badges\"")
+                // The one thing it does have is still there.
+                .contains("class=\"status open\"");
+    }
+
     @Test
     @DisplayName("an unreadable zone degrades one shop's clock instead of failing the page")
     void survivesAZoneNobodyCanParse() throws Exception {

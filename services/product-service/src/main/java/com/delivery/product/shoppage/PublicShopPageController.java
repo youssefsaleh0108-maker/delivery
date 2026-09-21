@@ -119,6 +119,16 @@ public class PublicShopPageController {
     private final ShopPageCache<Document> renderedPages;
 
     /**
+     * The manifests already built, by slug and language.
+     *
+     * <p>Held for the same five minutes as the page, and for the same reason: a browser fetches it
+     * on every page load, it is built from the same read, and it is the same few hundred bytes for
+     * everybody. The bound is smaller than the page memo's because a manifest is a twentieth of
+     * the size and is asked for once per reader rather than once per link in a group chat.
+     */
+    private final ShopPageCache<Document> manifests;
+
+    /**
      * The sitemap, under one key.
      *
      * <p>A cache of one, because there is one sitemap — the map is here so that the hour, the bound
@@ -141,13 +151,31 @@ public class PublicShopPageController {
     /** The stylesheet, read once: it ships with the build and never changes while this JVM runs. */
     private final byte[] stylesheet;
 
+    /** The one script, read once, for the same reason and on the same terms. */
+    private final byte[] script;
+
+    /**
+     * The two asset URLs every rendering points at, fingerprinted by the bytes behind them.
+     *
+     * <p>Computed once from the files this build shipped. Both are served {@code immutable} for a
+     * year, so the address has to move when the bytes do — see {@link ShopPageHtml.Assets}.
+     */
+    private final ShopPageHtml.Assets assets;
+
     /**
      * What the page's own Content-Security-Policy allows.
      *
-     * <p>Exactly two things: the stylesheet from this origin, and pictures from the object store
-     * the URLs in the markup actually point at. Everything else — script, font, frame, form, connect
-     * — is {@code 'none'}, because the page uses none of them and a policy that allowed what it did
-     * not use would be a hole nobody was watching.
+     * <p>Exactly four things: the stylesheet, the catalogue filter and the shop's manifest from
+     * this origin, and pictures from the object store the URLs in the markup actually point at.
+     * Everything else — font, frame, form, connect — is {@code 'none'}, because the page uses none
+     * of them and a policy that allowed what it did not use would be a hole nobody was watching.
+     *
+     * <p>{@code script-src 'self'} and no {@code 'unsafe-inline'}: the page's one script is a file
+     * this service serves, so the policy never has to allow a block of markup to run. The
+     * structured data at the end of the body is a {@code <script>} element too, but it carries a
+     * JSON media type — a browser parses it as data and never executes it, which is why it needs
+     * nothing from this policy and why opening the policy up for it would have been the wrong way
+     * to ship it.
      *
      * <p>Built from {@code delivery.storage.minio.public-endpoint}, which is the very setting that
      * produced those image URLs ({@code StorageService.readUrl}), so the policy cannot drift from
@@ -173,10 +201,15 @@ public class PublicShopPageController {
                              LongSupplier nanoClock) {
         this.pages = pages;
         this.baseUrl = trimTrailingSlash(baseUrl);
-        this.stylesheet = readStylesheet();
+        this.stylesheet = readAsset("shoppage/shop.css");
+        this.script = readAsset("shoppage/shop.js");
+        this.assets = new ShopPageHtml.Assets(
+                ShopPageHtml.STYLESHEET + "?v=" + fingerprint(stylesheet),
+                ShopPageHtml.SCRIPT + "?v=" + fingerprint(script));
         this.contentSecurityPolicy = policyFor(imageOrigin);
         this.qrCodes = new ShopPageCache<>(QR_MEMO_FOR, QR_MEMO_ENTRIES, nanoClock);
         this.renderedPages = new ShopPageCache<>(PAGE_MAX_AGE, PAGE_MEMO_ENTRIES, nanoClock);
+        this.manifests = new ShopPageCache<>(PAGE_MAX_AGE, PAGE_MEMO_ENTRIES, nanoClock);
         this.sitemaps = new ShopPageCache<>(SITEMAP_MAX_AGE, 1, nanoClock);
     }
 
@@ -208,7 +241,8 @@ public class PublicShopPageController {
     }
 
     private Document render(String slug, ShopPageText text) {
-        return Document.of(ShopPageHtml.render(pages.read(slug), text, baseUrl, pages.lbpPerUsd())
+        return Document.of(ShopPageHtml
+                .render(pages.read(slug), text, baseUrl, pages.lbpPerUsd(), assets)
                 .getBytes(StandardCharsets.UTF_8));
     }
 
@@ -238,10 +272,59 @@ public class PublicShopPageController {
         return asset(png, MediaType.IMAGE_PNG, request);
     }
 
+    /**
+     * The shop's web manifest, so a regular can keep it on a home screen.
+     *
+     * <p>Under the shop's own address rather than a shared file with a query string, because a
+     * manifest's scope and {@code start_url} are this one shop's page and a browser keys what it
+     * installed by the manifest's URL.
+     *
+     * <p>Refused for a shop nobody may see, by the same rule and with the same page as everything
+     * else here: a manifest that outlived its shop is an icon on somebody's home screen pointing
+     * at a 404.
+     */
+    @GetMapping("/s/{slug}" + ShopPageManifest.PATH)
+    public ResponseEntity<byte[]> manifest(@PathVariable String slug,
+                                           @RequestParam(name = "lang", required = false)
+                                           String lang,
+                                           @RequestHeader(name = HttpHeaders.ACCEPT_LANGUAGE,
+                                                   required = false) String acceptLanguage,
+                                           HttpServletRequest request) {
+        ShopPageText text = ShopPageText.choose(lang, acceptLanguage);
+        Document manifest;
+        try {
+            manifest = manifests.get(slug + "\n" + text.tag(), () -> renderManifest(slug, text));
+        } catch (ShopPageNotFoundException absent) {
+            return notFound(text);
+        }
+        return document(manifest, MediaType.valueOf("application/manifest+json"),
+                CacheControl.maxAge(PAGE_MAX_AGE).cachePublic(), text, request);
+    }
+
+    private Document renderManifest(String slug, ShopPageText text) {
+        PublicShopPage page = pages.read(slug);
+        return Document.of(ShopPageManifest
+                .render(page, text, baseUrl + "/s/" + slug, ShopPageHtml.describe(page, text))
+                .getBytes(StandardCharsets.UTF_8));
+    }
+
     /** The page's one stylesheet. Same origin, so the site's {@code style-src 'self'} allows it. */
     @GetMapping("/s/assets/shop.css")
     public ResponseEntity<byte[]> stylesheet(HttpServletRequest request) {
         return asset(stylesheet, MediaType.valueOf("text/css;charset=UTF-8"), request);
+    }
+
+    /**
+     * The page's one script: the catalogue filter, and nothing else.
+     *
+     * <p>A file from this origin rather than a block in the markup, because the policy this
+     * service sends is {@code script-src 'self'} with no {@code 'unsafe-inline'} — and because a
+     * script that is its own request is cached for a year across every shop page a reader opens,
+     * while an inline one is re-sent with every one of them.
+     */
+    @GetMapping("/s/assets/shop.js")
+    public ResponseEntity<byte[]> script(HttpServletRequest request) {
+        return asset(script, MediaType.valueOf("text/javascript;charset=UTF-8"), request);
     }
 
     /**
@@ -301,7 +384,8 @@ public class PublicShopPageController {
      * evening.
      */
     private ResponseEntity<byte[]> notFound(ShopPageText text) {
-        byte[] body = ShopPageHtml.renderNotFound(text, baseUrl).getBytes(StandardCharsets.UTF_8);
+        byte[] body = ShopPageHtml.renderNotFound(text, baseUrl, assets)
+                .getBytes(StandardCharsets.UTF_8);
         return secured(ResponseEntity.status(HttpStatus.NOT_FOUND))
                 .cacheControl(CacheControl.maxAge(Duration.ofMinutes(1)).cachePublic())
                 .header("X-Robots-Tag", "noindex")
@@ -379,6 +463,17 @@ public class PublicShopPageController {
         return false;
     }
 
+    /**
+     * The short content fingerprint an asset's URL carries.
+     *
+     * <p>The same digest the ETag is made of, so the two can never disagree about whether a file
+     * changed. Ten characters of it: this only has to separate one build's stylesheet from the
+     * next's, not resist anybody.
+     */
+    private static String fingerprint(byte[] body) {
+        return strongTag(body).replace("\"", "").substring(0, 10);
+    }
+
     /** A strong ETag over the exact bytes sent. Content-addressed, so it cannot go stale. */
     private static String strongTag(byte[] body) {
         try {
@@ -403,6 +498,10 @@ public class PublicShopPageController {
         return "default-src 'none'; "
                 + "img-src 'self'" + (origin == null ? "" : " " + origin) + "; "
                 + "style-src 'self'; "
+                + "script-src 'self'; "
+                // Exactly this service's own manifest, and nothing else: default-src 'none' would
+                // block it outright, and the only alternative to naming it was not shipping it.
+                + "manifest-src 'self'; "
                 + "base-uri 'none'; "
                 + "form-action 'none'; "
                 + "frame-ancestors 'none'";
@@ -434,13 +533,14 @@ public class PublicShopPageController {
         return trimmed;
     }
 
-    private static byte[] readStylesheet() {
-        try (var in = new ClassPathResource("shoppage/shop.css").getInputStream()) {
+    private static byte[] readAsset(String path) {
+        try (var in = new ClassPathResource(path).getInputStream()) {
             return StreamUtils.copyToByteArray(in);
         } catch (IOException e) {
-            // It is packaged in the jar beside this class. Missing means a broken build, and a
-            // service that starts without it would serve every shop page unstyled.
-            throw new UncheckedIOException("shoppage/shop.css is missing from the build", e);
+            // They are packaged in the jar beside this class. Missing means a broken build, and a
+            // service that started without one would serve every shop page unstyled, or with a
+            // search box that never appears.
+            throw new UncheckedIOException(path + " is missing from the build", e);
         }
     }
 

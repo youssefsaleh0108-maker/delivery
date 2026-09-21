@@ -57,7 +57,9 @@ api /receipts/8f2.pdf UNROUTED
 api /webhooks/dlr sms-connector
 api /s/dekkanet-al-rawche-1a2b3c4d product-service
 api /s/dekkanet-al-rawche-1a2b3c4d/qr.png product-service
+api /s/dekkanet-al-rawche-1a2b3c4d/manifest.webmanifest product-service
 api /s/assets/shop.css product-service
+api /s/assets/shop.js product-service
 api /sitemap.xml product-service
 '
 

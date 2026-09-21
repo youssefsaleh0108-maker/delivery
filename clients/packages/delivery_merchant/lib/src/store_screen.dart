@@ -7,6 +7,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
+import 'shop_share.dart';
 import 'store_pin_map.dart';
 
 /// Shop Configuration — everything a merchant needs to get their store listed and keep it accurate.
@@ -28,13 +29,26 @@ import 'store_pin_map.dart';
 /// controls all stay — restyled into the frame's own card-and-labelled-box language rather than
 /// dropped, because dropping them would strand a real merchant in DRAFT with no way out.
 class StoreScreen extends StatefulWidget {
-  const StoreScreen({super.key, required this.api, this.geocoding, this.onBack});
+  const StoreScreen({
+    super.key,
+    required this.api,
+    this.geocoding,
+    this.onBack,
+    this.shopPageOrigin = defaultShopPageOrigin,
+    this.onShare,
+  });
 
   final StoreApi api;
 
   /// Lets the map picker turn the typed address into a point instead of making the merchant pan
   /// across a country. Optional: without it the picker still works, it just has no search box.
   final GeocodingApi? geocoding;
+
+  /// Where this shop's public page lives, for the share block. See [defaultShopPageOrigin].
+  final String shopPageOrigin;
+
+  /// The host's own share sheet, for the share block. See [ShopShareCard.onShare].
+  final Future<bool> Function(String text)? onShare;
 
   /// Back to whatever pushed this. Null on the portal, where the shop config is a nav-rail tab
   /// rather than a pushed route and so needs no back control.
@@ -46,6 +60,10 @@ class StoreScreen extends StatefulWidget {
 
 class _StoreScreenState extends State<StoreScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  /// The address card, so the share block's "Place your shop on the map" can scroll to the map
+  /// that is already on this page rather than opening a second one. See [_showTheMap].
+  final GlobalKey _addressKey = GlobalKey();
 
   final TextEditingController _name = TextEditingController();
   final TextEditingController _tagline = TextEditingController();
@@ -312,6 +330,18 @@ class _StoreScreenState extends State<StoreScreen> {
               ),
               children: <Widget>[
                 _statusCard(t, store),
+                const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
+                // Directly under the listing status, because it answers the question that status
+                // raises: the shop is live — so where do customers find it? This is the portal's
+                // only home for it (a nav-rail tab for one QR code is a tab nobody goes back to),
+                // and on the phone it is the second way in, beside the Settings row.
+                ShopShareCard(
+                  store: store,
+                  origin: widget.shopPageOrigin,
+                  onShare: widget.onShare,
+                  // The map is on this very screen, so the fix is a scroll rather than a route.
+                  onFix: _showTheMap,
+                ),
                 const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
                 _bannerSection(t, store),
                 const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
@@ -862,8 +892,26 @@ class _StoreScreenState extends State<StoreScreen> {
     }
   }
 
+  /// Brings the address card — and the map under it — into view.
+  ///
+  /// What "Place your shop on the map" does when the share block is on this screen: the map is a
+  /// few hundred pixels below, so pushing a route to reach it would be leaving a screen to arrive
+  /// at the same one. Animated rather than jumped, so it reads as a move down the page rather than
+  /// as a screen that changed under the merchant.
+  Future<void> _showTheMap() async {
+    final BuildContext? target = _addressKey.currentContext;
+    if (target == null) return;
+    await Scrollable.ensureVisible(
+      target,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+      alignment: 0.1,
+    );
+  }
+
   Widget _addressSection(DeliveryStrings t, Store store) {
     return Column(
+      key: _addressKey,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         _SectionLabel(t.merchbShopAddress),

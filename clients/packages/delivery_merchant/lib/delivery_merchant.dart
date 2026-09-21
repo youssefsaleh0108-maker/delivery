@@ -61,6 +61,11 @@ export 'src/shop_inbox_screen.dart';
 export 'src/shop_thread_screen.dart';
 // The number both hosts put on their way into that inbox, kept current without a push.
 export 'src/shop_unread_count.dart';
+// A shop's own page, as something it can hand out: the link, the QR code and the printable poster.
+// Both halves are exported because the two hosts mount different ones — the portal puts the card on
+// its My shop page, since a nav-rail tab for one QR code is a tab nobody returns to, and the phone
+// opens the screen from its Settings list, Shop Profile being two taps further in.
+export 'src/shop_share.dart';
 export 'src/store_screen.dart';
 // The map pin's own parts — the preview that sits in the shop-config frame's map slot and the
 // picker behind it. Exported for the same reason the metric cards are: a host or a test has to be

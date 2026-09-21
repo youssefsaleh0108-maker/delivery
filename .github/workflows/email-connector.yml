@@ -28,7 +28,57 @@ on:
       - 'pom.xml'
 
 jobs:
+  # The service's own Spring context, booted the way the pod boots it.
+  #
+  # DemandWeeks reached dev in product-service with two public constructors and no @Autowired:
+  # Spring declined to guess, the context failed at start-up and the pod crash-looped, while every
+  # unit test passed the whole way — because each of them builds its subject with `new` and none of
+  # them ever asks the container to assemble anything. ApplicationContextBootTest asks.
+  #
+  # This connector holds no database, so its context test needs nothing to run against and is
+  # gated on nothing: it runs in every build. The guard below is still worth having — it catches
+  # the test being renamed, moved or excluded, which is the other way a proof goes quiet.
+  #
+  # A job of this caller's own, as product-service has, rather than a service container in
+  # reusable-service-ci.yml, which the other services share. `ci` waits for it, so an image whose
+  # context no longer starts is never built, pushed or rolled out.
+  context-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+
+      # -am builds the platform libraries this module depends on, as the build job does. The test
+      # filter matches nothing in them, which failIfNoSpecifiedTests=false allows.
+      - name: Boot the application context
+        run: >-
+          mvn -B -U -pl services/email-connector -am test
+          -Dtest=ApplicationContextBootTest
+          -Dsurefire.failIfNoSpecifiedTests=false
+
+      - name: Fail if the context test did not run
+        run: |
+          report=services/email-connector/target/surefire-reports/TEST-com.delivery.connector.email.ApplicationContextBootTest.xml
+          if [ ! -f "$report" ]; then
+            echo "::error::No report at $report, so the context test did not run."
+            exit 1
+          fi
+          if ! grep -q 'tests="[1-9]' "$report" || grep -q 'skipped="[1-9]' "$report"; then
+            echo "::error::com.delivery.connector.email.ApplicationContextBootTest was skipped, so nothing proved this service still starts. It is gated on nothing, so look for an exclusion or a rename."
+            exit 1
+          fi
+
   ci:
+    needs: context-test
     uses: ./.github/workflows/reusable-service-ci.yml
     with:
       service-name: email-connector

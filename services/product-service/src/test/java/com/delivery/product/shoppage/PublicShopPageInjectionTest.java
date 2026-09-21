@@ -62,10 +62,11 @@ class PublicShopPageInjectionTest {
     private static final String POWER = "powernote";
     private static final String SECTION = "section";
     private static final String ITEM = "itemname";
+    private static final String ITEM_ABOUT = "itemabout";
     private static final String AREA = "areaname";
 
     private static final List<String> FIELDS =
-            List.of(NAME, TAGLINE, ABOUT, TAG, DISTRICT, POWER, SECTION, ITEM, AREA);
+            List.of(NAME, TAGLINE, ABOUT, TAG, DISTRICT, POWER, SECTION, ITEM, ITEM_ABOUT, AREA);
 
     private static ShopPageFixture hostileShop() {
         return new ShopPageFixture()
@@ -74,7 +75,8 @@ class PublicShopPageInjectionTest {
                 // 14:30Z against the fixture's 15:00Z clock: recent enough that the page draws it.
                 .power(Store.PowerStatus.GENERATOR, typed(POWER), "2026-09-20T14:30:00Z")
                 .areas(typed(AREA))
-                .section(typed(SECTION), Item.of(typed(ITEM), "1.50"));
+                .section(typed(SECTION),
+                        Item.of(typed(ITEM), "1.50").describedAs(typed(ITEM_ABOUT)));
     }
 
     private static String page(String language) throws Exception {
@@ -110,7 +112,10 @@ class PublicShopPageInjectionTest {
         String html = page(language);
 
         assertThat(html)
-                .doesNotContain("<script")
+                // The page's own two: the filter this service serves, and a block of data. A
+                // merchant's "</title><script>" must not become a third.
+                .contains("<script src=\"/s/assets/shop.js?v=")
+                .contains("<script type=\"application/ld+json\">")
                 .doesNotContain("</title><script")
                 .doesNotContain("javascript:")
                 .doesNotContain("onerror=")
@@ -118,9 +123,11 @@ class PublicShopPageInjectionTest {
                 .doesNotContain("\u202E")
                 .doesNotContain("&#8238;")
                 .doesNotContain("&#x202E");
-        // One title element, opened and closed once: the head is still the head.
+        // One title element, opened and closed once: the head is still the head. And exactly the
+        // page's own two script elements, no more.
         assertThat(html.split("<title>", -1).length - 1).isEqualTo(1);
         assertThat(html.split("</title>", -1).length - 1).isEqualTo(1);
+        assertThat(html.split("<script", -1).length - 1).isEqualTo(2);
     }
 
     @Test
@@ -155,6 +162,9 @@ class PublicShopPageInjectionTest {
                 .contains("<li>" + rendered(AREA) + "</li>")
                 .contains("<h3>" + rendered(SECTION) + "</h3>")
                 .contains("<span class=\"n\">" + rendered(ITEM) + "</span>")
+                // Inside the row that expands, which is a second path onto the page for text the
+                // merchant typed — and one <details> the payload must not have closed.
+                .contains("<p class=\"d\">" + rendered(ITEM_ABOUT) + "</p></details>")
                 .contains("<p class=\"tagline\">" + rendered(TAGLINE) + "</p>")
                 .contains("<p class=\"about\">" + rendered(ABOUT) + "</p>");
     }
@@ -172,6 +182,43 @@ class PublicShopPageInjectionTest {
                 .contains("<meta property=\"og:url\" content=\"" + shop.url() + "\">")
                 .contains("href=\"" + shop.url() + "/qr.png\"");
         assertThat(shop.slug()).startsWith("dekkanet-al-rawche-");
+    }
+
+    /**
+     * The structured data, which is the one part of this page that is not markup.
+     *
+     * <p>A second escaper, a second set of rules, and every one of the same values going through
+     * it. {@code &amp;quot;} is six literal characters to a JSON parser rather than a quote mark,
+     * a backslash means nothing in HTML and ends a string in JSON, and the block sits inside an
+     * HTML document where {@code </script>} closes it whatever the JSON says. So this asks a real
+     * parser, on a shop that typed all of it: the block must still be one JSON object, the shop's
+     * name must come back out of it exactly as the merchant typed it, and the page must still have
+     * only the two script elements it wrote itself.
+     */
+    @ParameterizedTest(name = "in {0}")
+    @ValueSource(strings = {"en", "ar"})
+    @DisplayName("the structured data is still JSON a crawler can parse, and still says only this")
+    void keepsTheStructuredDataParseable(String language) throws Exception {
+        String html = page(language);
+
+        var data = PublicShopPageStructuredDataTest.structuredData(html);
+
+        // Out of the parser, the merchant's own characters — not entities, and not a truncated
+        // string that stopped at the first quote mark they typed.
+        assertThat(data.path("name").asText()).isEqualTo(typed(NAME).replace("‮", ""));
+        assertThat(data.path("address").path("addressLocality").asText())
+                .isEqualTo(typed(DISTRICT).replace("‮", ""));
+        assertThat(data.path("areaServed").get(0).path("name").asText())
+                .isEqualTo(typed(AREA).replace("‮", ""));
+        var aisle = data.path("hasOfferCatalog").path("itemListElement").get(0);
+        assertThat(aisle.path("name").asText()).isEqualTo(typed(SECTION).replace("‮", ""));
+        assertThat(aisle.path("itemListElement").get(0).path("itemOffered").path("name").asText())
+                .isEqualTo(typed(ITEM).replace("‮", ""));
+
+        // And none of it wrote a tag on the way in: the block is closed by this page's own
+        // </script>, and the page still has exactly the two script elements it meant to have.
+        assertThat(html.split("<script", -1).length - 1).isEqualTo(2);
+        assertThat(html.split("</script>", -1).length - 1).isEqualTo(2);
     }
 
     @Test
