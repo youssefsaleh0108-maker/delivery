@@ -32,6 +32,17 @@ final class ShopPageHtml {
     static final String STYLESHEET = "/s/assets/shop.css";
 
     /**
+     * The one script, and the one thing it is allowed to do.
+     *
+     * <p>Same origin, so {@code script-src 'self'} allows it and nothing else. It filters the rows
+     * this document already carries and never builds one: the catalogue is in the HTML, so a phone
+     * with scripting off, a phone that gave up on this file, a chat app's preview and a crawler all
+     * see the whole shelf. The search box it drives starts {@code hidden} in the markup and is
+     * revealed by the script, because a box that did nothing when tapped is worse than no box.
+     */
+    static final String SCRIPT = "/s/assets/shop.js";
+
+    /**
      * Renders one shop.
      *
      * @param base    the public origin the page believes it is on, for the canonical URL, the Open
@@ -136,6 +147,9 @@ final class ShopPageHtml {
                 .append("<meta name=\"twitter:description\" content=\"").append(esc(description))
                 .append("\">")
                 .append("<link rel=\"stylesheet\" href=\"").append(STYLESHEET).append("\">")
+                // Deferred, so it is fetched alongside the markup and runs after it: the shelf is
+                // already on the screen before this file arrives, and nothing waits on it.
+                .append("<script src=\"").append(SCRIPT).append("\" defer></script>")
                 .append("</head>");
     }
 
@@ -281,9 +295,15 @@ final class ShopPageHtml {
             return;
         }
         b.append("<section class=\"block menu\"><h2>").append(esc(t.catalogue())).append("</h2>");
+        finder(b, catalogue, t);
+        int index = 0;
         for (PublicShopPage.Section section : catalogue.sections()) {
             String name = section.name().isEmpty() ? t.otherItems() : section.name();
-            b.append("<h3>").append(esc(name)).append("</h3><ul class=\"items\">");
+            // A wrapper with a positional id, so a jump link has something to land on and the
+            // filter has one element to hide when a search empties the whole aisle. Positional
+            // rather than the section's own row id, which has no business being on this page.
+            b.append("<div class=\"sec\" id=\"s").append(++index).append("\">")
+                    .append("<h3>").append(esc(name)).append("</h3><ul class=\"items\">");
             for (PublicShopPage.Item item : section.items()) {
                 b.append("<li").append(item.inStock() ? "" : " class=\"gone\"").append(">");
                 if (item.imageUrl() != null) {
@@ -301,7 +321,7 @@ final class ShopPageHtml {
                 }
                 b.append("</li>");
             }
-            b.append("</ul>");
+            b.append("</ul></div>");
         }
         if (catalogue.total() > catalogue.shown()) {
             b.append("<p class=\"note\">")
@@ -309,6 +329,43 @@ final class ShopPageHtml {
                     .append("</p>");
         }
         b.append("</section>");
+    }
+
+    /**
+     * How a reader finds one thing in a shop that sells a hundred and twenty.
+     *
+     * <p>Two halves, and only one of them needs a script.
+     *
+     * <p>The <strong>jump links</strong> are plain anchors at the sections the document already
+     * contains. They work with scripting off, with the script still in flight, and in a reader
+     * mode that stripped it — which is the case this page is built for.
+     *
+     * <p>The <strong>search field</strong> ships {@code hidden} and is revealed by
+     * {@code shop.js}. It is the honest way round: filtering happens entirely in the browser
+     * ({@code form-action 'none'}, and there is no search endpoint to submit to), so a box left
+     * visible for a reader with no script would be a control that swallows what they type. The
+     * "nothing matches" line ships with it, in the markup, in the reader's own language, rather
+     * than being a string the script would have to carry in two languages.
+     */
+    private static void finder(StringBuilder b, PublicShopPage.Catalogue catalogue,
+                               ShopPageText t) {
+        b.append("<div class=\"find\">");
+        if (catalogue.sections().size() > 1) {
+            b.append("<p class=\"jump\"><span>").append(esc(t.jumpTo())).append("</span>");
+            int index = 0;
+            for (PublicShopPage.Section section : catalogue.sections()) {
+                b.append("<a href=\"#s").append(++index).append("\">")
+                        .append(esc(section.name().isEmpty() ? t.otherItems() : section.name()))
+                        .append("</a>");
+            }
+            b.append("</p>");
+        }
+        b.append("<p class=\"q\" hidden><label for=\"q\">").append(esc(t.searchThisShop()))
+                .append("</label>")
+                .append("<input id=\"q\" type=\"search\" autocomplete=\"off\" ")
+                .append("enterkeyhint=\"search\"></p>")
+                .append("<p class=\"qn\" role=\"status\" hidden>").append(esc(t.nothingMatches()))
+                .append("</p></div>");
     }
 
     /**

@@ -290,6 +290,24 @@ enum ShopPageText {
         return this == AR ? "أصناف أخرى" : "Other items";
     }
 
+    /** The label on the search field, which only appears once the script has revealed it. */
+    String searchThisShop() {
+        return this == AR ? "ابحث في المتجر" : "Search this shop";
+    }
+
+    /** The row of section anchors. Plain links: they are what a reader with no script gets. */
+    String jumpTo() {
+        return this == AR ? "انتقل إلى" : "Jump to";
+    }
+
+    /**
+     * Shipped in the markup rather than built by the script, so it is in the reader's own language
+     * without the script having to carry a second dictionary.
+     */
+    String nothingMatches() {
+        return this == AR ? "لا يوجد صنف يطابق بحثك." : "Nothing in this shop matches that.";
+    }
+
     String outOfStock() {
         return this == AR ? "غير متوفر" : "Out of stock";
     }

@@ -110,7 +110,9 @@ class PublicShopPageInjectionTest {
         String html = page(language);
 
         assertThat(html)
-                .doesNotContain("<script")
+                // One script element, and it is the file this service serves. A merchant's
+                // "</title><script>" must not become a second one.
+                .contains("<script src=\"/s/assets/shop.js\" defer></script>")
                 .doesNotContain("</title><script")
                 .doesNotContain("javascript:")
                 .doesNotContain("onerror=")
@@ -118,9 +120,11 @@ class PublicShopPageInjectionTest {
                 .doesNotContain("\u202E")
                 .doesNotContain("&#8238;")
                 .doesNotContain("&#x202E");
-        // One title element, opened and closed once: the head is still the head.
+        // One title element, opened and closed once: the head is still the head. And one script
+        // element, which is this service's own.
         assertThat(html.split("<title>", -1).length - 1).isEqualTo(1);
         assertThat(html.split("</title>", -1).length - 1).isEqualTo(1);
+        assertThat(html.split("<script", -1).length - 1).isEqualTo(1);
     }
 
     @Test

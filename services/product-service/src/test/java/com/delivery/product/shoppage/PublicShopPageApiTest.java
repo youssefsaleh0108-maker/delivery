@@ -76,17 +76,27 @@ class PublicShopPageApiTest {
                 .contains("/qr.png");
     }
 
+    /**
+     * It is still a document, not an app.
+     *
+     * <p>There is one script now — the catalogue filter — and the shape of it is the promise: a
+     * file from this origin, deferred, with nothing inline and no handler attribute anywhere. The
+     * page is complete before it arrives and stays complete if it never does, which is what the
+     * whole design rests on: a chat app's preview runs no JavaScript at all.
+     */
     @Test
-    @DisplayName("it is a document, not an app: no script of any kind")
-    void carriesNoScript() throws Exception {
+    @DisplayName("one script, from this origin, and nothing inline")
+    void carriesOneExternalScriptAndNothingInline() throws Exception {
         ShopPageFixture shop = stocked();
         String html = body(shop.mvc().perform(get("/s/" + shop.slug())).andReturn());
 
+        assertThat(html.split("<script", -1).length - 1).isEqualTo(1);
         assertThat(html)
-                .doesNotContain("<script")
+                .contains("<script src=\"/s/assets/shop.js\" defer></script>")
                 .doesNotContain("javascript:")
                 .doesNotContain("onerror=")
                 .doesNotContain("onload=")
+                .doesNotContain("onclick=")
                 // One stylesheet, from this origin. No CDN, and no web font to wait on.
                 .contains("<link rel=\"stylesheet\" href=\"/s/assets/shop.css\">")
                 .doesNotContain("<style")
@@ -364,11 +374,13 @@ class PublicShopPageApiTest {
                 .contains("default-src 'none'")
                 .contains("style-src 'self'")
                 .contains("img-src 'self' " + ShopPageFixture.IMAGE_ORIGIN)
+                // The catalogue filter, and only from here. A merchant who types a script tag
+                // into a product name has nowhere for it to run.
+                .contains("script-src 'self'")
                 .contains("frame-ancestors 'none'")
                 .contains("base-uri 'none'")
                 .contains("form-action 'none'")
-                // The three that would make this a page that could run or leak something.
-                .doesNotContain("script-src")
+                // The two that would make this a page that could run something it was handed.
                 .doesNotContain("unsafe-inline")
                 .doesNotContain("unsafe-eval");
         assertThat(response.getHeader("X-Content-Type-Options")).isEqualTo("nosniff");

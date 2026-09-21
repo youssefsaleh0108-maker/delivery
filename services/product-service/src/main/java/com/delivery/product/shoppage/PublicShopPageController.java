@@ -141,13 +141,19 @@ public class PublicShopPageController {
     /** The stylesheet, read once: it ships with the build and never changes while this JVM runs. */
     private final byte[] stylesheet;
 
+    /** The one script, read once, for the same reason and on the same terms. */
+    private final byte[] script;
+
     /**
      * What the page's own Content-Security-Policy allows.
      *
-     * <p>Exactly two things: the stylesheet from this origin, and pictures from the object store
-     * the URLs in the markup actually point at. Everything else — script, font, frame, form, connect
-     * — is {@code 'none'}, because the page uses none of them and a policy that allowed what it did
-     * not use would be a hole nobody was watching.
+     * <p>Exactly three things: the stylesheet and the catalogue filter from this origin, and
+     * pictures from the object store the URLs in the markup actually point at. Everything else —
+     * font, frame, form, connect — is {@code 'none'}, because the page uses none of them and a
+     * policy that allowed what it did not use would be a hole nobody was watching.
+     *
+     * <p>{@code script-src 'self'} and no {@code 'unsafe-inline'}: the page has one script and it
+     * is a file this service serves, so the policy never has to allow a block of markup to run.
      *
      * <p>Built from {@code delivery.storage.minio.public-endpoint}, which is the very setting that
      * produced those image URLs ({@code StorageService.readUrl}), so the policy cannot drift from
@@ -173,7 +179,8 @@ public class PublicShopPageController {
                              LongSupplier nanoClock) {
         this.pages = pages;
         this.baseUrl = trimTrailingSlash(baseUrl);
-        this.stylesheet = readStylesheet();
+        this.stylesheet = readAsset("shoppage/shop.css");
+        this.script = readAsset("shoppage/shop.js");
         this.contentSecurityPolicy = policyFor(imageOrigin);
         this.qrCodes = new ShopPageCache<>(QR_MEMO_FOR, QR_MEMO_ENTRIES, nanoClock);
         this.renderedPages = new ShopPageCache<>(PAGE_MAX_AGE, PAGE_MEMO_ENTRIES, nanoClock);
@@ -242,6 +249,19 @@ public class PublicShopPageController {
     @GetMapping("/s/assets/shop.css")
     public ResponseEntity<byte[]> stylesheet(HttpServletRequest request) {
         return asset(stylesheet, MediaType.valueOf("text/css;charset=UTF-8"), request);
+    }
+
+    /**
+     * The page's one script: the catalogue filter, and nothing else.
+     *
+     * <p>A file from this origin rather than a block in the markup, because the policy this
+     * service sends is {@code script-src 'self'} with no {@code 'unsafe-inline'} — and because a
+     * script that is its own request is cached for a year across every shop page a reader opens,
+     * while an inline one is re-sent with every one of them.
+     */
+    @GetMapping("/s/assets/shop.js")
+    public ResponseEntity<byte[]> script(HttpServletRequest request) {
+        return asset(script, MediaType.valueOf("text/javascript;charset=UTF-8"), request);
     }
 
     /**
@@ -403,6 +423,7 @@ public class PublicShopPageController {
         return "default-src 'none'; "
                 + "img-src 'self'" + (origin == null ? "" : " " + origin) + "; "
                 + "style-src 'self'; "
+                + "script-src 'self'; "
                 + "base-uri 'none'; "
                 + "form-action 'none'; "
                 + "frame-ancestors 'none'";
@@ -434,13 +455,14 @@ public class PublicShopPageController {
         return trimmed;
     }
 
-    private static byte[] readStylesheet() {
-        try (var in = new ClassPathResource("shoppage/shop.css").getInputStream()) {
+    private static byte[] readAsset(String path) {
+        try (var in = new ClassPathResource(path).getInputStream()) {
             return StreamUtils.copyToByteArray(in);
         } catch (IOException e) {
-            // It is packaged in the jar beside this class. Missing means a broken build, and a
-            // service that starts without it would serve every shop page unstyled.
-            throw new UncheckedIOException("shoppage/shop.css is missing from the build", e);
+            // They are packaged in the jar beside this class. Missing means a broken build, and a
+            // service that started without one would serve every shop page unstyled, or with a
+            // search box that never appears.
+            throw new UncheckedIOException(path + " is missing from the build", e);
         }
     }
 

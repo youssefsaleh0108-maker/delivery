@@ -20,6 +20,12 @@
   --r: 12px;
 }
 * { box-sizing: border-box; }
+/*
+  The script hides rows, aisles and the search box itself with the `hidden` attribute, and several
+  of those elements are also given a `display` here. A rule in a stylesheet beats the UA's own
+  [hidden] rule, so without this the filter would set `hidden` and nothing would disappear.
+*/
+[hidden] { display: none !important; }
 body {
   margin: 0;
   background: var(--bg);
@@ -75,6 +81,31 @@ a { color: var(--brand); }
 .hours td { color: var(--muted); }
 .hours .today th, .hours .today td { font-weight: 700; color: var(--ink); }
 .hours .now { color: var(--brand); font-size: .75rem; font-weight: 600; }
+
+/*
+  Finding one thing in a shop that sells a hundred and twenty. The jump links are plain anchors and
+  are all a reader with no script gets; the field beside them arrives hidden and is revealed by
+  shop.js. Sticky, because the point of a filter on a long shelf is to still be reachable halfway
+  down it.
+*/
+.find {
+  position: sticky; top: 0; z-index: 1; background: var(--white);
+  padding-block: 8px; margin-block-end: 4px; border-block-end: 1px solid var(--border);
+}
+.jump { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; margin: 0 0 8px; }
+.jump span { font-size: .78rem; color: var(--faint); }
+.jump a {
+  font-size: .82rem; text-decoration: none; padding: 3px 10px; border-radius: 100px;
+  background: var(--bg); border: 1px solid var(--border);
+}
+.q { display: flex; flex-direction: column; gap: 4px; margin: 0; }
+.q label { font-size: .78rem; color: var(--muted); }
+.q input {
+  font: inherit; font-size: 1rem; width: 100%; padding: 9px 12px; color: var(--ink);
+  border: 1px solid var(--border); border-radius: 100px; background: var(--bg);
+}
+.q input:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
+.qn { margin: 10px 0 0; color: var(--muted); font-size: .9rem; }
 
 .items { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .items li {
