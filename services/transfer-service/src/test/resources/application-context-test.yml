@@ -1,0 +1,53 @@
+# What the service is allowed to reach while a test boots its own context.
+#
+# Loaded only under the "context-test" profile, which only ApplicationContextBootTest activates.
+# Everything here is either a switch the service already ships or a pointer at a test double, and
+# nothing in this file may name a host outside this JVM: the whole point of the profile is that
+# booting the real context can never touch a real environment.
+# The database is the one live thing, and it is not named here — it comes from TRANSFER_TEST_DB_URL,
+# the throwaway PostGIS the CI job starts, and the test skips itself when that is unset.
+
+spring:
+  cloud:
+    # The test is about THIS service's beans. A config server would layer another environment's
+    # properties over them, and reaching for one is a network call on the way up.
+    config:
+      enabled: false
+
+  rabbitmq:
+    listener:
+      # The containers are still BUILT, so an @RabbitListener with a signature or a converter
+      # Spring cannot satisfy still fails this test. They simply never open a socket — and the
+      # connection factory is a stub (ApplicationContextBootTest.StubbedBroker), so there is
+      # nothing behind them to open one to.
+      simple:
+        auto-startup: false
+      direct:
+        auto-startup: false
+
+  jpa:
+    hibernate:
+      # What the pod boots with: Flyway owns the schema and Hibernate refuses to start on drift.
+      # Spelled again here so the test keeps checking it even if the shipped default is relaxed.
+      ddl-auto: validate
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Keycloak is never contacted: platformJwtDecoder builds its NimbusJwtDecoder from
+          # jwk-set-uri, which fetches the key set on the first token rather than at start-up,
+          # and this context verifies no token. Pointed at a closed port so that stays true by
+          # force rather than by trust.
+          issuer-uri: http://127.0.0.1:1/realms/context-test
+          jwk-set-uri: http://127.0.0.1:1/realms/context-test/protocol/openid-connect/certs
+
+management:
+  otlp:
+    tracing:
+      # The exporter is built and wired as it is in the pod; it simply has nowhere to post to.
+      endpoint: http://127.0.0.1:1/v1/traces
+
+delivery:
+  services:
+    order-manager: http://127.0.0.1:1

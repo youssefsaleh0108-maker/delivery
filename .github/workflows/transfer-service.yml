@@ -60,25 +60,43 @@ jobs:
           distribution: temurin
           cache: maven
 
-      - name: Split shares against PostgreSQL
+      # ApplicationContextBootTest runs here too, and wants the same throwaway PostgreSQL: it boots
+      # this service's real Spring context — Flyway, Hibernate on validate, the AMQP wiring and the
+      # rate a quote is locked from — which nothing else in the suite does. DemandWeeks reached dev
+      # in product-service with two constructors Spring could not choose between, and no unit test
+      # anywhere could have caught it, because unit tests build their subject with `new`.
+      #
+      # It is gated on an environment variable rather than on this job's -Ddelivery.test.postgres
+      # pair, because every context test in the estate is gated the same way, on
+      # <SERVICE>_TEST_DB_URL. Both name the same container.
+      - name: Split shares and the context boot against PostgreSQL
+        env:
+          TRANSFER_TEST_DB_URL: jdbc:postgresql://localhost:5432/postgres
         run: >-
           mvn -B -U -pl services/transfer-service -am test
-          -Dtest=SplitSharesPostgresTest
+          -Dtest=SplitSharesPostgresTest,ApplicationContextBootTest
           -Dsurefire.failIfNoSpecifiedTests=false
           -Ddelivery.test.postgres=true
           -Ddelivery.test.postgres.url=jdbc:postgresql://localhost:5432/postgres
 
+      # A loop now that two classes run here, and fully qualified, because they do not share a
+      # package: a guard that guessed would look for a report that never existed and pass the
+      # moment it was wrong.
       - name: Fail if the database tests did not run
         run: |
-          report=services/transfer-service/target/surefire-reports/TEST-com.delivery.transfer.domain.SplitSharesPostgresTest.xml
-          if [ ! -f "$report" ]; then
-            echo "::error::No report at $report, so the database tests did not run."
-            exit 1
-          fi
-          if ! grep -q 'tests="[1-9]' "$report" || grep -q 'skipped="[1-9]' "$report"; then
-            echo "::error::The database tests were skipped. Is -Ddelivery.test.postgres=true set?"
-            exit 1
-          fi
+          for test in \
+            com.delivery.transfer.domain.SplitSharesPostgresTest \
+            com.delivery.transfer.ApplicationContextBootTest; do
+            report=services/transfer-service/target/surefire-reports/TEST-$test.xml
+            if [ ! -f "$report" ]; then
+              echo "::error::No report at $report, so the database tests did not run."
+              exit 1
+            fi
+            if ! grep -q 'tests="[1-9]' "$report" || grep -q 'skipped="[1-9]' "$report"; then
+              echo "::error::$test was skipped. Is -Ddelivery.test.postgres=true (and TRANSFER_TEST_DB_URL) set?"
+              exit 1
+            fi
+          done
 
   ci:
     needs: database-tests
