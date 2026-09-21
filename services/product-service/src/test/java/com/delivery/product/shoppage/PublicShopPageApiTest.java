@@ -77,6 +77,39 @@ class PublicShopPageApiTest {
     }
 
     /**
+     * One call to action, and it is honest about both halves.
+     *
+     * <p>The page carries a shop's prices, which makes it look like a shop that takes money. It
+     * cannot: it is anonymous, cached and crawled, and anything on it that took an address or a
+     * phone number would be collecting a stranger's details on a page that can authenticate
+     * nobody. So it says so, and points at the one place an order can actually be placed — naming
+     * what the button hands back, because {@code /app} is the Android build itself and a reader on
+     * an iPhone should learn that from the label rather than from a file they cannot open.
+     */
+    @Test
+    @DisplayName("one way to order: the app, what the button downloads, and no basket here")
+    void offersOneWayToOrder() throws Exception {
+        ShopPageFixture shop = stocked();
+        String html = body(shop.mvc().perform(get("/s/" + shop.slug())).andReturn());
+
+        assertThat(html)
+                .contains("Orders from this shop are placed in the YouDrop app. "
+                        + "This page cannot take an order itself.")
+                .contains("<a class=\"cta\" href=\"https://www.youdrop.shop/app\">Get the app"
+                        + "<span class=\"sub\">Android · direct download</span></a>")
+                // Room held for the two listings, without a link to either: neither exists, and a
+                // dead one on the page a shopkeeper prints on a sign is worse than saying "not
+                // yet".
+                .contains("<ul class=\"stores\"><li>App Store</li><li>Google Play</li></ul>")
+                .contains("Coming soon to the App Store and Google Play.");
+        // One button. Nothing here is a form, a field or a basket.
+        assertThat(html.split("class=\"cta\"", -1).length - 1).isEqualTo(1);
+        assertThat(html)
+                .doesNotContain("<form").doesNotContain("<button").doesNotContain("<textarea")
+                .doesNotContain("type=\"tel\"").doesNotContain("type=\"email\"");
+    }
+
+    /**
      * It is still a document, not an app.
      *
      * <p>There is one script now — the catalogue filter — and the shape of it is the promise: a

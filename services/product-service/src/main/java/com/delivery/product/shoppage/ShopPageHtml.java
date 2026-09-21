@@ -390,9 +390,23 @@ final class ShopPageHtml {
      */
     private static void order(StringBuilder b, ShopPageText t, String base, String url) {
         b.append("<section class=\"block order\"><h2>").append(esc(t.howToOrder()))
-                .append("</h2><p>").append(esc(t.orderInTheApp())).append("</p>")
+                .append("</h2><p>").append(esc(t.orderInTheApp())).append(" ")
+                // Said out loud, because a page with a shop's prices on it looks like a shop that
+                // takes money, and a reader who taps around looking for a basket and finds none
+                // has been misled by the layout rather than told anything.
+                .append(esc(t.thisPageTakesNoOrders())).append("</p>")
+                // One button, and it says what happens when it is pressed: /app hands back the
+                // Android build itself, as a download. A reader on an iPhone should find that out
+                // from the label rather than from a file they cannot open.
                 .append("<p><a class=\"cta\" href=\"").append(esc(base)).append("/app\">")
-                .append(esc(t.getTheApp())).append("</a></p>")
+                .append(esc(t.getTheApp()))
+                .append("<span class=\"sub\">").append(esc(t.androidDownload()))
+                .append("</span></a></p>")
+                // The room the store links will take, held open and honest about being empty.
+                // Not anchors: neither listing exists yet, and a dead link on the one page a
+                // shopkeeper prints on a sign is worse than a label that says "not yet".
+                .append("<ul class=\"stores\"><li>App Store</li><li>Google Play</li></ul>")
+                .append("<p class=\"note\">").append(esc(t.storesSoon())).append("</p>")
                 .append("<p><a class=\"qr\" href=\"").append(esc(url)).append("/qr.png\">")
                 .append(esc(t.printThisPage())).append("</a></p></section>");
     }

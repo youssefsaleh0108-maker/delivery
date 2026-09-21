@@ -54,7 +54,12 @@ class PublicShopPageArabicTest {
                 .contains("التوصيل")
                 .contains("المناطق التي يوصّل إليها")
                 .contains("كيف تطلب")
-                .contains("حمّل التطبيق");
+                .contains("حمّل التطبيق")
+                // The call to action carries its own second line and its honest sentence, both in
+                // Arabic: a reader who switched language should not meet an English button.
+                .contains("أندرويد · تحميل مباشر")
+                .contains("هذه الصفحة لا تستقبل الطلبات.")
+                .contains("قريبًا على App Store و Google Play.");
 
         // The hours, the prices and the rating, in the digits the Arabic app uses.
         assertThat(html)

@@ -133,6 +133,18 @@ a { color: var(--brand); }
   display: inline-block; background: var(--brand); color: var(--white); text-decoration: none;
   padding: 11px 20px; border-radius: 100px; font-weight: 600;
 }
+/*
+  The one button on the page, and on a phone it is the width of the phone: this is the whole point
+  of the page, and a pill floating at the inline start is a target a thumb has to aim for.
+*/
+.order .cta { display: block; text-align: center; padding: 13px 20px; }
+.order .cta .sub { display: block; font-weight: 400; font-size: .78rem; opacity: .85; }
+/* The room the two store listings will take when they exist. Not links: neither one does yet. */
+.stores { display: flex; flex-wrap: wrap; gap: 6px; margin-block-start: 12px; }
+.stores li {
+  font-size: .8rem; padding: 4px 12px; border-radius: 100px; color: var(--faint);
+  border: 1px dashed var(--border);
+}
 .qr { font-size: .88rem; }
 .foot { padding: 16px; }
 .missing { padding: 48px 16px; text-align: center; }

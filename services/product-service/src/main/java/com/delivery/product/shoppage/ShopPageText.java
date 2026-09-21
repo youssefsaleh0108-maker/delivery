@@ -340,6 +340,28 @@ enum ShopPageText {
         return this == AR ? "حمّل التطبيق" : "Get the app";
     }
 
+    /**
+     * The honest sentence. A page with a shop's prices on it looks like a shop that takes money,
+     * and a reader hunting for a basket that is not there has been misled by the layout.
+     */
+    String thisPageTakesNoOrders() {
+        return this == AR
+                ? "هذه الصفحة لا تستقبل الطلبات."
+                : "This page cannot take an order itself.";
+    }
+
+    /** What the button actually hands back: {@code /app} is the Android build, as a download. */
+    String androidDownload() {
+        return this == AR ? "أندرويد · تحميل مباشر" : "Android · direct download";
+    }
+
+    /** The two listings that do not exist yet, said plainly rather than linked to nothing. */
+    String storesSoon() {
+        return this == AR
+                ? "قريبًا على App Store و Google Play."
+                : "Coming soon to the App Store and Google Play.";
+    }
+
     String printThisPage() {
         return this == AR ? "رمز QR للطباعة" : "QR code to print";
     }
