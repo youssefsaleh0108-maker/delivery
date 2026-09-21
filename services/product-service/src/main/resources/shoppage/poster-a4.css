@@ -1,0 +1,62 @@
+/*
+  The A4 copy, laid over poster.css.
+
+  Everything about the sheet is already decided — black on white, one QR code, one name, one line
+  in two languages. All this file changes is the paper and the scale that goes with it, because a
+  poster taped to a window is read from across a street and an A5 card is read from arm's length.
+
+  A separate file rather than a class on <body>, because @page is a page context: it cannot be
+  selected by anything in the document, so the paper can only be chosen by which stylesheet is
+  linked.
+*/
+
+@page {
+  size: A4 portrait;
+  /* Proportionally a little wider than A5's, which keeps the artwork off the edge of the longer
+     sheet without letting the margin grow with the paper. */
+  margin: 14mm;
+}
+
+.sheet {
+  width: 182mm;
+  padding: 10mm 0 12mm;
+}
+
+.name {
+  font-size: 14mm;
+  margin: 0 0 10mm;
+}
+
+.qr {
+  /* 130 mm: the biggest square that leaves room for the name above and the address below, and the
+     size at which the code is picked up from several metres away. */
+  width: 130mm;
+  height: 130mm;
+}
+
+.line {
+  font-size: 7.5mm;
+  margin: 8mm 0 0;
+}
+
+.line + .line {
+  font-size: 6.5mm;
+  margin-top: 3mm;
+}
+
+.addr {
+  margin: 10mm 0 0;
+  font-size: 6mm;
+}
+
+@media screen {
+  .sheet {
+    width: 210mm;
+    padding: 14mm;
+    min-height: 297mm;
+  }
+}
+
+@media print {
+  .sheet { width: auto; min-height: 0; padding: 0; }
+}

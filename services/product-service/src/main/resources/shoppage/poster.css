@@ -1,0 +1,141 @@
+/*
+  The printable poster. A5 by default — the card that stands beside a till.
+
+  Black on white and nothing else: no brand colour, no grey panel, no tint. A shop prints this on
+  whatever is in the office inkjet, often on a laser with one toner cartridge, sometimes on a
+  photocopier at the shop next door. Every one of those renders pure black on white correctly and
+  every one of them makes a mess of anything else. There is no @font-face for the same reason the
+  page has none: the system's own Arabic and Latin faces are the ones the machine can already print.
+
+  Millimetres, not pixels. This sheet's size is decided by the paper, so the sizes are written in
+  the paper's own unit and the on-screen preview is drawn at the same measurements — what the
+  merchant sees is the sheet that comes out.
+
+  Logical properties throughout, so the Arabic rendering is this stylesheet mirrored by dir="rtl"
+  rather than a second set of rules.
+*/
+
+@page {
+  size: A5 portrait;
+  /* The margin the printer is told about. Wide enough that no desktop printer's unprintable edge
+     eats the QR's quiet zone, which is the commonest reason a printed code will not scan. */
+  margin: 10mm;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #fff;
+  color: #000;
+  font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Naskh Arabic", sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* ------------------------------------------------------------------ the sheet */
+
+.sheet {
+  /* A5 less the page margin, so the preview on screen is the printed area exactly. */
+  width: 128mm;
+  margin: 0 auto;
+  padding: 6mm 0 8mm;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  break-inside: avoid;
+}
+
+.name {
+  font-size: 9mm;
+  line-height: 1.15;
+  font-weight: 700;
+  margin: 0 0 6mm;
+  /* A shop can call itself something long. Wrapping is fine; overflowing the sheet is not. */
+  overflow-wrap: anywhere;
+}
+
+.qr {
+  display: block;
+  width: 90mm;
+  height: 90mm;
+  /* The PNG is 1,024 modules-worth of pixels and this draws it at about 1,063 at 300 dpi, so it is
+     very nearly 1:1. Nearest-neighbour keeps the modules square edged; smoothing them is what turns
+     a code that scans instantly into one that takes three tries under a shop's fluorescent tube. */
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.line {
+  font-size: 5mm;
+  line-height: 1.35;
+  margin: 5mm 0 0;
+}
+
+/* The second of the two languages, a shade quieter so the sheet has one voice and a translation
+   rather than two competing headlines. Still pure black — this is size, not colour. */
+.line + .line {
+  font-size: 4.4mm;
+  margin-top: 2mm;
+}
+
+.addr {
+  margin: 7mm 0 0;
+  font-size: 4.2mm;
+  letter-spacing: .02em;
+  /* An address is read character by character by somebody typing it, so the slug's hyphens must be
+     unmistakable and the line must not be broken in the middle of the host. */
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------ on screen only */
+
+.controls {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  padding: 10px 0 0;
+  font-size: 14px;
+}
+
+.controls a,
+.controls .on {
+  display: inline-block;
+  min-width: 44px;
+  padding: 8px 12px;
+  border: 1px solid #000;
+  border-radius: 6px;
+  text-decoration: none;
+  color: #000;
+}
+
+.controls .on {
+  background: #000;
+  color: #fff;
+}
+
+@media screen {
+  body {
+    /* A desk to lay the sheet on, so its edges are visible before it is printed. */
+    background: #f2f2f2;
+    padding: 12px;
+  }
+  .sheet {
+    background: #fff;
+    border: 1px solid #ccc;
+    /* A5 whole, margins included: the preview is the paper, not the printable area. */
+    width: 148mm;
+    padding: 10mm;
+    margin: 12px auto 24px;
+    min-height: 210mm;
+  }
+}
+
+@media print {
+  /* The paper switch is not part of the poster. */
+  .controls { display: none; }
+  body { background: #fff; padding: 0; }
+  .sheet { border: 0; margin: 0; padding: 0; width: auto; min-height: 0; }
+}
