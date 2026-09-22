@@ -13520,4 +13520,167 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get merchSharePublishYourShop => 'انشر متجرك';
+
+  @override
+  String get menuBuilderTitle => 'منشئ القائمة';
+
+  @override
+  String get menuPreview => 'معاينة';
+
+  @override
+  String get menuAddItem => 'أضف صنفًا';
+
+  @override
+  String menuItemCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count صنف',
+      many: '$count صنفًا',
+      few: '$count أصناف',
+      two: 'صنفان',
+      one: 'صنف واحد',
+      zero: 'لا أصناف',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get menuOtherItems => 'باقي الأصناف';
+
+  @override
+  String get menuSectionEmpty => 'لا شيء في هذا القسم بعد.';
+
+  @override
+  String get menuNoDescription => 'بلا وصف';
+
+  @override
+  String menuAvailableSwitch(String name) {
+    return '$name — متوفّر الآن';
+  }
+
+  @override
+  String get menuTakeOffTitle => 'أتريد إخفاء هذا الصنف من القائمة؟';
+
+  @override
+  String menuTakeOffConfirm(String name) {
+    return 'لن يظهر $name في صفحتك حتى تعيد تشغيله. لن يُحذف شيء.';
+  }
+
+  @override
+  String get menuTakeOff => 'أخفِه';
+
+  @override
+  String get menuMoveUp => 'حرّكه لأعلى القائمة';
+
+  @override
+  String get menuMoveDown => 'حرّكه لأسفل القائمة';
+
+  @override
+  String get menuExpandSection => 'افتح هذا القسم';
+
+  @override
+  String get menuCollapseSection => 'أغلق هذا القسم';
+
+  @override
+  String get menuCouldNotReorder => 'تعذّر حفظ الترتيب الجديد';
+
+  @override
+  String get menuCouldNotPreview => 'تعذّر فتح صفحتك';
+
+  @override
+  String get menuCouldNotLoad => 'تعذّر تحميل قائمتك';
+
+  @override
+  String get menuEmptyTitle => 'قائمتك فارغة';
+
+  @override
+  String get menuEmptyMessage =>
+      'أضف ما تبيعه، فيصير القائمة التي يراها الزبائن في صفحتك.';
+
+  @override
+  String get merchShareDownloadQr => 'تنزيل الرمز';
+
+  @override
+  String get merchSharePrintQr => 'طباعة الرمز';
+
+  @override
+  String get merchShareCouldNotOpenQr => 'تعذّر فتح رمز QR';
+
+  @override
+  String get merchTablesTitle => 'رموز QR للطاولات';
+
+  @override
+  String get merchTablesWhat =>
+      'رمز لكل طاولة. الطلب الذي يبدأ من رمز يعرف من أي طاولة جاء.';
+
+  @override
+  String get merchTablesHowMany => 'عدد الطاولات';
+
+  @override
+  String get merchTablesFewer => 'طاولة أقل';
+
+  @override
+  String get merchTablesMore => 'طاولة أكثر';
+
+  @override
+  String merchTablesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count طاولة',
+      many: '$count طاولة',
+      few: '$count طاولات',
+      two: 'طاولتان',
+      one: 'طاولة واحدة',
+      zero: 'لا طاولات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get merchTablesSave => 'احفظ وأنشئ الرموز';
+
+  @override
+  String merchTablesSaved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count رمز طاولة جاهز',
+      many: '$count رمز طاولة جاهز',
+      few: '$count رموز طاولات جاهزة',
+      two: 'رمزا طاولتين جاهزان',
+      one: 'رمز طاولة واحد جاهز',
+      zero: 'أُوقفت رموز الطاولات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get merchTablesCouldNotSave => 'تعذّر حفظ عدد الطاولات';
+
+  @override
+  String get merchTablesPrintSheet => 'اطبع بطاقات الطاولات';
+
+  @override
+  String get merchTablesReprintOne => 'ضاعت بطاقة؟ أعد طباعة طاولة واحدة:';
+
+  @override
+  String merchTablesReprintTable(int number) {
+    return 'أعد طباعة الطاولة $number';
+  }
+
+  @override
+  String get merchTablesCouldNotOpen => 'تعذّر فتح بطاقات الطاولات';
+
+  @override
+  String get merchTablesOrderingTitle => 'استقبل الطلبات من الطاولة';
+
+  @override
+  String get merchTablesOrderingOn =>
+      'من يمسح رمز طاولة يستطيع أن يطلب منها، ويصل الطلب ورقم الطاولة عليه.';
+
+  @override
+  String get merchTablesOrderingOff =>
+      'الرموز تفتح قائمتك فقط. لا أحد يستطيع الطلب منها بعد.';
 }

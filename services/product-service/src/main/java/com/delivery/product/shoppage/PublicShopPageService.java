@@ -168,7 +168,9 @@ public class PublicShopPageService {
                 openingOf(store, now),
                 powerOf(store, now),
                 deliveryOf(store),
-                catalogueOf(store));
+                catalogueOf(store),
+                store.getTableCount(),
+                store.isTableOrdering());
     }
 
     /**
@@ -183,6 +185,23 @@ public class PublicShopPageService {
     @Transactional(readOnly = true)
     public boolean exists(String slug) {
         return stores.findBySlug(slug).filter(this::publiclyVisible).isPresent();
+    }
+
+    /**
+     * How many tables this shop has codes for, or zero for a shop nobody may see.
+     *
+     * <p>{@link #exists}'s one lookup with one more column read off the row it already had, rather
+     * than a page read: printing a sheet of table cards needs the shop's name and its table count
+     * and nothing else about the shelf. Zero for a hidden shop is the same refusal
+     * {@link #exists} gives — a table code is a QR on a table pointing at the page, and a shop that
+     * has no page must not be able to print one.
+     */
+    @Transactional(readOnly = true)
+    public short tablesOf(String slug) {
+        return stores.findBySlug(slug)
+                .filter(this::publiclyVisible)
+                .map(Store::getTableCount)
+                .orElse((short) 0);
     }
 
     /**
@@ -361,9 +380,18 @@ public class PublicShopPageService {
      * whatever the shelf's size: the products, the sections, and one batch for the pictures.
      */
     private PublicShopPage.Catalogue catalogueOf(Store store) {
+        // The merchant's own order inside each block (V41), name for the ties and for any block
+        // whose positions have never been written. Sections are ordered separately, by
+        // sectionNames(); this sort only has to settle what is inside one of them, which is why
+        // position leads and the section is not in the sort at all.
+        //
+        // It also changes which items a shop past MAX_ITEMS loses, and for the better: the cut now
+        // falls after the top of every section rather than somewhere in the alphabet, so a shop with
+        // two hundred lines shows the start of each of its sections instead of everything from A to M.
         Page<Product> page = products.findActiveInStore(
                 store.getId(), null, "%",
-                PageRequest.of(0, MAX_ITEMS, Sort.by(Sort.Direction.ASC, "name")));
+                PageRequest.of(0, MAX_ITEMS,
+                        Sort.by(Sort.Direction.ASC, "position").and(Sort.by(Sort.Direction.ASC, "name"))));
         List<Product> shelf = page.getContent();
         if (shelf.isEmpty()) {
             return new PublicShopPage.Catalogue(List.of(), 0, (int) page.getTotalElements());

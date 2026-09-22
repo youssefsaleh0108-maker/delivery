@@ -118,6 +118,9 @@ void main() {
     final List<String> goodsOnly = <String>[
       en.navInventory,
       en.navPos,
+      // The menu, for the reason the shelf sections are here: a services shop has no shelf to
+      // arrange, so a menu builder there would be an empty screen with a switch that means nothing.
+      en.menuBuilderTitle,
       en.navCategories,
       en.navStaff,
     ];

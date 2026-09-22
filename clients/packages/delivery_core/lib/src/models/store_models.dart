@@ -442,6 +442,8 @@ class Store {
     this.deliveryRadiusMetres,
     this.deliveryZones,
     this.serviceCategory,
+    this.tableCount = 0,
+    this.tableOrdering = false,
   });
 
   final String id;
@@ -525,6 +527,24 @@ class Store {
   /// shop still serves, because a saved address naming one still orders there: judge an address
   /// by all of them, but show a customer only the active ones, the only ones they can pick.
   final List<DeliveryZone>? deliveryZones;
+
+  /// How many tables this shop has QR cards for; 0 for a shop that has asked for none.
+  ///
+  /// The number lives on the shop rather than on the device that printed the cards, so a reprint
+  /// from another device — or next month — produces the same codes. Zero on any server that
+  /// predates the field, which is the same as "this shop has no table codes" and draws the same
+  /// empty stepper.
+  final int tableCount;
+
+  /// Whether this shop takes orders from the table, as against handing out its menu there.
+  ///
+  /// A decision of its own, not an inference from [tableCount]: a bakery may print table codes
+  /// purely as a menu on the wall, while a restaurant wants a diner at table 7 to build an order
+  /// and send it to the till. Both print the same cards. The web basket reads the same answer off
+  /// the shop's public page to decide whether to offer a pad at all.
+  ///
+  /// False on any server that predates the field, which is the same as a shop that never asked.
+  final bool tableOrdering;
 
   /// Whether there is a pin to draw or to measure "near me" from.
   bool get hasPin => latitude != null && longitude != null;
@@ -614,6 +634,8 @@ class Store {
         deliveryRadiusMetres: deliveryRadiusMetres,
         deliveryZones: deliveryZones,
         serviceCategory: serviceCategory,
+        tableCount: tableCount,
+        tableOrdering: tableOrdering,
       );
 
   factory Store.fromJson(Map<String, dynamic> json) => Store(
@@ -655,6 +677,8 @@ class Store {
         deliveryRadiusMetres: (json['deliveryRadiusMetres'] as num?)?.toInt(),
         deliveryZones: _deliveryZonesFrom(json['deliveryZones']),
         serviceCategory: ServiceCategory.maybeFromWire(json['serviceCategory'] as String?),
+        tableCount: (json['tableCount'] as num?)?.toInt() ?? 0,
+        tableOrdering: json['tableOrdering'] as bool? ?? false,
       );
 
   /// Null when the key is absent or not a list — an older server, which says nothing about areas.

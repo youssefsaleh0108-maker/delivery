@@ -50,6 +50,7 @@ import com.delivery.product.api.dto.StoreDtos.StoreRequest;
 import com.delivery.product.api.dto.StoreDtos.PowerRequest;
 import com.delivery.product.api.dto.StoreDtos.RadiusRequest;
 import com.delivery.product.api.dto.StoreDtos.StoreResponse;
+import com.delivery.product.api.dto.StoreDtos.TablesRequest;
 import com.delivery.product.api.dto.StoreDtos.VerifiedLocalRequest;
 import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.domain.Product;
@@ -530,6 +531,27 @@ public class StoreController {
                 .toList();
     }
 
+    /**
+     * How many tables this shop seats, and whether it takes orders at them.
+     *
+     * <p>{@code PUT} with the whole number rather than a nudge, because the stepper on the share
+     * screen is a number the merchant sets: two devices that both nudged would each apply their own
+     * delta and the shop would end up with tables nobody has.
+     *
+     * <p>One call for both because they are one decision on one screen — "we seat twelve, and yes,
+     * take orders there" — and because the two constrain each other: taking the tables to zero
+     * turns ordering off with them. {@code ordering} omitted leaves the switch alone, so a client
+     * that only knows about the count cannot quietly stop a restaurant trading.
+     */
+    @PutMapping("/{id}/tables")
+    @PreAuthorize("hasRole('MERCHANT')")
+    public StoreResponse setTables(@PathVariable UUID id, @Valid @RequestBody TablesRequest request) {
+        return toResponse(
+                storeService.setTables(id, CurrentUser.requireId(), request.tables(),
+                        request.ordering()),
+                Set.of());
+    }
+
     /** The merchant draws (or clears) their delivery circle. */
     @PostMapping("/{id}/delivery-radius")
     @PreAuthorize("hasRole('MERCHANT')")
@@ -784,7 +806,9 @@ public class StoreController {
                 v.powerCurrent(),
                 store.getDeliveryRadiusMetres(),
                 withAreas ? servedZonesOf(store) : null,
-                store.getServiceCategory());
+                store.getServiceCategory(),
+                store.getTableCount(),
+                store.isTableOrdering());
     }
 
     /**

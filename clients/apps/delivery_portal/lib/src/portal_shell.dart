@@ -393,6 +393,21 @@ class PortalArea {
               PosCheckoutScreen.show(ctx, sale: sale, api: a.pos),
         )),
       ),
+      // The menu (Figma 139:8), before the sections it is made of: a merchant who came here to
+      // move an item wants the menu, and the one who came to rename a shelf goes one row further.
+      // Inside the appended suite, well past index 2, so `jump(2)` still means Orders.
+      PortalDestination(
+        icon: Icons.restaurant_menu_outlined,
+        selectedIcon: Icons.restaurant_menu,
+        label: (DeliveryStrings t) => t.menuBuilderTitle,
+        build: (PortalApis a, _, __, ___) => _withStore(
+            a,
+            (String? storeId) => MenuBuilderScreen(
+                  api: a.catalog,
+                  storeApi: a.store,
+                  storeId: storeId,
+                )),
+      ),
       PortalDestination(
         icon: Icons.category_outlined,
         selectedIcon: Icons.category,
@@ -486,9 +501,14 @@ class PortalArea {
     ],
   );
 
-  /// Where the goods rail keeps the shelves, the register, the shelf sections and the staff roster:
-  /// the merchant suite's pages, appended after My shop and never moved (see [merchant_]).
-  static const Set<int> _notForServicesShops = <int>{7, 8, 9, 10};
+  /// Where the goods rail keeps the shelves, the register, the menu, the shelf sections and the
+  /// staff roster: the merchant suite's pages, appended after My shop and never moved
+  /// (see [merchant_]).
+  ///
+  /// The menu is in here for the reason the shelf sections are — a services shop has no shelf to
+  /// arrange, and Product Service refuses an offer without its service terms, so a menu builder
+  /// there would be a screen with nothing in it and a switch that means nothing.
+  static const Set<int> _notForServicesShops = <int>{7, 8, 9, 10, 11};
 
   /// The Merchant Hub for an owner who runs a goods shop and a services shop: the goods rail exactly as
   /// it is, with the services shop's queue and offers appended.

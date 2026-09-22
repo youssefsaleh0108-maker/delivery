@@ -259,16 +259,33 @@ public class PublicShopPageController {
      */
     @GetMapping("/s/{slug}/qr.png")
     public ResponseEntity<byte[]> qr(@PathVariable String slug,
+                                     @RequestParam(name = "t", required = false) Integer table,
                                      @RequestParam(name = "lang", required = false) String lang,
                                      @RequestHeader(name = HttpHeaders.ACCEPT_LANGUAGE,
                                              required = false) String acceptLanguage,
                                      HttpServletRequest request) {
-        if (!pages.exists(slug)) {
+        if (table == null) {
+            if (!pages.exists(slug)) {
+                return notFound(ShopPageText.choose(lang, acceptLanguage));
+            }
+            // The un-suffixed page URL, not this request's: what the sign points at is the page, in
+            // whichever language the phone that scans it prefers.
+            byte[] png = qrCodes.get(slug,
+                    () -> ShopQrCode.pngOf(baseUrl + "/s/" + slug, ShopQrCode.Resilience.COUNTER));
+            return asset(png, MediaType.IMAGE_PNG, request);
+        }
+        // A table this shop has not said it has is the same refusal as a shop nobody may see: the
+        // count is what a merchant declared, and a code for table 30 in a room with twelve is a
+        // card that would be stuck to nothing.
+        if (table < 1 || table > pages.tablesOf(slug)) {
             return notFound(ShopPageText.choose(lang, acceptLanguage));
         }
-        // The un-suffixed page URL, not this request's: what the sign points at is the page, in
-        // whichever language the phone that scans it prefers.
-        byte[] png = qrCodes.get(slug, () -> ShopQrCode.pngOf(baseUrl + "/s/" + slug));
+        // Q, not the counter sign's M: this one is printed at half the size, lives flat on a table
+        // under a candle and a water glass, is scanned in evening light, and gets photocopied when
+        // the room grows. See ShopQrCode.Resilience.TABLE.
+        byte[] png = qrCodes.get(slug + "\n" + table,
+                () -> ShopQrCode.pngOf(ShopTableCodes.urlOf(baseUrl, slug, table),
+                        ShopQrCode.Resilience.TABLE));
         return asset(png, MediaType.IMAGE_PNG, request);
     }
 

@@ -121,7 +121,18 @@ public final class StoreDtos {
              */
             List<ZoneResponse> deliveryZones,
             /** What a SERVICES shop does. Always set for a service shop and null for every other. */
-            Store.ServiceCategory serviceCategory) {
+            Store.ServiceCategory serviceCategory,
+            /**
+             * How many tables this shop has QR codes for (V42). Zero for a shop that has never
+             * asked for any, which is most of them — the share screen draws its stepper from this
+             * and the printable sheet exists only above zero.
+             */
+            short tableCount,
+            /**
+             * Whether this shop takes orders from the table (V43), as against handing out its menu
+             * there. False for every shop that has not asked.
+             */
+            boolean tableOrdering) {
     }
 
     /** The card shape: everything a storefront grid needs and nothing it does not. */
@@ -266,6 +277,24 @@ public final class StoreDtos {
     /** The delivery circle's size. Null clears it — back to zones-only. */
     public record RadiusRequest(
             @Min(200) @Max(50000) Integer metres) {
+    }
+
+    /**
+     * How many tables the room has, which is how many QR cards the shop can print.
+     *
+     * <p>Zero is a real answer — "we do not seat anybody" — so the field is required and a body
+     * that omits it is a 400 rather than a shop quietly losing its tables.
+     */
+    public record TablesRequest(
+            @NotNull @Min(0) @Max(Store.MAX_TABLES) Integer tables,
+            /**
+             * Whether the shop takes orders from the table, or null to leave that as it is.
+             *
+             * <p>Nullable on purpose, and it is not the same as false: a client that only knows
+             * about the count — an older build, or a screen that is only adding a table — must not
+             * silently stop a restaurant taking orders. Only a body that says so switches it.
+             */
+            Boolean ordering) {
     }
 
     public record CommercialsRequest(

@@ -147,7 +147,18 @@ public final class CatalogDtos {
              * back office restores it. No customer ever receives one: a taken-down offer is ARCHIVED,
              * and only its provider can read a product that is not on sale.
              */
-            ModerationResponse moderation) {
+            ModerationResponse moderation,
+            /**
+             * Where this item sits inside its block of the menu (V41) — its section, or the shop's
+             * unsectioned remainder.
+             *
+             * <p>Read-only here, like {@link #inStock()}: it is written by
+             * {@code PUT /api/stores/{storeId}/categories/{categoryId}/products/order}, which takes
+             * a whole block at once, and never by {@link ProductRequest}. Zero throughout a block
+             * nothing has ever reordered, which leaves the name to break the tie exactly as the
+             * shop page has always sorted.
+             */
+            short position) {
     }
 
     /** A taken-down offer's hold, as its provider and back office read it. See {@link Product#takeDown}. */

@@ -52,6 +52,7 @@ class MerchantSettingsScreen extends StatelessWidget {
     this.onServiceOrders,
     this.onServiceOffers,
     this.onCategories,
+    this.onMenuBuilder,
     this.onStaff,
     this.onStockCount,
     this.onCatalogScan,
@@ -110,6 +111,12 @@ class MerchantSettingsScreen extends StatelessWidget {
   final VoidCallback? onCategories;
   final VoidCallback? onStaff;
   final VoidCallback? onStockCount;
+
+  /// The menu builder: the same shelf arranged as the thing a customer reads. Beside the sections
+  /// row, because the two are the same catalogue seen from either end — sections without their
+  /// items, and items inside their sections. Null on the same terms as [onCategories]: a services
+  /// shop has no shelf to arrange, and an employee without the permission sees no door.
+  final VoidCallback? onMenuBuilder;
 
   /// Merchant Blitz: builds the catalogue from shelf photos. Absent, not disabled, when unwired —
   /// the host leaves it null for anyone the server would refuse, which is everyone but the owner.
@@ -336,6 +343,14 @@ class MerchantSettingsScreen extends StatelessWidget {
               icon: Icons.design_services_outlined,
               title: t.svcServiceOffersRow,
               onTap: onServiceOffers,
+            ),
+          ],
+          if (onMenuBuilder != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _MenuRow(
+              icon: Icons.restaurant_menu_outlined,
+              title: t.menuBuilderTitle,
+              onTap: onMenuBuilder,
             ),
           ],
           if (onCategories != null) ...<Widget>[
