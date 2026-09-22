@@ -26,7 +26,18 @@ final class ShopTableCodes {
     private ShopTableCodes() {
     }
 
-    /** The parameter every table code carries. Agreed with the web ordering work. */
+    /**
+     * The parameter every table code carries. Agreed with the web ordering work.
+     *
+     * <p><strong>The table code is not a secret and nothing may ever treat it as one.</strong> It
+     * is printed on a card in a public room, it is the number written on the table itself, and
+     * anybody who knows a shop's slug can type one. It decides which ticket a kitchen sees and
+     * nothing else: never who the diner is, never a price, never a discount, never whether an
+     * order may be placed at all. Everything that actually protects the kitchen — the shop's own
+     * switch, the table being one the shop has, and the per-table and per-shop rate limits — is
+     * decided on the server from the shop's own record, and none of it trusts this value for
+     * anything beyond naming a table.
+     */
     static final String PARAM = "t";
 
     /**
