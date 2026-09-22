@@ -270,7 +270,8 @@ public class PublicShopPageController {
             }
             // The un-suffixed page URL, not this request's: what the sign points at is the page, in
             // whichever language the phone that scans it prefers.
-            byte[] png = qrCodes.get(slug, () -> ShopQrCode.pngOf(baseUrl + "/s/" + slug));
+            byte[] png = qrCodes.get(slug,
+                    () -> ShopQrCode.pngOf(baseUrl + "/s/" + slug, ShopQrCode.Resilience.COUNTER));
             return asset(png, MediaType.IMAGE_PNG, request);
         }
         // A table this shop has not said it has is the same refusal as a shop nobody may see: the
@@ -279,8 +280,12 @@ public class PublicShopPageController {
         if (table < 1 || table > pages.tablesOf(slug)) {
             return notFound(ShopPageText.choose(lang, acceptLanguage));
         }
+        // Q, not the counter sign's M: this one is printed at half the size, lives flat on a table
+        // under a candle and a water glass, is scanned in evening light, and gets photocopied when
+        // the room grows. See ShopQrCode.Resilience.TABLE.
         byte[] png = qrCodes.get(slug + "\n" + table,
-                () -> ShopQrCode.pngOf(ShopTableCodes.urlOf(baseUrl, slug, table)));
+                () -> ShopQrCode.pngOf(ShopTableCodes.urlOf(baseUrl, slug, table),
+                        ShopQrCode.Resilience.TABLE));
         return asset(png, MediaType.IMAGE_PNG, request);
     }
 

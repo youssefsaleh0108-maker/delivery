@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import com.google.zxing.BinaryBitmap;
 import com.google.zxing.DecodeHintType;
 import com.google.zxing.MultiFormatReader;
+import com.google.zxing.ResultMetadataType;
 import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
 import com.google.zxing.common.HybridBinarizer;
 
@@ -89,13 +90,48 @@ class ShopQrCodeTest {
     }
 
     @Test
-    @DisplayName("the longest slug the column allows still encodes")
+    @DisplayName("the longest slug the column allows still encodes, at either resilience")
     void encodesTheLongestSlugThereCanBe() throws Exception {
         // slug is varchar(180): 160 characters of name plus a dash and eight hex digits.
         String longest = "a".repeat(160) + "-0123abcd";
         String url = ShopFixtureUrl.of(longest);
 
-        assertThat(scan(ShopQrCode.pngOf(url))).isEqualTo(url);
+        assertThat(scan(ShopQrCode.pngOf(url, ShopQrCode.Resilience.COUNTER))).isEqualTo(url);
+        // And with a table on the end, at the higher correction a table card is printed with: the
+        // denser symbol is the case that could have run past what a QR version can hold.
+        String table = ShopTableCodes.urlOf(ShopPageFixture.BASE, longest, 400);
+        assertThat(scan(ShopQrCode.pngOf(table, ShopQrCode.Resilience.TABLE))).isEqualTo(table);
+    }
+
+    @Test
+    @DisplayName("a table card's code is encoded to survive a table, and a photocopier")
+    void tableCodesCarryMoreCorrection() throws Exception {
+        ShopPageFixture shop = new ShopPageFixture().tables(4);
+        byte[] counter = shop.mvc().perform(get("/s/" + shop.slug() + "/qr.png"))
+                .andReturn().getResponse().getContentAsByteArray();
+        byte[] table = shop.mvc().perform(get("/s/" + shop.slug() + "/qr.png").param("t", "3"))
+                .andReturn().getResponse().getContentAsByteArray();
+
+        // Both still read, which is the only thing that finally matters.
+        assertThat(scan(counter)).isEqualTo(shop.url());
+        assertThat(scan(table)).isEqualTo(shop.url() + "?t=3");
+
+        // Read out of the decoded symbol, not out of the constant that made it: what a scanner
+        // finds in the printed square is the claim, and a table card claims Q — about a quarter of
+        // it recoverable, against the counter sign's sixth. That quarter is what is left after a
+        // candle, a water ring and a photocopy have each taken a bite out of it.
+        assertThat(correctionOf(table)).isEqualTo("Q");
+        assertThat(correctionOf(counter)).isEqualTo("M");
+    }
+
+    /** The error-correction level a scanner reports for the symbol it just read. */
+    private static String correctionOf(byte[] png) throws Exception {
+        BinaryBitmap bitmap = new BinaryBitmap(
+                new HybridBinarizer(new BufferedImageLuminanceSource(decodeImage(png))));
+        Map<DecodeHintType, Object> hints = new EnumMap<>(DecodeHintType.class);
+        hints.put(DecodeHintType.TRY_HARDER, Boolean.TRUE);
+        return String.valueOf(new MultiFormatReader().decode(bitmap, hints)
+                .getResultMetadata().get(ResultMetadataType.ERROR_CORRECTION_LEVEL));
     }
 
     /** The shape of a page URL, so the long-slug case does not need a whole shop behind it. */

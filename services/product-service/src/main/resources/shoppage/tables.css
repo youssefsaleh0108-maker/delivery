@@ -1,5 +1,5 @@
 /*
-  The sheet of table cards. A4 portrait, six cards to a page, cut along the dotted lines.
+  The sheet of table cards. A4 portrait, four cards to a page, cut along the dotted lines.
 
   The poster's rules, for the poster's reasons: black on white and nothing else, because this comes
   out of whatever is in the office inkjet; no @font-face, because the system's own Arabic and Latin
@@ -9,7 +9,18 @@
 
   Not a second copy of poster.css. A poster is one sheet with one code on it; this is a grid that
   has to survive being cut up, so the cards carry their own borders and must never be split across
-  a page — which is the whole of what is different here.
+  a page.
+
+  FOUR to a page, not six, and that is the load-bearing decision here. A table card is not a report
+  about tables: it is the way into the shop's menu for somebody sitting down to eat, and a card that
+  scans on the third try in a restaurant's evening light has failed. Four cards means 95 x 138 mm —
+  near enough A6 to laminate or drop into a standard tent holder — which buys a 50 mm code and a
+  table number big enough to read across a room. Six would have bought one fewer sheet of paper.
+
+  And it has to survive a photocopier, because a shop that opens four more tables runs the page
+  through the machine at the shop next door rather than asking us for another sheet. That is why
+  there is no grey anywhere, why the modules are printed hard-edged, and why the code itself is
+  encoded at the higher error correction (see ShopQrCode.Resilience.TABLE).
 */
 
 @page {
@@ -45,9 +56,11 @@ html, body {
 }
 
 .card {
-  /* A4's printable height is 277mm; three rows of 92mm leave room for the last row's cut line. */
-  height: 92mm;
-  padding: 5mm;
+  /* A4's printable height is 277mm; two rows of 138mm leave a millimetre for the last cut line.
+     95 x 138 is within a couple of millimetres of A6, so a laminating pouch or a tent holder
+     bought anywhere fits one. */
+  height: 138mm;
+  padding: 6mm;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -58,19 +71,49 @@ html, body {
   border: 1px dotted #000;
   /* A card split down the middle by a page break is a card nobody can use. */
   break-inside: avoid;
+  /* The cell is a fixed height because the grid has to be cuttable, so a shop that names itself
+     something very long is clipped rather than allowed to push the card below it out of line. The
+     number and the code are first in the column, so what a clip takes is the typed address — the
+     least of the four things on the card, and the only one the code itself replaces. */
+  overflow: hidden;
+}
+
+/* The number and the word for it, on one line above the code.
+
+   The number carries the card: a waiter reads it across a room, and a diner whose code will not
+   scan reads it out. So it is set at 16mm — about 45pt — against the word at 4.4mm, and the two sit
+   on a baseline together rather than the number being a caption. */
+.card .head {
+  display: flex;
+  align-items: baseline;
+  gap: 2.5mm;
+  margin: 0 0 4mm;
+}
+
+.card .word {
+  font-size: 4.4mm;
+  line-height: 1;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: .06em;
 }
 
 .card .no {
-  font-size: 6mm;
+  font-size: 16mm;
   line-height: 1;
   font-weight: 700;
-  margin: 0 0 3mm;
+  margin: 0;
+  /* Tabular figures so 11 and 17 are the same width, and the cards in a row line up. */
+  font-variant-numeric: tabular-nums;
 }
 
 .card .qr {
   display: block;
-  width: 42mm;
-  height: 42mm;
+  /* 50mm from a 1,024-pixel bitmap is about 520 dpi of modules — every one lands on two printer
+     dots or more at 300 dpi, with the margin a photocopy eats. Below about 35mm a phone starts
+     hunting for the symbol in a dim room. */
+  width: 50mm;
+  height: 50mm;
   /* The PNG is a 1,024-pixel bitmap of square modules. Nearest-neighbour keeps their edges hard;
      smoothing them is what turns a code that scans instantly into one that takes three tries
      under a shop's fluorescent tube. */
@@ -79,23 +122,23 @@ html, body {
 }
 
 .card .shop {
-  font-size: 4.2mm;
+  font-size: 5mm;
   line-height: 1.2;
   font-weight: 700;
-  margin: 3mm 0 0;
+  margin: 4mm 0 0;
   /* A shop can call itself something long. Wrapping is fine; overflowing the card is not. */
   overflow-wrap: anywhere;
 }
 
 .card .line {
-  font-size: 3.4mm;
+  font-size: 4mm;
   line-height: 1.3;
-  margin: 2mm 0 0;
+  margin: 2.5mm 0 0;
 }
 
 .card .addr {
-  margin: 2mm 0 0;
-  font-size: 3mm;
+  margin: 3mm 0 0;
+  font-size: 3.2mm;
   letter-spacing: .02em;
   /* Read character by character by somebody typing it, so it must not break mid-host. */
   overflow-wrap: anywhere;
@@ -103,11 +146,13 @@ html, body {
 
 /* ------------------------------------------------------------------ one card alone */
 
-/* A reprint of a single table. The same card, given the middle of the sheet rather than a grid
-   cell, so a merchant who lost one card is not handed a page with five blanks on it. */
-.one .cards { grid-template-columns: 1fr; width: 95mm; }
-.one .card { height: 120mm; }
-.one .card .qr { width: 60mm; height: 60mm; }
+/* A reprint of a single table.
+
+   The SAME card, at the same size, alone in a one-column grid. Nothing about it is resized: a card
+   is reprinted because the original was spilled on, and it has to go back into the same holder
+   beside the same cards, so a replacement of a different size would be a different card. All this
+   rule does is stop the page being one card and three blanks. */
+.one .cards { grid-template-columns: 95mm; justify-content: start; width: 190mm; }
 
 /* ------------------------------------------------------------------ on screen only */
 
@@ -153,6 +198,8 @@ html, body {
     min-height: 297mm;
     align-content: start;
   }
+  /* The preview is the paper with the card in its place on it, not the card blown up to fill a
+     window — what comes out of the printer is what the merchant is looking at. */
   .one .cards { width: 210mm; }
 }
 

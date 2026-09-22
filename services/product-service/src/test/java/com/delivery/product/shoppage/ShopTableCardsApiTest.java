@@ -133,10 +133,50 @@ class ShopTableCardsApiTest {
                 .as("one card per table").hasSize(12);
         for (int table = 1; table <= 12; table++) {
             assertThat(sheet).contains("/s/" + shop.slug() + "/qr.png?t=" + table);
-            assertThat(sheet).contains("Table " + table);
+            // The number is its own element, set large beside the code: a waiter reads it across a
+            // room to know which card goes on which table, and a card on the wrong table is a wrong
+            // order rather than a missing one.
+            assertThat(sheet).contains("<p class=\"no\" dir=\"ltr\">" + table + "</p>");
             assertThat(sheet).contains("www.youdrop.shop/s/" + shop.slug() + "?t=" + table);
         }
+        assertThat(sheet).contains("<p class=\"word\">Table</p>");
         assertThat(sheet).contains("Dekkanet Al Rawche");
+    }
+
+    @Test
+    @DisplayName("four cards to a page, so each one is big enough to scan off a table")
+    void fourToAPage() throws Exception {
+        // The sheet's own stylesheet is what decides this, and it is the decision that makes a card
+        // usable: 95 x 138 mm is near enough A6 to laminate, and it holds a 50 mm code and a table
+        // number big enough to read across a room. Six to a page bought one fewer sheet of paper
+        // and a code that scans on the third try in a restaurant's evening light.
+        String css = body(sheets(roomOfTwelve()).perform(get("/s/assets/tables.css"))
+                .andExpect(status().isOk()).andReturn());
+
+        assertThat(css).contains("height: 138mm").contains("width: 190mm")
+                .contains("grid-template-columns: repeat(2, 1fr)");
+        assertThat(css).contains("width: 50mm");
+        // Nothing grey anywhere: a photocopier turns a tint into a smear, and a shop that opens six
+        // more tables photocopies this page at the shop next door.
+        assertThat(css).doesNotContain("#888").doesNotContain("#999").doesNotContain("gray");
+        // Hard-edged modules. Smoothing them is what turns a code that scans instantly into one
+        // that takes three tries.
+        assertThat(css).contains("image-rendering: pixelated");
+    }
+
+    @Test
+    @DisplayName("a reprint is the same card at the same size, not one blown up to fill a page")
+    void aReprintIsTheSameSize() throws Exception {
+        String css = body(sheets(roomOfTwelve()).perform(get("/s/assets/tables.css"))
+                .andExpect(status().isOk()).andReturn());
+
+        // A card is reprinted because the original was spilled on, and it goes back into the same
+        // holder beside the same cards. The single-card rule narrows the grid and touches nothing
+        // about the card itself — no height, no code size, no type size.
+        int one = css.indexOf(".one .cards");
+        assertThat(one).isPositive();
+        String single = css.substring(one, css.indexOf('\n', css.indexOf('}', one)));
+        assertThat(single).doesNotContain("height").doesNotContain("font-size");
     }
 
     @Test
@@ -196,7 +236,10 @@ class ShopTableCardsApiTest {
                 .andReturn());
 
         assertThat(sheet).contains("<html lang=\"ar\" dir=\"rtl\"");
-        assertThat(sheet).contains("طاولة 7");
+        assertThat(sheet).contains("<p class=\"word\">طاولة</p>");
+        // Western digits, marked left-to-right, on an Arabic card too: this is the number the order
+        // carries and the number printed in the address below it.
+        assertThat(sheet).contains("<p class=\"no\" dir=\"ltr\">7</p>");
         assertThat(sheet).contains("امسح الرمز لترى القائمة وتطلب");
         // Both languages on every card, whichever one the merchant asked for.
         assertThat(sheet).contains("Scan to see the menu and order");
@@ -218,6 +261,25 @@ class ShopTableCardsApiTest {
 
         // Its one stylesheet is served by this service, so style-src 'self' is the whole of it.
         sheets(shop).perform(get("/s/assets/tables.css")).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("the page says whether the shop takes orders at its tables, for the pad to read")
+    void thePageCarriesTheOrderingSwitch() {
+        // What the web ordering work reads to decide whether to draw its pad. Separate from the
+        // table count on purpose: printing cards is not a promise that somebody is watching a
+        // screen, so a shop with twelve tables and the switch off is a shop handing out its menu.
+        ShopPageFixture menuOnly = roomOfTwelve();
+        assertThat(menuOnly.service().read(menuOnly.slug()).tables()).isEqualTo((short) 12);
+        assertThat(menuOnly.service().read(menuOnly.slug()).tableOrdering()).isFalse();
+
+        ShopPageFixture ordering = roomOfTwelve().takesTableOrders();
+        assertThat(ordering.service().read(ordering.slug()).tableOrdering()).isTrue();
+
+        // And the cards are printed either way: the switch is about what happens after the scan.
+        assertThat(ShopTableCodes.urlOf(ShopPageFixture.BASE, ordering.slug(), 7))
+                .isEqualTo(ShopTableCodes.urlOf(ShopPageFixture.BASE, menuOnly.slug(), 7)
+                        .replace(menuOnly.slug(), ordering.slug()));
     }
 
     @Test

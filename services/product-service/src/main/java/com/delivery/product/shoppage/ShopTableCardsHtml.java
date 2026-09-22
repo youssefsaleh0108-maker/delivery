@@ -96,14 +96,21 @@ final class ShopTableCardsHtml {
         String typed = ShopTableCodes.typedOf(base, page.slug(), table);
         String alt = (t.arabic() ? QR_ALT_AR : QR_ALT_EN) + table + " · " + page.name();
 
-        StringBuilder b = new StringBuilder(512);
+        StringBuilder b = new StringBuilder(640);
         b.append("<li class=\"card\">")
-                // The number as the staff read it off the card before sticking it down, and as it
-                // is printed in the address underneath: Western digits in both renderings, marked
-                // left-to-right, so it cannot be typed back as a different table.
-                .append("<p class=\"no\" dir=\"ltr\">")
-                .append(t.arabic() ? TABLE_AR : TABLE_EN).append(' ').append(table)
-                .append("</p>")
+                // The number, large, beside the code it belongs to.
+                //
+                // Not decoration. A waiter carrying a tray reads it across a room to know which
+                // card goes on which table; a diner whose code will not scan reads it out to the
+                // person who can type the address; and a card that was moved to another table is a
+                // wrong order rather than a missing one. So it is the biggest thing on the card,
+                // set beside the square rather than under it, and it is Western digits marked
+                // left-to-right in both languages — the same digits that are printed in the
+                // address below and that the order carries.
+                .append("<div class=\"head\">")
+                .append("<p class=\"word\">").append(t.arabic() ? TABLE_AR : TABLE_EN).append("</p>")
+                .append("<p class=\"no\" dir=\"ltr\">").append(table).append("</p>")
+                .append("</div>")
                 // Width and height so the sheet does not reflow when the images arrive, and so a
                 // browser printing with pictures turned off still leaves each square's space.
                 .append("<img class=\"qr\" src=\"").append(ShopPageHtml.esc(qr))
