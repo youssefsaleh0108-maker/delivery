@@ -142,11 +142,17 @@ class ShopBasketScriptTest {
         // A basket, its receipt and one request. Anything approaching a framework here would be a
         // second download standing between a reader on 3G and a shop's opening hours.
         //
-        // 13 kB on disk and about 4.3 kB over the wire, which is the figure that matters and the
+        // About 13.4 kB on disk and 4.7 kB over the wire, which is the figure that matters and the
         // one PublicShopPageWeightTest counts: the two rules this file is built on are written at
         // the top of it, and prose gzips to almost nothing. shop.js keeps its comments short
         // because a wrong guess there costs a search box; a wrong guess here costs somebody money.
-        assertThat(result.getResponse().getContentAsByteArray().length).isLessThan(13 * 1024);
+        //
+        // The ceiling was 13 kB until this file grew a second job: the same basket now also takes
+        // an order at a restaurant table, where there is no address, no fee and no rider. That put
+        // it 339 B over on disk and 0.4 kB over on the wire, and a busy 40-item shop still gzips to
+        // 18.6 kB against a 35 kB budget. Raised rather than shrunk, and the real numbers written
+        // down — a ceiling nobody can name the cost of is one that gets nudged again next time.
+        assertThat(result.getResponse().getContentAsByteArray().length).isLessThan(14 * 1024);
     }
 
     @Test
