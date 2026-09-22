@@ -16,10 +16,14 @@
 #   ops-auth              a new ops basic-auth password: its hash in ops-auth-users, the password in
 #                         /root/ops-auth-password-<env>.txt (mode 600)
 #   vault-reseed          restart Vault so its seed stops carrying the two client secrets
-#   client <clientId>     regenerate one service account's secret in Keycloak, store it, restart the
+#   client <clientId> [--bootstrap]
+#                         regenerate one service account's secret in Keycloak, store it, restart the
 #                         service that presents it (onboarding-service | accounting-service |
 #                         notifications-manager | order-manager). Creates the client first if this
 #                         realm does not have it yet — see step_client.
+#                         --bootstrap is for a client whose manifest has NOT shipped yet: it mints
+#                         the key first so the Deployment's (deliberately non-optional) secretKeyRef
+#                         finds it on arrival instead of failing every pod. Skips the restart.
 #   drop-stale-keys       remove ONBOARDING_CLIENT_SECRET from platform-secrets once nothing reads it
 #   lock-unused-db-roles  NOLOGIN for the database roles no service logs in as
 #   test-accounts [--disable]  count (and, with --disable, disable) accounts the repository's test
@@ -522,11 +526,30 @@ JSON
 }
 
 step_client() {
-  local c="${1:?usage: client <onboarding-service|accounting-service|notifications-manager|order-manager>}" key ref
+  local c="${1:?usage: client <onboarding-service|accounting-service|notifications-manager|order-manager> [--bootstrap]}" key ref bootstrap=
+  [ "${2:-}" = --bootstrap ] && bootstrap=1
   key=$(client_key "$c") || die "unknown client $c"
   secret_exists keycloak-clients || die "keycloak-clients does not exist in $NS: run 'adopt' first"
   ref=$(k get deploy "$c" -o json | jq -r '.spec.template.spec.containers[0].env[]? | select(.name == "KEYCLOAK_CLIENT_SECRET") | .valueFrom.secretKeyRef | "\(.name)/\(.key)"')
-  [ "$ref" = "keycloak-clients/$key" ] || die "deploy/$c reads its client secret from '${ref:-nowhere}', not keycloak-clients/$key: the manifest change has not reached $NS"
+  # A NEW service account deadlocks against this guard, and the deadlock is not obvious from either
+  # end: the secretKeyRef that will read the key is deliberately NOT optional, so the moment the
+  # manifest lands every pod of this service fails with CreateContainerConfigError until the key
+  # exists — while this step refuses to create the key until the manifest has landed. Something has
+  # to go first, and it must be the secret: a Secret nobody reads yet breaks nothing, whereas a
+  # Deployment pointing at a missing key is an outage.
+  #
+  # So --bootstrap mints the key BEFORE the manifest ships. It is a flag and not an automatic
+  # fallback on purpose: "the manifest has not shipped yet" and "the manifest shipped and something
+  # reverted it" look identical from here, and only the operator knows which one this is. The checks
+  # below that need a running reader are skipped, because there is not one yet.
+  if [ "$ref" != "keycloak-clients/$key" ]; then
+    [ -n "$bootstrap" ] || die "deploy/$c reads its client secret from '${ref:-nowhere}', not keycloak-clients/$key: the manifest change has not reached $NS (if this client is NEW and its manifest has not shipped yet, run: client $c --bootstrap)"
+    [ -z "$ref" ] || die "deploy/$c reads keycloak-clients via '$ref', not '$key': that is a wrong manifest, not an unshipped one, so --bootstrap is the wrong tool"
+    ! secret_has keycloak-clients "$key" || die "keycloak-clients/$key already exists, so this is not first-time provisioning: ship the manifest and run without --bootstrap"
+    echo "BOOTSTRAP: deploy/$c does not read keycloak-clients/$key yet; minting it first so the manifest can land without an outage."
+  elif [ -n "$bootstrap" ]; then
+    die "deploy/$c already reads keycloak-clients/$key, so --bootstrap is not what you want: run without it and the service is restarted onto the new secret"
+  fi
   if [ "$c" != onboarding-service ] && vault_keys "$c" | grep -q client-secret; then
     die "Vault still hands $c the old client secret, and the Config Server's value would win: run 'vault-reseed' first"
   fi
@@ -542,8 +565,12 @@ step_client() {
   fi
   client_secret_regenerate_to "$c" "$WORK/new"
   secret_set_key keycloak-clients "$key" "$WORK/new"
-  echo "$c: Keycloak regenerated its secret and keycloak-clients/$key holds it; restarting deploy/$c ..."
-  restart "$c"
+  if [ -n "$bootstrap" ]; then
+    echo "$c: Keycloak holds a secret and keycloak-clients/$key holds the same value. NOT restarting: nothing reads it yet."
+  else
+    echo "$c: Keycloak regenerated its secret and keycloak-clients/$key holds it; restarting deploy/$c ..."
+    restart "$c"
+  fi
   check "$c: the new secret gets a token" 200 "$(cc_code "$c" "$WORK/new")"
   # An empty file would be "refused" by Keycloak too, and a proof that passes for a value that
   # never existed proves nothing. Said out loud instead.
@@ -552,8 +579,13 @@ step_client() {
   else
     skip "$c: no previous secret to prove refused — this client was created a moment ago"
   fi
-  check "$c: the running pod holds the Secret's value" same "$(same "$(env_sha "$c" KEYCLOAK_CLIENT_SECRET)" "$(secret_sha keycloak-clients "$key")")"
+  if [ -n "$bootstrap" ]; then
+    skip "$c: no running pod reads this key yet — the manifest ships next, and its rollout is the proof"
+  else
+    check "$c: the running pod holds the Secret's value" same "$(same "$(env_sha "$c" KEYCLOAK_CLIENT_SECRET)" "$(secret_sha keycloak-clients "$key")")"
+  fi
   check "$c: the Secret holds Keycloak's value" same "$(same "$(secret_sha keycloak-clients "$key")" "$(file_sha "$WORK/new")")"
+  [ -z "$bootstrap" ] || echo "NEXT: ship the manifest that points deploy/$c at keycloak-clients/$key. Until it rolls out, $c has no service account and behaves exactly as it did before."
 }
 
 step_drop_stale_keys() {
