@@ -4143,5 +4143,87 @@
   "@merchShareNeedsPublish": {
     "description": "Shown instead of the QR code when the shop is pinned but still a draft or suspended, so its public page is not live."
   },
-  "merchSharePublishYourShop": "انشر متجرك"
+  "merchSharePublishYourShop": "انشر متجرك",
+  "menuBuilderTitle": "منشئ القائمة",
+  "menuPreview": "معاينة",
+  "menuAddItem": "أضف صنفًا",
+  "menuItemCount": "{count, plural, =0{لا أصناف} =1{صنف واحد} =2{صنفان} few{{count} أصناف} many{{count} صنفًا} other{{count} صنف}}",
+  "@menuItemCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "menuOtherItems": "باقي الأصناف",
+  "menuSectionEmpty": "لا شيء في هذا القسم بعد.",
+  "menuNoDescription": "بلا وصف",
+  "menuAvailableSwitch": "{name} — متوفّر الآن",
+  "@menuAvailableSwitch": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "menuTakeOffTitle": "أتريد إخفاء هذا الصنف من القائمة؟",
+  "menuTakeOffConfirm": "لن يظهر {name} في صفحتك حتى تعيد تشغيله. لن يُحذف شيء.",
+  "@menuTakeOffConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "menuTakeOff": "أخفِه",
+  "menuMoveUp": "حرّكه لأعلى القائمة",
+  "menuMoveDown": "حرّكه لأسفل القائمة",
+  "menuExpandSection": "افتح هذا القسم",
+  "menuCollapseSection": "أغلق هذا القسم",
+  "menuCouldNotReorder": "تعذّر حفظ الترتيب الجديد",
+  "menuCouldNotPreview": "تعذّر فتح صفحتك",
+  "menuCouldNotLoad": "تعذّر تحميل قائمتك",
+  "menuEmptyTitle": "قائمتك فارغة",
+  "menuEmptyMessage": "أضف ما تبيعه، فيصير القائمة التي يراها الزبائن في صفحتك.",
+  "merchShareDownloadQr": "تنزيل الرمز",
+  "merchSharePrintQr": "طباعة الرمز",
+  "merchShareCouldNotOpenQr": "تعذّر فتح رمز QR",
+  "merchTablesTitle": "رموز QR للطاولات",
+  "merchTablesWhat": "رمز لكل طاولة. الطلب الذي يبدأ من رمز يعرف من أي طاولة جاء.",
+  "merchTablesHowMany": "عدد الطاولات",
+  "merchTablesFewer": "طاولة أقل",
+  "merchTablesMore": "طاولة أكثر",
+  "merchTablesCount": "{count, plural, =0{لا طاولات} =1{طاولة واحدة} =2{طاولتان} few{{count} طاولات} many{{count} طاولة} other{{count} طاولة}}",
+  "@merchTablesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "merchTablesSave": "احفظ وأنشئ الرموز",
+  "merchTablesSaved": "{count, plural, =0{أُوقفت رموز الطاولات} =1{رمز طاولة واحد جاهز} =2{رمزا طاولتين جاهزان} few{{count} رموز طاولات جاهزة} many{{count} رمز طاولة جاهز} other{{count} رمز طاولة جاهز}}",
+  "@merchTablesSaved": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "merchTablesCouldNotSave": "تعذّر حفظ عدد الطاولات",
+  "merchTablesPrintSheet": "اطبع بطاقات الطاولات",
+  "merchTablesReprintOne": "ضاعت بطاقة؟ أعد طباعة طاولة واحدة:",
+  "merchTablesReprintTable": "أعد طباعة الطاولة {number}",
+  "@merchTablesReprintTable": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "merchTablesCouldNotOpen": "تعذّر فتح بطاقات الطاولات"
+,
+  "merchTablesOrderingTitle": "استقبل الطلبات من الطاولة",
+  "merchTablesOrderingOn": "من يمسح رمز طاولة يستطيع أن يطلب منها، ويصل الطلب ورقم الطاولة عليه.",
+  "merchTablesOrderingOff": "الرموز تفتح قائمتك فقط. لا أحد يستطيع الطلب منها بعد."
 }

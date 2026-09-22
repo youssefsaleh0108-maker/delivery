@@ -543,6 +543,11 @@ class _MerchantShellState extends State<MerchantShell> {
           onCategories: !services && _access.can(StorePermission.modifyInventoryPricing)
               ? _openCategories
               : null,
+          // The same shelf, arranged as the thing a customer reads (Figma 139:8). On the same
+          // terms as the sections door, because it writes the same rows.
+          onMenuBuilder: !services && _access.can(StorePermission.modifyInventoryPricing)
+              ? _openMenuBuilder
+              : null,
           // No roster for a services shop: nobody on it could work here. An employee's MERCHANT_STAFF
           // token opens the customer app, the portal admits MERCHANT alone, and services mode is read
           // from the shops the account owns — so staff added to a services shop would have no screen.
@@ -689,6 +694,18 @@ class _MerchantShellState extends State<MerchantShell> {
     navigator.push(MaterialPageRoute<void>(
       builder: (_) => MerchantCategoriesScreen(
         api: widget.catalogApi,
+        storeId: _storeId,
+        onBack: navigator.pop,
+      ),
+    ));
+  }
+
+  void _openMenuBuilder() {
+    final NavigatorState navigator = Navigator.of(context);
+    navigator.push(MaterialPageRoute<void>(
+      builder: (_) => MenuBuilderScreen(
+        api: widget.catalogApi,
+        storeApi: widget.storeApi,
         storeId: _storeId,
         onBack: navigator.pop,
       ),

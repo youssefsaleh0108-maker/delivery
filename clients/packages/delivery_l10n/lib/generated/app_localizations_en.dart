@@ -13349,4 +13349,159 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get merchSharePublishYourShop => 'Publish your shop';
+
+  @override
+  String get menuBuilderTitle => 'Menu Builder';
+
+  @override
+  String get menuPreview => 'Preview';
+
+  @override
+  String get menuAddItem => 'Add menu item';
+
+  @override
+  String menuItemCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+      zero: 'No items',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get menuOtherItems => 'Everything else';
+
+  @override
+  String get menuSectionEmpty => 'Nothing in this section yet.';
+
+  @override
+  String get menuNoDescription => 'No description';
+
+  @override
+  String menuAvailableSwitch(String name) {
+    return '$name — on the shelf right now';
+  }
+
+  @override
+  String get menuTakeOffTitle => 'Take this off the menu?';
+
+  @override
+  String menuTakeOffConfirm(String name) {
+    return '$name stops showing on your page until you switch it back on. Nothing is deleted.';
+  }
+
+  @override
+  String get menuTakeOff => 'Take it off';
+
+  @override
+  String get menuMoveUp => 'Move up the menu';
+
+  @override
+  String get menuMoveDown => 'Move down the menu';
+
+  @override
+  String get menuExpandSection => 'Open this section';
+
+  @override
+  String get menuCollapseSection => 'Close this section';
+
+  @override
+  String get menuCouldNotReorder => 'Couldn\'t save the new order';
+
+  @override
+  String get menuCouldNotPreview => 'Couldn\'t open your page';
+
+  @override
+  String get menuCouldNotLoad => 'Couldn\'t load your menu';
+
+  @override
+  String get menuEmptyTitle => 'Your menu is empty';
+
+  @override
+  String get menuEmptyMessage =>
+      'Add what you sell, and it becomes the menu customers see on your page.';
+
+  @override
+  String get merchShareDownloadQr => 'Download QR';
+
+  @override
+  String get merchSharePrintQr => 'Print QR';
+
+  @override
+  String get merchShareCouldNotOpenQr => 'Couldn\'t open the QR code';
+
+  @override
+  String get merchTablesTitle => 'Table QR codes';
+
+  @override
+  String get merchTablesWhat =>
+      'A code for each table. An order started from one knows which table it came from.';
+
+  @override
+  String get merchTablesHowMany => 'Number of tables';
+
+  @override
+  String get merchTablesFewer => 'One table fewer';
+
+  @override
+  String get merchTablesMore => 'One table more';
+
+  @override
+  String merchTablesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tables',
+      one: '1 table',
+      zero: 'No tables',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get merchTablesSave => 'Save and make the codes';
+
+  @override
+  String merchTablesSaved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count table codes ready',
+      one: '1 table code ready',
+      zero: 'Table codes turned off',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get merchTablesCouldNotSave =>
+      'Couldn\'t save how many tables you have';
+
+  @override
+  String get merchTablesPrintSheet => 'Print the table cards';
+
+  @override
+  String get merchTablesReprintOne => 'Lost one? Reprint a single table:';
+
+  @override
+  String merchTablesReprintTable(int number) {
+    return 'Reprint table $number';
+  }
+
+  @override
+  String get merchTablesCouldNotOpen => 'Couldn\'t open the table cards';
+
+  @override
+  String get merchTablesOrderingTitle => 'Take orders at the table';
+
+  @override
+  String get merchTablesOrderingOn =>
+      'A diner who scans a table\'s code can order from it. The order arrives with the table number on it.';
+
+  @override
+  String get merchTablesOrderingOff =>
+      'The codes open your menu. Nobody can order from them yet.';
 }
