@@ -10,15 +10,30 @@
 set -euo pipefail
 
 HOST="${1:-delivery-vps}"
+# Which environment's portal this is. There are two directories on the box now and one Deployment
+# per namespace, so the environment cannot be implicit: writing dev's build into qa's directory
+# would be silent and wrong. Defaults to dev because that is the one deployed constantly.
+ENV="${2:-${ENV:-dev}}"
+case "$ENV" in
+  dev|qa) ;;
+  *) echo "Unknown environment '$ENV' (expected dev or qa)" >&2; exit 1 ;;
+esac
 # The public hostnames, since the TLS cutover. The old IP:port form still works for a curl on the
 # box, but a build addressed that way breaks twice on a real client: Android denies cleartext to a
 # public address, and Keycloak's issuer check refuses a token minted under a different hostname.
-PORTAL_HOST="${PORTAL_HOST:-portal-dev.youdrop.shop}"
-API_HOST="${API_HOST:-api-dev.youdrop.shop}"
-IAM_HOST="${IAM_HOST:-iam-dev.youdrop.shop}"
+PORTAL_HOST="${PORTAL_HOST:-portal-$ENV.youdrop.shop}"
+API_HOST="${API_HOST:-api-$ENV.youdrop.shop}"
+IAM_HOST="${IAM_HOST:-iam-$ENV.youdrop.shop}"
 
 APP="$(cd "$(dirname "$0")/../clients/apps/delivery_portal" && pwd)"
-REMOTE=/opt/delivery/infra/portal/web
+# Where the portal Deployment's hostPath volume actually points, per environment — see
+# deploy/k3s/overlays/<env>/kustomization.yaml, which patches it.
+#
+# This said /opt/delivery/infra/portal/web until 2026-09-22, left behind when the box moved from
+# docker compose to k3s. That directory does not exist, so `find ... -delete` created nothing to
+# delete, tar wrote a fresh tree nothing serves, and the script printed "Portal deployed" — the
+# exact shape of failure the comments below were written to prevent, in the step they do not cover.
+REMOTE="/opt/delivery/sites/$ENV/portal"
 
 echo "Building the portal against $API_HOST / $IAM_HOST..."
 cd "$APP"
@@ -51,10 +66,16 @@ ssh "$HOST" "mkdir -p $REMOTE"
 # happened). And Windows scp refuses the `dir/.` idiom the old fallback used, failing after the
 # build with exit 0 further up the pipe, so the failure read as success. tar over ssh has neither
 # problem and needs no rsync on the box.
-tar -C "$APP/build/web" -czf - . | ssh "$HOST" "mkdir -p $REMOTE && find $REMOTE -mindepth 1 -delete && tar -C $REMOTE -xzf -"
+[ -f "$APP/build/web/index.html" ] || { echo "The build produced no index.html; refusing to deploy nothing." >&2; exit 1; }
+ssh "$HOST" "test -d $REMOTE" || { echo "No portal directory at $HOST:$REMOTE — check which environment's Deployment mounts what before creating it." >&2; exit 1; }
+tar -C "$APP/build/web" -czf - . | ssh "$HOST" "find $REMOTE -mindepth 1 -delete && tar -C $REMOTE -xzf -"
 
-# nginx serves from the mount, so new files are live immediately. The reload is for the config,
-# and costs nothing when it has not changed.
-ssh "$HOST" "cd /opt/delivery/infra && docker compose -f docker-compose.dev.yml up -d portal >/dev/null 2>&1 && docker exec delivery-portal nginx -s reload >/dev/null 2>&1 || true"
+# Proof rather than a hopeful message: ask the box for the file we just sent. A deploy that copied
+# into the wrong directory used to end with "Portal deployed" all the same.
+LOCAL_SUM=$(sha256sum "$APP/build/web/index.html" | cut -d' ' -f1)
+REMOTE_SUM=$(ssh "$HOST" "sha256sum $REMOTE/index.html | cut -d' ' -f1")
+[ "$LOCAL_SUM" = "$REMOTE_SUM" ] || { echo "index.html on the box does not match the one just built." >&2; exit 1; }
 
-echo "Portal deployed: https://${PORTAL_HOST}/"
+# No restart: nginx serves the hostPath mount, so the new files are already being served. Its
+# config comes from a ConfigMap and is not touched here.
+echo "Portal deployed to $ENV ($REMOTE, index.html verified): https://${PORTAL_HOST}/"
