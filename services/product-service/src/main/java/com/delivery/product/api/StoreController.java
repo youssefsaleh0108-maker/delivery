@@ -50,6 +50,7 @@ import com.delivery.product.api.dto.StoreDtos.StoreRequest;
 import com.delivery.product.api.dto.StoreDtos.PowerRequest;
 import com.delivery.product.api.dto.StoreDtos.RadiusRequest;
 import com.delivery.product.api.dto.StoreDtos.StoreResponse;
+import com.delivery.product.api.dto.StoreDtos.TablesRequest;
 import com.delivery.product.api.dto.StoreDtos.VerifiedLocalRequest;
 import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.domain.Product;
@@ -530,6 +531,20 @@ public class StoreController {
                 .toList();
     }
 
+    /**
+     * How many tables this shop seats, and so how many QR cards it can print.
+     *
+     * <p>{@code PUT} with the whole number rather than a nudge, because the stepper on the share
+     * screen is a number the merchant sets: two devices that both nudged would each apply their own
+     * delta and the shop would end up with tables nobody has.
+     */
+    @PutMapping("/{id}/tables")
+    @PreAuthorize("hasRole('MERCHANT')")
+    public StoreResponse setTables(@PathVariable UUID id, @Valid @RequestBody TablesRequest request) {
+        return toResponse(
+                storeService.setTables(id, CurrentUser.requireId(), request.tables()), Set.of());
+    }
+
     /** The merchant draws (or clears) their delivery circle. */
     @PostMapping("/{id}/delivery-radius")
     @PreAuthorize("hasRole('MERCHANT')")
@@ -784,7 +799,8 @@ public class StoreController {
                 v.powerCurrent(),
                 store.getDeliveryRadiusMetres(),
                 withAreas ? servedZonesOf(store) : null,
-                store.getServiceCategory());
+                store.getServiceCategory(),
+                store.getTableCount());
     }
 
     /**

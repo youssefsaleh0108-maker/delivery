@@ -168,7 +168,8 @@ public class PublicShopPageService {
                 openingOf(store, now),
                 powerOf(store, now),
                 deliveryOf(store),
-                catalogueOf(store));
+                catalogueOf(store),
+                store.getTableCount());
     }
 
     /**
@@ -183,6 +184,23 @@ public class PublicShopPageService {
     @Transactional(readOnly = true)
     public boolean exists(String slug) {
         return stores.findBySlug(slug).filter(this::publiclyVisible).isPresent();
+    }
+
+    /**
+     * How many tables this shop has codes for, or zero for a shop nobody may see.
+     *
+     * <p>{@link #exists}'s one lookup with one more column read off the row it already had, rather
+     * than a page read: printing a sheet of table cards needs the shop's name and its table count
+     * and nothing else about the shelf. Zero for a hidden shop is the same refusal
+     * {@link #exists} gives — a table code is a QR on a table pointing at the page, and a shop that
+     * has no page must not be able to print one.
+     */
+    @Transactional(readOnly = true)
+    public short tablesOf(String slug) {
+        return stores.findBySlug(slug)
+                .filter(this::publiclyVisible)
+                .map(Store::getTableCount)
+                .orElse((short) 0);
     }
 
     /**

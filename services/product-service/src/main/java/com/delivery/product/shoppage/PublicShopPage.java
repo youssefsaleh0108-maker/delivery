@@ -68,7 +68,16 @@ public record PublicShopPage(
         /** Null unless the merchant said what the lights are doing, recently enough to mean now. */
         Power power,
         Delivery delivery,
-        Catalogue catalogue) {
+        Catalogue catalogue,
+        /**
+         * How many tables this shop has QR cards for (V42); zero for a shop that has asked for
+         * none.
+         *
+         * <p>Read by the printable card sheet and by the per-table code, and by nothing the page
+         * itself draws: a customer reading a menu has no use for the number of tables, and the one
+         * who scanned a table's card already knows which table they are at.
+         */
+        short tables) {
 
     /**
      * Whether the shop is open <em>right now</em>, in its own calendar, and the week behind that

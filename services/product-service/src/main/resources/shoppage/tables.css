@@ -1,0 +1,164 @@
+/*
+  The sheet of table cards. A4 portrait, six cards to a page, cut along the dotted lines.
+
+  The poster's rules, for the poster's reasons: black on white and nothing else, because this comes
+  out of whatever is in the office inkjet; no @font-face, because the system's own Arabic and Latin
+  faces are the ones the machine can already print; millimetres, because the paper decides the size
+  and the on-screen preview should be the sheet that comes out; logical properties, so the Arabic
+  rendering is this stylesheet mirrored by dir="rtl" rather than a second set of rules.
+
+  Not a second copy of poster.css. A poster is one sheet with one code on it; this is a grid that
+  has to survive being cut up, so the cards carry their own borders and must never be split across
+  a page — which is the whole of what is different here.
+*/
+
+@page {
+  size: A4 portrait;
+  /* Wide enough that no desktop printer's unprintable edge eats a card's quiet zone, which is the
+     commonest reason a printed code will not scan. */
+  margin: 10mm;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #fff;
+  color: #000;
+  font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Naskh Arabic", sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* ------------------------------------------------------------------ the grid */
+
+.cards {
+  /* A4 less the page margin: 210 - 20. Two columns of 95mm, so the preview on screen is the
+     printed area exactly. */
+  width: 190mm;
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0;
+}
+
+.card {
+  /* A4's printable height is 277mm; three rows of 92mm leave room for the last row's cut line. */
+  height: 92mm;
+  padding: 5mm;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  /* Dotted, because it is a cut line rather than a border: a solid box printed on every card looks
+     like part of the card and gets left on after the scissors. */
+  border: 1px dotted #000;
+  /* A card split down the middle by a page break is a card nobody can use. */
+  break-inside: avoid;
+}
+
+.card .no {
+  font-size: 6mm;
+  line-height: 1;
+  font-weight: 700;
+  margin: 0 0 3mm;
+}
+
+.card .qr {
+  display: block;
+  width: 42mm;
+  height: 42mm;
+  /* The PNG is a 1,024-pixel bitmap of square modules. Nearest-neighbour keeps their edges hard;
+     smoothing them is what turns a code that scans instantly into one that takes three tries
+     under a shop's fluorescent tube. */
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.card .shop {
+  font-size: 4.2mm;
+  line-height: 1.2;
+  font-weight: 700;
+  margin: 3mm 0 0;
+  /* A shop can call itself something long. Wrapping is fine; overflowing the card is not. */
+  overflow-wrap: anywhere;
+}
+
+.card .line {
+  font-size: 3.4mm;
+  line-height: 1.3;
+  margin: 2mm 0 0;
+}
+
+.card .addr {
+  margin: 2mm 0 0;
+  font-size: 3mm;
+  letter-spacing: .02em;
+  /* Read character by character by somebody typing it, so it must not break mid-host. */
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------ one card alone */
+
+/* A reprint of a single table. The same card, given the middle of the sheet rather than a grid
+   cell, so a merchant who lost one card is not handed a page with five blanks on it. */
+.one .cards { grid-template-columns: 1fr; width: 95mm; }
+.one .card { height: 120mm; }
+.one .card .qr { width: 60mm; height: 60mm; }
+
+/* ------------------------------------------------------------------ on screen only */
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  padding: 10px 0 0;
+  font-size: 14px;
+}
+
+.controls a,
+.controls .on {
+  display: inline-block;
+  /* A tap target a thumb can hit: this preview is opened on the phone that printed it. */
+  min-width: 44px;
+  padding: 8px 12px;
+  border: 1px solid #000;
+  border-radius: 6px;
+  text-decoration: none;
+  color: #000;
+}
+
+.controls .on {
+  background: #000;
+  color: #fff;
+}
+
+@media screen {
+  body {
+    /* A desk to lay the sheet on, so its edges are visible before it is printed. */
+    background: #f2f2f2;
+    padding: 12px;
+  }
+  .cards {
+    background: #fff;
+    border: 1px solid #ccc;
+    /* A4 whole, margins included: the preview is the paper, not the printable area. */
+    width: 210mm;
+    padding: 10mm;
+    margin: 12px auto 24px;
+    min-height: 297mm;
+    align-content: start;
+  }
+  .one .cards { width: 210mm; }
+}
+
+@media print {
+  /* The reprint links are not part of the sheet. */
+  .controls { display: none; }
+  body { background: #fff; padding: 0; }
+  .cards { border: 0; margin: 0; padding: 0; width: auto; min-height: 0; }
+}

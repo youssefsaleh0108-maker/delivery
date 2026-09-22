@@ -264,6 +264,20 @@ public class Store {
     private Integer deliveryRadiusMetres;
 
     /**
+     * How many tables this shop has QR codes for (V42), zero when it has none.
+     *
+     * <p>A property of the shop and not of whichever device printed the sheet: the codes are
+     * generated from it, so a merchant who reprints table 7 from the portal next month gets the
+     * card the phone printed today, byte for byte.
+     *
+     * <p>Lowering it does not invalidate anything already on a table — a printed code is a URL to
+     * the page, not to this service — it only stops the shop printing new cards for tables it has
+     * said it no longer has.
+     */
+    @Column(name = "table_count", nullable = false)
+    private short tableCount;
+
+    /**
      * Written by the column default, and read straight back — see {@link Product#getCreatedAt}.
      * Without {@code @Generated} a store serialised in the same transaction it was created in
      * carries the null it was constructed with, because the column is not insertable.
@@ -865,6 +879,28 @@ public class Store {
 
     public void setDeliveryRadiusMetres(Integer metres) {
         this.deliveryRadiusMetres = metres;
+    }
+
+    /** The most tables one shop may have codes for. The database check constraint says the same. */
+    public static final int MAX_TABLES = 400;
+
+    /**
+     * Says how many tables the room has, which is how many QR cards the shop can print.
+     *
+     * <p>Refused outside {@code 0..}{@value #MAX_TABLES} rather than clamped: a merchant who typed
+     * a number this shop cannot have is better told so than handed a different one silently, and a
+     * clamp would turn one mistyped digit into a print job nobody asked for.
+     */
+    public void seatTables(int tables) {
+        if (tables < 0 || tables > MAX_TABLES) {
+            throw new IllegalArgumentException(
+                    "A shop can have between 0 and " + MAX_TABLES + " tables");
+        }
+        this.tableCount = (short) tables;
+    }
+
+    public short getTableCount() {
+        return tableCount;
     }
 
     public BigDecimal getLatitude() {

@@ -104,7 +104,18 @@ public class ShopPosterController {
     private final String baseUrl;
     private final byte[] stylesheet;
     private final byte[] stylesheetA4;
+    private final byte[] stylesheetTables;
     private final ShopPageCache<Sheet> posters;
+
+    /**
+     * The rendered card sheets, by shop, language and which table.
+     *
+     * <p>Shares the poster's window and bound rather than adding a second policy: a sheet of table
+     * cards is the same kind of document, asked for in the same burst — a merchant setting up a
+     * room asks for the whole sheet, then for table 4 again because the printer ate it — and it
+     * costs the same {@link PublicShopPageService#read} to draw a name and a slug twelve times.
+     */
+    private final ShopPageCache<Sheet> tableSheets;
 
     @Autowired
     public ShopPosterController(
@@ -119,7 +130,9 @@ public class ShopPosterController {
         this.baseUrl = trimTrailingSlash(baseUrl);
         this.stylesheet = read("shoppage/poster.css");
         this.stylesheetA4 = read("shoppage/poster-a4.css");
+        this.stylesheetTables = read("shoppage/tables.css");
         this.posters = new ShopPageCache<>(POSTER_MEMO_FOR, POSTER_MEMO_ENTRIES, nanoClock);
+        this.tableSheets = new ShopPageCache<>(POSTER_MEMO_FOR, POSTER_MEMO_ENTRIES, nanoClock);
     }
 
     /**
@@ -154,6 +167,54 @@ public class ShopPosterController {
     private Sheet render(String slug, ShopPageText text, Paper paper) {
         return Sheet.of(ShopPosterHtml.render(pages.read(slug), text, paper, baseUrl)
                 .getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * The sheet of table cards: one per table, cut along the dotted lines.
+     *
+     * <p>{@code ?t=7} reprints that one card instead, which is what a merchant needs when one gets
+     * peeled off; the card it draws is the card the whole sheet drew, because
+     * {@link ShopTableCardsHtml#card} is the only thing that writes one and it is given nothing
+     * that varies with when it was asked for. {@code ?lang} and {@code Accept-Language} choose the
+     * direction and which of the two printed lines comes first — both are always printed.
+     *
+     * <p>A shop with no tables, and a table past the number the shop says it has, are the same 404
+     * as a shop nobody may see. The count is a thing the merchant declared
+     * ({@code PUT /api/stores/{id}/tables}), and a card for table 30 in a room with twelve is a
+     * card that would be stuck to nothing.
+     */
+    @GetMapping("/s/{slug}/tables")
+    public ResponseEntity<byte[]> tables(@PathVariable String slug,
+                                         @RequestParam(name = ShopTableCodes.PARAM,
+                                                 required = false) Integer table,
+                                         @RequestParam(name = "lang", required = false) String lang,
+                                         @RequestHeader(name = HttpHeaders.ACCEPT_LANGUAGE,
+                                                 required = false) String acceptLanguage,
+                                         HttpServletRequest request) {
+        ShopPageText text = ShopPageText.choose(lang, acceptLanguage);
+        short seats = pages.tablesOf(slug);
+        if (seats < 1 || (table != null && (table < 1 || table > seats))) {
+            return notFound(text);
+        }
+        Sheet sheet;
+        try {
+            sheet = tableSheets.get(slug + "\n" + text.tag() + "\n" + (table == null ? "*" : table),
+                    () -> Sheet.of(ShopTableCardsHtml
+                            .render(pages.read(slug), text, table, baseUrl)
+                            .getBytes(StandardCharsets.UTF_8)));
+        } catch (ShopPageNotFoundException absent) {
+            // The count said the shop was visible a moment ago; a suspension between the two reads
+            // lands here, and gets the answer everything else under /s/** gives.
+            return notFound(text);
+        }
+        return respond(sheet.body(), sheet.etag(), MediaType.TEXT_HTML,
+                CacheControl.maxAge(POSTER_MAX_AGE).cachePublic(), text, request);
+    }
+
+    /** The card sheet's layout. Same origin, so its own {@code style-src 'self'} allows it. */
+    @GetMapping("/s/assets/tables.css")
+    public ResponseEntity<byte[]> stylesheetTables(HttpServletRequest request) {
+        return asset(stylesheetTables, request);
     }
 
     /** The poster's layout. Same origin, so its own {@code style-src 'self'} allows it. */

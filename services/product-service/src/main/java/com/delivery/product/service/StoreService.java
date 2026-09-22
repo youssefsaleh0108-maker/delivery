@@ -345,6 +345,22 @@ public class StoreService {
     }
 
     /**
+     * The merchant says how many tables the room has, which is how many QR cards it can print.
+     *
+     * <p>Stored on the shop and not on the device that printed the sheet, so the twelve codes a
+     * merchant generated on the phone are the twelve the portal reprints from next month. Lowering
+     * the number does not revoke a card already on a table — the card is a URL to the page, and the
+     * page does not consult this — it only stops the shop printing cards for tables it says it does
+     * not have.
+     */
+    @Transactional
+    public StoreView setTables(UUID id, String merchantId, int tables) {
+        Store store = requireOwned(id, merchantId);
+        store.seatTables(tables);
+        return view(store, clock.instant());
+    }
+
+    /**
      * Whether the shop's circle covers the point. See the repository for the three answers.
      *
      * <p>Through {@link GeoPoint} for the same reason {@link #nearby} is: a latitude of 999 or a

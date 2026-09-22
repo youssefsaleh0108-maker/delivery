@@ -121,7 +121,13 @@ public final class StoreDtos {
              */
             List<ZoneResponse> deliveryZones,
             /** What a SERVICES shop does. Always set for a service shop and null for every other. */
-            Store.ServiceCategory serviceCategory) {
+            Store.ServiceCategory serviceCategory,
+            /**
+             * How many tables this shop has QR codes for (V42). Zero for a shop that has never
+             * asked for any, which is most of them — the share screen draws its stepper from this
+             * and the printable sheet exists only above zero.
+             */
+            short tableCount) {
     }
 
     /** The card shape: everything a storefront grid needs and nothing it does not. */
@@ -266,6 +272,16 @@ public final class StoreDtos {
     /** The delivery circle's size. Null clears it — back to zones-only. */
     public record RadiusRequest(
             @Min(200) @Max(50000) Integer metres) {
+    }
+
+    /**
+     * How many tables the room has, which is how many QR cards the shop can print.
+     *
+     * <p>Zero is a real answer — "we do not seat anybody" — so the field is required and a body
+     * that omits it is a 400 rather than a shop quietly losing its tables.
+     */
+    public record TablesRequest(
+            @NotNull @Min(0) @Max(Store.MAX_TABLES) Integer tables) {
     }
 
     public record CommercialsRequest(
