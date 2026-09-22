@@ -28,13 +28,34 @@ import 'package:flutter_test/flutter_test.dart';
 const String _origin = 'https://www.youdrop.shop';
 
 class _StoreAdapter implements HttpClientAdapter {
-  _StoreAdapter({this.pinned = true, this.listed = true, this.shops = 1});
+  _StoreAdapter({
+    this.pinned = true,
+    this.listed = true,
+    this.shops = 1,
+    this.tables = 0,
+    this.ordering = false,
+  });
 
   final bool pinned;
   final bool listed;
 
   /// How many shops this merchant has, for the first-of-mine rule the suite follows.
   final int shops;
+
+  /// How many tables the shop starts with — what a merchant who has already generated codes sees.
+  int tables;
+
+  /// Whether the shop takes orders at those tables — the switch the web basket reads.
+  bool ordering;
+
+  /// Every `PUT /api/stores/{id}/tables` this screen made, in order.
+  final List<int> tablesSaved = <int>[];
+
+  /// And what each of them said about ordering; null when the body left it out.
+  final List<bool?> orderingSaved = <bool?>[];
+
+  /// Set to refuse the table save, which is the case the stepper has to put back.
+  bool refuseTables = false;
 
   Map<String, dynamic> _store(int index) => <String, dynamic>{
         'id': 'store-$index',
@@ -48,6 +69,8 @@ class _StoreAdapter implements HttpClientAdapter {
         'minOrder': 10.0,
         'etaMinMinutes': 20,
         'etaMaxMinutes': 40,
+        'tableCount': tables,
+        'tableOrdering': ordering,
         if (pinned) 'latitude': 33.8938,
         if (pinned) 'longitude': 35.5018,
       };
@@ -55,6 +78,25 @@ class _StoreAdapter implements HttpClientAdapter {
   @override
   Future<ResponseBody> fetch(RequestOptions options, Stream<Uint8List>? requestStream,
       Future<void>? cancelFuture) async {
+    if (options.path.endsWith('/tables')) {
+      if (refuseTables) {
+        return ResponseBody.fromString('{"detail":"nope"}', 500,
+            headers: <String, List<String>>{
+              Headers.contentTypeHeader: <String>[Headers.jsonContentType]
+            });
+      }
+      final Map<String, dynamic> body = options.data as Map<String, dynamic>;
+      final int asked = body['tables'] as int;
+      tablesSaved.add(asked);
+      orderingSaved.add(body['ordering'] as bool?);
+      tables = asked;
+      // What the server does: no tables means nobody can order at them.
+      ordering = asked == 0 ? false : (body['ordering'] as bool? ?? ordering);
+      return ResponseBody.fromString(jsonEncode(_store(0)), 200,
+          headers: <String, List<String>>{
+            Headers.contentTypeHeader: <String>[Headers.jsonContentType]
+          });
+    }
     final Object body = options.path.endsWith('/mine')
         ? <String, dynamic>{
             'content': <Map<String, dynamic>>[
@@ -109,11 +151,16 @@ class _Spy {
   }
 }
 
+/// The adapter the last [_pump] built, for the tests that ask what the screen sent.
+late _StoreAdapter _server;
+
 Future<_Spy> _pump(
   WidgetTester tester, {
   bool pinned = true,
   bool listed = true,
   int shops = 1,
+  int tables = 0,
+  bool ordering = false,
   Locale locale = const Locale('en'),
   Size size = const Size(400, 1600),
   Future<bool> Function(String text)? onShare,
@@ -124,8 +171,9 @@ Future<_Spy> _pump(
   addTearDown(tester.view.reset);
 
   final _Spy spy = _Spy()..install(tester);
-  final Dio dio = Dio(BaseOptions(baseUrl: 'http://gateway'))
-    ..httpClientAdapter = _StoreAdapter(pinned: pinned, listed: listed, shops: shops);
+  _server = _StoreAdapter(
+      pinned: pinned, listed: listed, shops: shops, tables: tables, ordering: ordering);
+  final Dio dio = Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = _server;
 
   await tester.pumpWidget(MaterialApp(
     theme: DeliveryTheme.light(),
@@ -166,9 +214,12 @@ void main() {
     expect(find.text('$_origin/s/falafel-king'), findsOneWidget);
     expect(find.byType(SelectableText), findsOneWidget);
     expect(_qrUrl(tester), '$_origin/s/falafel-king/qr.png');
-    expect(find.text(en.merchShareCopyLink), findsOneWidget);
+    // Copy is the icon beside the address now, as the design draws it; the three tiles under it
+    // are download, print and share.
+    expect(find.byTooltip(en.merchShareCopyLink), findsOneWidget);
+    expect(find.text(en.merchShareDownloadQr), findsOneWidget);
+    expect(find.text(en.merchSharePrintQr), findsOneWidget);
     expect(find.text(en.merchShareShare), findsOneWidget);
-    expect(find.text(en.merchSharePrintPoster), findsOneWidget);
     // What the merchant is handing over, before they hand it over.
     expect(find.text(en.merchShareWhatTheySee), findsOneWidget);
   });
@@ -194,7 +245,7 @@ void main() {
       (WidgetTester tester) async {
     final _Spy spy = await _pump(tester);
 
-    await tester.tap(find.text(en.merchShareCopyLink));
+    await tester.tap(find.byTooltip(en.merchShareCopyLink));
     await tester.pumpAndSettle();
 
     expect(spy.copied, <String>['$_origin/s/falafel-king']);
@@ -244,7 +295,7 @@ void main() {
       (WidgetTester tester) async {
     final _Spy spy = await _pump(tester, locale: const Locale('ar'));
 
-    await tester.tap(find.text(ar.merchSharePrintPoster));
+    await tester.tap(find.text(ar.merchSharePrintQr));
     await tester.pumpAndSettle();
 
     expect(spy.launched, <String>['$_origin/s/falafel-king/poster?lang=ar']);
@@ -261,7 +312,7 @@ void main() {
     expect(find.text(en.merchShareNeedsPin), findsOneWidget);
     // The whole point: no dead QR code, and no address that answers 404.
     expect(_qrUrl(tester), isNull);
-    expect(find.text(en.merchShareCopyLink), findsNothing);
+    expect(find.byTooltip(en.merchShareCopyLink), findsNothing);
 
     await tester.tap(find.text(en.merchSharePlaceOnMap));
     await tester.pumpAndSettle();
@@ -341,9 +392,10 @@ void main() {
     await _pump(tester, locale: const Locale('ar'), size: const Size(320, 1800));
 
     expect(Directionality.of(tester.element(find.byType(ShopShareCard))), TextDirection.rtl);
-    expect(find.text(ar.merchShareCopyLink), findsOneWidget);
+    expect(find.byTooltip(ar.merchShareCopyLink), findsOneWidget);
+    expect(find.text(ar.merchShareDownloadQr), findsOneWidget);
+    expect(find.text(ar.merchSharePrintQr), findsOneWidget);
     expect(find.text(ar.merchShareShare), findsOneWidget);
-    expect(find.text(ar.merchSharePrintPoster), findsOneWidget);
     expect(find.text(ar.merchShareWhatTheySee), findsOneWidget);
 
     // A URL mirrored by the page's direction is a URL typed back wrong.
@@ -352,6 +404,163 @@ void main() {
 
     // Nothing overflowed the narrowest phone the suite supports.
     expect(tester.takeException(), isNull);
+  });
+
+  // ---------------------------------------------------------------- table QR codes
+
+  testWidgets('a shop that has asked for no tables is offered the stepper and nothing to print',
+      (WidgetTester tester) async {
+    await _pump(tester);
+
+    expect(find.text(en.merchTablesTitle), findsOneWidget);
+    expect(find.text(en.merchTablesHowMany), findsOneWidget);
+    // Nothing to print until the shop has said how many tables it has: the codes are generated
+    // from that number, and the server refuses a card for a table nobody declared.
+    expect(find.text(en.merchTablesSave), findsOneWidget);
+    expect(find.text(en.merchTablesPrintSheet), findsNothing);
+    expect(find.text(en.merchTablesReprintOne), findsNothing);
+  });
+
+  testWidgets('twelve taps of plus saves twelve, and twelve reprint chips appear',
+      (WidgetTester tester) async {
+    await _pump(tester, size: const Size(400, 2200));
+
+    for (int i = 0; i < 12; i++) {
+      await tester.tap(find.bySemanticsLabel(en.merchTablesMore));
+      await tester.pump();
+    }
+    await tester.tap(find.text(en.merchTablesSave));
+    await tester.pumpAndSettle();
+
+    // The number is saved whole, not as twelve nudges: two devices each sending a delta would
+    // leave the room with tables nobody has.
+    expect(_server.tablesSaved, <int>[12]);
+    expect(find.text(en.merchTablesSaved(12)), findsOneWidget);
+    // One chip per table, so a merchant replacing the card on table 7 taps 7.
+    for (int table = 1; table <= 12; table++) {
+      expect(find.byTooltip(en.merchTablesReprintTable(table)), findsOneWidget);
+    }
+    expect(find.text(en.merchTablesPrintSheet), findsOneWidget);
+  });
+
+  testWidgets('the sheet and a single reprint open the service, carrying the table parameter',
+      (WidgetTester tester) async {
+    final _Spy spy = await _pump(tester, tables: 12, size: const Size(400, 2200));
+
+    await tester.tap(find.text(en.merchTablesPrintSheet));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip(en.merchTablesReprintTable(7)));
+    await tester.pumpAndSettle();
+
+    // `t`, and the table's own number — the parameter the printed code carries and the web basket
+    // reads back. A second spelling here would be a card that scans to a page with no table on it.
+    expect(spy.launched, <String>[
+      '$_origin/s/falafel-king/tables?lang=en',
+      '$_origin/s/falafel-king/tables?lang=en&t=7',
+    ]);
+  });
+
+  testWidgets('Download QR opens the image the service draws', (WidgetTester tester) async {
+    final _Spy spy = await _pump(tester);
+
+    await tester.tap(find.text(en.merchShareDownloadQr));
+    await tester.pumpAndSettle();
+
+    expect(spy.launched, <String>['$_origin/s/falafel-king/qr.png']);
+  });
+
+  testWidgets('a refused save puts the number back to what the shop still has',
+      (WidgetTester tester) async {
+    await _pump(tester, tables: 4, size: const Size(400, 2200));
+    _server.refuseTables = true;
+
+    await tester.tap(find.bySemanticsLabel(en.merchTablesMore));
+    await tester.pump();
+    expect(find.bySemanticsLabel(en.merchTablesCount(5)), findsOneWidget);
+
+    await tester.tap(find.text(en.merchTablesSave));
+    await tester.pumpAndSettle();
+
+    // A screen that kept the 5 would be telling the merchant they have a card for table 5.
+    expect(find.text(en.merchTablesCouldNotSave), findsOneWidget);
+    expect(find.bySemanticsLabel(en.merchTablesCount(4)), findsOneWidget);
+  });
+
+  // -------------------------------------------- taking orders at the table
+
+  testWidgets('a shop with no tables is not asked whether it takes orders at them',
+      (WidgetTester tester) async {
+    await _pump(tester);
+
+    // There would be nothing for an order to say it came from: every one carries the number off
+    // the card it was scanned from, and there are no cards.
+    expect(find.text(en.merchTablesOrderingTitle), findsNothing);
+  });
+
+  testWidgets('the switch is off until the shop says otherwise, and saves with the count',
+      (WidgetTester tester) async {
+    await _pump(tester, tables: 6, size: const Size(400, 2400));
+
+    // Off is where a shop starts. Printing cards is not a promise that somebody is watching a
+    // screen, and a default of on would have made that promise for shops that never asked.
+    expect(find.text(en.merchTablesOrderingOff), findsOneWidget);
+
+    await tester.tap(find.byType(MerchantAvailabilitySwitch));
+    await tester.pump();
+    expect(find.text(en.merchTablesOrderingOn), findsOneWidget);
+
+    await tester.tap(find.text(en.merchTablesSave));
+    await tester.pumpAndSettle();
+
+    // One call for both, because they are one decision on one screen.
+    expect(_server.tablesSaved, <int>[6]);
+    expect(_server.orderingSaved, <bool?>[true]);
+  });
+
+  testWidgets('a shop already taking orders says so when the screen opens',
+      (WidgetTester tester) async {
+    await _pump(tester, tables: 6, ordering: true, size: const Size(400, 2400));
+
+    expect(find.text(en.merchTablesOrderingOn), findsOneWidget);
+    // Nothing to save: the screen opened on what the shop already is.
+    expect(find.text(en.merchTablesPrintSheet), findsOneWidget);
+  });
+
+  testWidgets('taking the tables to none takes the ordering with them',
+      (WidgetTester tester) async {
+    await _pump(tester, tables: 1, ordering: true, size: const Size(400, 2400));
+
+    await tester.tap(find.bySemanticsLabel(en.merchTablesFewer));
+    await tester.pump();
+    await tester.tap(find.text(en.merchTablesSave));
+    await tester.pumpAndSettle();
+
+    // The server turns it off with them, and the screen settles on the server's answer rather than
+    // on what it sent: a shop advertising ordering at tables it has said it does not have is a
+    // diner at a card that leads nowhere.
+    expect(_server.tablesSaved, <int>[0]);
+    expect(find.text(en.merchTablesOrderingTitle), findsNothing);
+    expect(find.text(en.merchTablesPrintSheet), findsNothing);
+  });
+
+  testWidgets('the table block reads in Arabic on a 320dp phone', (WidgetTester tester) async {
+    await _pump(tester, tables: 3, locale: const Locale('ar'), size: const Size(320, 2400));
+
+    expect(find.text(ar.merchTablesTitle), findsOneWidget);
+    expect(find.text(ar.merchTablesHowMany), findsOneWidget);
+    expect(find.text(ar.merchTablesPrintSheet), findsOneWidget);
+    // Western digits, left to right: this is the number printed on the card and in its address.
+    final Text number = tester.widget<Text>(find.text('3').first);
+    expect(number.textDirection, TextDirection.ltr);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a shop with no page is offered no table codes either',
+      (WidgetTester tester) async {
+    await _pump(tester, pinned: false);
+
+    // The cards point at the page. A shop with no page must not be able to print one.
+    expect(find.text(en.merchTablesTitle), findsNothing);
   });
 
   testWidgets('the not-ready state reads in Arabic too on a 320dp phone',

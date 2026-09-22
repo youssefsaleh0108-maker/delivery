@@ -337,6 +337,10 @@ class _StoreScreenState extends State<StoreScreen> {
                 // and on the phone it is the second way in, beside the Settings row.
                 ShopShareCard(
                   store: store,
+                  // The portal's only home for the share block is this page, so the table codes
+                  // block has to be here too — a shop that set its tables on the phone must be
+                  // able to reprint a card from the desk.
+                  storeApi: widget.api,
                   origin: widget.shopPageOrigin,
                   onShare: widget.onShare,
                   // The map is on this very screen, so the fix is a scroll rather than a route.
