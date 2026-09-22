@@ -121,7 +121,7 @@ patches:
 - patch: |-
     - op: add
       path: /spec/template/metadata/annotations/youdrop.shop~1order-manager-build
-      value: "057af6b8"
+      value: "d9089214"
   target:
     kind: Deployment
     name: order-manager
@@ -220,7 +220,7 @@ patches:
   # pointed at on 2026-09-22, by its own immutable tag.
 images:
 - name: docker.io/youssefsaleh0108/delivery-order-manager
-  newTag: sha-057af6b89db6aa2e5c14b9bc0d4603a83833435e
+  newTag: sha-d90892141fca810c1c4725552219691e9af6bcf3
 - name: ghcr.io/youssefsaleh0108-maker/accounting-service
   newName: ghcr.io/youssefsaleh0108-maker/accounting-service
   newTag: sha-a57504b17b7b5a0a183628b176b93d78ec5a95a6
