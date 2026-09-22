@@ -281,6 +281,114 @@ class ApiExceptionHandlerTest {
         }
     }
 
+    /**
+     * The refusals Spring raises before any of this service's code runs.
+     *
+     * <p>They reached the catch-all, so the wrong method on an endpoint that exists answered 500
+     * and wrote a full stack trace at ERROR — a caller's own mistake reported as this service
+     * breaking, and, for every unauthenticated endpoint here, a stack trace anyone could provoke
+     * with one trivial request repeated as fast as they liked.
+     *
+     * <p>The probe is the existing hours endpoint, which takes a PUT and nothing else.
+     */
+    @Nested
+    @DisplayName("a request Spring itself refuses")
+    class FrameworkRefusals {
+
+        private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new Probe())
+                .setControllerAdvice(handler)
+                .build();
+
+        @Test
+        @DisplayName("the wrong method on a path that exists is a 405, not a 500")
+        void the_wrong_method_is_a_405() throws Exception {
+            mvc.perform(get("/probe/hours"))
+                    .andExpect(status().isMethodNotAllowed())
+                    .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+                    .andExpect(jsonPath("$.status").value(405))
+                    .andExpect(jsonPath("$.title").value("Method Not Allowed"));
+        }
+
+        @Test
+        @DisplayName("a body in a content type nothing here reads is a 415, not a 500")
+        void an_unsupported_content_type_is_a_415() throws Exception {
+            mvc.perform(put("/probe/hours").contentType(MediaType.TEXT_PLAIN).content("mon 9-5"))
+                    .andExpect(status().isUnsupportedMediaType())
+                    .andExpect(jsonPath("$.title").value("Unsupported Media Type"));
+        }
+
+        /**
+         * Nothing a caller is refused with may say more about this service than the status does.
+         * A 405 that started quoting the framework would put class names and our own routing into a
+         * body, which is what the catch-all's comment promises it will never do.
+         */
+        @Test
+        @DisplayName("and carries no internal detail in the body")
+        void a_refusal_says_nothing_about_the_inside_of_the_service() throws Exception {
+            String body = mvc.perform(get("/probe/hours"))
+                    .andReturn().getResponse().getContentAsString();
+
+            assertThat(body)
+                    .doesNotContain("org.springframework", "java.lang", "com.delivery")
+                    .doesNotContain("Exception", "\tat ")
+                    // Spring's own wording, which names the method and our routing decision.
+                    .doesNotContain("not supported", "Supported methods");
+        }
+
+        /** Malformed JSON was already a 400 and stays one: its own handler is the specific match. */
+        @Test
+        @DisplayName("malformed JSON is still the 400 its own handler chose")
+        void malformed_json_is_unchanged() throws Exception {
+            mvc.perform(put("/probe/hours")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("[{\"dayOfWeek\":"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.title").value("Bad request"));
+        }
+    }
+
+    /**
+     * The same two answers without a request behind them, so the rule is visible on its own: a 4xx
+     * the framework chose is kept, and everything else is still the catch-all's 500.
+     */
+    @Nested
+    @DisplayName("the catch-all")
+    class CatchAll {
+
+        @Test
+        void keeps_the_status_a_framework_refusal_already_chose() {
+            ProblemDetail problem = handler.onUnexpected(
+                    new org.springframework.web.HttpRequestMethodNotSupportedException("GET"));
+
+            assertThat(problem.getStatus()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED.value());
+            assertThat(problem.getTitle()).isEqualTo("Method Not Allowed");
+            assertThat(problem.getDetail()).doesNotContain("supported", "GET");
+        }
+
+        /**
+         * A 5xx the framework raises is a failure whatever raised it, so it keeps the catch-all's
+         * answer and its ERROR with a stack trace. Only the 4xx half of {@code ErrorResponse} is a
+         * client's mistake.
+         */
+        @Test
+        void still_answers_500_for_a_framework_failure_that_is_not_the_callers_fault() {
+            ProblemDetail problem = handler.onUnexpected(
+                    new org.springframework.web.context.request.async.AsyncRequestTimeoutException());
+
+            assertThat(problem.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
+            assertThat(problem.getTitle()).isEqualTo("Internal error");
+        }
+
+        @Test
+        void still_answers_500_for_a_real_failure_and_says_nothing_about_it() {
+            ProblemDetail problem = handler.onUnexpected(
+                    new IllegalStateException("could not extract ResultSet from products"));
+
+            assertThat(problem.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
+            assertThat(problem.getDetail()).doesNotContain("ResultSet", "products");
+        }
+    }
+
     private static MethodArgumentTypeMismatchException mismatch(String value, Class<?> requiredType) {
         return new MethodArgumentTypeMismatchException(value, requiredType, "storeId",
                 storeIdParameter(), new IllegalArgumentException("Invalid UUID string: " + value));
