@@ -455,6 +455,55 @@ spec:
         - { name: shop-page-headers }
         - { name: shop-page-compress }
 ---
+# Ordering at the table, on the same two hostnames as the page that calls it — and that is the
+# whole reason this router exists separately from the /api/orders one above.
+#
+# A diner scans the code on table seven and lands on www.youdrop.shop/s/{slug}?t=7, because www is
+# the address a shop prints. The page's Content-Security-Policy is `default-src 'none'` with
+# `connect-src 'self'`: it may fetch this origin and nothing else. If the only route to these
+# endpoints were on the API hostname, every send from a scanned card would be a cross-origin
+# request, blocked by that policy before it left the browser — and the fix would have been either
+# to name an API host in the page's CSP or to turn CORS on for an anonymous endpoint that writes
+# into a kitchen. Routing the path on both hostnames instead means the page keeps `'self'` and
+# there is no CORS to get wrong.
+#
+# So this is the mirror of the shop-page router above and shares its shape deliberately: the API
+# hostname first and unconditionally (so verify.sh and a smoke test can reach it in an environment
+# whose www belongs to somebody else), www dev-only with an explicit priority against the static
+# site's catch-all, and ONE middleware list by alias so the two can never drift.
+#
+# /api/table-orders and not /api/orders: everything under /api/orders requires the CUSTOMER role,
+# and a diner at a table has no account and will never be asked for one. A separate prefix keeps
+# that rule untouched and makes "which paths are anonymous" a question with a one-line answer.
+# order-manager's own `delivery.security.permit-all` is what actually opens it; a route is not a
+# permission.
+#
+# platform-cors is deliberately absent, as on the shop page: same-origin requests need none, and a
+# CORS allowance on the one anonymous endpoint that prints paper in a restaurant would be an
+# invitation for it to be called from anywhere. platform-rate-limit IS here, but it is the edge's
+# coarse per-IP guard against a flood — the rule that matters is per table and per shop, in
+# order-manager (TableOrderRate), because a restaurant's guest Wi-Fi is one address and an IP
+# limit alone would let one diner lock out the room.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: table-orders
+spec:
+  entryPoints: [websecure]
+  tls:
+    certResolver: letsencrypt
+  routes:
+    # The API hostname first, so it is the one that DEFINES the middleware list: the www rule below
+    # is deleted outright when this file is rendered for qa, and an anchor declared on a line that
+    # does not exist in one environment is a YAML document that does not parse in that environment.
+    - kind: Rule
+      match: Host(`api-qa.youdrop.shop`) && PathPrefix(`/api/table-orders`)
+      services: [{ name: order-manager, port: 8101 }]
+      middlewares: &table-orders-mw
+        - { name: platform-rate-limit }
+        - { name: strip-identity-headers }
+        - { name: security-headers }
+---
 # Keycloak owns its whole origin: /realms, /resources, the account and admin consoles.
 # KEYCLOAK_PUBLIC_URL must match this hostname exactly or every token's issuer is refused.
 apiVersion: traefik.io/v1alpha1

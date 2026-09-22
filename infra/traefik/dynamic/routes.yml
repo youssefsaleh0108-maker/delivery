@@ -153,6 +153,26 @@ http:
       entryPoints: [web, https]
       middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
 
+    # ------------------------------------------------------------------ table orders (8101)
+    # Ordering at the table: a diner scans the card on table seven, the shop's public page opens,
+    # and it sends here. Its own router rather than a prefix on the one above, for two reasons that
+    # both matter.
+    #
+    # Everything under /api/orders requires the CUSTOMER role, and a diner has no account and will
+    # never be asked for one — a separate prefix keeps that rule untouched and makes "which paths
+    # are anonymous" a question with a one-line answer. And no platform-cors: these are same-origin
+    # requests from the shop's own page, so none is needed, and a CORS allowance on the one
+    # anonymous endpoint that prints paper in a kitchen would let any site on the internet call it.
+    #
+    # There is only one hostname in compose, so nothing here mirrors the two-host rule the k3s
+    # ingress needs; that split exists because the page is served on www as well as on the API
+    # host, and the page's `connect-src 'self'` has to cover whichever one a card sent a phone to.
+    table-orders:
+      rule: PathPrefix(`/api/table-orders`)
+      service: order-manager
+      entryPoints: [web, https]
+      middlewares: [platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
+
     # ------------------------------------------------------------------ order-tracking (8102)
     order-tracking:
       rule: PathPrefix(`/api/tracking`)
