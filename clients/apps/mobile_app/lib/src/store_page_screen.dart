@@ -737,8 +737,10 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
       imageUrl: product.listImageUrl,
       addLabel: t.custAddToBasket,
       quantityInBasket: widget.cart.qtyOf(product.id),
+      // The merchant's own availability switch, honoured. See [_productRow].
+      soldOutLabel: product.inStock ? null : t.soldOut,
       // A closed shop's shelf still browses, and draws no add control it could not honour.
-      onAdd: _acceptsOrders ? () => _add(product) : null,
+      onAdd: _acceptsOrders && product.inStock ? () => _add(product) : null,
       onRemove: () => widget.cart.removeProduct(product.id),
       onTap: () => _openProduct(product),
       removeSemanticLabel: t.remove,
@@ -1254,10 +1256,29 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
                       ),
                       const SizedBox(width: DeliverySpacing.sm),
                     ],
-                    AddButton(
-                      onPressed: _acceptsOrders ? () => _add(product) : null,
-                      semanticLabel: DeliveryStrings.of(context).add,
-                    ),
+                    // An item the shop has switched off says so, instead of offering a button that
+                    // cannot be honoured.
+                    //
+                    // `Product.inStock` has been on the wire since V25 and parsed since, but until
+                    // now nothing on this shelf read it: the merchant's availability switch turned
+                    // the item off on the public web menu — which has always drawn it struck out
+                    // with "out of stock" (ShopPageHtml) — and left it fully orderable in the app.
+                    // The menu builder makes that switch a thing a shop uses daily, so the two
+                    // menus disagreeing is no longer a corner.
+                    if (!product.inStock)
+                      Text(
+                        DeliveryStrings.of(context).soldOut,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: DeliveryColors.muted,
+                        ),
+                      )
+                    else
+                      AddButton(
+                        onPressed: _acceptsOrders ? () => _add(product) : null,
+                        semanticLabel: DeliveryStrings.of(context).add,
+                      ),
                   ],
                 ),
               ],

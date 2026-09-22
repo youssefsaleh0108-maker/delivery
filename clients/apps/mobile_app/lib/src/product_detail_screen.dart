@@ -519,7 +519,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _actionRow() {
-    final bool canAdd = _isComplete &&
+    // An item the shop has switched off can still be read — its photo, its description and its
+    // price are what a customer came to see, and hiding them would only make the menu look shorter
+    // than it is. It just cannot be added, here or on the shelf that opened this.
+    final bool canAdd = widget.product.inStock &&
+        _isComplete &&
         !_pricing &&
         _priceError == null &&
         (!_needsPricing || _priced != null);
@@ -571,7 +575,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         // 360px phone.
                         Flexible(
                           child: Text(
-                            _missingRequired ? t.selectRequiredOptions : t.custAddToBasket,
+                            !widget.product.inStock
+                                ? t.soldOut
+                                : _missingRequired
+                                    ? t.selectRequiredOptions
+                                    : t.custAddToBasket,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
