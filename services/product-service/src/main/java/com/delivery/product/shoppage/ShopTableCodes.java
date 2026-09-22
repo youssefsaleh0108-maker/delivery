@@ -41,6 +41,34 @@ final class ShopTableCodes {
     static final String PARAM = "t";
 
     /**
+     * Whether a {@code ?t=} value looks like one of this shop's printed cards, for counting only.
+     *
+     * <p>Used by nothing that decides anything. The page renders identically either way — see
+     * {@code PublicShopBasketApiTest.aTableCodeNeverReachesTheDocument} — and whether an order may
+     * actually be placed at a table is settled on the server against the shop's own record. This
+     * answers a narrower question, asked once per page render by {@code MenuViewRecorder}: should
+     * this open be counted against the table codes or against every other way in.
+     *
+     * <p><strong>A value that is not a plain positive number counts as a link, not as a table.</strong>
+     * Cards only ever print one ({@link #urlOf}), so {@code ?t=B12} was typed or mangled by
+     * somebody rather than scanned off a card, and counting it as a table code would put a figure
+     * in front of a merchant that anybody could inflate by editing an address bar. Undercounting
+     * in the doubtful direction is the same choice the rest of that screen makes.
+     */
+    static boolean looksLikeATable(String value) {
+        if (value == null || value.isEmpty() || value.length() > 4) {
+            return false;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            if (value.charAt(i) < '0' || value.charAt(i) > '9') {
+                return false;
+            }
+        }
+        // "0" is not a table anybody prints: ShopTableCodes.urlOf is only ever called for 1..n.
+        return !value.equals("0") && value.charAt(0) != '0';
+    }
+
+    /**
      * The address of a shop's page for one table.
      *
      * @param base  the public origin, trimmed of its trailing slash by the caller — the same value

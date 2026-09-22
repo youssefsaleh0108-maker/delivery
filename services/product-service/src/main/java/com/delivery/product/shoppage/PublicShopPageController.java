@@ -246,7 +246,7 @@ public class PublicShopPageController {
     public ResponseEntity<byte[]> page(@PathVariable String slug,
                                        @RequestParam(name = "lang", required = false) String lang,
                                        @RequestParam(name = ShopTableCodes.PARAM,
-                                               required = false) Integer table,
+                                               required = false) String table,
                                        @RequestHeader(name = HttpHeaders.ACCEPT_LANGUAGE,
                                                required = false) String acceptLanguage,
                                        HttpServletRequest request) {
@@ -267,11 +267,17 @@ public class PublicShopPageController {
         // not kept. Note what this is NOT counting: a scan of the shop's own counter QR, which
         // encodes this same plain address and is therefore the same request as a tapped link.
         //
+        // Taken as a String and never as an Integer, which is a correctness point and not a style
+        // one: ?t= is a public query parameter that anything may put anything in, and binding it
+        // to a number makes Spring answer 400 for `?t=B12` — a page that refused to render because
+        // somebody mangled a link. It is read here exactly as `aTableCodeNeverReachesTheDocument`
+        // says the page reads it: as something that changes not one byte of the document.
+        //
         // The memo above does not hide readers from this — it is inside the handler, so a memo hit
         // still counts. Shared caches do: this page says max-age=300, so a link opened by a whole
         // group chat inside five minutes may reach here once. The number is a trend, and the
         // merchant-facing read says so.
-        menuViews.record(slug, table != null);
+        menuViews.record(slug, ShopTableCodes.looksLikeATable(table));
         return document(page, MediaType.TEXT_HTML,
                 CacheControl.maxAge(PAGE_MAX_AGE).cachePublic(), text, request);
     }

@@ -56,6 +56,28 @@ class MenuViewCountingTest {
     }
 
     @Test
+    @DisplayName("a mangled table code still renders the page, and counts as a link")
+    void aMangledTableCodeIsNotATable() throws Exception {
+        ShopPageFixture fixture = stocked();
+        MockMvc mvc = fixture.mvc();
+
+        // Every one of these is a 200 that renders the ordinary page — pinned next door by
+        // `aTableCodeNeverReachesTheDocument`. Counting must not be the thing that turns a mangled
+        // link into a refusal, which is why the parameter is read as text and never bound to a
+        // number.
+        for (String mangled : new String[] {"B12", "<script>alert(1)</script>", "../../etc/passwd",
+                "' or 1=1--", "", "0", "007", "99999"}) {
+            mvc.perform(get("/s/" + fixture.slug()).param("t", mangled))
+                    .andExpect(status().isOk());
+        }
+
+        // And none of them counted as a table: a card prints a plain number, so anything else was
+        // typed. A figure a merchant is shown must not be one an address bar can inflate.
+        verify(fixture.menuViews(), never()).record(anyString(), eq(true));
+        verify(fixture.menuViews(), times(8)).record(fixture.slug(), false);
+    }
+
+    @Test
     @DisplayName("a shop that is not there is not counted, so probing adds to nobody's total")
     void aMissingShopIsNotCounted() throws Exception {
         ShopPageFixture fixture = stocked();
