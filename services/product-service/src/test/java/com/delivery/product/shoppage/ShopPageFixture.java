@@ -32,6 +32,7 @@ import com.delivery.product.domain.Store;
 import com.delivery.product.domain.StoreHours;
 import com.delivery.product.domain.StoreRepository;
 import com.delivery.product.service.DeliveryZoneService;
+import com.delivery.product.service.MenuViewRecorder;
 import com.delivery.product.service.ProductImageService;
 import com.delivery.product.service.ProductImageService.ImageUrl;
 import com.delivery.product.service.ServiceCategories;
@@ -86,6 +87,13 @@ final class ShopPageFixture {
     private final DeliveryZoneService zones = mock(DeliveryZoneService.class);
     private final ProductImageService images = mock(ProductImageService.class);
     private final ServiceCategories serviceCategories = mock(ServiceCategories.class);
+
+    /**
+     * The menu-view counter, mocked: these tests are about the page, not about counting it, and a
+     * real recorder would hold a buffer none of them flush. {@code MenuViewCountingTest} is where
+     * what the page hands it is pinned.
+     */
+    private final MenuViewRecorder menuViews = mock(MenuViewRecorder.class);
 
     private final Store shop;
     private final List<Product> shelf = new ArrayList<>();
@@ -384,11 +392,17 @@ final class ShopPageFixture {
      */
     MockMvc mvc(LongSupplier nanoClock) {
         return MockMvcBuilders.standaloneSetup(
-                new PublicShopPageController(service(), BASE, IMAGE_ORIGIN, nanoClock)).build();
+                new PublicShopPageController(service(), menuViews, BASE, IMAGE_ORIGIN, nanoClock))
+                .build();
     }
 
     PublicShopPageController controller() {
-        return new PublicShopPageController(service(), BASE, IMAGE_ORIGIN);
+        return new PublicShopPageController(service(), menuViews, BASE, IMAGE_ORIGIN);
+    }
+
+    /** The counter the page was built with, so a test can assert what it was handed. */
+    MenuViewRecorder menuViews() {
+        return menuViews;
     }
 
     PublicShopPageService service() {

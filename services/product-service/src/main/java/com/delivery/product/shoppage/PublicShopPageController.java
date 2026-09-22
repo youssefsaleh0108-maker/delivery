@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.delivery.product.service.MenuViewRecorder;
 import com.delivery.product.shoppage.PublicShopPageService.ShopPageNotFoundException;
 
 /**
@@ -90,6 +91,17 @@ public class PublicShopPageController {
     private static final int PAGE_MEMO_ENTRIES = 256;
 
     private final PublicShopPageService pages;
+
+    /**
+     * Where an open of a shop's menu is counted.
+     *
+     * <p>The only thing on this controller that is not a pure function of the request, and it is
+     * deliberately the weakest possible kind of one: it takes a slug and a boolean, writes nothing
+     * here, and cannot throw. Nothing about the caller is read to feed it — this class still has no
+     * {@code CurrentUser}, reads no user agent and no address, and a page still cannot become
+     * personalised or be cached for one reader and served to another.
+     */
+    private final MenuViewRecorder menuViews;
 
     /**
      * The QR codes this service has already drawn, by slug.
@@ -191,15 +203,17 @@ public class PublicShopPageController {
     @Autowired
     public PublicShopPageController(
             PublicShopPageService pages,
+            MenuViewRecorder menuViews,
             @Value("${delivery.public.base-url:https://www.youdrop.shop}") String baseUrl,
             @Value("${delivery.storage.minio.public-endpoint:}") String imageOrigin) {
-        this(pages, baseUrl, imageOrigin, System::nanoTime);
+        this(pages, menuViews, baseUrl, imageOrigin, System::nanoTime);
     }
 
     /** The clock the memos age on, injectable so a test can step over an expiry. */
-    PublicShopPageController(PublicShopPageService pages, String baseUrl, String imageOrigin,
-                             LongSupplier nanoClock) {
+    PublicShopPageController(PublicShopPageService pages, MenuViewRecorder menuViews,
+                             String baseUrl, String imageOrigin, LongSupplier nanoClock) {
         this.pages = pages;
+        this.menuViews = menuViews;
         this.baseUrl = trimTrailingSlash(baseUrl);
         this.stylesheet = readAsset("shoppage/shop.css");
         this.script = readAsset("shoppage/shop.js");
@@ -224,6 +238,8 @@ public class PublicShopPageController {
     @GetMapping("/s/{slug}")
     public ResponseEntity<byte[]> page(@PathVariable String slug,
                                        @RequestParam(name = "lang", required = false) String lang,
+                                       @RequestParam(name = ShopTableCodes.PARAM,
+                                               required = false) Integer table,
                                        @RequestHeader(name = HttpHeaders.ACCEPT_LANGUAGE,
                                                required = false) String acceptLanguage,
                                        HttpServletRequest request) {
@@ -236,6 +252,19 @@ public class PublicShopPageController {
         } catch (ShopPageNotFoundException absent) {
             return notFound(text);
         }
+        // Counted after the page is known to exist, so a probe for shops that are not there adds
+        // nothing to anybody's total. This adds one map update to the request and no query and no
+        // write: MenuViewRecorder buffers and coarsens, and it cannot throw.
+        //
+        // `table` is read only to tell a table card's address from any other; the number itself is
+        // not kept. Note what this is NOT counting: a scan of the shop's own counter QR, which
+        // encodes this same plain address and is therefore the same request as a tapped link.
+        //
+        // The memo above does not hide readers from this — it is inside the handler, so a memo hit
+        // still counts. Shared caches do: this page says max-age=300, so a link opened by a whole
+        // group chat inside five minutes may reach here once. The number is a trend, and the
+        // merchant-facing read says so.
+        menuViews.record(slug, table != null);
         return document(page, MediaType.TEXT_HTML,
                 CacheControl.maxAge(PAGE_MAX_AGE).cachePublic(), text, request);
     }
