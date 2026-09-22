@@ -253,6 +253,13 @@ final class ShopPageFixture {
      * line saying to order with the staff.
      */
     ShopPageFixture takesTableOrders() {
+        if (shop.getTableCount() < 1) {
+            // A room, because the domain refuses the switch without one — a shop with no cards has
+            // no table for an order to have come from. Twelve is a restaurant, and it means a test
+            // about ordering does not have to furnish the place first. A test that cares about the
+            // count says so with tables().
+            shop.seatTables(12);
+        }
         shop.acceptTableOrders(true);
         return this;
     }

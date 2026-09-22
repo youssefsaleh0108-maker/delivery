@@ -217,12 +217,17 @@ public class PublicShopPageService {
         if (trimmed.isEmpty() || trimmed.length() > 3) {
             return null;
         }
-        int table;
-        try {
-            table = Integer.parseInt(trimmed);
-        } catch (NumberFormatException notANumber) {
-            return null;
+        // ASCII digits, checked here rather than left to Integer.parseInt — which accepts every
+        // decimal digit Unicode has. "٧" parses to 7 under it, so a code carrying Arabic-Indic
+        // digits would have been a table, and the kitchen would have been handed a number that
+        // matched no card in the room. The cards are printed in Latin figures; this reads them.
+        for (int i = 0; i < trimmed.length(); i++) {
+            char c = trimmed.charAt(i);
+            if (c < '0' || c > '9') {
+                return null;
+            }
         }
+        int table = Integer.parseInt(trimmed);
         return table >= 1 && table <= store.getTableCount() ? table : null;
     }
 

@@ -251,6 +251,7 @@ function answer(overrides) {
     total: '$1.50',
     totalLbp: '135,000 LBP',
     totalLabel: 'Total',
+    table: '7',
     says: []
   }, overrides || {});
 }
@@ -310,21 +311,41 @@ heading('anything that is not a table code is not a table');
     check('no pad for ' + search, [page.panel.hidden, page.table.hidden], [true, true]);
   });
 
-  // The shapes a real sticker has.
-  ['?t=7', '?t=12', '?t=B12', '?a=1&t=3', '?t=3&lang=ar'].forEach(search => {
+  // The shapes a real card has: a number, and nothing else.
+  ['?t=7', '?t=12', '?a=1&t=3', '?t=3&lang=ar'].forEach(search => {
     const page = visit({ slug: 'furn', version: 'v1', names: ['Hummus'], store: browser(),
       search: search, reply: answer() });
-    check('a pad for ' + search, [page.panel.hidden, page.table.hidden], [false, false]);
+    check('a pad for ' + search, page.panel.hidden, false);
+    check('and a question for the server about ' + search, page.flush().sent.length, 1);
   });
 }
 
-heading('the table is shown, after the page’s own word');
+heading('the table is shown, and it is the server that says which');
 {
+  // Asked on load with nothing chosen: the server is the only thing that knows whether this shop
+  // really has the table the address named, and how to spell it in the page's language.
   const page = visit({ slug: 'furn', version: 'v1', names: ['Hummus'], store: browser(),
-    search: '?t=B12', reply: answer() });
+    search: '?t=12', reply: answer({ table: '12' }) });
+  page.flush();
 
-  check('the word and the code', page.table.textContent, 'Table B12');
-  check('the code itself reads left to right', page.table.children[0].dir, 'ltr');
+  check('the empty pad still asked', page.sent[0].body.table, '12');
+  check('the word and the number', page.table.textContent, 'Table 12');
+  check('shown', page.table.hidden, false);
+}
+
+heading('a number this shop does not have is not a table');
+{
+  // The card said 99; the room seats twelve. The script cannot know that, so it sends it and the
+  // server declines to name a table — which is the whole of the rule.
+  const page = visit({ slug: 'furn', version: 'v1', names: ['Hummus'], store: browser(),
+    search: '?t=99',
+    reply: { ok: false, count: '', lines: [], total: '', totalLabel: '',
+      says: ['Scan the code on your table to order from here.'] } });
+  page.flush();
+
+  check('nothing is shown as a table', [page.table.hidden, page.table.textContent], [true, '']);
+  check('and the diner is told', page.says.textContent,
+    'Scan the code on your table to order from here.');
 }
 
 // --- filling the pad

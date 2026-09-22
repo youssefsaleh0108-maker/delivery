@@ -271,20 +271,28 @@ class PublicShopBasketApiTest {
         String version = versionOf(page(shop, "en"));
 
         // A stray space either side is trimmed rather than refused — a QR decoder that hands back
-        // " 7" has not made the diner a liar — but a space in the middle is not a table code.
+        // " 7" has not made the diner a liar — but everything else here is not a table number.
+        //
+        // "٧" is in this list because Integer.parseInt accepts it: it takes every decimal digit
+        // Unicode has, so an Arabic-Indic seven parsed to 7 and would have named a table nobody
+        // could find a card for. "99" is here because the room seats twelve — a number this shop
+        // does not have is not a table, whatever it looks like, which is the difference between a
+        // rule about characters and a rule about this restaurant.
         for (String table : List.of("<script>", "7 OR 1=1", "../../etc/passwd", "ABCDEFGHIJ",
-                "٧", "7‮", "a b", "7;12")) {
+                "٧", "7‮", "a b", "7;12", "B4", "0", "-1", "99", "0007")) {
             JsonNode answer = JSON.readTree(quote(shop, "en", JSON.writeValueAsString(
                     java.util.Map.of("version", version, "table", table,
                             "lines", List.of(java.util.Map.of("at", 0, "qty", 1))))));
             assertThat(answer.path("ok").asBoolean()).as("%s is refused", table).isFalse();
             assertThat(answer.has("table")).as("%s is not echoed", table).isFalse();
         }
-        // What a printed sticker actually carries is kept.
-        for (String table : List.of("7", "12", "B4", "a-1")) {
+        // What a printed card actually carries — a number the shop has — is kept, and echoed
+        // spelled the way the page spells every other number.
+        for (String table : List.of("1", "7", "12", " 7 ")) {
             JsonNode answer = JSON.readTree(quote(shop, "en", "{\"version\":\"" + version
                     + "\",\"table\":\"" + table + "\",\"lines\":[{\"at\":0,\"qty\":4}]}"));
-            assertThat(answer.path("table").asText()).as("%s is a table", table).isEqualTo(table);
+            assertThat(answer.path("table").asText()).as("%s is a table", table)
+                    .isEqualTo(table.trim());
             assertThat(answer.path("ok").asBoolean()).isTrue();
         }
     }
