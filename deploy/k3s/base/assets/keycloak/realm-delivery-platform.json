@@ -305,6 +305,20 @@
       "serviceAccountsEnabled": true,
       "secret": "${ACCOUNTING_CLIENT_SECRET}",
       "protocol": "openid-connect"
+    },
+    {
+      "clientId": "order-manager",
+      "name": "Order Manager service account",
+      "description": "Prices an order whose customer is not signed in - a diner who scanned the code on their table - by reading the shop's own catalogue from Product Service. Used ONLY when there is no caller token to forward: an order placed by a signed-in customer still travels on that customer's token, so the audit trail keeps naming the real person. Holds no roles at all, neither realm nor realm-management: catalogue reads are open to any authenticated principal, so being one is the whole grant.",
+      "enabled": true,
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "${ORDER_MANAGER_CLIENT_SECRET}",
+      "protocol": "openid-connect"
     }
   ],
   "components": {
