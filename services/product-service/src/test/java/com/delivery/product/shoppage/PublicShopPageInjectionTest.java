@@ -78,7 +78,9 @@ class PublicShopPageInjectionTest {
      * rendered it, and this test would have passed over the new path without touching it.
      */
     private static ShopPageFixture hostileShop() {
-        return new ShopPageFixture()
+        // Table ordering on, because the pad is another surface the merchant's text reaches: a
+        // line's name comes back through the quote's JSON and into the document a second time.
+        return new ShopPageFixture().takesTableOrders()
                 .profile(typed(NAME), typed(TAGLINE), typed(ABOUT), List.of(typed(TAG)),
                         typed(DISTRICT))
                 // 14:30Z against the fixture's 15:00Z clock: recent enough that the page draws it.
@@ -122,9 +124,10 @@ class PublicShopPageInjectionTest {
         String html = page(language);
 
         assertThat(html)
-                // The page's own two: the filter this service serves, and a block of data. A
-                // merchant's "</title><script>" must not become a third.
+                // The page's own three: the two files this service serves, and a block of data. A
+                // merchant's "</title><script>" must not become a fourth.
                 .contains("<script src=\"/s/assets/shop.js?v=")
+                .contains("<script src=\"/s/assets/basket.js?v=")
                 .contains("<script type=\"application/ld+json\">")
                 .doesNotContain("</title><script")
                 .doesNotContain("javascript:")
@@ -134,10 +137,10 @@ class PublicShopPageInjectionTest {
                 .doesNotContain("&#8238;")
                 .doesNotContain("&#x202E");
         // One title element, opened and closed once: the head is still the head. And exactly the
-        // page's own two script elements, no more.
+        // page's own three script elements, no more.
         assertThat(html.split("<title>", -1).length - 1).isEqualTo(1);
         assertThat(html.split("</title>", -1).length - 1).isEqualTo(1);
-        assertThat(html.split("<script", -1).length - 1).isEqualTo(2);
+        assertThat(html.split("<script", -1).length - 1).isEqualTo(3);
     }
 
     @Test
@@ -255,9 +258,43 @@ class PublicShopPageInjectionTest {
                 .isEqualTo(typed(ITEM).replace("‮", ""));
 
         // And none of it wrote a tag on the way in: the block is closed by this page's own
-        // </script>, and the page still has exactly the two script elements it meant to have.
-        assertThat(html.split("<script", -1).length - 1).isEqualTo(2);
-        assertThat(html.split("</script>", -1).length - 1).isEqualTo(2);
+        // </script>, and the page still has exactly the three script elements it meant to have.
+        assertThat(html.split("<script", -1).length - 1).isEqualTo(3);
+        assertThat(html.split("</script>", -1).length - 1).isEqualTo(3);
+    }
+
+    /**
+     * The basket's answer, which is the newest surface a merchant's text reaches — and the first
+     * one on this page that is not markup at all.
+     *
+     * <p>A quote names every line by the thing's own name, and the shop typed those names. The
+     * document is JSON, so {@code esc} would be wrong in both directions there and
+     * {@link ShopPageHtml#json} is what escapes it, exactly as it escapes the structured data:
+     * what JSON requires, and then {@code <}, {@code >} and {@code &} as numeric escapes so a
+     * product called {@code </script>} cannot close anything, wherever this body is eventually
+     * read. The invisible characters are dropped by the same one list, so a right-to-left override
+     * cannot reach a basket line by the door the renderer left open.
+     */
+    @ParameterizedTest(name = "in {0}")
+    @ValueSource(strings = {"en", "ar"})
+    @DisplayName("a quote is still JSON, and the shop's own characters survive it intact")
+    void escapesTheBasketsAnswer(String language) throws Exception {
+        ShopPageFixture shop = hostileShop();
+        String html = render(shop, language);
+        String version = PublicShopBasketApiTest.versionOf(html);
+
+        String json = PublicShopBasketApiTest.quote(shop, language, "{\"version\":\"" + version
+                + "\",\"table\":\"7\",\"lines\":[{\"at\":0,\"qty\":2}]}");
+
+        assertThat(json)
+                .doesNotContain("<").doesNotContain(">")
+                .doesNotContain("‮")
+                .contains("\\u003C").contains("\\u003E").contains("\\u0026");
+        // Parsed rather than pattern-matched, and the name comes back out as the merchant typed it
+        // — not as entities, and not truncated at the first quote mark they used.
+        var parsed = new com.fasterxml.jackson.databind.ObjectMapper().readTree(json);
+        assertThat(parsed.path("lines").get(0).path("name").asText())
+                .isEqualTo(typed(ITEM).replace("‮", ""));
     }
 
     @Test

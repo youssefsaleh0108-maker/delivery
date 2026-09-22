@@ -73,12 +73,68 @@ class PublicShopPageFindingTest {
             assertThat(html).contains("<span class=\"n\">" + name + "</span>");
         }
         assertThat(occurrences(html, "<span class=\"n\">")).isEqualTo(names.size());
-        // Nothing arrives hidden except the two controls the script owns: the search field and
-        // the line it shows when a search finds nothing. Not one item, and not one aisle.
+        // A shop that does not take orders from its tables — which is every shop on the platform
+        // until one turns it on — has exactly the two hidden controls it has always had: the
+        // search field and its "nothing matches" line. No pad, no Add buttons, no strip.
         assertThat(occurrences(html, "hidden")).isEqualTo(2);
         assertThat(html)
                 .contains("<p class=\"q\" hidden>")
-                .contains("<p class=\"qn\" role=\"status\" hidden>");
+                .contains("<p class=\"qn\" role=\"status\" hidden>")
+                .doesNotContain("class=\"bk\"")
+                .doesNotContain("class=\"peek\"");
+        // The shelf itself: every row is there, visible, priced, whatever happens to the scripts.
+        assertThat(occurrences(html, "<li hidden")).isZero();
+        assertThat(occurrences(html, "<div class=\"sec\" hidden")).isZero();
+    }
+
+    /**
+     * The same shop with table ordering on: every control the pad owns arrives hidden.
+     *
+     * <p>The pad, the strip that leads back to it, the table line, the counter, the note about
+     * what the total is — and an Add button on every row that is in stock. All of them are
+     * controls a script owns, and a control that does nothing when it is tapped is worse than no
+     * control. Not one <em>item</em> is hidden, which is the promise the catalogue has always made.
+     */
+    @Test
+    @DisplayName("with table ordering on, the pad's controls arrive hidden and the shelf does not")
+    void theTableOrderingControlsAllShipHidden() throws Exception {
+        String html = render(aisled().takesTableOrders(), "en");
+
+        // Four rows in the fixture, all in stock, so four Add buttons; plus the two search
+        // controls and the five parts of the pad.
+        assertThat(occurrences(html, "hidden")).isEqualTo(2 + 4 + 5);
+        assertThat(html)
+                .contains("<div class=\"bk\" hidden")
+                .contains("<a class=\"peek\" href=\"#basket\" hidden>Your order</a>")
+                .contains("<button class=\"a\" type=\"button\" hidden>Add</button>");
+        assertThat(occurrences(html, "<li hidden")).isZero();
+    }
+
+    /**
+     * What a diner with no JavaScript is told about the pad.
+     *
+     * <p>The panel ships hidden and one line ships visible, which is the honest way round: the
+     * diner who never gets {@code basket.js} is the one who needs to be told there is a pad they
+     * cannot have, and the one who does get it never sees the line because the script hides it.
+     * Either way the menu above is complete, which is the promise this page has always made.
+     */
+    @Test
+    @DisplayName("with no script the pad is honestly absent, and the menu is still whole")
+    void theBasketSaysSoWhenItCannotWork() throws Exception {
+        String html = render(aisled().takesTableOrders(), "en");
+
+        assertThat(html)
+                .contains("<p class=\"bkno note\">Ordering from the table needs JavaScript. "
+                        + "The menu and the prices above are complete without it.</p>")
+                .contains("<div class=\"bk\" hidden")
+                // Priced rows, section links and the whole shelf: none of it waits on a script.
+                .contains("<span class=\"n\">Kaak</span>")
+                .contains("<span class=\"p\">$1.50")
+                .contains("<a href=\"#s1\">Bread</a>");
+        // And the one control that would send food to a kitchen is dead in the markup, not merely
+        // dead once a script has been and gone.
+        assertThat(html).contains("<button class=\"cta bkgo\" type=\"button\" disabled "
+                + "aria-disabled=\"true\">Send to the kitchen</button>");
     }
 
     /**

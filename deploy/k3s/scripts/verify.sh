@@ -61,6 +61,8 @@ api /s/dekkanet-al-rawche-1a2b3c4d/manifest.webmanifest product-service
 api /s/assets/shop.css product-service
 api /s/assets/shop.js product-service
 api /sitemap.xml product-service
+api /api/table-orders order-manager
+api /api/table-orders/8f2 order-manager
 '
 
 for env in dev qa; do
@@ -308,6 +310,46 @@ grep -F -A4 'Host(`www.youdrop.shop`) && (PathPrefix(`/s/`)' "$dev_ing" \
 grep -q 'Sitemap: https://www.youdrop.shop/sitemap.xml' ../../clients/website/nginx.conf \
   && ok "robots.txt points crawlers at the shop sitemap" \
   || fail "clients/website/nginx.conf serves a robots.txt with no Sitemap line"
+
+echo "== ordering at the table (/api/table-orders) =="
+# A diner scans the card on table seven and lands on www, because www is the address a shop prints.
+# The page may fetch its own origin and nothing else (`connect-src 'self'`), so the endpoint it
+# sends to has to answer on www as well — or every send from a scanned card is a cross-origin
+# request the browser refuses, and the only ways out would be naming an API host in the page's CSP
+# or turning CORS on for an anonymous endpoint that prints paper in a kitchen.
+grep -q 'Host(`www.youdrop.shop`) && PathPrefix(`/api/table-orders`)' "$dev_ing" \
+  && ok "dev takes table orders on www, the address on the card" \
+  || fail "no www route for /api/table-orders: a scanned code could not send, and connect-src 'self' is why"
+# Same reasoning as the shop page: ONE www, pointed at ONE environment.
+grep -q 'PathPrefix(`/api/table-orders`)' "$qa_ing" \
+  && ok "qa takes table orders on its own API host" \
+  || fail "qa has no /api/table-orders route at all"
+grep -F -A2 'Host(`www.youdrop.shop`) && PathPrefix(`/api/table-orders`)' "$dev_ing" \
+  | grep -q 'priority:' \
+  && ok "the www table-order route outranks the site's catch-all explicitly" \
+  || fail "the www table-order route has no explicit priority: the static site would answer it"
+grep -F -A4 'Host(`www.youdrop.shop`) && PathPrefix(`/api/table-orders`)' "$dev_ing" \
+  | grep -q 'middlewares: \*table-orders-mw' \
+  && ok "www and the API host take table orders through the same middlewares" \
+  || fail "the www table-order route has a middleware list of its own: the two will drift"
+for env in dev qa; do
+  ing="$tmp/$env-ingress-nocomments.yaml"
+  # CORS on the one anonymous endpoint that writes into a kitchen would be an invitation for it to
+  # be called from anywhere. Same-origin needs none, which is the whole point of the www route.
+  grep -F -A6 "PathPrefix(\`/api/table-orders\`)" "$ing" | grep -q 'name: platform-cors' \
+    && fail "$env allows CORS on table orders: an anonymous kitchen endpoint callable from any site" \
+    || ok "$env takes table orders same-origin only, with no CORS allowance"
+  # The edge's limiter is per source IP and a restaurant's guest Wi-Fi is one address, so this is
+  # a flood guard and never the rule; TableOrderRate in order-manager is keyed per table and shop.
+  grep -F -A6 "PathPrefix(\`/api/table-orders\`)" "$ing" | grep -q 'name: platform-rate-limit' \
+    && ok "$env keeps the edge flood guard on table orders" \
+    || fail "$env takes table orders with no rate limit at the edge"
+  # A route is not a permission: these paths reach order-manager, and order-manager's own
+  # permit-all list is what decides they may be called without a token.
+  grep -F -A2 "PathPrefix(\`/api/table-orders\`)" "$ing" | grep -q 'name: order-manager' \
+    && ok "$env sends table orders to order-manager" \
+    || fail "$env routes /api/table-orders somewhere other than order-manager"
+done
 
 echo "== the realm a fresh import would build (PT-3, PT-7) =="
 # Greps rather than jq: jq is not assumed anywhere in this script, and every value below is alone

@@ -67,6 +67,22 @@ public class OrderEventListener {
             java.util.Set.of("COLLECTED", "CAPTURED");
 
     /**
+     * The one {@code OrderKind} this service books nothing for.
+     *
+     * <p>A diner at a table in a restaurant, ordering from the shop's own menu on their phone and
+     * paying the restaurant at the table. No delivery, no rider, no carrier, no fee, no money
+     * through the platform and — by the owner's decision — no commission: the platform lent the
+     * restaurant an order pad, it did not sell the meal.
+     *
+     * <p>A string rather than an enum because that is how this service reads every kind: the event
+     * is JSON from another service's own enum, and adding a compile-time dependency on
+     * order-manager's domain to recognise one value would be a far larger commitment than the
+     * value is worth. It matches {@code OrderKind.TABLE} in order-manager, and
+     * {@code AccountingTableOrderTest} fails loudly if the two ever stop agreeing.
+     */
+    static final String TABLE_ORDER = "TABLE";
+
+    /**
      * <strong>What happens when a settlement fails, which is the whole shape of this method
      * (RECON-04).</strong>
      *
@@ -174,6 +190,35 @@ public class OrderEventListener {
         // Absent on events published before Butler existed; those were all baskets from shops.
         String kind = event.path("kind").asText("CATALOG");
         boolean errand = kind.startsWith("BUTLER");
+
+        // THE ORDER THIS SERVICE MUST NOT TOUCH.
+        //
+        // A table order is a diner sitting in a restaurant who scanned the code on their table,
+        // chose from the menu and sent it to the kitchen. They pay the restaurant, at the table,
+        // in whatever way they were already paying it. The platform lent them an order pad; it
+        // did not sell the meal, carry it, collect for it or take a cut of it. There is nothing
+        // here for a ledger to record, and anything it did record would be an invention.
+        //
+        // <strong>Without this line it would settle, and settle wrongly.</strong> A table order is
+        // CASH and has no rider, and it is not carried — which is exactly the shape the pickup
+        // branch below was built for. It would take the merchant-holder path, write a
+        // CASH_COLLECTED leg against the restaurant for notes the platform never saw, credit the
+        // merchant, take a PLATFORM_COMMISSION on a meal the platform had no part in, open a
+        // cash_float obligation the restaurant would be chased for, and award points on top. Every
+        // one of those is a real row in a real ledger that somebody would later have to explain.
+        //
+        // Returned as SETTLED rather than refused, because nothing went wrong: settling to nothing
+        // is the correct outcome, and recording it in SettlementFailureLog would fill the Back
+        // Office's list of things to look at with orders that are exactly as they should be.
+        //
+        // It is here — before the parties check, before the payment gate, before settle() and
+        // before awardPoints() — so that it is one return rather than a condition repeated at
+        // four sites, and so that a later change to any of them cannot reach a table order at all.
+        // AccountingTableOrderTest and AccountingTableOrderDatabaseTest hold it to that.
+        if (TABLE_ORDER.equals(kind)) {
+            log.debug("Order {} is a table order: nothing to settle, by design", orderId);
+            return Outcome.ok();
+        }
 
         // Who must be present depends on what this is. A basket needs the shop that sold it; an
         // errand needs the rider who ran it, because they are the one owed the money. Demanding
@@ -353,6 +398,15 @@ public class OrderEventListener {
      * from an Order Manager that has not been deployed yet looks like.
      */
     private void onOrderCancelled(JsonNode event, String correlationId) {
+        // Said here as well as on the delivered path, and not because it is reachable today: a
+        // table order can never be AFTER_PICKUP, because nobody picks one up and a database CHECK
+        // in another service forbids the status. That is a good reason and it is somebody else's
+        // reason. The rule "this service books nothing for a table order" should hold at every
+        // door into it, on this service's own terms, rather than resting on a constraint a future
+        // migration could relax without anyone here noticing.
+        if (TABLE_ORDER.equals(event.path("kind").asText("CATALOG"))) {
+            return;
+        }
         String stage = event.path("stage").asText(null);
         boolean compensateMerchant = event.path("compensateMerchant").asBoolean(false);
         boolean compensateCarrier = event.path("compensateCarrier").asBoolean(false);
