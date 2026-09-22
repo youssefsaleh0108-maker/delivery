@@ -220,6 +220,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// How busy the areas around a shop are — the merchant Demand Radar. Owner-only, like every
   /// order-backed number a shop sees; MerchantShell decides who gets the door.
   late final DemandApi _demandApi = DemandApi(_dio);
+  late final MenuInsightsApi _menuInsightsApi = MenuInsightsApi(_dio);
   late final RiderMoneyApi _riderMoneyApi = RiderMoneyApi(_dio);
 
   /// The rider's own completion rate and claimed/delivered counts, behind the Earnings tab.
@@ -1072,6 +1073,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               reportsApi: _reportsApi,
               catalogScanApi: _catalogScanApi,
               demandApi: _demandApi,
+              menuInsightsApi: _menuInsightsApi,
               shopChatApi: _shopChatApi,
               chatSocket: _socket,
               // A services shop's bell (126:51), the delivery rule on its offers, and its
