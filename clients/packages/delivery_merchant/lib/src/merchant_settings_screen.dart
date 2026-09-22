@@ -53,6 +53,7 @@ class MerchantSettingsScreen extends StatelessWidget {
     this.onServiceOffers,
     this.onCategories,
     this.onMenuBuilder,
+    this.onMenuInsights,
     this.onStaff,
     this.onStockCount,
     this.onCatalogScan,
@@ -117,6 +118,12 @@ class MerchantSettingsScreen extends StatelessWidget {
   /// items, and items inside their sections. Null on the same terms as [onCategories]: a services
   /// shop has no shelf to arrange, and an employee without the permission sees no door.
   final VoidCallback? onMenuBuilder;
+
+  /// Menu insights: what that menu has been doing. Under the builder that arranges it, because a
+  /// merchant who has just rearranged a menu is the one who wants to know whether it is being
+  /// read. Null on its own terms rather than the builder's — reading the shop's figures needs
+  /// VIEW_REPORTS, not the permission that changes prices.
+  final VoidCallback? onMenuInsights;
 
   /// Merchant Blitz: builds the catalogue from shelf photos. Absent, not disabled, when unwired —
   /// the host leaves it null for anyone the server would refuse, which is everyone but the owner.
@@ -351,6 +358,14 @@ class MerchantSettingsScreen extends StatelessWidget {
               icon: Icons.restaurant_menu_outlined,
               title: t.menuBuilderTitle,
               onTap: onMenuBuilder,
+            ),
+          ],
+          if (onMenuInsights != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _MenuRow(
+              icon: Icons.insights_outlined,
+              title: t.merchMenuInsightsTitle,
+              onTap: onMenuInsights,
             ),
           ],
           if (onCategories != null) ...<Widget>[

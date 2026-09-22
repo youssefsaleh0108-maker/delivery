@@ -121,6 +121,7 @@ class _DeliveryPortalAppState extends State<DeliveryPortalApp> {
     reports: ReportsApi(_dio),
     catalogScan: CatalogScanApi(_dio),
     demand: DemandApi(_dio),
+    menuInsights: MenuInsightsApi(_dio),
     shopChat: ShopChatApi(_dio),
     moderation: ChatModerationApi(_dio),
     attachments: OrderAttachmentApi(_dio),

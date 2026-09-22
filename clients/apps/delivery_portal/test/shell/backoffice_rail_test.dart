@@ -46,6 +46,7 @@ PortalApis _apis() {
     reports: ReportsApi(dio),
     catalogScan: CatalogScanApi(dio),
     demand: DemandApi(dio),
+    menuInsights: MenuInsightsApi(dio),
     shopChat: ShopChatApi(dio),
     moderation: ChatModerationApi(dio),
     attachments: OrderAttachmentApi(dio),
