@@ -16,9 +16,14 @@
 #   ops-auth              a new ops basic-auth password: its hash in ops-auth-users, the password in
 #                         /root/ops-auth-password-<env>.txt (mode 600)
 #   vault-reseed          restart Vault so its seed stops carrying the two client secrets
-#   client <clientId>     regenerate one service account's secret in Keycloak, store it, restart the
+#   client <clientId> [--bootstrap]
+#                         regenerate one service account's secret in Keycloak, store it, restart the
 #                         service that presents it (onboarding-service | accounting-service |
-#                         notifications-manager)
+#                         notifications-manager | order-manager). Creates the client first if this
+#                         realm does not have it yet — see step_client.
+#                         --bootstrap is for a client whose manifest has NOT shipped yet: it mints
+#                         the key first so the Deployment's (deliberately non-optional) secretKeyRef
+#                         finds it on arrival instead of failing every pod. Skips the restart.
 #   drop-stale-keys       remove ONBOARDING_CLIENT_SECRET from platform-secrets once nothing reads it
 #   lock-unused-db-roles  NOLOGIN for the database roles no service logs in as
 #   test-accounts [--disable]  count (and, with --disable, disable) accounts the repository's test
@@ -71,7 +76,13 @@ TOKEN_URL="$IAM/realms/$REALM/protocol/openid-connect/token"
 ADMIN=""
 OLD_TAR="${OLD_TAR:-/dev/shm/rotation-old.tar}"
 OPS_PASSWORD_FILE="${OPS_PASSWORD_FILE:-/root/ops-auth-password-$ENV_NAME.txt}"
-CLIENTS="onboarding-service accounting-service notifications-manager"
+# Every service-account client in the realm: what `adopt` collects and what the final proof walks.
+CLIENTS="onboarding-service accounting-service notifications-manager order-manager"
+# The subset whose old secret was published with the repository, so there is something in $OLD_TAR
+# to prove refused. order-manager is NOT one: it was minted after the repository went private and
+# has never had a value anyone outside the box has seen. Keeping the two lists apart is what stops
+# check-old reporting a missing proof for a credential that was never exposed.
+EXPOSED_CLIENTS="onboarding-service accounting-service notifications-manager"
 DEMO_USERS="customer rider merchant backoffice carrier"
 UNUSED_ROLES="delivery_readonly identity_service file_service corebanking_simulator"
 
@@ -150,6 +161,7 @@ client_key() {
     onboarding-service) echo ONBOARDING_CLIENT_SECRET ;;
     accounting-service) echo ACCOUNTING_CLIENT_SECRET ;;
     notifications-manager) echo NOTIFICATIONS_CLIENT_SECRET ;;
+    order-manager) echo ORDER_MANAGER_CLIENT_SECRET ;;
     *) return 1 ;;
   esac
 }
@@ -241,6 +253,7 @@ kc() {   # kc <curl args...>: the admin API
   curl -s -H @"$WORK/auth" "$@"
 }
 client_uuid() { kc "$ADMIN/clients?clientId=$1" | jq -r '.[0].id // empty'; }
+client_exists() { [ -n "$(client_uuid "$1")" ]; }
 client_secret_to() {   # Keycloak's current secret of <clientId> -> <file>
   local id; id=$(client_uuid "$1"); [ -n "$id" ] || die "client $1 not found in $IAM"
   kc "$ADMIN/clients/$id/client-secret" | jq -j '.value // empty' > "$2"
@@ -325,7 +338,7 @@ step_backup() {
 step_check_old() {   # a preflight: is every exposed value the refusal proofs need in $OLD_TAR?
   local c u p r
   [ -s "$OLD_TAR" ] || die "no $OLD_TAR — stream the base commit's files in first (see the runbook)"
-  for c in $CLIENTS; do check "old secret of $c" found "$(old_value client "$c" "$WORK/x" && echo found || echo missing)"; done
+  for c in $EXPOSED_CLIENTS; do check "old secret of $c" found "$(old_value client "$c" "$WORK/x" && echo found || echo missing)"; done
   for u in $DEMO_USERS; do check "old password of $u" found "$(old_value user "$u" "$WORK/x" && echo found || echo missing)"; done
   for p in WHATSAPP_APP_SECRET WHATSAPP_VERIFY_TOKEN; do check "old $p" found "$(old_value whatsapp "$p" "$WORK/x" && echo found || echo missing)"; done
   check "old DLR secret" found "$(old_value dlr - "$WORK/x" && echo found || echo missing)"
@@ -339,7 +352,7 @@ step_check_old() {   # a preflight: is every exposed value the refusal proofs ne
   echo "== each exposed value is live in $NS today"
   local code
   kc_login
-  for c in $CLIENTS; do old_value client "$c" "$WORK/x"; check "$c gets a token with the repository's secret" 200 "$(cc_code "$c" "$WORK/x")"; done
+  for c in $EXPOSED_CLIENTS; do old_value client "$c" "$WORK/x"; check "$c gets a token with the repository's secret" 200 "$(cc_code "$c" "$WORK/x")"; done
   for u in $DEMO_USERS; do old_value user "$u" "$WORK/x"; check "$u signs in with the repository's password" 200 "$(pw_code "$(demo_client "$u")" "$u" "$WORK/x")"; done
   old_value whatsapp WHATSAPP_APP_SECRET "$WORK/x"; check "the WhatsApp webhook accepts the repository's signature" 200 "$(wa_code "$WORK/x")"
   old_value whatsapp WHATSAPP_VERIFY_TOKEN "$WORK/x"; check "the WhatsApp handshake accepts the repository's token" 200 "$(verify_token_code "$WORK/x")"
@@ -356,7 +369,18 @@ step_adopt() {
   local c key
   kc_login
   mkdir "$WORK/adopt"
-  for c in $CLIENTS; do key=$(client_key "$c"); client_secret_to "$c" "$WORK/adopt/$key"; done
+  # Only what this realm actually holds. A client added to the realm file after the environment was
+  # built is not here yet (the realm import ran once), and there is nothing of it to adopt —
+  # 'client <id>' creates it and mints its secret in one go. Skipped rather than fatal, so adopting
+  # the clients that DO exist is not blocked by one that does not.
+  for c in $CLIENTS; do
+    key=$(client_key "$c")
+    if client_exists "$c"; then
+      client_secret_to "$c" "$WORK/adopt/$key"
+    else
+      echo "  --    $c is not in realm $REALM: nothing to adopt; run '$0 $NS client $c' to create it"
+    fi
+  done
   if secret_exists keycloak-clients; then
     echo "keycloak-clients already exists in $NS; comparing it with Keycloak:"
   else
@@ -365,6 +389,7 @@ step_adopt() {
   fi
   for c in $CLIENTS; do
     key=$(client_key "$c")
+    [ -s "$WORK/adopt/$key" ] || { skip "keycloak-clients/$key: $c is not in realm $REALM yet"; continue; }
     check "keycloak-clients/$key == Keycloak's $c" same "$(same "$(secret_sha keycloak-clients "$key")" "$(file_sha "$WORK/adopt/$key")")"
   done
   if secret_has platform-secrets ONBOARDING_CLIENT_SECRET; then
@@ -461,25 +486,106 @@ step_vault_reseed() {
   done
 }
 
+# Creates a service-account client this realm does not have yet, from the definition the realm file
+# carries. Needed because `start-dev --import-realm` imports a realm ONCE: a client added to
+# realm-delivery-platform.json after an environment was built never reaches that environment, and
+# this is the only script allowed to put it there (apply-realm-updates.sh re-asserts old public
+# client secrets and must not be run). No secret is set here — the caller regenerates one
+# immediately, so the value is never anything this script chose or printed.
+#
+# Roles are deliberately absent from every definition below: a service account that needs one is a
+# decision to make in the realm file and review, not a flag to pass here.
+client_create() {
+  case "$1" in
+    order-manager)
+      cat > "$WORK/new-client.json" <<'JSON'
+{
+  "clientId": "order-manager",
+  "name": "Order Manager service account",
+  "description": "Prices an order whose customer is not signed in - a diner who scanned the code on their table - by reading the shop's own catalogue from Product Service. Used ONLY when there is no caller token to forward. Holds no roles at all.",
+  "enabled": true,
+  "publicClient": false,
+  "bearerOnly": false,
+  "standardFlowEnabled": false,
+  "implicitFlowEnabled": false,
+  "directAccessGrantsEnabled": false,
+  "serviceAccountsEnabled": true,
+  "protocol": "openid-connect"
+}
+JSON
+      ;;
+    *) die "no stored definition for client $1: add it to client_create, from the realm file" ;;
+  esac
+  local code
+  code=$(kc -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
+    --data-binary @"$WORK/new-client.json" "$ADMIN/clients")
+  rm -f "$WORK/new-client.json"
+  [ "$code" = 201 ] || die "Keycloak refused to create client $1 (HTTP $code)"
+  client_exists "$1" || die "created client $1 but it cannot be read back"
+  echo "  created client $1 in realm $REALM (no roles, no secret yet)"
+}
+
 step_client() {
-  local c="${1:?usage: client <onboarding-service|accounting-service|notifications-manager>}" key ref
+  local c="${1:?usage: client <onboarding-service|accounting-service|notifications-manager|order-manager> [--bootstrap]}" key ref bootstrap=
+  [ "${2:-}" = --bootstrap ] && bootstrap=1
   key=$(client_key "$c") || die "unknown client $c"
   secret_exists keycloak-clients || die "keycloak-clients does not exist in $NS: run 'adopt' first"
   ref=$(k get deploy "$c" -o json | jq -r '.spec.template.spec.containers[0].env[]? | select(.name == "KEYCLOAK_CLIENT_SECRET") | .valueFrom.secretKeyRef | "\(.name)/\(.key)"')
-  [ "$ref" = "keycloak-clients/$key" ] || die "deploy/$c reads its client secret from '${ref:-nowhere}', not keycloak-clients/$key: the manifest change has not reached $NS"
+  # A NEW service account deadlocks against this guard, and the deadlock is not obvious from either
+  # end: the secretKeyRef that will read the key is deliberately NOT optional, so the moment the
+  # manifest lands every pod of this service fails with CreateContainerConfigError until the key
+  # exists — while this step refuses to create the key until the manifest has landed. Something has
+  # to go first, and it must be the secret: a Secret nobody reads yet breaks nothing, whereas a
+  # Deployment pointing at a missing key is an outage.
+  #
+  # So --bootstrap mints the key BEFORE the manifest ships. It is a flag and not an automatic
+  # fallback on purpose: "the manifest has not shipped yet" and "the manifest shipped and something
+  # reverted it" look identical from here, and only the operator knows which one this is. The checks
+  # below that need a running reader are skipped, because there is not one yet.
+  if [ "$ref" != "keycloak-clients/$key" ]; then
+    [ -n "$bootstrap" ] || die "deploy/$c reads its client secret from '${ref:-nowhere}', not keycloak-clients/$key: the manifest change has not reached $NS (if this client is NEW and its manifest has not shipped yet, run: client $c --bootstrap)"
+    [ -z "$ref" ] || die "deploy/$c reads keycloak-clients via '$ref', not '$key': that is a wrong manifest, not an unshipped one, so --bootstrap is the wrong tool"
+    ! secret_has keycloak-clients "$key" || die "keycloak-clients/$key already exists, so this is not first-time provisioning: ship the manifest and run without --bootstrap"
+    echo "BOOTSTRAP: deploy/$c does not read keycloak-clients/$key yet; minting it first so the manifest can land without an outage."
+  elif [ -n "$bootstrap" ]; then
+    die "deploy/$c already reads keycloak-clients/$key, so --bootstrap is not what you want: run without it and the service is restarted onto the new secret"
+  fi
   if [ "$c" != onboarding-service ] && vault_keys "$c" | grep -q client-secret; then
     die "Vault still hands $c the old client secret, and the Config Server's value would win: run 'vault-reseed' first"
   fi
   kc_login
-  client_secret_to "$c" "$WORK/old"
+  # A client this realm has never had (one added to the realm file after the environment was built)
+  # is created now, and then has no old secret to prove refused — there was never one to leak.
+  if client_exists "$c"; then
+    client_secret_to "$c" "$WORK/old"
+  else
+    echo "$c is not in realm $REALM yet; creating it (the realm import only ever ran once)."
+    client_create "$c"
+    : > "$WORK/old"
+  fi
   client_secret_regenerate_to "$c" "$WORK/new"
   secret_set_key keycloak-clients "$key" "$WORK/new"
-  echo "$c: Keycloak regenerated its secret and keycloak-clients/$key holds it; restarting deploy/$c ..."
-  restart "$c"
+  if [ -n "$bootstrap" ]; then
+    echo "$c: Keycloak holds a secret and keycloak-clients/$key holds the same value. NOT restarting: nothing reads it yet."
+  else
+    echo "$c: Keycloak regenerated its secret and keycloak-clients/$key holds it; restarting deploy/$c ..."
+    restart "$c"
+  fi
   check "$c: the new secret gets a token" 200 "$(cc_code "$c" "$WORK/new")"
-  check "$c: the old secret is refused" 401 "$(cc_code "$c" "$WORK/old")"
-  check "$c: the running pod holds the Secret's value" same "$(same "$(env_sha "$c" KEYCLOAK_CLIENT_SECRET)" "$(secret_sha keycloak-clients "$key")")"
+  # An empty file would be "refused" by Keycloak too, and a proof that passes for a value that
+  # never existed proves nothing. Said out loud instead.
+  if [ -s "$WORK/old" ]; then
+    check "$c: the old secret is refused" 401 "$(cc_code "$c" "$WORK/old")"
+  else
+    skip "$c: no previous secret to prove refused — this client was created a moment ago"
+  fi
+  if [ -n "$bootstrap" ]; then
+    skip "$c: no running pod reads this key yet — the manifest ships next, and its rollout is the proof"
+  else
+    check "$c: the running pod holds the Secret's value" same "$(same "$(env_sha "$c" KEYCLOAK_CLIENT_SECRET)" "$(secret_sha keycloak-clients "$key")")"
+  fi
   check "$c: the Secret holds Keycloak's value" same "$(same "$(secret_sha keycloak-clients "$key")" "$(file_sha "$WORK/new")")"
+  [ -z "$bootstrap" ] || echo "NEXT: ship the manifest that points deploy/$c at keycloak-clients/$key. Until it rolls out, $c has no service account and behaves exactly as it did before."
 }
 
 step_drop_stale_keys() {
@@ -981,6 +1087,12 @@ step_verify() {
   for c in $CLIENTS; do
     kc_fresh
     key=$(client_key "$c")
+    # Reported, not fatal: this is the proof run, and a client the realm is missing is exactly the
+    # finding it exists to surface — dying here would hide every check after it.
+    if ! client_exists "$c"; then
+      bad "$c is not in realm $REALM: run '$0 $NS client $c'"
+      continue
+    fi
     client_secret_to "$c" "$WORK/kc-$c"
     check "$c: Keycloak holds keycloak-clients' value" same "$(same "$(file_sha "$WORK/kc-$c")" "$(secret_sha keycloak-clients "$key")")"
     check "$c: the running pod holds it too" same "$(same "$(env_sha "$c" KEYCLOAK_CLIENT_SECRET)" "$(secret_sha keycloak-clients "$key")")"

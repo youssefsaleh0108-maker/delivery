@@ -26,6 +26,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -166,6 +168,9 @@ public class PublicShopPageController {
     /** The one script, read once, for the same reason and on the same terms. */
     private final byte[] script;
 
+    /** The basket's script, read once, on the same terms again. */
+    private final byte[] basketScript;
+
     /**
      * The two asset URLs every rendering points at, fingerprinted by the bytes behind them.
      *
@@ -217,9 +222,11 @@ public class PublicShopPageController {
         this.baseUrl = trimTrailingSlash(baseUrl);
         this.stylesheet = readAsset("shoppage/shop.css");
         this.script = readAsset("shoppage/shop.js");
+        this.basketScript = readAsset("shoppage/basket.js");
         this.assets = new ShopPageHtml.Assets(
                 ShopPageHtml.STYLESHEET + "?v=" + fingerprint(stylesheet),
-                ShopPageHtml.SCRIPT + "?v=" + fingerprint(script));
+                ShopPageHtml.SCRIPT + "?v=" + fingerprint(script),
+                ShopPageHtml.BASKET_SCRIPT + "?v=" + fingerprint(basketScript));
         this.contentSecurityPolicy = policyFor(imageOrigin);
         this.qrCodes = new ShopPageCache<>(QR_MEMO_FOR, QR_MEMO_ENTRIES, nanoClock);
         this.renderedPages = new ShopPageCache<>(PAGE_MAX_AGE, PAGE_MEMO_ENTRIES, nanoClock);
@@ -371,6 +378,116 @@ public class PublicShopPageController {
     @GetMapping("/s/assets/shop.js")
     public ResponseEntity<byte[]> script(HttpServletRequest request) {
         return asset(script, MediaType.valueOf("text/javascript;charset=UTF-8"), request);
+    }
+
+    /**
+     * The basket's script, on exactly the same terms as the catalogue filter.
+     *
+     * <p>A second file rather than a second half of the first: see {@link ShopPageHtml#BASKET_SCRIPT}
+     * for why the two rules cannot live in one. The reader with no basket — a crawler, a chat app
+     * drawing a preview card — never asks for either, and both are cached for a year across every
+     * shop page on the platform.
+     */
+    @GetMapping("/s/assets/basket.js")
+    public ResponseEntity<byte[]> basketScript(HttpServletRequest request) {
+        return asset(basketScript, MediaType.valueOf("text/javascript;charset=UTF-8"), request);
+    }
+
+    // ---------------------------------------------------------------- the order pad
+
+    /**
+     * What is on a table's order pad, and what the food comes to, answered by the server.
+     *
+     * <p><strong>This is the whole reason the page may show a total.</strong> The figures come back
+     * already added up and already spelled in the diner's language
+     * ({@link PublicShopPageService#price}, {@link ShopBasketJson}), so the script is handed
+     * sentences and never numbers — a page that added two prices together in a browser and showed
+     * somebody a figure the restaurant had not agreed to is the failure this shape makes
+     * impossible rather than merely forbidden.
+     *
+     * <p><strong>It is the first thing on this surface that takes input</strong>, and the service's
+     * own note on {@code /s/**} — "it takes no input but a slug" — is narrowed by exactly this
+     * method and no other. What it accepts is bounded and dull: a shelf fingerprint this page
+     * printed, up to {@value PublicShopPageService#MAX_BASKET_LINES} positions on that shelf with a
+     * count and a short note each, and the code printed on the table. There is no id in it, no
+     * address, no payment and nothing about who the diner is. It still reads no caller and still
+     * cannot become personalised.
+     *
+     * <p>Answered with {@code no-store}. A quote is about prices and what the kitchen still has as
+     * they are this second, and a shared cache handing a stale one to the next diner is a total
+     * nobody agreed to; it is also the one response here that must never be kept by a proxy,
+     * because it is the only one a reader's own choices shaped.
+     *
+     * <p>The refusal for a shop nobody may see is the page's, not a variant: a slug that has no
+     * page has no pad either, and answering differently would make this endpoint a way to ask
+     * whether a draft or suspended shop exists.
+     */
+    @PostMapping(path = "/s/{slug}/quote", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<byte[]> quote(@PathVariable String slug,
+                                        @RequestParam(name = "lang", required = false) String lang,
+                                        @RequestHeader(name = HttpHeaders.ACCEPT_LANGUAGE,
+                                                required = false) String acceptLanguage,
+                                        @RequestBody BasketRequest body) {
+        ShopPageText text = ShopPageText.choose(lang, acceptLanguage);
+        ShopBasket basket;
+        try {
+            basket = pages.price(slug, body.safeVersion(), body.safeLines(), body.table());
+        } catch (ShopPageNotFoundException absent) {
+            return notFound(text);
+        }
+        byte[] json = ShopBasketJson.render(basket, text, pages.lbpPerUsd())
+                .getBytes(StandardCharsets.UTF_8);
+        return secured(ResponseEntity.ok())
+                .cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.CONTENT_LANGUAGE, text.tag())
+                .header(HttpHeaders.VARY, HttpHeaders.ACCEPT_LANGUAGE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(json);
+    }
+
+    /**
+     * A basket, as it arrives.
+     *
+     * <p>Every field is bounded here rather than trusted and bounded later, because this body comes
+     * from a stranger with no token: a version that is not the fingerprint this page prints matches
+     * nothing and is refused as stale, a line list longer than a basket can be is cut, and a count
+     * outside 1..{@value PublicShopPageService#MAX_LINE_QTY} is clamped into it. Nothing here can
+     * be a string a merchant typed, an id, or an amount of money.
+     *
+     * @param table the code printed on the diner's table, exactly as it came out of the query
+     *              string. Bounded and checked on the server ({@code PublicShopPageService#tableOf})
+     *              rather than believed: the script's copy of that rule decides what a diner is
+     *              shown, and this one decides what a kitchen would be sent.
+     */
+    public record BasketRequest(String version, List<Line> lines, String table) {
+
+        /** One line: where it sits on the shelf, how many, and what was asked for with it. */
+        public record Line(Integer at, Integer qty, String note) {
+        }
+
+        String safeVersion() {
+            // Never null, so the comparison in price() is a comparison rather than a special case,
+            // and an absent version is simply a version that matches no shelf.
+            return version == null ? "" : version;
+        }
+
+        List<PublicShopPageService.BasketLine> safeLines() {
+            if (lines == null) {
+                return List.of();
+            }
+            List<PublicShopPageService.BasketLine> safe = new java.util.ArrayList<>();
+            for (Line line : lines) {
+                if (line == null || line.at() == null || line.qty() == null) {
+                    continue;
+                }
+                if (safe.size() >= PublicShopPageService.MAX_BASKET_LINES) {
+                    break;
+                }
+                int qty = Math.min(Math.max(line.qty(), 1), PublicShopPageService.MAX_LINE_QTY);
+                safe.add(new PublicShopPageService.BasketLine(line.at(), qty, line.note()));
+            }
+            return safe;
+        }
     }
 
     /**
@@ -548,6 +665,16 @@ public class PublicShopPageController {
                 // Exactly this service's own manifest, and nothing else: default-src 'none' would
                 // block it outright, and the only alternative to naming it was not shipping it.
                 + "manifest-src 'self'; "
+                // The basket's quote, from this origin and nowhere else.
+                //
+                // default-src 'none' had been blocking every fetch on this page, which was right
+                // while there was nothing to fetch. A total is the server's answer, so there is
+                // now exactly one request to allow, and it is answered by this service at this
+                // origin — which is also why the endpoint is /s/{slug}/quote and not a call to the
+                // API host: the page is served on www.youdrop.shop as well, an API request from
+                // there would be cross-origin, and 'self' is a promise that is worth more than the
+                // convenience of reaching another service directly.
+                + "connect-src 'self'; "
                 + "base-uri 'none'; "
                 + "form-action 'none'; "
                 + "frame-ancestors 'none'";

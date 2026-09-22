@@ -253,8 +253,21 @@ final class ShopPageFixture {
         return this;
     }
 
-    /** And the switch beside it: this shop takes orders from those tables, not just hands out a menu. */
+    /**
+     * And the switch beside it: this shop takes orders from those tables, not just hands out a menu.
+     *
+     * <p>Off by default here exactly as it is off by default in the database, so every test that
+     * does not ask for it is testing the shop every shop on the platform is today: a menu, and a
+     * line saying to order with the staff.
+     */
     ShopPageFixture takesTableOrders() {
+        if (shop.getTableCount() < 1) {
+            // A room, because the domain refuses the switch without one — a shop with no cards has
+            // no table for an order to have come from. Twelve is a restaurant, and it means a test
+            // about ordering does not have to furnish the place first. A test that cares about the
+            // count says so with tables().
+            shop.seatTables(12);
+        }
         shop.acceptTableOrders(true);
         return this;
     }

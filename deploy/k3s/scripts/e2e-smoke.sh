@@ -93,6 +93,57 @@ C=$(code "$MERCH" GET "/api/stores/mine")
 C=$(code "$MERCH" GET "/api/orders/merchant?page=0&size=5")
 [ "$C" = 200 ] && ok "merchant order queue answers" || bad "orders/merchant" "HTTP $C"
 
+echo "=== $ENV : a diner at a table ==="
+# The one door on this platform that nobody signs in at, so the thing worth smoking from outside is
+# exactly that: these paths must answer WITHOUT a token. A 401 here means the route is missing from
+# the ingress or the path is missing from order-manager's permit-all — the two failures that look
+# identical from a phone and cannot be told apart by any test that sends credentials.
+#
+# Nothing below needs demo data or leaves anything behind. The send is deliberately aimed at a
+# store id that does not exist, so it can never print a ticket in somebody's kitchen: reaching a
+# 4xx from order-manager's own rules is proof the request got all the way there anonymously, which
+# is what is being checked. A real send follows only if a shop has actually turned table ordering
+# on.
+anon() { # anon <method> <path> [json]
+  if [ -n "${3:-}" ]; then
+    curl -s -o /tmp/e2e_body -w "%{http_code}" -X "$1" \
+      -H "Content-Type: application/json" -d "$3" "$API$2"
+  else
+    curl -s -o /tmp/e2e_body -w "%{http_code}" -X "$1" "$API$2"
+  fi
+}
+
+NOWHERE="00000000-0000-4000-8000-000000000000"
+C=$(anon POST "/api/table-orders" \
+  "{\"storeId\":\"$NOWHERE\",\"table\":1,\"items\":[{\"productId\":\"$NOWHERE\",\"qty\":1}]}")
+case "$C" in
+  401|403) bad "table orders take no token" "HTTP $C: the path is not permit-all, or not routed" ;;
+  404)     bad "table orders are routed"    "HTTP $C: nothing serves /api/table-orders" ;;
+  *)       ok  "table orders answer a stranger with no token (HTTP $C)" ;;
+esac
+
+# The diner's own ticket, by id. A random id is not a real order, so the only correct answer is the
+# same quiet 404 an expired link gets — and critically NOT a 401, which is what a missing permit-all
+# line would produce.
+C=$(anon GET "/api/table-orders/status/$(printf '%s' "$NOWHERE")")
+case "$C" in
+  401|403) bad "a diner reads their ticket with no token" "HTTP $C: status/* is not permit-all" ;;
+  404)     ok  "an unknown ticket is a quiet 404, not a challenge" ;;
+  *)       bad "a diner reads their ticket with no token" "HTTP $C: expected 404 for a random id" ;;
+esac
+
+# And the kitchen's side of the same feature, which must NOT be open. The queue is the merchant's
+# own orders filtered by kind, on their token: if this ever answers a stranger, every restaurant's
+# live tickets are public.
+C=$(anon GET "/api/orders/merchant?kind=TABLE&page=0&size=1")
+case "$C" in
+  401|403) ok  "the kitchen's queue still demands a token" ;;
+  *)       bad "the kitchen's queue is open" "HTTP $C: a stranger can read a shop's live tickets" ;;
+esac
+C=$(code "$MERCH" GET "/api/orders/merchant?kind=TABLE&page=0&size=5")
+[ "$C" = 200 ] && ok "the kitchen reads its table tickets on its own token" \
+  || bad "orders/merchant?kind=TABLE" "HTTP $C"
+
 echo "=== $ENV : the rider's day ==="
 C=$(code "$RIDER" GET "/api/orders/available?page=0&size=5")
 [ "$C" = 200 ] && ok "job board answers" || bad "orders/available" "HTTP $C"

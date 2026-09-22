@@ -61,6 +61,8 @@ api /s/dekkanet-al-rawche-1a2b3c4d/manifest.webmanifest product-service
 api /s/assets/shop.css product-service
 api /s/assets/shop.js product-service
 api /sitemap.xml product-service
+api /api/table-orders order-manager
+api /api/table-orders/8f2 order-manager
 '
 
 for env in dev qa; do
@@ -308,6 +310,46 @@ grep -F -A4 'Host(`www.youdrop.shop`) && (PathPrefix(`/s/`)' "$dev_ing" \
 grep -q 'Sitemap: https://www.youdrop.shop/sitemap.xml' ../../clients/website/nginx.conf \
   && ok "robots.txt points crawlers at the shop sitemap" \
   || fail "clients/website/nginx.conf serves a robots.txt with no Sitemap line"
+
+echo "== ordering at the table (/api/table-orders) =="
+# A diner scans the card on table seven and lands on www, because www is the address a shop prints.
+# The page may fetch its own origin and nothing else (`connect-src 'self'`), so the endpoint it
+# sends to has to answer on www as well — or every send from a scanned card is a cross-origin
+# request the browser refuses, and the only ways out would be naming an API host in the page's CSP
+# or turning CORS on for an anonymous endpoint that prints paper in a kitchen.
+grep -q 'Host(`www.youdrop.shop`) && PathPrefix(`/api/table-orders`)' "$dev_ing" \
+  && ok "dev takes table orders on www, the address on the card" \
+  || fail "no www route for /api/table-orders: a scanned code could not send, and connect-src 'self' is why"
+# Same reasoning as the shop page: ONE www, pointed at ONE environment.
+grep -q 'PathPrefix(`/api/table-orders`)' "$qa_ing" \
+  && ok "qa takes table orders on its own API host" \
+  || fail "qa has no /api/table-orders route at all"
+grep -F -A2 'Host(`www.youdrop.shop`) && PathPrefix(`/api/table-orders`)' "$dev_ing" \
+  | grep -q 'priority:' \
+  && ok "the www table-order route outranks the site's catch-all explicitly" \
+  || fail "the www table-order route has no explicit priority: the static site would answer it"
+grep -F -A4 'Host(`www.youdrop.shop`) && PathPrefix(`/api/table-orders`)' "$dev_ing" \
+  | grep -q 'middlewares: \*table-orders-mw' \
+  && ok "www and the API host take table orders through the same middlewares" \
+  || fail "the www table-order route has a middleware list of its own: the two will drift"
+for env in dev qa; do
+  ing="$tmp/$env-ingress-nocomments.yaml"
+  # CORS on the one anonymous endpoint that writes into a kitchen would be an invitation for it to
+  # be called from anywhere. Same-origin needs none, which is the whole point of the www route.
+  grep -F -A6 "PathPrefix(\`/api/table-orders\`)" "$ing" | grep -q 'name: platform-cors' \
+    && fail "$env allows CORS on table orders: an anonymous kitchen endpoint callable from any site" \
+    || ok "$env takes table orders same-origin only, with no CORS allowance"
+  # The edge's limiter is per source IP and a restaurant's guest Wi-Fi is one address, so this is
+  # a flood guard and never the rule; TableOrderRate in order-manager is keyed per table and shop.
+  grep -F -A6 "PathPrefix(\`/api/table-orders\`)" "$ing" | grep -q 'name: platform-rate-limit' \
+    && ok "$env keeps the edge flood guard on table orders" \
+    || fail "$env takes table orders with no rate limit at the edge"
+  # A route is not a permission: these paths reach order-manager, and order-manager's own
+  # permit-all list is what decides they may be called without a token.
+  grep -F -A2 "PathPrefix(\`/api/table-orders\`)" "$ing" | grep -q 'name: order-manager' \
+    && ok "$env sends table orders to order-manager" \
+    || fail "$env routes /api/table-orders somewhere other than order-manager"
+done
 
 echo "== the realm a fresh import would build (PT-3, PT-7) =="
 # Greps rather than jq: jq is not assumed anywhere in this script, and every value below is alone
@@ -897,6 +939,36 @@ for name in $(grep -o '"\${[A-Z][A-Z0-9_]*}"' "$realm" | tr -d '"${}' | sort -u)
     && ok "placeholder $name is fed from a Secret" \
     || fail "placeholder $name has no secretKeyRef on the keycloak container: it would import as literal text"
 done
+# Every service account that presents its own token to ANOTHER PLATFORM SERVICE has to be on the
+# azp allow-list, or AuthorizedPartyValidator refuses it: 401, empty body, one WARN line in the
+# service that refused. Nothing else in this repository connects the two facts, and the two are
+# five files apart — the Deployment that reads a client secret, and the config rows.
+#
+# So: a Deployment reading keycloak-clients/<X>_CLIENT_SECRET is a service account; if it calls a
+# platform service it must be on the list. accounting-service and notifications-manager call
+# Keycloak's admin API instead and are deliberately absent, which is why this is a named list
+# rather than a derivation — the two SQL copies must simply agree with it, and with each other.
+allowlist_callers="onboarding-service order-manager"
+for sql in ../../infra/postgres/init/03-config-properties.sql base/assets/postgres-init/03-config-properties.sql; do
+  [ -f "$sql" ] || { fail "$sql is missing: the azp allow-list has nowhere to come from"; continue; }
+  for c in $allowlist_callers; do
+    grep -q "delivery.security.allowed-client-ids\[[0-9]\+\]', '$c'" "$sql" \
+      && ok "$c is on the azp allow-list in $(basename "$(dirname "$(dirname "$sql")")")/$(basename "$sql")" \
+      || fail "$c presents a service-account token to a platform service but is NOT on delivery.security.allowed-client-ids in $sql: every call it makes would be answered 401 with an empty body"
+  done
+  # Relaxed binding stops at the first gap, so [0],[1],[3] binds two entries and drops the third
+  # without a word. Checked rather than trusted: the rows are edited by hand.
+  idx=$(grep -o "allowed-client-ids\[[0-9]\+\]" "$sql" | grep -o '[0-9]\+' | sort -n | tr '\n' ' ')
+  expected=$(i=0; for _ in $idx; do printf '%s ' "$i"; i=$((i + 1)); done)
+  [ "$idx" = "$expected" ] \
+    && ok "the allow-list indices run 0..n with no gap in $(basename "$sql")" \
+    || fail "delivery.security.allowed-client-ids in $sql is indexed '$idx', not '$expected': Spring binds up to the first gap and silently drops the rest"
+done
+# One list, two copies, and only the k3s one is applied by the cluster. A row added to one and not
+# the other is a difference between what docker compose runs and what the cluster runs.
+diff -q ../../infra/postgres/init/03-config-properties.sql base/assets/postgres-init/03-config-properties.sql >/dev/null 2>&1 \
+  && ok "both copies of 03-config-properties.sql are identical" \
+  || fail "infra/postgres/init/03-config-properties.sql and base/assets/postgres-init/03-config-properties.sql have drifted"
 for secret in $( { grep -h -o 'secretKeyRef: { name: [a-z0-9-]*' base/*.yaml | awk '{print $4}'
                    grep -h -A1 'secretKeyRef:$' base/*.yaml | grep -o 'name: [a-z0-9-]*' | awk '{print $2}'
                    grep -h -o 'secret: [a-z0-9-]*' overlays/ingress.template.yaml | awk '{print $2}'; } | sort -u); do

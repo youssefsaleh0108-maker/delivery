@@ -353,6 +353,175 @@ enum ShopPageText {
                         + " LBP to the dollar";
     }
 
+    // ---------------------------------------------------------------- ordering at the table
+
+    /**
+     * How many of one thing, as it is printed on the count badge.
+     *
+     * <p>Through {@link #digits} like everything else numeric, so the Arabic page says "٢×" rather
+     * than being the one surface on the platform that counts in Latin figures. The script prints
+     * this string; it never counts with it, because it is a string.
+     */
+    String times(int qty) {
+        return this == AR ? digits(String.valueOf(qty)) + "×" : qty + "×";
+    }
+
+    /** The pad's own heading. */
+    String yourOrder() {
+        return this == AR ? "طلبك" : "Your order";
+    }
+
+    String itemCount(int items) {
+        if (this == AR) {
+            return items == 1 ? "صنف واحد" : number(items) + " أصناف";
+        }
+        return items == 1 ? "1 item" : number(items) + " items";
+    }
+
+    /** The button on a menu row that puts it on the pad. */
+    String add() {
+        return this == AR ? "أضف" : "Add";
+    }
+
+    /**
+     * What each of the two count buttons on a line does, for a screen reader.
+     *
+     * <p>A prefix, and the script puts the dish's own name after it — so a merchant's text reaches
+     * the label through the DOM, where it is a string being assigned, and never through a string
+     * this page built. Shipped once in an attribute rather than once per line.
+     */
+    String addOneMore() {
+        return this == AR ? "أضف واحدًا من" : "Add one more";
+    }
+
+    String removeOne() {
+        return this == AR ? "أزل واحدًا من" : "Remove one";
+    }
+
+    /** The label on the note a diner may leave on a line, and the example that explains it. */
+    String noteOnALine() {
+        return this == AR ? "ملاحظة للمطبخ" : "A note for the kitchen";
+    }
+
+    String noteExample() {
+        return this == AR ? "بدون بصل" : "no onions";
+    }
+
+    String emptyPad() {
+        return this == AR
+                ? "لم تختر شيئًا بعد. أضف من القائمة أعلاه."
+                : "Nothing chosen yet. Add something from the menu above.";
+    }
+
+    /** The strip at the foot of the screen that leads back to the pad. */
+    String viewOrder() {
+        return this == AR ? "عرض طلبك" : "Your order";
+    }
+
+    /**
+     * The last line of the pad.
+     *
+     * <p>Not "Total (incl. VAT)", which is what the design asks for, and not a subtotal either.
+     * There is one figure here — the food — because there is no delivery fee, no minimum, no
+     * service charge and no tax anywhere in this: the diner pays the restaurant at the table, and
+     * the platform is lending it an order pad. {@link #totalIsTheFood} says so beneath it.
+     */
+    String totalLine() {
+        return this == AR ? "المجموع" : "Total";
+    }
+
+    String totalIsTheFood() {
+        return this == AR
+                ? "ما تطلبه فقط. تدفع للمطعم على الطاولة كالعادة."
+                : "The food, and nothing else. You pay the restaurant at the table, as usual.";
+    }
+
+    /**
+     * The table a printed code sent this diner to. Shown, and trusted for nothing else.
+     *
+     * <p>Only the word: the code itself comes out of the query string, is put after this by the
+     * script and is drawn {@code dir="ltr"} — a table code is an identifier printed on a sticker,
+     * "7" or "B12", and identifiers are not transliterated into another set of digits the way a
+     * count or a price is.
+     */
+    String tableLabel() {
+        return this == AR ? "طاولة" : "Table";
+    }
+
+    /** The one action: this goes to the kitchen. */
+    String sendToKitchen() {
+        return this == AR ? "أرسل إلى المطبخ" : "Send to the kitchen";
+    }
+
+    // ---------------------------------------------------------------- when it cannot be sent
+
+    /**
+     * This shop has not turned table ordering on.
+     *
+     * <p>The page still reads — it is the shop's menu and that is most of why anybody opened it —
+     * and this is the whole of what changes: the pad is not there, and the reason is a sentence
+     * rather than an absence a diner has to work out.
+     */
+    String orderWithTheStaff() {
+        return this == AR
+                ? "هذا المتجر لا يستقبل الطلبات من الطاولة عبر الإنترنت. اطلب من الموظفين."
+                : "This shop does not take orders from the table online. Please order with the staff.";
+    }
+
+    /**
+     * The page was opened without a table's code — from a link somebody shared, most likely.
+     *
+     * <p>Which is exactly the case that must not be allowed to send food to a kitchen: a shop's
+     * page travels in WhatsApp, and a stranger on the other side of the city holding it is not
+     * sitting at one of its tables.
+     */
+    String scanTheCodeOnYourTable() {
+        return this == AR
+                ? "امسح الرمز الموجود على طاولتك لتطلب من هنا."
+                : "Scan the code on your table to order from here.";
+    }
+
+    String kitchenClosed() {
+        return this == AR
+                ? "المطبخ مغلق الآن، ولا يمكن إرسال الطلب."
+                : "The kitchen is closed right now, so this cannot be sent.";
+    }
+
+    String somethingRanOut() {
+        return this == AR
+                ? "نفد صنف من طلبك. أزله لمتابعة الإرسال."
+                : "Something on your order has run out. Remove it to send the rest.";
+    }
+
+    /** The shelf moved under a pad that was already in a browser. */
+    String menuChanged() {
+        return this == AR
+                ? "تغيّرت قائمة المتجر، لذلك أُفرغ طلبك. أعد تحميل الصفحة وابدأ من جديد."
+                : "This shop’s menu changed, so your order was cleared. Reload the page and start again.";
+    }
+
+    /**
+     * When the server could not be asked what the order comes to.
+     *
+     * <p>The lines stay on the screen and the money does not appear at all. A page that filled the
+     * gap with its own arithmetic would be showing somebody a figure nobody had agreed to, which is
+     * the one thing this whole feature is built not to do.
+     */
+    String couldNotPrice() {
+        return this == AR
+                ? "تعذّر حساب المجموع الآن. حاول مرة أخرى بعد قليل."
+                : "The total could not be worked out just now. Try again in a moment.";
+    }
+
+    /** What the diner with no script sees where the pad would have been. */
+    String padNeedsScript() {
+        return this == AR
+                ? "يحتاج الطلب من الطاولة إلى JavaScript. القائمة والأسعار أعلاه كاملة بدونه."
+                : "Ordering from the table needs JavaScript. The menu and the prices above are "
+                        + "complete without it.";
+    }
+
+
     String howToOrder() {
         return this == AR ? "كيف تطلب" : "How to order";
     }

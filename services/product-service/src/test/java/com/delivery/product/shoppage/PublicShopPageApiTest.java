@@ -108,59 +108,68 @@ class PublicShopPageApiTest {
     }
 
     /**
-     * One call to action, and it is honest about both halves.
+     * The way out of the page, and it is still honest about where the web stops.
      *
-     * <p>The page carries a shop's prices, which makes it look like a shop that takes money. It
-     * cannot: it is anonymous, cached and crawled, and anything on it that took an address or a
-     * phone number would be collecting a stranger's details on a page that can authenticate
-     * nobody. So it says so, and points at the one place an order can actually be placed — naming
-     * what the button hands back, because {@code /app} is the Android build itself and a reader on
-     * an iPhone should learn that from the label rather than from a file they cannot open.
+     * <p>The page used to say it could not take an order at all, and that sentence has gone because
+     * it stopped being true: it takes one as far as a priced basket. What it still cannot do is
+     * place it — signing in and sending an order are the next piece of work — so the app is still
+     * the one way to finish, and the basket's own button says so where a reader is looking when
+     * they want it.
+     *
+     * <p>What has not changed is the part that made this page safe to publish anonymously: nothing
+     * on it takes an address, a name or a phone number. The controls that exist are a button on a
+     * row, two counters on a basket line, a dead Checkout, and — only where the shop prices by area
+     * — a list of the shop's own area names. There is no form, no text field and no way to type
+     * anything about yourself into this page at all.
      */
     @Test
-    @DisplayName("one way to order: the app, what the button downloads, and no basket here")
+    @DisplayName("one way to finish an order: the app, what the button downloads, and no form here")
     void offersOneWayToOrder() throws Exception {
         ShopPageFixture shop = stocked();
         String html = body(shop.mvc().perform(get("/s/" + shop.slug())).andReturn());
 
         assertThat(html)
-                .contains("Orders from this shop are placed in the YouDrop app. "
-                        + "This page cannot take an order itself.")
+                .contains("Orders from this shop are placed in the YouDrop app.")
                 .contains("<a class=\"cta\" href=\"https://www.youdrop.shop/app\">Get the app"
                         + "<span class=\"sub\">Android · direct download</span></a>")
                 // Room held for the two listings, without a link to either: neither exists, and a
                 // dead one on the page a shopkeeper prints on a sign is worse than saying "not
                 // yet".
                 .contains("<ul class=\"stores\"><li>App Store</li><li>Google Play</li></ul>")
-                .contains("Coming soon to the App Store and Google Play.");
-        // One button. Nothing here is a form, a field or a basket.
-        assertThat(html.split("class=\"cta\"", -1).length - 1).isEqualTo(1);
+                .contains("Coming soon to the App Store and Google Play.")
+                // This shop does not take orders from its tables, so the page says so where the
+                // pad would have been rather than leaving a reader to work it out.
+                .contains("This shop does not take orders from the table online.");
         assertThat(html)
-                .doesNotContain("<form").doesNotContain("<button").doesNotContain("<textarea")
-                .doesNotContain("type=\"tel\"").doesNotContain("type=\"email\"");
+                .doesNotContain("<form").doesNotContain("<textarea").doesNotContain("<input type")
+                .doesNotContain("type=\"tel\"").doesNotContain("type=\"email\"")
+                .doesNotContain("type=\"text\"");
+        // The only field of any kind is the catalogue search, which submits nowhere.
+        assertThat(html.split("<input", -1).length - 1).isEqualTo(1);
     }
 
     /**
      * It is still a document, not an app.
      *
-     * <p>Two {@code <script>} elements now, and neither one is code the page was handed: the
-     * catalogue filter, which is a file from this origin, and the structured-data block, which
-     * carries a JSON media type a browser parses as data and never executes — which is also why
-     * {@code script-src 'self'} does not have to allow anything inline for it. Nothing here is
+     * <p>Three {@code <script>} elements now, and not one of them is code the page was handed: the
+     * catalogue filter and the basket, both files from this origin, and the structured-data block,
+     * which carries a JSON media type a browser parses as data and never executes — which is also
+     * why {@code script-src 'self'} does not have to allow anything inline for it. Nothing here is
      * inline JavaScript, and there is no handler attribute anywhere. The page is complete before
-     * either arrives and stays complete if neither does, which is what the whole design rests on:
-     * a chat app's preview runs no JavaScript at all.
+     * any of them arrives and stays complete if none does, which is what the whole design rests
+     * on: a chat app's preview runs no JavaScript at all.
      */
     @Test
-    @DisplayName("no inline code: one script file from this origin, and one block of data")
+    @DisplayName("no inline code: two script files from this origin, and one block of data")
     void carriesNoInlineScript() throws Exception {
         ShopPageFixture shop = stocked();
         String html = body(shop.mvc().perform(get("/s/" + shop.slug())).andReturn());
 
-        // Every script element on the page is one of the two, by name.
-        assertThat(html.split("<script", -1).length - 1).isEqualTo(2);
+        // Every script element on the page is one of the three, by name.
+        assertThat(html.split("<script", -1).length - 1).isEqualTo(3);
         assertThat(html)
                 .contains("<script src=\"/s/assets/shop.js?v=")
+                .contains("<script src=\"/s/assets/basket.js?v=")
                 .contains("\" defer></script>")
                 .contains("<script type=\"application/ld+json\">")
                 .doesNotContain("javascript:")

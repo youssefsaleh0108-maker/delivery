@@ -126,9 +126,17 @@ delivery:
     # /s/** and /sitemap.xml are the public shop page: a document a shopkeeper pastes into a
     # WhatsApp status and prints as a QR for the counter, and the only thing on this platform a
     # search engine can index. It cannot ask for a token — a crawler has none and a chat app
-    # building a link preview has none — so it is built to be read by a stranger instead: it takes
-    # no input but a slug, reads no caller, and renders a fixed set of fields that contains no
-    # merchant identity (PublicShopPage).
+    # building a link preview has none — so it is built to be read by a stranger instead: it reads
+    # no caller, and renders a fixed set of fields that contains no merchant identity
+    # (PublicShopPage).
+    #
+    # It took no input but a slug until ordering at the table, and now takes one thing more:
+    # POST /s/{slug}/quote says what is on a diner's order pad and what the food comes to. What it
+    # accepts is deliberately dull — a shelf fingerprint the page itself printed, up to twenty
+    # positions on that shelf with a count each and a short note, and the code printed on the
+    # table. No id, no address, no payment, nothing about who the diner is, and it still reads no
+    # caller (PublicShopPageController#quote). It saves nothing: a quote is a read, answered
+    # no-store, and no shop takes one at all until it turns table ordering on (V41).
     permit-all:
       - /actuator/health
       - /actuator/health/**
