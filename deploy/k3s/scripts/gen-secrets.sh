@@ -13,10 +13,10 @@
 #   platform-secrets  infrastructure credentials (Postgres, Redis, RabbitMQ, MinIO, the Keycloak
 #                     bootstrap admin, the Config Server, Vault). Every Spring service imports it
 #                     whole, so nothing that only one service needs belongs in it.
-#   keycloak-clients  the three service-account client secrets (onboarding-service,
-#                     accounting-service, notifications-manager). The realm file names them as
-#                     `${...}` placeholders that Keycloak fills from this Secret at its first-boot
-#                     import, and each service presents its own from the same Secret.
+#   keycloak-clients  the four service-account client secrets (onboarding-service,
+#                     accounting-service, notifications-manager, order-manager). The realm file
+#                     names them as `${...}` placeholders that Keycloak fills from this Secret at
+#                     its first-boot import, and each service presents its own from the same Secret.
 #   demo-logins       the five demo logins' passwords, one key per username
 #                     (customer/rider/merchant/backoffice/carrier): the realm import sets them and
 #                     scripts/e2e-smoke.sh signs in with them. Six-digit passcodes, as the app
@@ -116,7 +116,8 @@ mint whatsapp-webhook WHATSAPP_APP_SECRET WHATSAPP_VERIFY_TOKEN
 mint sms-dlr SMS_DEV_DLR_SECRET
 
 if [ "$NEW_ENV" = yes ]; then
-  mint keycloak-clients ONBOARDING_CLIENT_SECRET ACCOUNTING_CLIENT_SECRET NOTIFICATIONS_CLIENT_SECRET
+  mint keycloak-clients ONBOARDING_CLIENT_SECRET ACCOUNTING_CLIENT_SECRET NOTIFICATIONS_CLIENT_SECRET \
+    ORDER_MANAGER_CLIENT_SECRET
   # The four logins used on the phone get passcodes; backoffice signs in only through the portal's
   # Keycloak page, which takes any password, and holds the widest role — so it gets a long one.
   mint demo-logins customer:passcode rider:passcode merchant:passcode backoffice carrier:passcode
