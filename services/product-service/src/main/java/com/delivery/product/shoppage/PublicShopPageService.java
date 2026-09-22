@@ -166,9 +166,174 @@ public class PublicShopPageService {
                 store.getVertical(),
                 store.getServiceCategory(),
                 openingOf(store, now),
+                store.isTableOrdering(),
                 powerOf(store, now),
                 deliveryOf(store),
                 catalogueOf(store));
+    }
+
+    /**
+     * The most lines one table's order may hold, and the most of any one dish.
+     *
+     * <p>Smaller than a delivery basket's fifty deliberately. This request arrives from a stranger
+     * with no token and ends as paper in a kitchen, so the cap is what a table of people plausibly
+     * orders in one round rather than what a database could hold: twenty lines and twenty of any
+     * one dish is a large table ordering generously, and anything past it is somebody playing.
+     */
+    static final int MAX_BASKET_LINES = 20;
+
+    static final int MAX_LINE_QTY = 20;
+
+    /**
+     * How much a diner may write on one line.
+     *
+     * <p>"No onions", "well done", "for the child". It is the only free text anywhere on this
+     * surface, it is typed by somebody nobody has identified, and a waiter reads it off a ticket —
+     * so it is short enough to be read at a glance and capped here rather than wherever it is
+     * eventually drawn.
+     */
+    static final int MAX_LINE_NOTE = 60;
+
+    /**
+     * What a table's code may look like.
+     *
+     * <p>A short plain code, because that is what is printed on a sticker: {@code 7}, {@code 12},
+     * {@code B4}. Anything else is refused outright rather than cleaned up — this string is drawn
+     * on the diner's phone and on the kitchen's ticket, and the narrow rule is cheaper to defend in
+     * both places than an escaping rule in each.
+     */
+    private static final java.util.regex.Pattern TABLE = java.util.regex.Pattern.compile(
+            "[A-Za-z0-9-]{1,8}");
+
+    /**
+     * The table a request names, or null when it names none this shop would recognise.
+     *
+     * <p>The rule lives here and not in {@code basket.js}: the script's copy of it decides what a
+     * diner is shown, and this one decides what a kitchen is sent. They agree, and only one of them
+     * is trusted.
+     */
+    static String tableOf(String raw) {
+        String trimmed = raw == null ? "" : raw.trim();
+        return TABLE.matcher(trimmed).matches() ? trimmed : null;
+    }
+
+    /**
+     * What is on a table's order pad, and what the food comes to.
+     *
+     * <p><strong>This is the whole of the reason the page may show a total at all.</strong> The
+     * figures are read here, from the rows the merchant owns, and handed to the renderer already
+     * added up; the browser is given words. Nothing in {@code basket.js} multiplies, adds or
+     * rounds, and nothing in it could, because it never sees a number to work with.
+     *
+     * <p><strong>The total is the food and nothing else.</strong> No delivery fee, no minimum, no
+     * service charge, no tax. A diner is sitting in the restaurant and will pay the restaurant at
+     * the table; the platform is lending it an order pad, not selling the meal. Every term in the
+     * platform's delivery formula ({@code Order.recomputeTotal}) is absent here by construction
+     * rather than by being set to zero — there is no fee to waive, no area to price, nobody to
+     * carry it and no commission to take.
+     *
+     * <p>It is also read-only and books nothing: pricing a pad writes no row anywhere. What a
+     * kitchen is sent is a separate act.
+     *
+     * @param version what the shelf was when the pad was built; a pad against any other shelf is
+     *                refused rather than repriced against rows that have moved
+     * @param at      the positions of the lines on that shelf, each with a count and maybe a note
+     * @param table   the code on the table, as it arrived; anything that is not one
+     *                ({@link #tableOf}) leaves the pad with nowhere to go, which is said rather
+     *                than guessed at
+     * @throws ShopPageNotFoundException for every shop a stranger may not see — the same refusal,
+     *                                   from the same rule, as the page itself
+     */
+    @Transactional(readOnly = true)
+    public ShopBasket price(String slug, String version, List<BasketLine> at, String table) {
+        Store store = stores.findBySlug(slug)
+                .filter(this::publiclyVisible)
+                .orElseThrow(ShopPageNotFoundException::new);
+
+        Set<ShopBasket.Problem> problems = ShopBasket.Problem.none();
+        // Answered first, and without reading the shelf. A shop that has not turned this on has no
+        // tables as far as this page is concerned, so there is nothing to price and nothing else
+        // worth saying — and the cheapest refusal is also the one that gives a caller poking at
+        // this endpoint the least to work with.
+        if (!store.isTableOrdering()) {
+            problems.add(ShopBasket.Problem.NOT_OFFERED);
+            return new ShopBasket(List.of(), ZERO2, null, problems);
+        }
+        String seat = tableOf(table);
+        if (seat == null) {
+            // Priced all the same, because a diner whose code did not survive the trip should see
+            // what they chose rather than an empty screen — it just cannot be sent anywhere.
+            problems.add(ShopBasket.Problem.NO_TABLE);
+        }
+
+        Shelf shelf = shelfOf(store);
+        if (!version.equals(shelf.version())) {
+            // Nothing is priced against a shelf that has moved. The lines are not returned either:
+            // their positions no longer name anything, and a list of names read off the wrong rows
+            // is worse than an empty answer.
+            problems.add(ShopBasket.Problem.STALE);
+            return new ShopBasket(List.of(), ZERO2, seat, problems);
+        }
+
+        List<ShopBasket.Line> lines = new ArrayList<>(at.size());
+        BigDecimal total = ZERO2;
+        for (BasketLine line : at) {
+            if (line.at() < 0 || line.at() >= shelf.ordered().size()) {
+                // A position off the end of a shelf that otherwise matches: the pad is not the one
+                // this shelf was drawn for, whatever the version said.
+                problems.add(ShopBasket.Problem.STALE);
+                return new ShopBasket(List.of(), ZERO2, seat, problems);
+            }
+            Product product = shelf.ordered().get(line.at());
+            BigDecimal unit = money(product.getPrice());
+            // The unit price times the count, and nothing else.
+            BigDecimal lineTotal = money(unit.multiply(BigDecimal.valueOf(line.qty())));
+            lines.add(new ShopBasket.Line(line.at(), product.getName(), note(line.note()),
+                    line.qty(), unit, lineTotal, product.isInStock()));
+            if (!product.isInStock()) {
+                // Priced, said, and left out of the sum: a diner must see what it would have cost,
+                // and must not be quoted a total that includes something the kitchen has run out of.
+                problems.add(ShopBasket.Problem.GONE);
+                continue;
+            }
+            total = total.add(lineTotal);
+        }
+
+        if (lines.isEmpty()) {
+            problems.add(ShopBasket.Problem.EMPTY);
+        }
+        if (!store.isOrderable(clock.instant())) {
+            problems.add(ShopBasket.Problem.CLOSED);
+        }
+        return new ShopBasket(lines, total, seat, problems);
+    }
+
+    /**
+     * One line a pad asks about: where it sits on the shelf, how many, and what was asked for.
+     *
+     * @param note free text from somebody nobody has identified, so it is cut to
+     *             {@value #MAX_LINE_NOTE} here and escaped wherever it is drawn
+     */
+    public record BasketLine(int at, int qty, String note) {
+    }
+
+    /** What a diner wrote on a line, cut to something a ticket can carry. Null for nothing. */
+    private static String note(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String trimmed = raw.strip();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return trimmed.length() <= MAX_LINE_NOTE ? trimmed : trimmed.substring(0, MAX_LINE_NOTE);
+    }
+
+    private static final BigDecimal ZERO2 = BigDecimal.ZERO.setScale(2);
+
+    /** Every figure this page quotes, at the scale the platform stores money in. */
+    private static BigDecimal money(BigDecimal amount) {
+        return amount == null ? ZERO2 : amount.setScale(2, RoundingMode.HALF_UP);
     }
 
     /**
@@ -347,8 +512,12 @@ public class PublicShopPageService {
                 store.getEtaMaxMinutes());
     }
 
+    private PublicShopPage.Catalogue catalogueOf(Store store) {
+        return shelfOf(store).catalogue();
+    }
+
     /**
-     * The shelf, by section.
+     * The shelf, by section — and the products behind it, in the order the page draws them.
      *
      * <p>{@code findActiveInStore} is the storefront's own query, so archived, draft and paused
      * products are gone before anything here sees them — this page cannot accidentally publish a
@@ -359,14 +528,20 @@ public class PublicShopPageService {
      * <p>Sections come out in the merchant's own order for the sections they created, then anything
      * filed under a platform category, then whatever has no section at all. Three queries in total,
      * whatever the shelf's size: the products, the sections, and one batch for the pictures.
+     *
+     * <p><strong>One method, because the basket depends on the two answers agreeing.</strong> A
+     * basket names a line by where it sits on the shelf, and {@link #quote} resolves that position
+     * against a shelf read here again — so the page's order and the quote's order have to be the
+     * same order, and the only way to be sure of that is for there to be one place that decides it.
      */
-    private PublicShopPage.Catalogue catalogueOf(Store store) {
+    Shelf shelfOf(Store store) {
         Page<Product> page = products.findActiveInStore(
                 store.getId(), null, "%",
                 PageRequest.of(0, MAX_ITEMS, Sort.by(Sort.Direction.ASC, "name")));
         List<Product> shelf = page.getContent();
+        int total = (int) page.getTotalElements();
         if (shelf.isEmpty()) {
-            return new PublicShopPage.Catalogue(List.of(), 0, (int) page.getTotalElements());
+            return new Shelf(List.of(), List.of(), 0, total, versionOf(List.of()));
         }
 
         List<String> refs = shelf.stream()
@@ -380,7 +555,13 @@ public class PublicShopPageService {
         // A LinkedHashMap keyed in the order sectionNames was built, so the page's sections come
         // out in the merchant's order rather than in whatever order the products happened to sort.
         Map<String, List<PublicShopPage.Item>> bySection = new LinkedHashMap<>();
-        sectionNames.values().forEach(name -> bySection.put(name, new ArrayList<>()));
+        // Filed the same way and in step with the items above, so that flattening the sections and
+        // flattening this map give the same sequence — which is what a basket's positions mean.
+        Map<String, List<Product>> rowsBySection = new LinkedHashMap<>();
+        sectionNames.values().forEach(name -> {
+            bySection.put(name, new ArrayList<>());
+            rowsBySection.put(name, new ArrayList<>());
+        });
 
         for (Product product : shelf) {
             String section = product.getCategoryId() == null
@@ -396,13 +577,66 @@ public class PublicShopPageService {
                             product.getPrice(),
                             lbpFaceOf(product.getPrice()),
                             product.isInStock()));
+            rowsBySection.computeIfAbsent(section, ignored -> new ArrayList<>()).add(product);
         }
 
         List<PublicShopPage.Section> sections = bySection.entrySet().stream()
                 .filter(entry -> !entry.getValue().isEmpty())
-                .map(entry -> new PublicShopPage.Section(entry.getKey(), List.copyOf(entry.getValue())))
+                .map(entry -> new PublicShopPage.Section(entry.getKey(),
+                        List.copyOf(entry.getValue())))
                 .toList();
-        return new PublicShopPage.Catalogue(sections, shelf.size(), (int) page.getTotalElements());
+        List<Product> ordered = rowsBySection.values().stream()
+                .filter(rows -> !rows.isEmpty())
+                .flatMap(List::stream)
+                .toList();
+        return new Shelf(sections, ordered, shelf.size(), total, versionOf(ordered));
+    }
+
+    /**
+     * The shelf a page drew and the rows it drew it from, kept together.
+     *
+     * @param ordered the products in drawing order — section by section, row by row. Position
+     *                {@code n} here is the {@code n}th {@code <li>} in the rendered menu, which is
+     *                the whole of what a basket line names.
+     */
+    record Shelf(List<PublicShopPage.Section> sections, List<Product> ordered, int shown, int total,
+                 String version) {
+
+        PublicShopPage.Catalogue catalogue() {
+            return new PublicShopPage.Catalogue(sections, shown, total, version);
+        }
+    }
+
+    /**
+     * What this exact shelf is, in twelve characters.
+     *
+     * <p>A basket kept in a browser names its lines by where they sat on the shelf, which is the
+     * one way to say "this row" without the page printing an id for every row it draws. Positions
+     * are only meaningful against the shelf they were read off, so the page carries this and a
+     * quote is refused unless it still matches: an item added, removed, paused or <em>renamed</em>
+     * moves rows under a basket that is already in a browser, and pricing it anyway would charge a
+     * customer for something they never tapped. A rename is in here because the query sorts by
+     * name — the ids alone would not have moved, and the rows would have.
+     *
+     * <p>It is a digest of ids and not the ids: a reader can tell whether the shelf they were shown
+     * is still the shelf, and nothing else. A price is deliberately not in it — a corrected price
+     * should reprice the basket a customer is holding, not throw it away.
+     */
+    static String versionOf(List<Product> ordered) {
+        StringBuilder joined = new StringBuilder(ordered.size() * 37);
+        for (Product product : ordered) {
+            joined.append(product.getId()).append('\n');
+        }
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(joined.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return java.util.Base64.getUrlEncoder().withoutPadding()
+                    .encodeToString(java.util.Arrays.copyOf(digest, 9));
+        } catch (java.security.NoSuchAlgorithmException impossible) {
+            // Every JVM ships SHA-256. A shelf that cannot be versioned must not be priced, and
+            // this value matches nothing, so every quote against it is refused as stale.
+            return "unversioned";
+        }
     }
 
     /**
@@ -456,7 +690,18 @@ public class PublicShopPageService {
      * displayed 0 LBP would be a price rather than an absence.
      */
     private BigDecimal lbpFaceOf(BigDecimal usd) {
-        if (lbpPerUsd.signum() <= 0 || usd == null) {
+        return lbpFaceOf(usd, lbpPerUsd);
+    }
+
+    /**
+     * The same rule, for the basket, which is spelled by a different class.
+     *
+     * <p>Static and shared rather than written out twice: the item prices in the markup are
+     * converted by this, and a basket that rounded to a different note would add up to a figure no
+     * column of the page reaches.
+     */
+    static BigDecimal lbpFaceOf(BigDecimal usd, BigDecimal lbpPerUsd) {
+        if (lbpPerUsd == null || lbpPerUsd.signum() <= 0 || usd == null) {
             return null;
         }
         return usd.multiply(lbpPerUsd)

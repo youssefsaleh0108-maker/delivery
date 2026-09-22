@@ -65,6 +65,15 @@ public record PublicShopPage(
         /** What a SERVICES shop does; null for every goods shop. */
         Store.ServiceCategory serviceCategory,
         Opening opening,
+        /**
+         * Whether a diner at a table here may order from this page.
+         *
+         * <p>The shop's own switch ({@code Store#isTableOrdering}), off until somebody at the shop
+         * turns it on. It is a property of the shop rather than of the reader or the URL, which is
+         * what keeps this page cacheable: the answer is the same for everybody who opens it, so
+         * the rendering does not split.
+         */
+        boolean tableOrdering,
         /** Null unless the merchant said what the lights are doing, recently enough to mean now. */
         Power power,
         Delivery delivery,
@@ -131,11 +140,14 @@ public record PublicShopPage(
     /**
      * The shelf.
      *
-     * @param shown how many items the page actually drew
-     * @param total how many it could have drawn, so the page can say honestly that there are more
-     *              in the app rather than passing a truncated shelf off as the whole shop
+     * @param shown   how many items the page actually drew
+     * @param total   how many it could have drawn, so the page can say honestly that there are more
+     *                in the app rather than passing a truncated shelf off as the whole shop
+     * @param version what this exact shelf is, so a basket built against it can be priced against it
+     *                — see {@code PublicShopPageService#versionOf}. It names no product: it is a
+     *                digest, and the page's one promise is that its markup carries no id at all.
      */
-    public record Catalogue(List<Section> sections, int shown, int total) {
+    public record Catalogue(List<Section> sections, int shown, int total, String version) {
     }
 
     /** One aisle. Items with no section of their own fall into the last one, named by the page. */

@@ -239,6 +239,18 @@ final class ShopPageFixture {
         return this;
     }
 
+    /**
+     * A shop that has turned ordering at the table on.
+     *
+     * <p>Off by default here exactly as it is off by default in the database, so every test that
+     * does not ask for it is testing the shop every shop on the platform is today: a menu, and a
+     * line saying to order with the staff.
+     */
+    ShopPageFixture takesTableOrders() {
+        shop.setTableOrdering(true);
+        return this;
+    }
+
     /** A section of the shop's own, in the merchant's order, with the items filed under it. */
     ShopPageFixture section(String name, Item... items) {
         Category section = new Category(shop.getId(), name, null, (short) ownSections.size());

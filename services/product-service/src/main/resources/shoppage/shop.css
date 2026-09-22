@@ -209,8 +209,93 @@ a { color: var(--brand); }
   font-size: .8rem; padding: 4px 12px; border-radius: 100px; color: var(--faint);
   border: 1px dashed var(--border);
 }
+/*
+  The basket. On the design it is a sidebar beside a two-column menu; this page is one column
+  720 px wide because it is opened on a phone out of a chat message, so the panel sits in the flow
+  where the menu ends and a pinned strip at the foot of the screen is how a reader forty rows down
+  gets back to it — which is what the app's own menu screen does.
+*/
+.bkno { margin-block-end: 0; }
+.bk { display: flex; flex-direction: column; gap: 12px; }
+.bktab, .bkn {
+  align-self: start; font-size: .8rem; font-weight: 700; padding: 3px 10px;
+  border-radius: 100px; background: #FFF1F2; color: var(--brand); margin: 0;
+}
+.bkempty { color: var(--muted); margin: 0; }
+
+/* One line: the two counters and the count, then the dish, then what it costs — and under all of
+   it, the note for the kitchen, which spans the row because it is a sentence rather than a chip. */
+.bl li {
+  display: grid; grid-template-columns: auto auto auto minmax(0, 1fr) auto;
+  align-items: center; gap: 6px;
+  padding-block: 8px; border-block-end: 1px solid var(--border);
+}
+.bl li:last-child { border-block-end: 0; }
+.bl .q {
+  font: inherit; font-size: 1rem; line-height: 1; width: 32px; height: 32px;
+  color: var(--brand); background: #FFF1F2; border: 1px solid var(--border);
+  border-radius: 8px; cursor: pointer;
+}
+.bl .q:focus-visible, .bkgo:focus-visible, .bl .nt:focus-visible, .items .a:focus-visible {
+  outline: 2px solid var(--brand); outline-offset: 2px;
+}
+.bl .c { min-width: 22px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+.bl .n { font-size: .92rem; padding-inline: 4px; }
+.bl .p { text-align: end; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bl .l { display: block; font-size: .74rem; font-weight: 400; color: var(--muted); }
+.bl .gone .n, .bl .gone .p { color: var(--muted); }
+.bl .nt {
+  grid-column: 1 / -1; font: inherit; font-size: .85rem; width: 100%;
+  margin-block-start: 6px; padding: 7px 10px; color: var(--ink);
+  border: 1px dashed var(--border); border-radius: 10px; background: var(--bg);
+}
+
+.bksum { display: flex; flex-direction: column; gap: 6px; }
+.bksum div { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); }
+.bksum .v {
+  text-align: end; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap;
+}
+/* The lira under the dollars, never beside them: "$5.25 473,000 LBP" reads as one figure. */
+.bksum .l { display: block; font-size: .74rem; font-weight: 400; color: var(--muted); }
+/* The one figure the reader is actually deciding on. */
+.bksum .sum {
+  border-block-start: 1px solid var(--border); padding-block-start: 8px;
+  font-weight: 700; color: var(--ink); font-size: 1.05rem;
+}
+.bksum .sum .v { color: var(--brand); }
+.bkwhat { margin: 0; }
+/* Closed, run out, short of the minimum — above the button, never after it. */
+.bksays:not(:empty) {
+  margin: 0; font-size: .88rem; color: #B91C1C;
+  background: #FEF2F2; border: 1px solid #FECACA; border-radius: var(--r); padding: 9px 12px;
+}
+/* Disabled in the markup and disabled here: there is nowhere for this to go yet, and the line
+   under it says so. It is drawn as the dead control it is rather than as a button to aim at. */
+.bkgo { width: 100%; border: 0; font: inherit; font-weight: 600; font-size: 1rem; cursor: not-allowed; }
+.bkgo[disabled] { background: var(--border); color: var(--muted); }
+
+/* The button on a menu row. Small, quiet, and only there once the script has revealed it. */
+.items .a {
+  grid-column: 3; grid-row: 2; justify-self: end; margin-block-start: 6px;
+  font: inherit; font-size: .8rem; font-weight: 600; line-height: 1;
+  color: var(--brand); background: #FFF1F2; border: 1px solid var(--brand);
+  border-radius: 8px; padding: 7px 12px; cursor: pointer;
+}
+
+/* The strip at the foot of the screen. Hidden until there is something in the basket. */
+.peek {
+  position: fixed; inset-inline: 12px; bottom: 12px; z-index: 3;
+  display: block; text-align: center; text-decoration: none;
+  max-width: 696px; margin: 0 auto;
+  background: var(--brand); color: var(--white); font-weight: 600; font-size: .92rem;
+  border-radius: 100px; padding: 13px 20px;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, .18);
+}
 .qr { font-size: .88rem; }
 .foot { padding: 16px; }
+/* Room for the pinned strip, so the foot of the page is not under it. Only while there is one:
+   where :has() is not understood the strip merely overlaps the last line, which is cosmetic. */
+body:has(.peek:not([hidden])) .foot { padding-block-end: 72px; }
 .missing { padding: 48px 16px; text-align: center; }
 /* A shop with nothing on its shelf yet. Said, rather than left as a gap after the hours. */
 .empty { color: var(--muted); font-weight: 600; margin-block-start: 4px; }
@@ -225,4 +310,10 @@ a { color: var(--brand); }
   .items { --pic: 52px; }
   .items .p { padding-inline-start: 8px; }
   .bar a { padding-inline: 12px; }
+  /* A basket line is two counters, a count, a name and a price on 320 px of screen. The counters
+     keep a thumb-sized target and the name gives up the gap, because the name is the one part
+     that can wrap. */
+  .bl li { gap: 4px; }
+  .bl .n { padding-inline: 2px; font-size: .88rem; }
+  .peek { inset-inline: 8px; padding: 12px 14px; }
 }

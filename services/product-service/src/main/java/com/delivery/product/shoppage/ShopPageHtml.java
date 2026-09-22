@@ -43,7 +43,7 @@ final class ShopPageHtml {
      * <p>A query rather than a new filename, so {@code /s/assets/shop.css} keeps resolving for
      * anything that already links to it — caches key on the whole URL either way.
      */
-    record Assets(String stylesheet, String script) {
+    record Assets(String stylesheet, String script, String basket) {
 
         /**
          * For a page that may not link anything: the poster refuses an unknown shop under a
@@ -51,7 +51,7 @@ final class ShopPageHtml {
          * the browser and is simply not written.
          */
         static Assets none() {
-            return new Assets("", "");
+            return new Assets("", "", "");
         }
     }
 
@@ -98,6 +98,24 @@ final class ShopPageHtml {
     static final String SCRIPT = "/s/assets/shop.js";
 
     /**
+     * The second script, and the reason it is a second one.
+     *
+     * <p>{@link #SCRIPT} promises, in a comment at the top of the file and in a test that reads the
+     * served bytes, that it never fetches and never builds a row the document did not arrive with.
+     * The basket does both — it has to: a total is the server's answer, so it is fetched, and a
+     * chosen line is not in the markup, so it is built. Putting the two in one file would have
+     * meant deleting that promise for the catalogue as well, and the catalogue is the part a reader
+     * on a bad connection depends on.
+     *
+     * <p>So they are two files with two rules. {@code shop.js} still only hides and marks, and
+     * {@code PublicShopPageFindingTest} still holds it to that. {@code basket.js} may fetch this
+     * origin and may build the basket's own rows — and nothing else: it writes every value it
+     * receives with {@code textContent}, never markup, so a shop that calls a product
+     * {@code <script>} cannot reach the page through it either.
+     */
+    static final String BASKET_SCRIPT = "/s/assets/basket.js";
+
+    /**
      * Renders one shop.
      *
      * @param base    the public origin the page believes it is on, for the canonical URL, the Open
@@ -125,9 +143,14 @@ final class ShopPageHtml {
         delivery(b, page, t);
         hours(b, page, t);
         catalogue(b, page, t);
+        pad(b, page, t);
         order(b, t, base, url);
         footer(b, page, t, url, lbpPerUsd);
         b.append("</main>");
+        // Outside <main>, because it is furniture pinned to the screen rather than part of the
+        // document being read — and last, so with no stylesheet at all it is a link at the end
+        // rather than one in front of the shop's name.
+        basketPeek(b, page, t);
         // After everything a person reads, not in the head. A crawler finds it either way, and up
         // to twenty kilobytes of it between <head> and the shop's name is twenty kilobytes a
         // reader on 3G waits through before anything appears.
@@ -236,9 +259,10 @@ final class ShopPageHtml {
             b.append("<link rel=\"apple-touch-icon\" href=\"").append(esc(logo)).append("\">");
         }
         b.append("<link rel=\"stylesheet\" href=\"").append(assets.stylesheet()).append("\">")
-                // Deferred, so it is fetched alongside the markup and runs after it: the shelf is
-                // already on the screen before this file arrives, and nothing waits on it.
+                // Deferred, so they are fetched alongside the markup and run after it: the shelf is
+                // already on the screen before either file arrives, and nothing waits on them.
                 .append("<script src=\"").append(assets.script()).append("\" defer></script>")
+                .append("<script src=\"").append(assets.basket()).append("\" defer></script>")
                 .append("</head>");
     }
 
@@ -452,7 +476,7 @@ final class ShopPageHtml {
                     .append("<h3>").append(esc(name)).append("</h3><ul class=\"items")
                     .append(pictured(section) ? " pic" : "").append("\">");
             for (PublicShopPage.Item item : section.items()) {
-                item(b, item, t);
+                item(b, item, t, page.tableOrdering());
             }
             b.append("</ul></div>");
         }
@@ -489,7 +513,8 @@ final class ShopPageHtml {
      * the order a screen reader announces and the order the row falls into when there is no
      * stylesheet at all.
      */
-    private static void item(StringBuilder b, PublicShopPage.Item item, ShopPageText t) {
+    private static void item(StringBuilder b, PublicShopPage.Item item, ShopPageText t,
+                             boolean pad) {
         b.append("<li").append(item.inStock() ? "" : " class=\"gone\"").append(">");
         if (item.imageUrl() != null) {
             // Lazy below the fold: a hundred thumbnails fetched eagerly is the difference between
@@ -523,7 +548,25 @@ final class ShopPageHtml {
         if (item.priceLbp() != null) {
             b.append("<span class=\"l\">").append(esc(t.lbp(item.priceLbp()))).append("</span>");
         }
-        b.append("</span></li>");
+        b.append("</span>");
+        if (pad && item.inStock()) {
+            // Last, because that is reading order for an action: what it is, then what it costs,
+            // then the thing to do about it. Nothing that has run out gets one — a button that
+            // added something the kitchen cannot make would be the page making a promise for it —
+            // and neither does any row at a shop that has not turned table ordering on, where the
+            // menu is a menu and there is nothing anywhere on the page to add to.
+            //
+            // It ships hidden and is revealed by basket.js, the bargain the search field already
+            // makes: on a page opened without a table's code there is no pad to add to, and a
+            // control that does nothing when tapped is worse than no control. Its accessible name
+            // is set by the script from the row's own name, so the merchant's text is not printed a
+            // second time here — a hundred and twenty of those is a kilobyte of repeated prose for
+            // a label nobody reads twice, and a second path onto the page for a value that would
+            // have to be escaped again.
+            b.append("<button class=\"a\" type=\"button\" hidden>").append(esc(t.add()))
+                    .append("</button>");
+        }
+        b.append("</li>");
     }
 
     /**
@@ -589,20 +632,126 @@ final class ShopPageHtml {
         b.append("</nav>");
     }
 
+
     /**
-     * How to order: the app, and nothing that looks like a basket.
+     * The order pad: what a diner at a table has chosen, and what the food comes to.
      *
-     * <p>Deliberately not a checkout and not a form. This page is anonymous, cached and crawled;
-     * anything on it that took an address or a phone number would be collecting a stranger's
-     * details on a page that cannot authenticate anybody.
+     * <p><strong>Every figure in here arrives from {@code /s/{slug}/quote} already added up and
+     * already spelled.</strong> Not one number is sent to the browser — the script is handed
+     * sentences, which is why it cannot produce a total of its own even by accident. The one place
+     * this page could have misled somebody about money is closed by the shape of the data rather
+     * than by a rule somebody has to remember.
+     *
+     * <p><strong>One figure, and it is the food.</strong> No delivery fee, no minimum, no service
+     * charge and no tax: the diner pays the restaurant at the table, and the platform is lending it
+     * an order pad rather than selling the meal.
+     *
+     * <p><strong>Drawn only for a shop that has turned this on.</strong> A shop that has not gets
+     * the sentence instead, in place of the pad, because a diner holding a scanned code deserves to
+     * be told why there is nothing to tap rather than left to work it out. And the pad is revealed
+     * only on a page opened from a table's own code: a shop's page travels in WhatsApp, and
+     * somebody across the city holding that link is not sitting at one of its tables.
+     *
+     * <p><strong>It asks for nothing about the diner.</strong> No address — there is nowhere to
+     * deliver to — no phone, no account. The one thing anybody types here is a note on a line, for
+     * the kitchen.
+     *
+     * <p>The whole panel ships {@code hidden} and is revealed by {@code basket.js}. A diner with no
+     * script gets the line that says so and a menu that is still complete — which is the promise
+     * this page has always made and the reason the catalogue is in the first response.
+     */
+    private static void pad(StringBuilder b, PublicShopPage page, ShopPageText t) {
+        b.append("<section class=\"block order\" id=\"basket\"><h2>").append(esc(t.yourOrder()))
+                .append("</h2>");
+        if (!page.tableOrdering()) {
+            // The shop's own decision, said and then nothing else drawn. No panel, no script hooks,
+            // no button: there is no pad on this page at all, and the sentence is the whole of it.
+            b.append("<p class=\"note\">").append(esc(t.orderWithTheStaff())).append("</p>")
+                    .append("</section>");
+            return;
+        }
+        b.append(
+                // Visible until the script hides it, rather than hidden until the script shows it:
+                // the diner who never gets the file is the one who needs to be told.
+                "<p class=\"bkno note\">").append(esc(t.padNeedsScript())).append("</p>")
+                // A path, not a URL — and that is not a detail. Every other address this page
+                // prints is absolute against the configured base, because a canonical link and an
+                // og:url must name the one public address whichever router the request arrived on.
+                // This one must do the opposite: the page is served on www.youdrop.shop and on the
+                // API host, the policy allows connect-src 'self', and an absolute address would be
+                // cross-origin — and therefore blocked — for every reader who reached the page by
+                // the other name. A path is same-origin by construction.
+                //
+                // The language is named on it rather than left to Accept-Language, exactly as the
+                // manifest link is and for the same reason: a diner whose phone is set to English
+                // reading an Arabic shop's menu in Arabic must not be handed an English total.
+                .append("<div class=\"bk\" hidden data-q=\"/s/").append(esc(page.slug()))
+                .append("/quote?lang=").append(t.tag())
+                .append("\" data-v=\"").append(esc(page.catalogue().version()))
+                // The sentences the script needs that are not in any answer: the one for a quote
+                // that could not be fetched, and the one for a page opened without a table. Shipped
+                // here so they are in the diner's own language without the script carrying a
+                // dictionary — the bargain the "nothing matches" line already makes.
+                .append("\" data-e=\"").append(esc(t.couldNotPrice()))
+                .append("\" data-nt=\"").append(esc(t.scanTheCodeOnYourTable())).append("\">")
+                // The table a printed code sent this diner from. Filled by the script from the
+                // query string and by nothing else — it is a number in a URL, so it is shown and
+                // kept with the pad, and believed about nothing at all. The word is the page's; the
+                // code is put after it by the script.
+                .append("<p class=\"bktab\" hidden data-l=\"").append(esc(t.tableLabel()))
+                .append("\"></p>")
+                .append("<p class=\"bkn\" hidden></p>")
+                .append("<p class=\"bkempty\">").append(esc(t.emptyPad())).append("</p>")
+                // The labels the script puts in front of a line's own name, and the two the note
+                // field needs, shipped once here rather than once per line and never built out of
+                // anything a merchant typed.
+                .append("<ul class=\"bl\" data-more=\"").append(esc(t.addOneMore()))
+                .append("\" data-less=\"").append(esc(t.removeOne()))
+                .append("\" data-note=\"").append(esc(t.noteOnALine()))
+                .append("\" data-eg=\"").append(esc(t.noteExample())).append("\"></ul>")
+                .append("<div class=\"bksum\"></div>")
+                .append("<p class=\"note bkwhat\" hidden>").append(esc(t.totalIsTheFood()))
+                .append("</p>")
+                // A live region, because what it says — the kitchen is closed, something has run
+                // out, there is no table — appears in answer to something the diner just tapped.
+                .append("<p class=\"bksays\" role=\"status\"></p>")
+                // Disabled in the markup, so it is disabled for the half-second before the script
+                // runs and for ever if it does not. aria-disabled as well: a disabled button is
+                // skipped by some screen readers entirely, and this one has something to say.
+                .append("<p><button class=\"cta bkgo\" type=\"button\" disabled aria-disabled=\"true\">")
+                .append(esc(t.sendToKitchen())).append("</button></p>")
+                .append("</div></section>");
+    }
+
+    /**
+     * The strip at the foot of the screen, so a reader forty rows down a menu knows there is a
+     * basket and can reach it.
+     *
+     * <p>An ordinary anchor at the basket's own id, hidden until there is something in it. On the
+     * design this is a sidebar beside the menu; this page is one column 720 px wide on purpose —
+     * it is opened on a phone from a chat message — so the same job is done the way the app's own
+     * menu screen does it.
+     */
+    private static void basketPeek(StringBuilder b, PublicShopPage page, ShopPageText t) {
+        if (!page.tableOrdering()) {
+            // No pad, nothing to lead back to. A shop that does not take orders from its tables
+            // gets no strip pinned over its menu.
+            return;
+        }
+        b.append("<a class=\"peek\" href=\"#basket\" hidden>").append(esc(t.viewOrder()))
+                .append("</a>");
+    }
+
+    /**
+     * How to order the rest of the way: the app.
+     *
+     * <p>What this section is for changed when the basket above it appeared. It no longer says the
+     * page takes no orders — it takes one as far as a total — but it is still the only way to
+     * finish, so it stays, and the basket's own button says plainly where the web stops.
      */
     private static void order(StringBuilder b, ShopPageText t, String base, String url) {
         b.append("<section class=\"block order\"><h2>").append(esc(t.howToOrder()))
-                .append("</h2><p>").append(esc(t.orderInTheApp())).append(" ")
-                // Said out loud, because a page with a shop's prices on it looks like a shop that
-                // takes money, and a reader who taps around looking for a basket and finds none
-                // has been misled by the layout rather than told anything.
-                .append(esc(t.thisPageTakesNoOrders())).append("</p>")
+                .append("</h2><p>").append(esc(t.orderInTheApp())).append("</p>")
                 // One button, and it says what happens when it is pressed: /app hands back the
                 // Android build itself, as a download. A reader on an iPhone should find that out
                 // from the label rather than from a file they cannot open.

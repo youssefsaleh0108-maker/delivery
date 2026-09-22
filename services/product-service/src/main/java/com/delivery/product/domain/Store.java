@@ -247,6 +247,21 @@ public class Store {
     private boolean verifiedLocal;
 
     /**
+     * Whether a diner at a table in this shop may order from its own public page.
+     *
+     * <p>Off for every shop until somebody at that shop turns it on, and that default is the whole
+     * of the safety here: the endpoint behind it writes a ticket in a real kitchen and is anonymous
+     * by necessity — a diner who scanned a sticker has no account and will not be asked for one —
+     * so a shop opts in rather than out, and a release cannot start printing paper in a restaurant
+     * that never asked for it.
+     *
+     * <p>A property of the shop rather than of a page or a table, which is what keeps the public
+     * page cacheable: the answer is the same for every reader of that shop.
+     */
+    @Column(name = "table_ordering", nullable = false)
+    private boolean tableOrdering;
+
+    /**
      * When the shop first listed — what "New on YouDrop" means. Stamped by the first
      * {@link #publish}, never moved by a later one: a shop suspended and listed again has not just
      * joined. Null for a shop that has never listed. V32 backfilled it from {@code created_at} for
@@ -857,6 +872,20 @@ public class Store {
      */
     public void setVerifiedLocal(boolean verified) {
         this.verifiedLocal = verified;
+    }
+
+    public boolean isTableOrdering() {
+        return tableOrdering;
+    }
+
+    /**
+     * Turns ordering at the table on or off for this shop.
+     *
+     * <p>The shop's own decision, unlike the badge above: it is the shop's kitchen, the shop's
+     * tables and the shop's paper. What it must never be is a default — see the field.
+     */
+    public void setTableOrdering(boolean offered) {
+        this.tableOrdering = offered;
     }
 
     public Integer getDeliveryRadiusMetres() {
