@@ -169,7 +169,8 @@ public class PublicShopPageService {
                 powerOf(store, now),
                 deliveryOf(store),
                 catalogueOf(store),
-                store.getTableCount());
+                store.getTableCount(),
+                store.isTableOrdering());
     }
 
     /**

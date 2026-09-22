@@ -77,7 +77,16 @@ public record PublicShopPage(
          * itself draws: a customer reading a menu has no use for the number of tables, and the one
          * who scanned a table's card already knows which table they are at.
          */
-        short tables) {
+        short tables,
+        /**
+         * Whether this shop takes orders from the table (V43).
+         *
+         * <p>Read by the web ordering work, which draws its pad or does not; nothing the menu
+         * builder or the card sheet writes depends on it. It is a separate answer from
+         * {@link #tables()} on purpose: a shop may print table cards purely as a menu on the wall,
+         * and printing cards is not a promise that somebody is watching a screen.
+         */
+        boolean tableOrdering) {
 
     /**
      * Whether the shop is open <em>right now</em>, in its own calendar, and the week behind that

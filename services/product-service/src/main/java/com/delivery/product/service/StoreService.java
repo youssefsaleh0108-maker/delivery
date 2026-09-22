@@ -354,9 +354,20 @@ public class StoreService {
      * not have.
      */
     @Transactional
-    public StoreView setTables(UUID id, String merchantId, int tables) {
+    public StoreView setTables(UUID id, String merchantId, int tables, Boolean ordering) {
         Store store = requireOwned(id, merchantId);
+        // The count first: seating nobody turns ordering off with it, and a body that asked for
+        // both "no tables" and "keep taking orders" is asking for something that cannot be true.
         store.seatTables(tables);
+        if (ordering != null) {
+            try {
+                store.acceptTableOrders(ordering);
+            } catch (IllegalStateException noTables) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY,
+                        noTables.getMessage());
+            }
+        }
         return view(store, clock.instant());
     }
 

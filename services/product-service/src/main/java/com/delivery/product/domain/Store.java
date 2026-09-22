@@ -278,6 +278,19 @@ public class Store {
     private short tableCount;
 
     /**
+     * Whether this shop takes orders from the table (V43), as against handing out its menu there.
+     *
+     * <p>A decision of its own, not an inference from {@link #tableCount}: a bakery may print table
+     * codes purely as a menu on the wall, and a restaurant wants a diner at table 7 to build an
+     * order and send it to the till. Both print the same cards.
+     *
+     * <p>Off is where every shop starts. Taking an order is a promise that somebody is watching a
+     * screen, and a default of on would have made that promise for shops that never asked.
+     */
+    @Column(name = "table_ordering", nullable = false)
+    private boolean tableOrdering;
+
+    /**
      * Written by the column default, and read straight back — see {@link Product#getCreatedAt}.
      * Without {@code @Generated} a store serialised in the same transaction it was created in
      * carries the null it was constructed with, because the column is not insertable.
@@ -897,10 +910,36 @@ public class Store {
                     "A shop can have between 0 and " + MAX_TABLES + " tables");
         }
         this.tableCount = (short) tables;
+        if (tables == 0) {
+            // A shop with no tables cannot be taking orders at them: an order carries the number
+            // off the card it was scanned from, and there are no cards.
+            this.tableOrdering = false;
+        }
     }
 
     public short getTableCount() {
         return tableCount;
+    }
+
+    /**
+     * Turns table ordering on or off.
+     *
+     * <p>Refused without tables, because there would be no table for an order to say it came from:
+     * every order a diner sends carries the number off the card they scanned, and a shop that seats
+     * nobody has no cards. Turning the tables down to zero turns this off with them, for the same
+     * reason — the alternative is a shop advertising ordering at tables it has said it does not
+     * have.
+     */
+    public void acceptTableOrders(boolean accepting) {
+        if (accepting && tableCount < 1) {
+            throw new IllegalStateException(
+                    "Say how many tables the room has before taking orders at them");
+        }
+        this.tableOrdering = accepting;
+    }
+
+    public boolean isTableOrdering() {
+        return tableOrdering;
     }
 
     public BigDecimal getLatitude() {

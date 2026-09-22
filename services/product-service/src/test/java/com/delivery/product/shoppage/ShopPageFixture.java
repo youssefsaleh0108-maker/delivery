@@ -245,6 +245,12 @@ final class ShopPageFixture {
         return this;
     }
 
+    /** And the switch beside it: this shop takes orders from those tables, not just hands out a menu. */
+    ShopPageFixture takesTableOrders() {
+        shop.acceptTableOrders(true);
+        return this;
+    }
+
     /** A section of the shop's own, in the merchant's order, with the items filed under it. */
     ShopPageFixture section(String name, Item... items) {
         Category section = new Category(shop.getId(), name, null, (short) ownSections.size());
