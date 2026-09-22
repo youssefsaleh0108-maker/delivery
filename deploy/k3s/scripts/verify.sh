@@ -897,6 +897,36 @@ for name in $(grep -o '"\${[A-Z][A-Z0-9_]*}"' "$realm" | tr -d '"${}' | sort -u)
     && ok "placeholder $name is fed from a Secret" \
     || fail "placeholder $name has no secretKeyRef on the keycloak container: it would import as literal text"
 done
+# Every service account that presents its own token to ANOTHER PLATFORM SERVICE has to be on the
+# azp allow-list, or AuthorizedPartyValidator refuses it: 401, empty body, one WARN line in the
+# service that refused. Nothing else in this repository connects the two facts, and the two are
+# five files apart — the Deployment that reads a client secret, and the config rows.
+#
+# So: a Deployment reading keycloak-clients/<X>_CLIENT_SECRET is a service account; if it calls a
+# platform service it must be on the list. accounting-service and notifications-manager call
+# Keycloak's admin API instead and are deliberately absent, which is why this is a named list
+# rather than a derivation — the two SQL copies must simply agree with it, and with each other.
+allowlist_callers="onboarding-service order-manager"
+for sql in ../../infra/postgres/init/03-config-properties.sql base/assets/postgres-init/03-config-properties.sql; do
+  [ -f "$sql" ] || { fail "$sql is missing: the azp allow-list has nowhere to come from"; continue; }
+  for c in $allowlist_callers; do
+    grep -q "delivery.security.allowed-client-ids\[[0-9]\+\]', '$c'" "$sql" \
+      && ok "$c is on the azp allow-list in $(basename "$(dirname "$(dirname "$sql")")")/$(basename "$sql")" \
+      || fail "$c presents a service-account token to a platform service but is NOT on delivery.security.allowed-client-ids in $sql: every call it makes would be answered 401 with an empty body"
+  done
+  # Relaxed binding stops at the first gap, so [0],[1],[3] binds two entries and drops the third
+  # without a word. Checked rather than trusted: the rows are edited by hand.
+  idx=$(grep -o "allowed-client-ids\[[0-9]\+\]" "$sql" | grep -o '[0-9]\+' | sort -n | tr '\n' ' ')
+  expected=$(i=0; for _ in $idx; do printf '%s ' "$i"; i=$((i + 1)); done)
+  [ "$idx" = "$expected" ] \
+    && ok "the allow-list indices run 0..n with no gap in $(basename "$sql")" \
+    || fail "delivery.security.allowed-client-ids in $sql is indexed '$idx', not '$expected': Spring binds up to the first gap and silently drops the rest"
+done
+# One list, two copies, and only the k3s one is applied by the cluster. A row added to one and not
+# the other is a difference between what docker compose runs and what the cluster runs.
+diff -q ../../infra/postgres/init/03-config-properties.sql base/assets/postgres-init/03-config-properties.sql >/dev/null 2>&1 \
+  && ok "both copies of 03-config-properties.sql are identical" \
+  || fail "infra/postgres/init/03-config-properties.sql and base/assets/postgres-init/03-config-properties.sql have drifted"
 for secret in $( { grep -h -o 'secretKeyRef: { name: [a-z0-9-]*' base/*.yaml | awk '{print $4}'
                    grep -h -A1 'secretKeyRef:$' base/*.yaml | grep -o 'name: [a-z0-9-]*' | awk '{print $2}'
                    grep -h -o 'secret: [a-z0-9-]*' overlays/ingress.template.yaml | awk '{print $2}'; } | sort -u); do
