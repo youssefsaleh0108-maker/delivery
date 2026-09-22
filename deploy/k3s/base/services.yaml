@@ -151,6 +151,17 @@ spec:
               valueFrom: { secretKeyRef: { name: platform-secrets, key: MINIO_ROOT_USER } }
             - name: MINIO_SECRET_KEY
               valueFrom: { secretKeyRef: { name: platform-secrets, key: MINIO_ROOT_PASSWORD } }
+            # The service account used ONLY to price an order that has no caller token to forward —
+            # a diner who scanned the code on their table and never signed in. Every order placed by
+            # a signed-in customer still travels on that customer's own token, so the audit trail on
+            # Product Service keeps naming the real person. KEYCLOAK_INTERNAL_URL comes with
+            # platform-common above.
+            #
+            # From keycloak-clients, not Vault, for the reason notifications-manager's
+            # KEYCLOAK_CLIENT_SECRET gives: one Secret holds what Keycloak holds, and
+            # scripts/rotate-secrets.sh <ns> client order-manager keeps the two in step.
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: keycloak-clients, key: ORDER_MANAGER_CLIENT_SECRET } }
           ports:
             - containerPort: 8101
           # Ask the application, not the socket.

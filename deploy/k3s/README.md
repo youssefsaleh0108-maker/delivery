@@ -312,7 +312,7 @@ in `platform-common`, and the ops basic-auth hash in `gen-secrets.sh`. None of t
 | Secret | keys | read by |
 | --- | --- | --- |
 | `platform-secrets` | infrastructure passwords (Postgres, Redis, RabbitMQ, MinIO, Keycloak admin, Config Server, Vault), `SMTP_PASSWORD` | every Spring service (whole, via envFrom), the data layer, Vault, Keycloak |
-| `keycloak-clients` | `ONBOARDING_CLIENT_SECRET`, `ACCOUNTING_CLIENT_SECRET`, `NOTIFICATIONS_CLIENT_SECRET` | Keycloak's first-boot import; each of those three services, its own key |
+| `keycloak-clients` | `ONBOARDING_CLIENT_SECRET`, `ACCOUNTING_CLIENT_SECRET`, `NOTIFICATIONS_CLIENT_SECRET`, `ORDER_MANAGER_CLIENT_SECRET` | Keycloak's first-boot import; each of those four services, its own key |
 | `demo-logins` | `customer`, `rider`, `merchant`, `backoffice`, `carrier` | Keycloak's first-boot import; `scripts/e2e-smoke.sh` |
 | `whatsapp-webhook` | `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN` | whatsapp-service |
 | `sms-dlr` | `SMS_DEV_DLR_SECRET` | sms-connector |
