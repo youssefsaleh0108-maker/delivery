@@ -49,6 +49,7 @@ class Product {
     this.service,
     this.fromPrice,
     this.moderation,
+    this.position = 0,
   });
 
   final String id;
@@ -128,6 +129,16 @@ class Product {
   /// cannot read an offer that is not on sale at all.
   final ProductModeration? moderation;
 
+  /// Where this item sits inside its block of the menu — its section, or the shop's unsectioned
+  /// remainder.
+  ///
+  /// READ-ONLY, like [inStock] and for a related reason: it is written by the menu builder's drag,
+  /// which sends a whole section's order at once, and never by the product form. So it is absent
+  /// from [toRequestJson] — a form that posted one would let two screens disagree about the order.
+  /// Zero from a server that predates the column, which is every item in the same block and leaves
+  /// the name to break the tie, exactly as the page used to sort.
+  final int position;
+
   /// Whether this is a service offer. Only a service shop's products are, and all of them are.
   bool get isServiceOffer => service != null;
 
@@ -166,6 +177,7 @@ class Product {
         service: ServiceTerms.maybeFromJson(json['service']),
         fromPrice: _doubleOrNull(json['fromPrice']),
         moderation: ProductModeration.maybeFromJson(json['moderation']),
+        position: (json['position'] as num?)?.toInt() ?? 0,
       );
 
   /// Note the absence of `merchantId` and `status`: the service derives the first from the token

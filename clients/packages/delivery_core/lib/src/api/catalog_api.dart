@@ -299,6 +299,32 @@ class CatalogApi {
     return _dio.delete<void>('/api/stores/$storeId/categories/$categoryId');
   }
 
+  /// Rewrites the order of the items inside one section, and answers with the ids as the server
+  /// now holds them.
+  ///
+  /// The [reorderStoreCategories] contract one level down, and a REPLACE for the same reason: the
+  /// server rewrites positions `0..n-1` in one transaction and refuses (422) a list that is not
+  /// exactly that section's product ids, each once. So the menu builder sends the whole block it
+  /// wants to end up with, never the single row a finger moved.
+  ///
+  /// **Every item in the section, whatever its status.** An item the merchant has switched off is
+  /// still on the menu and still holds its place, so leaving archived rows out would be a partial
+  /// list — refused — and, if it were not, would drop an item to the bottom the moment it was
+  /// switched back on.
+  ///
+  /// Only a section this shop owns; a platform category is 422, as is another shop's section.
+  Future<List<String>> reorderSectionProducts(
+    String storeId,
+    String categoryId,
+    List<String> productIds,
+  ) async {
+    final Response<dynamic> response = await _dio.put<dynamic>(
+      '/api/stores/$storeId/categories/$categoryId/products/order',
+      data: <String, dynamic>{'productIds': productIds},
+    );
+    return (response.data as List<dynamic>).cast<String>();
+  }
+
   // ---------------------------------------------------------------- images
 
   /// Uploads one product image, following the three-step flow from Section 5.

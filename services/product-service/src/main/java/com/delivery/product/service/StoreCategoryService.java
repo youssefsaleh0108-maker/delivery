@@ -125,6 +125,43 @@ public class StoreCategoryService {
         return sectionsOf(storeId);
     }
 
+    /**
+     * Applies the order the merchant dragged one section's items into.
+     *
+     * <p>{@link #reorder}'s contract, one level down: the full ordered list of the section's product
+     * ids, each exactly once, rewritten 0..n-1 in one transaction. A partial list is refused rather
+     * than applied to the part it names, because the ids it left out would keep positions that now
+     * collide with the ones it set.
+     *
+     * <p>Every status is in the list, including archived items. The builder draws them — an item off
+     * the shelf is still on the merchant's menu, waiting to be switched back on — so leaving them
+     * out of the order would make putting one back drop it at the bottom of its section.
+     *
+     * <p>Only a section this shop owns. A platform category is not a menu block a merchant may
+     * arrange: it is shared, and the page draws what is filed under it by name.
+     */
+    @Transactional
+    public List<Product> reorderProducts(UUID storeId, UUID categoryId, List<UUID> orderedIds) {
+        requireSection(storeId, categoryId);
+        List<Product> items = products
+                .findByStoreIdAndCategoryIdOrderByPositionAscNameAsc(storeId, categoryId);
+        Set<UUID> distinct = new LinkedHashSet<>(orderedIds);
+        if (distinct.size() != orderedIds.size() || distinct.size() != items.size()) {
+            throw new CatalogRuleViolationException(
+                    "The new order must list every item in the section exactly once");
+        }
+        short position = 0;
+        for (UUID id : orderedIds) {
+            Product item = items.stream()
+                    .filter(p -> p.getId().equals(id))
+                    .findFirst()
+                    .orElseThrow(() -> new CatalogRuleViolationException(
+                            "Item " + id + " is not in this section"));
+            item.moveTo(position++);
+        }
+        return products.findByStoreIdAndCategoryIdOrderByPositionAscNameAsc(storeId, categoryId);
+    }
+
     @Transactional
     public void delete(UUID storeId, UUID categoryId) {
         Category section = requireSection(storeId, categoryId);

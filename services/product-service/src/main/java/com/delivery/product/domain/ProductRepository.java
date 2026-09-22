@@ -115,6 +115,24 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     long countByCategoryIdAndStatusNot(UUID categoryId, Product.Status status);
 
     /**
+     * One block of the menu, in the order the merchant put it in: a shop's section and everything
+     * filed under it, whatever its status.
+     *
+     * <p>Every status, because this is what a reorder rewrites and the builder draws — an item the
+     * merchant has taken off the shelf still holds its place in the section, so putting it back does
+     * not drop it at the bottom. {@code name} breaks the tie, so a block whose positions have never
+     * been written comes out exactly as the page has always drawn it.
+     */
+    java.util.List<Product> findByStoreIdAndCategoryIdOrderByPositionAscNameAsc(UUID storeId,
+                                                                               UUID categoryId);
+
+    /** Where a new item lands in its section, and where one moved into a section lands: the end. */
+    long countByStoreIdAndCategoryId(UUID storeId, UUID categoryId);
+
+    /** The same, for the block of items that have no section at all. */
+    long countByStoreIdAndCategoryIdIsNull(UUID storeId);
+
+    /**
      * A store's shelf: the ACTIVE products in one store, optionally narrowed to one aisle.
      *
      * <p>The store landing page's main query, and the reason V11 adds a partial index on

@@ -239,15 +239,21 @@ final class ShopPageFixture {
         return this;
     }
 
+    /** How many tables the merchant says the room has, which is how many cards it can print. */
+    ShopPageFixture tables(int tables) {
+        shop.seatTables(tables);
+        return this;
+    }
+
     /**
-     * A shop that has turned ordering at the table on.
+     * And the switch beside it: this shop takes orders from those tables, not just hands out a menu.
      *
      * <p>Off by default here exactly as it is off by default in the database, so every test that
      * does not ask for it is testing the shop every shop on the platform is today: a menu, and a
      * line saying to order with the staff.
      */
     ShopPageFixture takesTableOrders() {
-        shop.setTableOrdering(true);
+        shop.acceptTableOrders(true);
         return this;
     }
 

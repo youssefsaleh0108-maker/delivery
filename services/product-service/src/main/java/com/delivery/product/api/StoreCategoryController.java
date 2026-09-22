@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.delivery.platform.security.CurrentUser;
 import com.delivery.product.domain.Category;
+import com.delivery.product.domain.Product;
 import com.delivery.product.domain.staff.Permission;
 import com.delivery.product.service.StaffService;
 import com.delivery.product.service.StoreAccess;
@@ -82,6 +83,27 @@ public class StoreCategoryController {
                 .toList();
     }
 
+    /**
+     * The menu builder's drag: the full ordered list of one section's product ids.
+     *
+     * <p>Under the section rather than under {@code /api/products}, because an item's place is a
+     * property of the block it sits in and the permission is the shop's, not the product's — the
+     * stockkeeper who may arrange shelves may arrange what is on them.
+     *
+     * <p>Answers with the ids in the order the server now holds, so a client that sent something the
+     * server reordered differently — or that raced another device — can settle on the answer rather
+     * than on what it hoped it sent.
+     */
+    @PutMapping("/{categoryId}/products/order")
+    @PreAuthorize("isAuthenticated()")
+    public List<UUID> reorderProducts(@PathVariable UUID storeId, @PathVariable UUID categoryId,
+                                      @Valid @RequestBody ProductOrderRequest request) {
+        require(storeId, Permission.MODIFY_INVENTORY_PRICING);
+        return sections.reorderProducts(storeId, categoryId, request.productIds()).stream()
+                .map(Product::getId)
+                .toList();
+    }
+
     @DeleteMapping("/{categoryId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("isAuthenticated()")
@@ -124,5 +146,9 @@ public class StoreCategoryController {
     }
 
     public record ReorderRequest(@NotEmpty List<UUID> categoryIds) {
+    }
+
+    /** The whole of one section's order, never a single moved id. See {@link #reorderProducts}. */
+    public record ProductOrderRequest(@NotEmpty List<UUID> productIds) {
     }
 }

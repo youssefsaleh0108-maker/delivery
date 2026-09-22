@@ -247,21 +247,6 @@ public class Store {
     private boolean verifiedLocal;
 
     /**
-     * Whether a diner at a table in this shop may order from its own public page.
-     *
-     * <p>Off for every shop until somebody at that shop turns it on, and that default is the whole
-     * of the safety here: the endpoint behind it writes a ticket in a real kitchen and is anonymous
-     * by necessity — a diner who scanned a sticker has no account and will not be asked for one —
-     * so a shop opts in rather than out, and a release cannot start printing paper in a restaurant
-     * that never asked for it.
-     *
-     * <p>A property of the shop rather than of a page or a table, which is what keeps the public
-     * page cacheable: the answer is the same for every reader of that shop.
-     */
-    @Column(name = "table_ordering", nullable = false)
-    private boolean tableOrdering;
-
-    /**
      * When the shop first listed — what "New on YouDrop" means. Stamped by the first
      * {@link #publish}, never moved by a later one: a shop suspended and listed again has not just
      * joined. Null for a shop that has never listed. V32 backfilled it from {@code created_at} for
@@ -277,6 +262,33 @@ public class Store {
      */
     @Column(name = "delivery_radius_metres")
     private Integer deliveryRadiusMetres;
+
+    /**
+     * How many tables this shop has QR codes for (V42), zero when it has none.
+     *
+     * <p>A property of the shop and not of whichever device printed the sheet: the codes are
+     * generated from it, so a merchant who reprints table 7 from the portal next month gets the
+     * card the phone printed today, byte for byte.
+     *
+     * <p>Lowering it does not invalidate anything already on a table — a printed code is a URL to
+     * the page, not to this service — it only stops the shop printing new cards for tables it has
+     * said it no longer has.
+     */
+    @Column(name = "table_count", nullable = false)
+    private short tableCount;
+
+    /**
+     * Whether this shop takes orders from the table (V43), as against handing out its menu there.
+     *
+     * <p>A decision of its own, not an inference from {@link #tableCount}: a bakery may print table
+     * codes purely as a menu on the wall, and a restaurant wants a diner at table 7 to build an
+     * order and send it to the till. Both print the same cards.
+     *
+     * <p>Off is where every shop starts. Taking an order is a promise that somebody is watching a
+     * screen, and a default of on would have made that promise for shops that never asked.
+     */
+    @Column(name = "table_ordering", nullable = false)
+    private boolean tableOrdering;
 
     /**
      * Written by the column default, and read straight back — see {@link Product#getCreatedAt}.
@@ -874,26 +886,60 @@ public class Store {
         this.verifiedLocal = verified;
     }
 
-    public boolean isTableOrdering() {
-        return tableOrdering;
-    }
-
-    /**
-     * Turns ordering at the table on or off for this shop.
-     *
-     * <p>The shop's own decision, unlike the badge above: it is the shop's kitchen, the shop's
-     * tables and the shop's paper. What it must never be is a default — see the field.
-     */
-    public void setTableOrdering(boolean offered) {
-        this.tableOrdering = offered;
-    }
-
     public Integer getDeliveryRadiusMetres() {
         return deliveryRadiusMetres;
     }
 
     public void setDeliveryRadiusMetres(Integer metres) {
         this.deliveryRadiusMetres = metres;
+    }
+
+    /** The most tables one shop may have codes for. The database check constraint says the same. */
+    public static final int MAX_TABLES = 400;
+
+    /**
+     * Says how many tables the room has, which is how many QR cards the shop can print.
+     *
+     * <p>Refused outside {@code 0..}{@value #MAX_TABLES} rather than clamped: a merchant who typed
+     * a number this shop cannot have is better told so than handed a different one silently, and a
+     * clamp would turn one mistyped digit into a print job nobody asked for.
+     */
+    public void seatTables(int tables) {
+        if (tables < 0 || tables > MAX_TABLES) {
+            throw new IllegalArgumentException(
+                    "A shop can have between 0 and " + MAX_TABLES + " tables");
+        }
+        this.tableCount = (short) tables;
+        if (tables == 0) {
+            // A shop with no tables cannot be taking orders at them: an order carries the number
+            // off the card it was scanned from, and there are no cards.
+            this.tableOrdering = false;
+        }
+    }
+
+    public short getTableCount() {
+        return tableCount;
+    }
+
+    /**
+     * Turns table ordering on or off.
+     *
+     * <p>Refused without tables, because there would be no table for an order to say it came from:
+     * every order a diner sends carries the number off the card they scanned, and a shop that seats
+     * nobody has no cards. Turning the tables down to zero turns this off with them, for the same
+     * reason — the alternative is a shop advertising ordering at tables it has said it does not
+     * have.
+     */
+    public void acceptTableOrders(boolean accepting) {
+        if (accepting && tableCount < 1) {
+            throw new IllegalStateException(
+                    "Say how many tables the room has before taking orders at them");
+        }
+        this.tableOrdering = accepting;
+    }
+
+    public boolean isTableOrdering() {
+        return tableOrdering;
     }
 
     public BigDecimal getLatitude() {

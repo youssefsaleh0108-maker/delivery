@@ -30,8 +30,11 @@ public record ShopBasket(
         List<Line> lines,
         /** Every line added up. It is the whole of what this order costs. */
         BigDecimal total,
-        /** The table this pad belongs to, as it was shown; null when the page has no table. */
-        String table,
+        /**
+         * The table this pad belongs to — a number this shop actually has
+         * ({@code PublicShopPageService#tableOf}) — or null when the page named none it recognises.
+         */
+        Integer table,
         /** Everything standing between this pad and a ticket. Empty means nothing is. */
         Set<Problem> problems) {
 

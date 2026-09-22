@@ -65,19 +65,28 @@ public record PublicShopPage(
         /** What a SERVICES shop does; null for every goods shop. */
         Store.ServiceCategory serviceCategory,
         Opening opening,
-        /**
-         * Whether a diner at a table here may order from this page.
-         *
-         * <p>The shop's own switch ({@code Store#isTableOrdering}), off until somebody at the shop
-         * turns it on. It is a property of the shop rather than of the reader or the URL, which is
-         * what keeps this page cacheable: the answer is the same for everybody who opens it, so
-         * the rendering does not split.
-         */
-        boolean tableOrdering,
         /** Null unless the merchant said what the lights are doing, recently enough to mean now. */
         Power power,
         Delivery delivery,
-        Catalogue catalogue) {
+        Catalogue catalogue,
+        /**
+         * How many tables this shop has QR cards for (V42); zero for a shop that has asked for
+         * none.
+         *
+         * <p>Read by the printable card sheet and by the per-table code, and by nothing the page
+         * itself draws: a customer reading a menu has no use for the number of tables, and the one
+         * who scanned a table's card already knows which table they are at.
+         */
+        short tables,
+        /**
+         * Whether this shop takes orders from the table (V43).
+         *
+         * <p>Read by the web ordering work, which draws its pad or does not; nothing the menu
+         * builder or the card sheet writes depends on it. It is a separate answer from
+         * {@link #tables()} on purpose: a shop may print table cards purely as a menu on the wall,
+         * and printing cards is not a promise that somebody is watching a screen.
+         */
+        boolean tableOrdering) {
 
     /**
      * Whether the shop is open <em>right now</em>, in its own calendar, and the week behind that

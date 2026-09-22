@@ -693,7 +693,11 @@ final class ShopPageHtml {
                 // here so they are in the diner's own language without the script carrying a
                 // dictionary — the bargain the "nothing matches" line already makes.
                 .append("\" data-e=\"").append(esc(t.couldNotPrice()))
-                .append("\" data-nt=\"").append(esc(t.scanTheCodeOnYourTable())).append("\">")
+                .append("\" data-nt=\"").append(esc(t.scanTheCodeOnYourTable()))
+                // The name of the parameter a table's card carries, from the one class that
+                // spells it. ShopTableCodes exists because three things had to agree about it and
+                // a fourth — the script that reads it back off the address — is now one of them.
+                .append("\" data-t=\"").append(esc(ShopTableCodes.PARAM)).append("\">")
                 // The table a printed code sent this diner from. Filled by the script from the
                 // query string and by nothing else — it is a number in a URL, so it is shown and
                 // kept with the pad, and believed about nothing at all. The word is the page's; the

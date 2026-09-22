@@ -17,6 +17,10 @@ export 'src/delivery_screen.dart';
 // mounted by both hosts like the screens above, and the POS trio is exported together because a
 // sale walks terminal -> checkout -> receipt and a host has to be able to name all three.
 export 'src/inventory_screen.dart';
+// The same catalogue arranged as the thing a customer reads (Figma 139:8): sections with their
+// items, an availability switch on each, and a Preview that opens the shop's real public page. Not
+// a second catalogue — it writes the very endpoints the two screens below it write.
+export 'src/menu_builder_screen.dart';
 export 'src/merchant_categories_screen.dart';
 export 'src/pos/pos_checkout_screen.dart';
 export 'src/pos/pos_receipt_screen.dart';

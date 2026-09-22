@@ -166,10 +166,11 @@ public class PublicShopPageService {
                 store.getVertical(),
                 store.getServiceCategory(),
                 openingOf(store, now),
-                store.isTableOrdering(),
                 powerOf(store, now),
                 deliveryOf(store),
-                catalogueOf(store));
+                catalogueOf(store),
+                store.getTableCount(),
+                store.isTableOrdering());
     }
 
     /**
@@ -195,26 +196,34 @@ public class PublicShopPageService {
     static final int MAX_LINE_NOTE = 60;
 
     /**
-     * What a table's code may look like.
+     * The table a request names, or null when it names none <em>this shop</em> has.
      *
-     * <p>A short plain code, because that is what is printed on a sticker: {@code 7}, {@code 12},
-     * {@code B4}. Anything else is refused outright rather than cleaned up — this string is drawn
-     * on the diner's phone and on the kitchen's ticket, and the narrow rule is cheaper to defend in
-     * both places than an escaping rule in each.
-     */
-    private static final java.util.regex.Pattern TABLE = java.util.regex.Pattern.compile(
-            "[A-Za-z0-9-]{1,8}");
-
-    /**
-     * The table a request names, or null when it names none this shop would recognise.
+     * <p>A table is a number, because that is what {@link ShopTableCodes} prints on the card and
+     * what the shop calls it: a merchant whose card came off table 7 reprints table 7, and there
+     * is nothing secret about a number written on a table.
+     *
+     * <p><strong>Checked against the shop's own room, not merely against a shape.</strong> A shop
+     * that has said it seats twelve has no table 500 and no table 0, so a code naming one is not a
+     * table here whatever it looks like — which is the difference between a rule about characters
+     * and a rule about this restaurant. It costs nothing: the count is already on the store row
+     * that was read to answer the request.
      *
      * <p>The rule lives here and not in {@code basket.js}: the script's copy of it decides what a
-     * diner is shown, and this one decides what a kitchen is sent. They agree, and only one of them
-     * is trusted.
+     * diner is shown, and this one decides what a kitchen would be sent. They agree, and only one
+     * of them is trusted.
      */
-    static String tableOf(String raw) {
+    static Integer tableOf(Store store, String raw) {
         String trimmed = raw == null ? "" : raw.trim();
-        return TABLE.matcher(trimmed).matches() ? trimmed : null;
+        if (trimmed.isEmpty() || trimmed.length() > 3) {
+            return null;
+        }
+        int table;
+        try {
+            table = Integer.parseInt(trimmed);
+        } catch (NumberFormatException notANumber) {
+            return null;
+        }
+        return table >= 1 && table <= store.getTableCount() ? table : null;
     }
 
     /**
@@ -259,7 +268,7 @@ public class PublicShopPageService {
             problems.add(ShopBasket.Problem.NOT_OFFERED);
             return new ShopBasket(List.of(), ZERO2, null, problems);
         }
-        String seat = tableOf(table);
+        Integer seat = tableOf(store, table);
         if (seat == null) {
             // Priced all the same, because a diner whose code did not survive the trip should see
             // what they chose rather than an empty screen — it just cannot be sent anywhere.
@@ -348,6 +357,23 @@ public class PublicShopPageService {
     @Transactional(readOnly = true)
     public boolean exists(String slug) {
         return stores.findBySlug(slug).filter(this::publiclyVisible).isPresent();
+    }
+
+    /**
+     * How many tables this shop has codes for, or zero for a shop nobody may see.
+     *
+     * <p>{@link #exists}'s one lookup with one more column read off the row it already had, rather
+     * than a page read: printing a sheet of table cards needs the shop's name and its table count
+     * and nothing else about the shelf. Zero for a hidden shop is the same refusal
+     * {@link #exists} gives — a table code is a QR on a table pointing at the page, and a shop that
+     * has no page must not be able to print one.
+     */
+    @Transactional(readOnly = true)
+    public short tablesOf(String slug) {
+        return stores.findBySlug(slug)
+                .filter(this::publiclyVisible)
+                .map(Store::getTableCount)
+                .orElse((short) 0);
     }
 
     /**
@@ -535,9 +561,18 @@ public class PublicShopPageService {
      * same order, and the only way to be sure of that is for there to be one place that decides it.
      */
     Shelf shelfOf(Store store) {
+        // The merchant's own order inside each block (V41), name for the ties and for any block
+        // whose positions have never been written. Sections are ordered separately, by
+        // sectionNames(); this sort only has to settle what is inside one of them, which is why
+        // position leads and the section is not in the sort at all.
+        //
+        // It also changes which items a shop past MAX_ITEMS loses, and for the better: the cut now
+        // falls after the top of every section rather than somewhere in the alphabet, so a shop with
+        // two hundred lines shows the start of each of its sections instead of everything from A to M.
         Page<Product> page = products.findActiveInStore(
                 store.getId(), null, "%",
-                PageRequest.of(0, MAX_ITEMS, Sort.by(Sort.Direction.ASC, "name")));
+                PageRequest.of(0, MAX_ITEMS,
+                        Sort.by(Sort.Direction.ASC, "position").and(Sort.by(Sort.Direction.ASC, "name"))));
         List<Product> shelf = page.getContent();
         int total = (int) page.getTotalElements();
         if (shelf.isEmpty()) {

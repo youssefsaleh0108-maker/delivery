@@ -95,7 +95,10 @@ final class ShopBasketJson {
         b.append(",\"totalLabel\":\"").append(ShopPageHtml.json(t.totalLine())).append('"');
 
         if (basket.table() != null) {
-            b.append(",\"table\":\"").append(ShopPageHtml.json(basket.table())).append('"');
+            // Spelled, like every other number this page prints: "٧" on the Arabic rendering. The
+            // script shows it and does nothing else with it.
+            b.append(",\"table\":\"")
+                    .append(ShopPageHtml.json(t.number(basket.table()))).append('"');
         }
 
         b.append(",\"says\":[");

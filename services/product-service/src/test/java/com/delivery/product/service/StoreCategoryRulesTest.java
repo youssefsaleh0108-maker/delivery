@@ -158,4 +158,85 @@ class StoreCategoryRulesTest {
                 .isInstanceOf(CatalogRuleViolationException.class)
                 .hasMessageContaining("3");
     }
+
+    // ------------------------------------------------- the items inside a section (V41)
+
+    private Product item(String name, UUID categoryId) {
+        return new Product("merchant-1", STORE, name, null, new java.math.BigDecimal("1.00"),
+                categoryId);
+    }
+
+    @Test
+    @DisplayName("reordering a section's items rewrites every position from the list")
+    void reorderProductsAppliesAValidList() {
+        Category menu = section("Breads", (short) 0);
+        when(categories.findById(menu.getId())).thenReturn(Optional.of(menu));
+        Product croissant = item("Croissant", menu.getId());
+        Product manouche = item("Manouche", menu.getId());
+        Product knefe = item("Knefe", menu.getId());
+        when(products.findByStoreIdAndCategoryIdOrderByPositionAscNameAsc(STORE, menu.getId()))
+                .thenReturn(List.of(croissant, manouche, knefe));
+
+        sections.reorderProducts(STORE, menu.getId(),
+                List.of(knefe.getId(), croissant.getId(), manouche.getId()));
+
+        // The house special goes to the top, which is the whole of what this feature is for.
+        assertThat(knefe.getPosition()).isZero();
+        assertThat(croissant.getPosition()).isEqualTo((short) 1);
+        assertThat(manouche.getPosition()).isEqualTo((short) 2);
+    }
+
+    @Test
+    @DisplayName("a partial list of a section's items is refused, not applied to the part it names")
+    void reorderProductsRefusesAPartialList() {
+        Category menu = section("Breads", (short) 0);
+        when(categories.findById(menu.getId())).thenReturn(Optional.of(menu));
+        Product a = item("A", menu.getId());
+        Product b = item("B", menu.getId());
+        Product c = item("C", menu.getId());
+        when(products.findByStoreIdAndCategoryIdOrderByPositionAscNameAsc(STORE, menu.getId()))
+                .thenReturn(List.of(a, b, c));
+
+        // Two of three, and the same id twice — both are lists that would leave one item holding a
+        // position another item now also holds.
+        assertThatThrownBy(() -> sections.reorderProducts(STORE, menu.getId(),
+                List.of(b.getId(), a.getId())))
+                .isInstanceOf(CatalogRuleViolationException.class);
+        assertThatThrownBy(() -> sections.reorderProducts(STORE, menu.getId(),
+                List.of(a.getId(), a.getId(), b.getId())))
+                .isInstanceOf(CatalogRuleViolationException.class);
+
+        assertThat(List.of(a, b, c)).allMatch(p -> p.getPosition() == 0);
+    }
+
+    @Test
+    @DisplayName("an item from another section cannot be dragged into this one's order")
+    void reorderProductsRefusesAForeignItem() {
+        Category menu = section("Breads", (short) 0);
+        when(categories.findById(menu.getId())).thenReturn(Optional.of(menu));
+        Product mine = item("Kaak", menu.getId());
+        Product elsewhere = item("Ayran", UUID.randomUUID());
+        when(products.findByStoreIdAndCategoryIdOrderByPositionAscNameAsc(STORE, menu.getId()))
+                .thenReturn(List.of(mine));
+
+        assertThatThrownBy(() -> sections.reorderProducts(STORE, menu.getId(),
+                List.of(elsewhere.getId())))
+                .isInstanceOf(CatalogRuleViolationException.class);
+    }
+
+    @Test
+    @DisplayName("another shop's section cannot be reordered, and neither can platform taxonomy")
+    void reorderProductsRefusesSomebodyElsesSection() {
+        Category theirs = new Category(UUID.randomUUID(), "Breads", null, (short) 0);
+        when(categories.findById(theirs.getId())).thenReturn(Optional.of(theirs));
+        Category platform = new Category("Food", null);
+        when(categories.findById(platform.getId())).thenReturn(Optional.of(platform));
+
+        for (Category refused : List.of(theirs, platform)) {
+            assertThatThrownBy(() -> sections.reorderProducts(STORE, refused.getId(),
+                    List.of(UUID.randomUUID())))
+                    .isInstanceOf(CatalogRuleViolationException.class)
+                    .hasMessage("No such section");
+        }
+    }
 }

@@ -36,17 +36,18 @@
   var offline = document.querySelector('.bkno');
 
   /*
-    The table, off the address. A short plain code is what a sticker carries — 7, 12, B4 — and
-    anything else is dropped rather than cleaned up: this string is drawn on the phone and would
-    be drawn on a kitchen's ticket. The server applies the same rule to the value it is sent, and
-    only the server's answer decides anything.
+    The table, off the address. A number is what the card carries (ShopTableCodes), and anything
+    that is not one is dropped here rather than cleaned up. This is the cheap half of the rule:
+    the server checks the number against the tables this shop actually says it has, and only its
+    answer decides whether there is a table at all.
   */
   function tableFromUrl() {
-    var found = /[?&]t=([^&#]*)/.exec(window.location.search);
+    var name = panel.getAttribute('data-t') || 't';
+    var found = new RegExp('[?&]' + name + '=([^&#]*)').exec(window.location.search);
     if (!found) { return null; }
     var raw;
     try { raw = decodeURIComponent(found[1].replace(/\+/g, ' ')); } catch (bad) { return null; }
-    return /^[A-Za-z0-9-]{1,8}$/.test(raw) ? raw : null;
+    return /^[0-9]{1,3}$/.test(raw) ? raw : null;
   }
 
   var table = tableFromUrl();
@@ -246,9 +247,18 @@
       }
     }
 
+    // Which table the kitchen would be told, spelled by the server in the page's own language —
+    // and absent when the server does not recognise the number the address carried, which is the
+    // only thing that decides whether this pad has anywhere to go.
+    var where = panel.querySelector('.bktab');
+    if (where) {
+      where.textContent = answer.table ? where.getAttribute('data-l') + ' ' + answer.table : '';
+      where.hidden = !answer.table;
+    }
+
     clear();
     money(answer.totalLabel, answer.total, answer.totalLbp);
-    about.hidden = false;
+    about.hidden = !lines.length;
 
     var trouble = '';
     for (var s = 0; s < (answer.says || []).length; s++) {
@@ -256,10 +266,10 @@
     }
     says.textContent = trouble;
     counter.textContent = answer.count;
-    counter.hidden = false;
+    counter.hidden = !lines.length;
     if (peek) {
       peek.textContent = peekLabel + ' · ' + answer.count + ' · ' + answer.total;
-      peek.hidden = false;
+      peek.hidden = !lines.length;
     }
   }
 
@@ -279,8 +289,14 @@
   var pending = null;
   var inFlight = null;
 
+  /*
+    Asked even for an empty pad, once, on load. Two things come back that nothing else can answer:
+    whether this shop really has the table the address named — a card peeled off table 7 and stuck
+    on the wall, or a number somebody typed — and how to spell it in the language the page is in.
+    A diner who scanned a code for a table that does not exist should be told before they choose
+    the food, not after.
+  */
   function ask() {
-    if (!lines.length) { return; }
     // A diner tapping + four times is one question, not four.
     if (pending) { window.clearTimeout(pending); }
     pending = window.setTimeout(send, 250);
@@ -320,18 +336,6 @@
   }
 
   // ---------------------------------------------------------------- starting up
-
-  var where = panel.querySelector('.bktab');
-  if (where) {
-    // The word is the page's own, in the diner's language. The code goes after it in its own
-    // element, left to right: it is an identifier off a sticker, not a count, so it is neither
-    // turned into another set of digits nor reordered beside Arabic text.
-    where.textContent = where.getAttribute('data-l') + ' ';
-    var code = text('span', '', table);
-    code.dir = 'ltr';
-    where.appendChild(code);
-    where.hidden = false;
-  }
 
   load();
 
