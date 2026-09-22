@@ -361,9 +361,18 @@ public class PublicShopPageService {
      * whatever the shelf's size: the products, the sections, and one batch for the pictures.
      */
     private PublicShopPage.Catalogue catalogueOf(Store store) {
+        // The merchant's own order inside each block (V41), name for the ties and for any block
+        // whose positions have never been written. Sections are ordered separately, by
+        // sectionNames(); this sort only has to settle what is inside one of them, which is why
+        // position leads and the section is not in the sort at all.
+        //
+        // It also changes which items a shop past MAX_ITEMS loses, and for the better: the cut now
+        // falls after the top of every section rather than somewhere in the alphabet, so a shop with
+        // two hundred lines shows the start of each of its sections instead of everything from A to M.
         Page<Product> page = products.findActiveInStore(
                 store.getId(), null, "%",
-                PageRequest.of(0, MAX_ITEMS, Sort.by(Sort.Direction.ASC, "name")));
+                PageRequest.of(0, MAX_ITEMS,
+                        Sort.by(Sort.Direction.ASC, "position").and(Sort.by(Sort.Direction.ASC, "name"))));
         List<Product> shelf = page.getContent();
         if (shelf.isEmpty()) {
             return new PublicShopPage.Catalogue(List.of(), 0, (int) page.getTotalElements());
