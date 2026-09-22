@@ -52,8 +52,8 @@ leaks() { # every minted value (and the ops password) looked for in the output; 
 echo "== a new environment gets every Secret, random where it should be =="
 S="$T/new"; mkdir "$S"
 run "$S" && ok "exits 0" || fail "exit status $? on a new environment"
-[ "$(keys "$S/keycloak-clients")" = "ACCOUNTING_CLIENT_SECRET NOTIFICATIONS_CLIENT_SECRET ONBOARDING_CLIENT_SECRET" ] \
-  && ok "keycloak-clients has the three client secrets" || fail "keycloak-clients keys: $(keys "$S/keycloak-clients")"
+[ "$(keys "$S/keycloak-clients")" = "ACCOUNTING_CLIENT_SECRET NOTIFICATIONS_CLIENT_SECRET ONBOARDING_CLIENT_SECRET ORDER_MANAGER_CLIENT_SECRET" ] \
+  && ok "keycloak-clients has the four client secrets" || fail "keycloak-clients keys: $(keys "$S/keycloak-clients")"
 [ "$(keys "$S/demo-logins")" = "backoffice carrier customer merchant rider" ] \
   && ok "demo-logins has the five demo users" || fail "demo-logins keys: $(keys "$S/demo-logins")"
 [ "$(keys "$S/whatsapp-webhook")" = "WHATSAPP_APP_SECRET WHATSAPP_VERIFY_TOKEN" ] \
@@ -75,7 +75,7 @@ for u in customer rider merchant carrier; do
 done
 [ "$bad" = 0 ] && ok "the four phone logins get six-digit passcodes (the app accepts nothing else)" \
   || fail "$bad phone demo login(s) without a six-digit passcode"
-[ "$(sort -u "$S"/keycloak-clients/* "$S"/demo-logins/* | wc -l | tr -d ' ')" = 8 ] \
+[ "$(sort -u "$S"/keycloak-clients/* "$S"/demo-logins/* | wc -l | tr -d ' ')" = 9 ] \
   && ok "no two minted values are equal" || fail "duplicate minted values"
 line=$(cat "$S/ops-auth-users/users")
 salt=$(printf '%s' "$line" | cut -d'$' -f3)

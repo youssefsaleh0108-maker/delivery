@@ -68,7 +68,25 @@ public record PublicShopPage(
         /** Null unless the merchant said what the lights are doing, recently enough to mean now. */
         Power power,
         Delivery delivery,
-        Catalogue catalogue) {
+        Catalogue catalogue,
+        /**
+         * How many tables this shop has QR cards for (V42); zero for a shop that has asked for
+         * none.
+         *
+         * <p>Read by the printable card sheet and by the per-table code, and by nothing the page
+         * itself draws: a customer reading a menu has no use for the number of tables, and the one
+         * who scanned a table's card already knows which table they are at.
+         */
+        short tables,
+        /**
+         * Whether this shop takes orders from the table (V43).
+         *
+         * <p>Read by the web ordering work, which draws its pad or does not; nothing the menu
+         * builder or the card sheet writes depends on it. It is a separate answer from
+         * {@link #tables()} on purpose: a shop may print table cards purely as a menu on the wall,
+         * and printing cards is not a promise that somebody is watching a screen.
+         */
+        boolean tableOrdering) {
 
     /**
      * Whether the shop is open <em>right now</em>, in its own calendar, and the week behind that
@@ -131,11 +149,14 @@ public record PublicShopPage(
     /**
      * The shelf.
      *
-     * @param shown how many items the page actually drew
-     * @param total how many it could have drawn, so the page can say honestly that there are more
-     *              in the app rather than passing a truncated shelf off as the whole shop
+     * @param shown   how many items the page actually drew
+     * @param total   how many it could have drawn, so the page can say honestly that there are more
+     *                in the app rather than passing a truncated shelf off as the whole shop
+     * @param version what this exact shelf is, so a basket built against it can be priced against it
+     *                — see {@code PublicShopPageService#versionOf}. It names no product: it is a
+     *                digest, and the page's one promise is that its markup carries no id at all.
      */
-    public record Catalogue(List<Section> sections, int shown, int total) {
+    public record Catalogue(List<Section> sections, int shown, int total, String version) {
     }
 
     /** One aisle. Items with no section of their own fall into the last one, named by the page. */

@@ -53,18 +53,54 @@ final class ShopQrCode {
     private static final int QUIET_ZONE_MODULES = 4;
 
     /**
-     * Encodes a URL as a black-and-white PNG.
+     * How much of a printed symbol may be lost and still read.
      *
-     * <p>Error correction M — about 15% of the symbol can be lost and still read. Not L, because
-     * this one is printed and then lives on a counter: it gets splashed, rubbed and taped over.
-     * Not Q or H, which would grow the symbol for a URL that is already short.
+     * <p>Two answers, because the two codes live different lives.
+     */
+    enum Resilience {
+
+        /**
+         * The counter sign: about 15% recoverable.
+         *
+         * <p>Printed at 90 mm on an A5 card that stands beside a till. It gets splashed, rubbed and
+         * taped over, which is why it is not L — but it is large, well lit and scanned deliberately
+         * by somebody who came to the counter, so Q would grow the symbol for nothing.
+         */
+        COUNTER(ErrorCorrectionLevel.M),
+
+        /**
+         * A table card: about 25% recoverable.
+         *
+         * <p>Everything about this one is worse and it is the one an order depends on. It is
+         * printed at 45 mm rather than 90, so every module is a quarter of the area. It lives flat
+         * on a table under a glass, catching a candle, a water ring and the corner of a plate. It is
+         * scanned in a restaurant's evening light by a phone held at whatever angle the diner is
+         * sitting at. And the sheet it came on gets photocopied — a shop that opens six more tables
+         * runs the page through the machine at the shop next door rather than asking us for another.
+         * Each of those eats contrast at the edges of the modules, and Q is what buys it back.
+         *
+         * <p>It costs a slightly denser symbol for a URL four characters longer than the counter's.
+         * At 45 mm that is still a comfortable module size, and a code that reads first time is
+         * worth more on a table than a code with larger modules that reads second time.
+         */
+        TABLE(ErrorCorrectionLevel.Q);
+
+        Resilience(ErrorCorrectionLevel level) {
+            this.level = level;
+        }
+
+        private final ErrorCorrectionLevel level;
+    }
+
+    /**
+     * Encodes a URL as a black-and-white PNG, at the resilience its printed life needs.
      *
      * @throws IllegalArgumentException if the content is too long for any QR version, which for a
      *         shop URL would mean a slug far past the 180 characters the column allows
      */
-    static byte[] pngOf(String url) {
+    static byte[] pngOf(String url, Resilience resilience) {
         Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
-        hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M);
+        hints.put(EncodeHintType.ERROR_CORRECTION, resilience.level);
         // A shop slug is ASCII, but the hint is what stops the encoder guessing a platform default
         // charset for a URL that one day carries something else.
         hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");

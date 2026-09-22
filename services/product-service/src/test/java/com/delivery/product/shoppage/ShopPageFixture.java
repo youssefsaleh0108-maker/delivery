@@ -239,6 +239,31 @@ final class ShopPageFixture {
         return this;
     }
 
+    /** How many tables the merchant says the room has, which is how many cards it can print. */
+    ShopPageFixture tables(int tables) {
+        shop.seatTables(tables);
+        return this;
+    }
+
+    /**
+     * And the switch beside it: this shop takes orders from those tables, not just hands out a menu.
+     *
+     * <p>Off by default here exactly as it is off by default in the database, so every test that
+     * does not ask for it is testing the shop every shop on the platform is today: a menu, and a
+     * line saying to order with the staff.
+     */
+    ShopPageFixture takesTableOrders() {
+        if (shop.getTableCount() < 1) {
+            // A room, because the domain refuses the switch without one — a shop with no cards has
+            // no table for an order to have come from. Twelve is a restaurant, and it means a test
+            // about ordering does not have to furnish the place first. A test that cares about the
+            // count says so with tables().
+            shop.seatTables(12);
+        }
+        shop.acceptTableOrders(true);
+        return this;
+    }
+
     /** A section of the shop's own, in the merchant's order, with the items filed under it. */
     ShopPageFixture section(String name, Item... items) {
         Category section = new Category(shop.getId(), name, null, (short) ownSections.size());

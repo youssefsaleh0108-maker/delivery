@@ -44,21 +44,35 @@ CREATE INDEX IF NOT EXISTS config_properties_lookup
 --
 -- The azp allow-list: which Keycloak clients' tokens this platform accepts at all. Finding 1 of
 -- docs/SECURITY_REVIEW.md. AuthorizedPartyValidator DISABLES ITSELF WHEN THE LIST IS EMPTY, so
--- losing these three rows is not a startup error — it is a platform that quietly stops checking.
--- Two clients, not four: delivery-portal replaced backoffice-web, merchant-portal and
+-- losing these rows is not a startup error — it is a platform that quietly stops checking.
+-- Two browser clients, not four: delivery-portal replaced backoffice-web, merchant-portal and
 -- carrier-portal when the three web apps merged into one.
 --
 -- carrier-portal was never in this list, which meant every Carrier token was refused by
 -- AuthorizedPartyValidator on every service. The merge removes that class of bug — there is one
 -- browser client now, so there is one entry to forget.
+--
+-- THE INDICES MUST STAY CONTIGUOUS FROM 0. Spring's relaxed binding stops at the first gap, so
+-- deleting [1] silently drops [2] and everything after it as well.
 INSERT INTO config.config_properties (application, profile, label, prop_key, prop_value) VALUES
   ('application', 'default', 'main', 'delivery.security.allowed-client-ids[0]', 'mobile-app'),
   ('application', 'default', 'main', 'delivery.security.allowed-client-ids[1]', 'delivery-portal'),
-  -- The onboarding service's SERVICE ACCOUNT. It is the one service whose token is checked by
-  -- this list, because it is the only one that calls another platform service rather than
-  -- Keycloak's admin API: it posts verification codes to Notifications Manager. Leave it out and
-  -- every sign-up fails at 'we could not send the code', with a 401 and no body.
-  ('application', 'default', 'main', 'delivery.security.allowed-client-ids[2]', 'onboarding-service');
+  -- The onboarding service's SERVICE ACCOUNT. A service account is on this list only when it
+  -- calls another platform service rather than Keycloak's admin API. This one posts verification
+  -- codes to Notifications Manager. Leave it out and every sign-up fails at 'we could not send
+  -- the code', with a 401 and no body.
+  ('application', 'default', 'main', 'delivery.security.allowed-client-ids[2]', 'onboarding-service'),
+  -- Order Manager's SERVICE ACCOUNT, the second of those. It reads a shop's catalogue from
+  -- Product Service to price an order placed by somebody who is not signed in — a diner who
+  -- scanned the code on their table. Leave it out and every product-service call on that path is
+  -- answered 401 with an empty body: the diner is told the catalogue is temporarily unavailable,
+  -- and the only clue anywhere is one WARN line in product-service.
+  --
+  -- Which is why order-manager now refuses to START when its service account is configured and
+  -- this row is missing (ServiceAccountAllowList, in the order-manager repository), and why
+  -- deploy/k3s/scripts/verify.sh asserts this row in both copies of this file. A credential that
+  -- fails at the table must not be discovered at the table.
+  ('application', 'default', 'main', 'delivery.security.allowed-client-ids[3]', 'order-manager');
 
 -- Per-service datasource wiring. Each service's own application.yml defaults point at
 -- localhost:5433 for IDE use; these override that with the in-network address. Passwords are NOT

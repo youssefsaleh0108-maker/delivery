@@ -108,6 +108,22 @@ public class Product {
     @Column(name = "in_stock", nullable = false)
     private boolean inStock = true;
 
+    /**
+     * Where this item sits inside its block of the menu — its shop's section, or the shop's
+     * unsectioned remainder (V41).
+     *
+     * <p>The same contract {@link Category#getPosition()} has, one level down: rewritten 0..n-1
+     * from one authoritative list by {@code StoreCategoryService.reorderProducts}, never nudged by
+     * one. Scoped to {@code (store_id, category_id)}, so moving an item to another section is the
+     * thing that decides its new position rather than something the merchant has to fix afterwards
+     * — which is why {@link CatalogService} appends on a section change.
+     *
+     * <p>Not part of {@link #update}: a product form that posted a position would let two screens
+     * disagree about the order, and the form does not draw one.
+     */
+    @Column(name = "position", nullable = false)
+    private short position;
+
     /** Object keys in the {@code product-images} bucket, in display order. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "image_refs", nullable = false, columnDefinition = "jsonb")
@@ -250,6 +266,18 @@ public class Product {
      */
     public void applyStockProjection(boolean inStock) {
         this.inStock = inStock;
+    }
+
+    /**
+     * Puts this item at a place in its block of the menu.
+     *
+     * <p>Separate from {@link #update} for the reason {@link #applyStockProjection} is: it does not
+     * come from the product form. It arrives either from a merchant dragging the menu into order,
+     * which rewrites every position in the block at once, or from the item landing in a new section
+     * and being appended to it.
+     */
+    public void moveTo(short position) {
+        this.position = position;
     }
 
     private static String blankToNull(String value) {
@@ -481,6 +509,10 @@ public class Product {
 
     public boolean isInStock() {
         return inStock;
+    }
+
+    public short getPosition() {
+        return position;
     }
 
     public List<String> getImageRefs() {

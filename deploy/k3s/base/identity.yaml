@@ -71,6 +71,12 @@ spec:
               valueFrom: { secretKeyRef: { name: keycloak-clients, key: ACCOUNTING_CLIENT_SECRET } }
             - name: NOTIFICATIONS_CLIENT_SECRET
               valueFrom: { secretKeyRef: { name: keycloak-clients, key: NOTIFICATIONS_CLIENT_SECRET } }
+            # order-manager's, for pricing an order nobody is signed in for (a diner who scanned
+            # the code on their table). Same rule as the three above, and the same consequence for
+            # forgetting it: the realm would import the literal `${ORDER_MANAGER_CLIENT_SECRET}`
+            # as this client's secret. scripts/verify.sh fails on a placeholder with no entry here.
+            - name: ORDER_MANAGER_CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: keycloak-clients, key: ORDER_MANAGER_CLIENT_SECRET } }
             - name: DEMO_CUSTOMER_PASSWORD
               valueFrom: { secretKeyRef: { name: demo-logins, key: customer } }
             - name: DEMO_RIDER_PASSWORD

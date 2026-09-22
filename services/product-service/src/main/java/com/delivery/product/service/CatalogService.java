@@ -5,6 +5,7 @@ import java.math.RoundingMode;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -333,6 +334,10 @@ public class CatalogService {
                 request.price(),
                 request.categoryId());
         product.assignCodes(request.sku(), request.barcode());
+        // At the end of whatever block it was filed under (V41), not at position 0, which is where
+        // the column's default would put every new item: the top of the menu, above the house
+        // special, for nothing more than being the newest.
+        product.moveTo(endOfSection(store.getId(), request.categoryId()));
         // Built before anything is saved, so terms that break a rule refuse the whole offer.
         ServiceTerms terms = request.service() == null
                 ? null
@@ -374,8 +379,19 @@ public class CatalogService {
             terms = reviseTerms(product, existing, request.service());
         }
 
+        // Before the update, while the product still says which section it is leaving.
+        boolean moved = !Objects.equals(product.getCategoryId(), request.categoryId());
+
         product.update(request.name(), request.description(), request.price(), request.categoryId(),
                 request.sku(), request.barcode());
+
+        if (moved) {
+            // An item that changed section keeps a position that belonged to the old one, where it
+            // would land on top of whatever already sits there. The end of the new section is the
+            // only place that is certainly free, and it is where a merchant expects a thing they
+            // just filed to appear.
+            product.moveTo(endOfSection(product.getStoreId(), request.categoryId()));
+        }
 
         outbox.record(CatalogEvents.AGGREGATE_TYPE, product.getId().toString(),
                 CatalogEvents.PRODUCT_UPDATED, CatalogEvents.ProductSnapshot.of(product, terms));
@@ -686,6 +702,25 @@ public class CatalogService {
             // was never issued.
             throw new CategoryNotFoundException(categoryId);
         }
+    }
+
+    /**
+     * The position after the last item of a block of the menu (V41).
+     *
+     * <p>A count rather than {@code max(position) + 1}: the reorder endpoint rewrites a block
+     * 0..n-1, so the count is the next free slot by construction, and a block that has never been
+     * reordered — every position still 0 from a backfill that left ties alone — gets an appended
+     * item at the end rather than one more row tied on zero.
+     *
+     * <p>Clamped at {@code Short.MAX_VALUE} for the same reason the section counter is: the column
+     * is a SMALLINT, and a shop with thirty-two thousand items in one section has a different
+     * problem.
+     */
+    private short endOfSection(UUID storeId, UUID categoryId) {
+        long count = categoryId == null
+                ? products.countByStoreIdAndCategoryIdIsNull(storeId)
+                : products.countByStoreIdAndCategoryId(storeId, categoryId);
+        return (short) Math.min(count, Short.MAX_VALUE);
     }
 
     // ---------------------------------------------------------------- exceptions

@@ -22514,6 +22514,240 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Publish your shop'**
   String get merchSharePublishYourShop;
+
+  /// Title of the screen where a merchant arranges the shop's catalogue as a menu: sections with items, each with a photo, a price and an availability switch.
+  ///
+  /// In en, this message translates to:
+  /// **'Menu Builder'**
+  String get menuBuilderTitle;
+
+  /// Header action on the menu builder. Opens the shop's real public page in a browser, as a customer sees it.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get menuPreview;
+
+  /// No description provided for @menuAddItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Add menu item'**
+  String get menuAddItem;
+
+  /// The pill beside a section's name on the menu builder, counting the items filed under it.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No items} =1{1 item} other{{count} items}}'**
+  String menuItemCount(int count);
+
+  /// Heading for the menu builder's last block: items with no section of the shop's own. The public page draws them last too.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything else'**
+  String get menuOtherItems;
+
+  /// No description provided for @menuSectionEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing in this section yet.'**
+  String get menuSectionEmpty;
+
+  /// No description provided for @menuNoDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'No description'**
+  String get menuNoDescription;
+
+  /// Accessibility label for the availability switch on a menu item. On publishes the item; off archives it, which is what the rest of the platform means by taking something off the shelf.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} — on the shelf right now'**
+  String menuAvailableSwitch(String name);
+
+  /// No description provided for @menuTakeOffTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Take this off the menu?'**
+  String get menuTakeOffTitle;
+
+  /// No description provided for @menuTakeOffConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} stops showing on your page until you switch it back on. Nothing is deleted.'**
+  String menuTakeOffConfirm(String name);
+
+  /// No description provided for @menuTakeOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Take it off'**
+  String get menuTakeOff;
+
+  /// Accessibility action on a menu item, for readers who cannot long-press to drag it.
+  ///
+  /// In en, this message translates to:
+  /// **'Move up the menu'**
+  String get menuMoveUp;
+
+  /// No description provided for @menuMoveDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Move down the menu'**
+  String get menuMoveDown;
+
+  /// No description provided for @menuExpandSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Open this section'**
+  String get menuExpandSection;
+
+  /// No description provided for @menuCollapseSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Close this section'**
+  String get menuCollapseSection;
+
+  /// No description provided for @menuCouldNotReorder.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save the new order'**
+  String get menuCouldNotReorder;
+
+  /// No description provided for @menuCouldNotPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open your page'**
+  String get menuCouldNotPreview;
+
+  /// No description provided for @menuCouldNotLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load your menu'**
+  String get menuCouldNotLoad;
+
+  /// No description provided for @menuEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your menu is empty'**
+  String get menuEmptyTitle;
+
+  /// No description provided for @menuEmptyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Add what you sell, and it becomes the menu customers see on your page.'**
+  String get menuEmptyMessage;
+
+  /// Opens the shop's QR image in the browser, where saving a picture is something the browser already does.
+  ///
+  /// In en, this message translates to:
+  /// **'Download QR'**
+  String get merchShareDownloadQr;
+
+  /// No description provided for @merchSharePrintQr.
+  ///
+  /// In en, this message translates to:
+  /// **'Print QR'**
+  String get merchSharePrintQr;
+
+  /// No description provided for @merchShareCouldNotOpenQr.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open the QR code'**
+  String get merchShareCouldNotOpenQr;
+
+  /// No description provided for @merchTablesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Table QR codes'**
+  String get merchTablesTitle;
+
+  /// No description provided for @merchTablesWhat.
+  ///
+  /// In en, this message translates to:
+  /// **'A code for each table. An order started from one knows which table it came from.'**
+  String get merchTablesWhat;
+
+  /// No description provided for @merchTablesHowMany.
+  ///
+  /// In en, this message translates to:
+  /// **'Number of tables'**
+  String get merchTablesHowMany;
+
+  /// No description provided for @merchTablesFewer.
+  ///
+  /// In en, this message translates to:
+  /// **'One table fewer'**
+  String get merchTablesFewer;
+
+  /// No description provided for @merchTablesMore.
+  ///
+  /// In en, this message translates to:
+  /// **'One table more'**
+  String get merchTablesMore;
+
+  /// Accessibility label for the number between the minus and plus buttons on the table stepper.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No tables} =1{1 table} other{{count} tables}}'**
+  String merchTablesCount(int count);
+
+  /// Saves how many tables the shop has. The codes are generated from that number, so it is saved before any sheet can be printed.
+  ///
+  /// In en, this message translates to:
+  /// **'Save and make the codes'**
+  String get merchTablesSave;
+
+  /// No description provided for @merchTablesSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Table codes turned off} =1{1 table code ready} other{{count} table codes ready}}'**
+  String merchTablesSaved(int count);
+
+  /// No description provided for @merchTablesCouldNotSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save how many tables you have'**
+  String get merchTablesCouldNotSave;
+
+  /// No description provided for @merchTablesPrintSheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Print the table cards'**
+  String get merchTablesPrintSheet;
+
+  /// No description provided for @merchTablesReprintOne.
+  ///
+  /// In en, this message translates to:
+  /// **'Lost one? Reprint a single table:'**
+  String get merchTablesReprintOne;
+
+  /// No description provided for @merchTablesReprintTable.
+  ///
+  /// In en, this message translates to:
+  /// **'Reprint table {number}'**
+  String merchTablesReprintTable(int number);
+
+  /// No description provided for @merchTablesCouldNotOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open the table cards'**
+  String get merchTablesCouldNotOpen;
+
+  /// The switch beside the table codes. On, a diner who scans a table's code can build an order and send it to the shop. Off, the code opens the menu and nothing more.
+  ///
+  /// In en, this message translates to:
+  /// **'Take orders at the table'**
+  String get merchTablesOrderingTitle;
+
+  /// No description provided for @merchTablesOrderingOn.
+  ///
+  /// In en, this message translates to:
+  /// **'A diner who scans a table\'s code can order from it. The order arrives with the table number on it.'**
+  String get merchTablesOrderingOn;
+
+  /// No description provided for @merchTablesOrderingOff.
+  ///
+  /// In en, this message translates to:
+  /// **'The codes open your menu. Nobody can order from them yet.'**
+  String get merchTablesOrderingOff;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

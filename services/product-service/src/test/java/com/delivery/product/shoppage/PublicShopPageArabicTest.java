@@ -33,6 +33,31 @@ class PublicShopPageArabicTest {
                 .section("خبز", Item.of("كعك", "1.50"));
     }
 
+    /** The same shop, taking orders from its tables, so the pad is drawn in Arabic too. */
+    private static ShopPageFixture withTables() {
+        return stocked().takesTableOrders();
+    }
+
+    @Test
+    @DisplayName("the order pad is Arabic too: its heading, its labels and its one figure")
+    void theOrderPadIsArabic() throws Exception {
+        ShopPageFixture shop = withTables();
+        String html = render(shop, get("/s/" + shop.slug()).param("lang", "ar"));
+
+        assertThat(html)
+                .contains("طلبك")
+                .contains("يحتاج الطلب من الطاولة إلى JavaScript")
+                .contains("ما تطلبه فقط. تدفع للمطعم على الطاولة كالعادة.")
+                .contains("أرسل إلى المطبخ")
+                .contains("<button class=\"a\" type=\"button\" hidden>أضف</button>")
+                .contains("data-l=\"طاولة\"")
+                .contains("data-note=\"ملاحظة للمطبخ\"")
+                .contains("data-eg=\"بدون بصل\"")
+                // The quote is asked for in the language the page was drawn in, so an Arabic menu
+                // is never handed an English total.
+                .contains("/quote?lang=ar\"");
+    }
+
     private static String render(ShopPageFixture shop, MockHttpServletRequestBuilder request)
             throws Exception {
         MvcResult result = shop.mvc().perform(request).andReturn();
@@ -55,11 +80,14 @@ class PublicShopPageArabicTest {
                 .contains("المناطق التي يوصّل إليها")
                 .contains("كيف تطلب")
                 .contains("حمّل التطبيق")
-                // The call to action carries its own second line and its honest sentence, both in
-                // Arabic: a reader who switched language should not meet an English button.
+                // The call to action carries its own second line in Arabic: a reader who switched
+                // language should not meet an English button.
                 .contains("أندرويد · تحميل مباشر")
-                .contains("هذه الصفحة لا تستقبل الطلبات.")
-                .contains("قريبًا على App Store و Google Play.");
+                .contains("قريبًا على App Store و Google Play.")
+                // This shop has not turned ordering at the table on, so where the pad would have
+                // been there is a sentence — in Arabic, like everything else a diner reads here.
+                .contains("طلبك")
+                .contains("هذا المتجر لا يستقبل الطلبات من الطاولة عبر الإنترنت. اطلب من الموظفين.");
 
         // The hours, the prices and the rating, in the digits the Arabic app uses.
         assertThat(html)

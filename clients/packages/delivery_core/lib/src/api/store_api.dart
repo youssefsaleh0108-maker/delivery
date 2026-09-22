@@ -694,6 +694,33 @@ class StoreApi {
     return Store.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// How many tables the room has, and so how many QR cards the shop can print.
+  ///
+  /// The whole number, not a nudge: the stepper on the share screen is a figure the merchant sets,
+  /// and two devices that each sent a delta would leave the shop with tables nobody has. Zero is a
+  /// real answer and clears the sheet; the server refuses anything above [maxTables].
+  ///
+  /// Lowering it revokes nothing already stuck to a table — a printed card is a URL to the shop's
+  /// page, which does not consult this — it only stops new cards being printed for tables the shop
+  /// says it does not have.
+  /// [ordering] is whether the shop takes orders from those tables. Omit it to leave the switch as
+  /// it is — null is not false, and a screen that only added a table must not quietly stop a
+  /// restaurant trading. Taking [tables] to zero turns it off whatever is passed, because an order
+  /// carries the number off the card it was scanned from and there would be no cards.
+  Future<Store> setTables(String storeId, int tables, {bool? ordering}) async {
+    final Response<dynamic> response = await _dio.put<dynamic>(
+      '/api/stores/$storeId/tables',
+      data: <String, dynamic>{
+        'tables': tables,
+        if (ordering != null) 'ordering': ordering,
+      },
+    );
+    return Store.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// The most tables one shop may have codes for; the server's own ceiling, and the database's.
+  static const int maxTables = 400;
+
   /// Whether the shop's circle covers the point — what checkout asks before promising.
   Future<bool> canDeliver(String storeId,
       {required double latitude, required double longitude}) async {

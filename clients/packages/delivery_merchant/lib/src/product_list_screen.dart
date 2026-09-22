@@ -605,7 +605,7 @@ class _ProductRow extends StatelessWidget {
           Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              _AvailabilitySwitch(
+              MerchantAvailabilitySwitch(
                 value: available,
                 busy: busy,
                 semanticLabel: t.merchbAvailability,
@@ -701,13 +701,19 @@ class _PhotoCountBadge extends StatelessWidget {
   }
 }
 
-/// The frame's 48x26 availability toggle.
+/// The frame's 48x26 availability toggle — "on the shelf right now".
 ///
 /// Hand-drawn rather than a Material [Switch]: the platform switch is a fixed 52x32 in Material 3
 /// and scaling it distorts the thumb, while the row's whole rhythm — a 64px photo, a two-line text
 /// stack, and this — is set by the 26px height the design chose.
-class _AvailabilitySwitch extends StatelessWidget {
-  const _AvailabilitySwitch({
+///
+/// Public because the menu builder draws the same switch (Figma 139:8) and it has to *mean* the
+/// same thing: on is `publish`, off is `archive`, and both screens send those. A second toggle
+/// that wrote something else — the stock projection, say, which belongs to inventory-service —
+/// would put two different sentences behind one control.
+class MerchantAvailabilitySwitch extends StatelessWidget {
+  const MerchantAvailabilitySwitch({
+    super.key,
     required this.value,
     required this.busy,
     required this.semanticLabel,

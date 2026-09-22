@@ -168,7 +168,10 @@ void main() {
 
     expect(find.byType(ShopShareCard), findsOneWidget);
     expect(find.text('https://www.youdrop.shop/s/beirut-grill'), findsOneWidget);
-    expect(find.text(en.merchSharePrintPoster), findsOneWidget);
+    expect(find.text(en.merchSharePrintQr), findsOneWidget);
+    // And, new beside it, the table codes: the portal's only home for the share block is this
+    // page, so a shop that set its tables on the phone reprints a card from the desk here.
+    expect(find.text(en.merchTablesTitle), findsOneWidget);
   });
 
   testWidgets('with no share sheet on a desktop browser, Share copies and confirms',
@@ -197,8 +200,9 @@ void main() {
     await _openMyShop(tester, locale: const Locale('ar'), size: const Size(320, 2400));
 
     expect(Directionality.of(tester.element(find.byType(ShopShareCard))), TextDirection.rtl);
-    expect(find.text(ar.merchShareCopyLink), findsOneWidget);
-    expect(find.text(ar.merchSharePrintPoster), findsOneWidget);
+    expect(find.byTooltip(ar.merchShareCopyLink), findsOneWidget);
+    expect(find.text(ar.merchSharePrintQr), findsOneWidget);
+    expect(find.text(ar.merchTablesTitle), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
