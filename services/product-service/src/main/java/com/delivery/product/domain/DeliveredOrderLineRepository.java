@@ -1,5 +1,6 @@
 package com.delivery.product.domain;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -51,4 +52,39 @@ public interface DeliveredOrderLineRepository
     List<Object[]> findBoughtWith(@Param("productId") UUID productId,
                                   @Param("minOrdersTogether") long minOrdersTogether,
                                   Pageable limit);
+
+    /**
+     * What one shop actually sold in a window, best first — the Menu Insights screen's best-seller
+     * list.
+     *
+     * <p>{@code COUNT(DISTINCT l.orderId)} ranks, and {@code SUM(l.qty)} is reported beside it. The
+     * same choice {@link #findBoughtWith} makes and for the same reason: a customer who bought six
+     * of something in one order is one order that wanted it, and ranking on units would let a
+     * single catering order decide what a shop believes its menu's best item is. Both figures are
+     * useful to a merchant, so both are returned and neither is used for the other's job.
+     *
+     * <p><strong>No floor here, unlike every other aggregate in this service.</strong> The floors
+     * elsewhere protect people who are not the shop's customers — searchers in the neighbourhood,
+     * readers of a public page. These rows are the shop's own delivered orders, which it filled
+     * itself and already has on its own receipts, and the table holds no customer id at all. A
+     * floor would hide a small shop's real sales from the only party entitled to them.
+     *
+     * <p>The window is half-open: {@code from} inclusive, {@code until} exclusive, so a day is not
+     * counted twice by two adjacent windows.
+     *
+     * @return rows of {@code [productId (UUID), baskets (Long), units (Long)]}, best first
+     */
+    @Query("""
+            SELECT l.productId, COUNT(DISTINCT l.orderId), SUM(l.qty)
+            FROM DeliveredOrderLine l
+            WHERE l.storeId = :storeId
+              AND l.deliveredAt >= :from
+              AND l.deliveredAt < :until
+            GROUP BY l.productId
+            ORDER BY COUNT(DISTINCT l.orderId) DESC, SUM(l.qty) DESC, l.productId ASC
+            """)
+    List<Object[]> topSellersIn(@Param("storeId") UUID storeId,
+                                @Param("from") Instant from,
+                                @Param("until") Instant until,
+                                Pageable limit);
 }

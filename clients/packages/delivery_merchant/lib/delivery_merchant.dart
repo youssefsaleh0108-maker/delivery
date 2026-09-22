@@ -21,6 +21,10 @@ export 'src/inventory_screen.dart';
 // items, an availability switch on each, and a Preview that opens the shop's real public page. Not
 // a second catalogue — it writes the very endpoints the two screens below it write.
 export 'src/menu_builder_screen.dart';
+// What that menu has been doing (Figma 139:255): opens of the public page as bands over a floor,
+// which part of the day they fall in, and what was actually delivered. Not the frame's QR scans or
+// per-item views — see the class for why neither is a number this platform can honestly produce.
+export 'src/menu_insights_screen.dart';
 export 'src/merchant_categories_screen.dart';
 export 'src/pos/pos_checkout_screen.dart';
 export 'src/pos/pos_receipt_screen.dart';

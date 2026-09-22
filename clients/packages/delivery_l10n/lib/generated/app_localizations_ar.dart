@@ -13683,4 +13683,123 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get merchTablesOrderingOff =>
       'الرموز تفتح قائمتك فقط. لا أحد يستطيع الطلب منها بعد.';
+
+  @override
+  String get merchMenuInsightsTitle => 'أرقام قائمتك';
+
+  @override
+  String get merchMenuInsightsWindowToday => 'اليوم';
+
+  @override
+  String get merchMenuInsightsWindowWeek => '٧ أيام';
+
+  @override
+  String get merchMenuInsightsWindowMonth => '٣٠ يوماً';
+
+  @override
+  String get merchMenuInsightsFailed => 'تعذّر تحميل أرقام قائمتك.';
+
+  @override
+  String get merchMenuOpensTitle => 'مرّات فتح القائمة';
+
+  @override
+  String merchMenuOpensAbout(int count) {
+    return 'حوالي $count';
+  }
+
+  @override
+  String merchMenuOpensTooFew(int minimum) {
+    return 'أقل من $minimum — عددٌ أقل من أن يُذكر';
+  }
+
+  @override
+  String get merchMenuOpensWhatItCounts =>
+      'نعدّ مرّات فتح صفحة قائمتك، لا الأشخاص. من يفتحها مرّتين تُحسب مرّتين، ومن كانت الصفحة محفوظة على هاتفه أو شبكته لا يُحسب أصلاً.';
+
+  @override
+  String merchMenuOpensCountingSince(String date) {
+    return 'بدأ العدّ في $date.';
+  }
+
+  @override
+  String get merchMenuOpensNothingYet =>
+      'لم يُسجَّل شيء بعد. شارك قائمتك وعُد بعد يوم أو يومين.';
+
+  @override
+  String get merchMenuFromTablesTitle => 'فُتحت من رمز طاولة';
+
+  @override
+  String get merchMenuFromTablesNone => 'لا شيء بعد';
+
+  @override
+  String get merchMenuNoScanCount =>
+      'لا يمكن عدّ مسحات رمز الكاونتر وحدها: فهو يفتح العنوان نفسه الذي يفتحه أي رابط مُشارَك، فيصل الاثنان بالصورة نفسها. أمّا رموز الطاولات فتحمل رقم طاولتها، لذلك يمكن عدّها.';
+
+  @override
+  String get merchMenuWhenTitle => 'متى تُقرأ قائمتك';
+
+  @override
+  String get merchMenuPartMorning => 'الصباح';
+
+  @override
+  String get merchMenuPartMidday => 'الظهر';
+
+  @override
+  String get merchMenuPartEvening => 'المساء';
+
+  @override
+  String get merchMenuPartNight => 'الليل';
+
+  @override
+  String get merchMenuPartMorningHours => '٥ ص – ١١ ص';
+
+  @override
+  String get merchMenuPartMiddayHours => '١١ ص – ٥ م';
+
+  @override
+  String get merchMenuPartEveningHours => '٥ م – ١١ م';
+
+  @override
+  String get merchMenuPartNightHours => '١١ م – ٥ ص';
+
+  @override
+  String get merchMenuWhenTooQuiet =>
+      'مرّات الفتح في هذه المدّة أقل من أن نُبيّن متى حدثت.';
+
+  @override
+  String get merchMenuWhenWhyNotHours =>
+      'نعرضها بأرباع اليوم لا بالساعة، حتى لا يدلّ رقمٌ يوماً ما على زبون بعينه.';
+
+  @override
+  String get merchMenuBestSellersTitle => 'ما الذي بيع';
+
+  @override
+  String merchMenuBestSellerLine(int baskets, int units) {
+    String _temp0 = intl.Intl.pluralLogic(
+      baskets,
+      locale: localeName,
+      other: '$baskets طلباً',
+      few: '$baskets طلبات',
+      two: 'طلبان',
+      one: 'طلب واحد',
+    );
+    return '$_temp0 · بيع منه $units';
+  }
+
+  @override
+  String get merchMenuBestSellersEmpty => 'لا طلبات مُسلَّمة في هذه المدّة.';
+
+  @override
+  String get merchMenuBestSellersNote =>
+      'الطلبات المُسلَّمة وحدها — السلّة الملغاة ليست دليلاً على شيء.';
+
+  @override
+  String get merchMenuNoItemViews =>
+      'لا يوجد عدد مشاهدات لكل صنف. صفحة قائمتك صفحة واحدة، فكل صنف فيها يُقرأ بقدر ما يُقرأ غيره.';
+
+  @override
+  String get merchMenuDemandRadarRow => 'ما الذي بحث عنه جيرانك';
+
+  @override
+  String get merchMenuOpensTooFewShort => 'أقل من أن يُذكر';
 }

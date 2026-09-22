@@ -275,6 +275,78 @@ void main() {
     });
   });
 
+  // Menu insights (Figma 139:255) has one door, under the menu builder that arranges the menu it
+  // reports on. Unlike the radar above it, this is not owner-only: everything on it is the shop's
+  // own page and its own delivered orders, and Product Service gates it on the roster's
+  // VIEW_REPORTS rather than on ownership.
+  group('Menu insights', () {
+    Future<DeliveryStrings> pumpShell(
+      WidgetTester tester, {
+      required bool wireInsights,
+      Set<DeliveryRole> roles = const <DeliveryRole>{DeliveryRole.merchant},
+    }) async {
+      tester.view.physicalSize = const Size(1100, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(MaterialApp(
+        theme: DeliveryTheme.light(),
+        localizationsDelegates: DeliveryStrings.localizationsDelegates,
+        supportedLocales: DeliveryStrings.supportedLocales,
+        home: MerchantShell(
+          orderApi: OrderApi(dio),
+          storeApi: StoreApi(dio),
+          catalogApi: CatalogApi(dio),
+          menuInsightsApi: wireInsights ? MenuInsightsApi(dio) : null,
+          session: AuthSession(
+            accessToken: 'token',
+            refreshToken: null,
+            expiresAt: DateTime.now().add(const Duration(hours: 1)),
+            roles: roles,
+            subject: 'merchant-sub',
+          ),
+          locale: LocaleController(read: () async => 'en', write: (String _) async {}),
+          onSignOut: () async {},
+        ),
+      ));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      return DeliveryStrings.of(tester.element(find.byType(MerchantShell)));
+    }
+
+    // This group's own, because the radar's is scoped to the radar's group.
+    Future<void> openSettings(WidgetTester tester, DeliveryStrings t) async {
+      await tester.tap(find.text(t.navSettings).last);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    Finder insightsRow(DeliveryStrings t) => find.descendant(
+        of: find.byType(MerchantSettingsScreen),
+        matching: find.text(t.merchMenuInsightsTitle));
+
+    testWidgets('the owner opens it from Settings', (WidgetTester tester) async {
+      final DeliveryStrings t = await pumpShell(tester, wireInsights: true);
+
+      await openSettings(tester, t);
+      await tester.tap(insightsRow(t));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.byType(MenuInsightsScreen), findsOneWidget);
+    });
+
+    testWidgets('a host that does not wire the client draws no door rather than a dead one',
+        (WidgetTester tester) async {
+      final DeliveryStrings t = await pumpShell(tester, wireInsights: false);
+
+      await openSettings(tester, t);
+
+      expect(find.byType(MerchantSettingsScreen), findsOneWidget);
+      expect(insightsRow(t), findsNothing);
+    });
+  });
+
   /// Customers can message a shop from its page; without this row the shop could never read them.
   testWidgets('the shop can open its customers\' messages from Settings', (WidgetTester tester) async {
     final DeliveryStrings t = await pumpShell(tester, wireChat: true);

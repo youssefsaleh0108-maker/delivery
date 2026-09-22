@@ -82,6 +82,7 @@ PortalApis _apis(Dio dio) => PortalApis(
       reports: ReportsApi(dio),
       catalogScan: CatalogScanApi(dio),
       demand: DemandApi(dio),
+      menuInsights: MenuInsightsApi(dio),
       shopChat: ShopChatApi(dio),
       moderation: ChatModerationApi(dio),
       attachments: OrderAttachmentApi(dio),
@@ -121,6 +122,9 @@ void main() {
       // The menu, for the reason the shelf sections are here: a services shop has no shelf to
       // arrange, so a menu builder there would be an empty screen with a switch that means nothing.
       en.menuBuilderTitle,
+      // And its figures follow it: a shop with no menu page has nothing to say about one being
+      // opened, and every number on that screen is about the page.
+      en.merchMenuInsightsTitle,
       en.navCategories,
       en.navStaff,
     ];

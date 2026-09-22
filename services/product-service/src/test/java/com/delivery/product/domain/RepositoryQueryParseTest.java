@@ -46,6 +46,7 @@ class RepositoryQueryParseTest {
                 .addAnnotatedClass(DeliveredOrderLine.class)
                 .addAnnotatedClass(DeliveryZone.class)
                 .addAnnotatedClass(GeocodeCacheEntry.class)
+                .addAnnotatedClass(MenuViewDay.class)
                 .addAnnotatedClass(OfferModerationAction.class)
                 .addAnnotatedClass(PhotoSearchUse.class)
                 .addAnnotatedClass(Product.class)

@@ -56,6 +56,7 @@ class MerchantShell extends StatefulWidget {
     this.reportsApi,
     this.catalogScanApi,
     this.demandApi,
+    this.menuInsightsApi,
     this.shopChatApi,
     this.chatSocket,
     this.notificationApi,
@@ -111,6 +112,14 @@ class MerchantShell extends StatefulWidget {
   /// How busy the neighbourhoods around the shop are. Null leaves the Demand Radar's doors undrawn.
   /// Opened for the owner only: the density is order-backed, and Order Manager refuses staff tokens.
   final DemandApi? demandApi;
+
+  /// What the shop's own menu has been doing: opens of its public page, when in the day they fall,
+  /// and what was actually delivered. Null leaves the Menu insights row undrawn.
+  ///
+  /// Unlike the radar above it, this is not owner-only. Everything it reads is the shop's own —
+  /// its page and its own orders — and Product Service gates it on the roster's VIEW_REPORTS, so
+  /// a manager trusted with the shop's figures opens it too.
+  final MenuInsightsApi? menuInsightsApi;
 
   /// Customers' conversations with the shop, behind Settings' Customer messages row. Null leaves
   /// the row undrawn.
@@ -548,6 +557,13 @@ class _MerchantShellState extends State<MerchantShell> {
           onMenuBuilder: !services && _access.can(StorePermission.modifyInventoryPricing)
               ? _openMenuBuilder
               : null,
+          // What that menu has been doing (Figma 139:255), a row under the builder that arranges
+          // it. On VIEW_REPORTS rather than the pricing permission above: reading the shop's own
+          // figures is not changing what is on sale, and it is the permission the roster already
+          // has for exactly this.
+          //
+          // A services shop has no menu page to open, so no figures about one.
+          onMenuInsights: !services ? _menuInsightsDoor : null,
           // No roster for a services shop: nobody on it could work here. An employee's MERCHANT_STAFF
           // token opens the customer app, the portal admits MERCHANT alone, and services mode is read
           // from the shops the account owns — so staff added to a services shop would have no screen.
@@ -708,6 +724,27 @@ class _MerchantShellState extends State<MerchantShell> {
         storeApi: widget.storeApi,
         storeId: _storeId,
         onBack: navigator.pop,
+      ),
+    ));
+  }
+
+  /// The door to Menu insights, drawn only for somebody who may read the shop's figures and only
+  /// when the host wired the client — an unwired build draws no door rather than a dead one.
+  VoidCallback? get _menuInsightsDoor =>
+      widget.menuInsightsApi != null && _access.can(StorePermission.viewReports)
+          ? _openMenuInsights
+          : null;
+
+  void _openMenuInsights() {
+    final NavigatorState navigator = Navigator.of(context);
+    navigator.push(MaterialPageRoute<void>(
+      builder: (_) => MenuInsightsScreen(
+        api: widget.menuInsightsApi!,
+        storeId: _storeId,
+        onBack: navigator.pop,
+        // The neighbourhood's searches are the radar's, not this screen's: offered as a door when
+        // the account may open one, never redrawn here.
+        onDemandRadar: _demandRadarDoor,
       ),
     ));
   }

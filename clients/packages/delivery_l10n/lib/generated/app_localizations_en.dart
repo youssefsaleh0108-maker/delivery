@@ -13504,4 +13504,121 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get merchTablesOrderingOff =>
       'The codes open your menu. Nobody can order from them yet.';
+
+  @override
+  String get merchMenuInsightsTitle => 'Menu insights';
+
+  @override
+  String get merchMenuInsightsWindowToday => 'Today';
+
+  @override
+  String get merchMenuInsightsWindowWeek => '7 days';
+
+  @override
+  String get merchMenuInsightsWindowMonth => '30 days';
+
+  @override
+  String get merchMenuInsightsFailed => 'Could not load your menu\'s figures.';
+
+  @override
+  String get merchMenuOpensTitle => 'Menu opens';
+
+  @override
+  String merchMenuOpensAbout(int count) {
+    return 'about $count';
+  }
+
+  @override
+  String merchMenuOpensTooFew(int minimum) {
+    return 'Fewer than $minimum — too few to report';
+  }
+
+  @override
+  String get merchMenuOpensWhatItCounts =>
+      'Counts times your menu page was opened, not people. One person opening it twice is two; a reader whose phone or network still had the page saved is not counted at all.';
+
+  @override
+  String merchMenuOpensCountingSince(String date) {
+    return 'Counting started $date.';
+  }
+
+  @override
+  String get merchMenuOpensNothingYet =>
+      'Nothing counted yet. Share your menu and come back in a day or two.';
+
+  @override
+  String get merchMenuFromTablesTitle => 'Opened from a table code';
+
+  @override
+  String get merchMenuFromTablesNone => 'None yet';
+
+  @override
+  String get merchMenuNoScanCount =>
+      'Scans of your counter QR cannot be counted apart: it opens the same address as a shared link, so the two arrive identically. Table codes carry their table number, so those can be.';
+
+  @override
+  String get merchMenuWhenTitle => 'When your menu is read';
+
+  @override
+  String get merchMenuPartMorning => 'Morning';
+
+  @override
+  String get merchMenuPartMidday => 'Midday';
+
+  @override
+  String get merchMenuPartEvening => 'Evening';
+
+  @override
+  String get merchMenuPartNight => 'Night';
+
+  @override
+  String get merchMenuPartMorningHours => '5am – 11am';
+
+  @override
+  String get merchMenuPartMiddayHours => '11am – 5pm';
+
+  @override
+  String get merchMenuPartEveningHours => '5pm – 11pm';
+
+  @override
+  String get merchMenuPartNightHours => '11pm – 5am';
+
+  @override
+  String get merchMenuWhenTooQuiet =>
+      'Too few opens this period to show when they happened.';
+
+  @override
+  String get merchMenuWhenWhyNotHours =>
+      'Shown in quarters of the day rather than by the hour, so a figure can never be about one customer.';
+
+  @override
+  String get merchMenuBestSellersTitle => 'What sold';
+
+  @override
+  String merchMenuBestSellerLine(int baskets, int units) {
+    String _temp0 = intl.Intl.pluralLogic(
+      baskets,
+      locale: localeName,
+      other: '$baskets orders',
+      one: '1 order',
+    );
+    return '$_temp0 · $units sold';
+  }
+
+  @override
+  String get merchMenuBestSellersEmpty => 'No delivered orders in this window.';
+
+  @override
+  String get merchMenuBestSellersNote =>
+      'Delivered orders only — a cancelled basket is not evidence of anything.';
+
+  @override
+  String get merchMenuNoItemViews =>
+      'There is no per-item view count. Your menu page is one page, so every item on it is read as often as every other.';
+
+  @override
+  String get merchMenuDemandRadarRow => 'What your neighbourhood searched for';
+
+  @override
+  String get merchMenuOpensTooFewShort => 'Too few';
 }

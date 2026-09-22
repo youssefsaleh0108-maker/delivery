@@ -98,12 +98,12 @@ jobs:
 
       # -am builds the platform libraries this module depends on, as the build job does. The test
       # filter matches nothing in them, which failIfNoSpecifiedTests=false allows.
-      - name: The context boot, storefront isolation, item search, delivery areas, the photo quota, the demand log and the public page against PostGIS
+      - name: The context boot, storefront isolation, item search, delivery areas, the photo quota, the demand log, the menu-view counters and the public page against PostGIS
         env:
           PRODUCT_TEST_DB_URL: jdbc:postgresql://localhost:5432/postgres
         run: >-
           mvn -B -U -pl services/product-service -am test
-          -Dtest=ApplicationContextBootTest,ServicesVerticalDatabaseTest,ItemSearchDatabaseTest,DeliveryAreaDatabaseTest,PhotoSearchDatabaseTest,SearchDemandDatabaseTest,PublicShopPageDatabaseTest
+          -Dtest=ApplicationContextBootTest,ServicesVerticalDatabaseTest,ItemSearchDatabaseTest,DeliveryAreaDatabaseTest,PhotoSearchDatabaseTest,SearchDemandDatabaseTest,MenuViewDatabaseTest,PublicShopPageDatabaseTest
           -Dsurefire.failIfNoSpecifiedTests=false
 
       # Fully qualified, because these tests no longer all live in one package: the public page's is
@@ -118,6 +118,7 @@ jobs:
             com.delivery.product.domain.DeliveryAreaDatabaseTest \
             com.delivery.product.domain.PhotoSearchDatabaseTest \
             com.delivery.product.domain.SearchDemandDatabaseTest \
+            com.delivery.product.domain.MenuViewDatabaseTest \
             com.delivery.product.shoppage.PublicShopPageDatabaseTest; do
             report=services/product-service/target/surefire-reports/TEST-$test.xml
             if [ ! -f "$report" ]; then

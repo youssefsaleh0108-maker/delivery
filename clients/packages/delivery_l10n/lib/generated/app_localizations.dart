@@ -22748,6 +22748,198 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'The codes open your menu. Nobody can order from them yet.'**
   String get merchTablesOrderingOff;
+
+  /// No description provided for @merchMenuInsightsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Menu insights'**
+  String get merchMenuInsightsTitle;
+
+  /// No description provided for @merchMenuInsightsWindowToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get merchMenuInsightsWindowToday;
+
+  /// No description provided for @merchMenuInsightsWindowWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'7 days'**
+  String get merchMenuInsightsWindowWeek;
+
+  /// No description provided for @merchMenuInsightsWindowMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'30 days'**
+  String get merchMenuInsightsWindowMonth;
+
+  /// No description provided for @merchMenuInsightsFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load your menu\'s figures.'**
+  String get merchMenuInsightsFailed;
+
+  /// No description provided for @merchMenuOpensTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Menu opens'**
+  String get merchMenuOpensTitle;
+
+  /// The banded count of menu opens. Never an exact figure: the server rounds down, so the word 'about' is part of the number and not decoration.
+  ///
+  /// In en, this message translates to:
+  /// **'about {count}'**
+  String merchMenuOpensAbout(int count);
+
+  /// Shown instead of a figure when a window or a part of the day is under the floor. Deliberately not '0': too few to report and nobody are different things, and a zero would say the second.
+  ///
+  /// In en, this message translates to:
+  /// **'Fewer than {minimum} — too few to report'**
+  String merchMenuOpensTooFew(int minimum);
+
+  /// No description provided for @merchMenuOpensWhatItCounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Counts times your menu page was opened, not people. One person opening it twice is two; a reader whose phone or network still had the page saved is not counted at all.'**
+  String get merchMenuOpensWhatItCounts;
+
+  /// Shown when a shop's page is older than the counting. Stops a short history reading as a quiet month.
+  ///
+  /// In en, this message translates to:
+  /// **'Counting started {date}.'**
+  String merchMenuOpensCountingSince(String date);
+
+  /// No description provided for @merchMenuOpensNothingYet.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing counted yet. Share your menu and come back in a day or two.'**
+  String get merchMenuOpensNothingYet;
+
+  /// No description provided for @merchMenuFromTablesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Opened from a table code'**
+  String get merchMenuFromTablesTitle;
+
+  /// No description provided for @merchMenuFromTablesNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None yet'**
+  String get merchMenuFromTablesNone;
+
+  /// No description provided for @merchMenuNoScanCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Scans of your counter QR cannot be counted apart: it opens the same address as a shared link, so the two arrive identically. Table codes carry their table number, so those can be.'**
+  String get merchMenuNoScanCount;
+
+  /// No description provided for @merchMenuWhenTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When your menu is read'**
+  String get merchMenuWhenTitle;
+
+  /// No description provided for @merchMenuPartMorning.
+  ///
+  /// In en, this message translates to:
+  /// **'Morning'**
+  String get merchMenuPartMorning;
+
+  /// No description provided for @merchMenuPartMidday.
+  ///
+  /// In en, this message translates to:
+  /// **'Midday'**
+  String get merchMenuPartMidday;
+
+  /// No description provided for @merchMenuPartEvening.
+  ///
+  /// In en, this message translates to:
+  /// **'Evening'**
+  String get merchMenuPartEvening;
+
+  /// No description provided for @merchMenuPartNight.
+  ///
+  /// In en, this message translates to:
+  /// **'Night'**
+  String get merchMenuPartNight;
+
+  /// No description provided for @merchMenuPartMorningHours.
+  ///
+  /// In en, this message translates to:
+  /// **'5am – 11am'**
+  String get merchMenuPartMorningHours;
+
+  /// No description provided for @merchMenuPartMiddayHours.
+  ///
+  /// In en, this message translates to:
+  /// **'11am – 5pm'**
+  String get merchMenuPartMiddayHours;
+
+  /// No description provided for @merchMenuPartEveningHours.
+  ///
+  /// In en, this message translates to:
+  /// **'5pm – 11pm'**
+  String get merchMenuPartEveningHours;
+
+  /// No description provided for @merchMenuPartNightHours.
+  ///
+  /// In en, this message translates to:
+  /// **'11pm – 5am'**
+  String get merchMenuPartNightHours;
+
+  /// No description provided for @merchMenuWhenTooQuiet.
+  ///
+  /// In en, this message translates to:
+  /// **'Too few opens this period to show when they happened.'**
+  String get merchMenuWhenTooQuiet;
+
+  /// No description provided for @merchMenuWhenWhyNotHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Shown in quarters of the day rather than by the hour, so a figure can never be about one customer.'**
+  String get merchMenuWhenWhyNotHours;
+
+  /// No description provided for @merchMenuBestSellersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What sold'**
+  String get merchMenuBestSellersTitle;
+
+  /// One best-selling item's figures. Orders is what the list is ranked on; units is how many went out.
+  ///
+  /// In en, this message translates to:
+  /// **'{baskets, plural, =1{1 order} other{{baskets} orders}} · {units} sold'**
+  String merchMenuBestSellerLine(int baskets, int units);
+
+  /// No description provided for @merchMenuBestSellersEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No delivered orders in this window.'**
+  String get merchMenuBestSellersEmpty;
+
+  /// No description provided for @merchMenuBestSellersNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered orders only — a cancelled basket is not evidence of anything.'**
+  String get merchMenuBestSellersNote;
+
+  /// No description provided for @merchMenuNoItemViews.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no per-item view count. Your menu page is one page, so every item on it is read as often as every other.'**
+  String get merchMenuNoItemViews;
+
+  /// No description provided for @merchMenuDemandRadarRow.
+  ///
+  /// In en, this message translates to:
+  /// **'What your neighbourhood searched for'**
+  String get merchMenuDemandRadarRow;
+
+  /// The suppressed figure where there is only room for a couple of words — a metric tile's value, a bar's trailing label. The full sentence, with the floor in it, is merchMenuOpensTooFew and is shown beside it.
+  ///
+  /// In en, this message translates to:
+  /// **'Too few'**
+  String get merchMenuOpensTooFewShort;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

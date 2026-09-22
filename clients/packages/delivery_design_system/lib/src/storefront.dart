@@ -1053,6 +1053,7 @@ class ShelfGridTile extends StatelessWidget {
     this.onTap,
     this.removeSemanticLabel,
     this.addMoreSemanticLabel,
+    this.soldOutLabel,
   });
 
   final String name;
@@ -1081,6 +1082,16 @@ class ShelfGridTile extends StatelessWidget {
   /// Screen-reader labels for the stepper's two glyphs, localised by the caller.
   final String? removeSemanticLabel;
   final String? addMoreSemanticLabel;
+
+  /// Drawn in place of the add control when the shop has this item marked unavailable, already
+  /// localised. Null is the ordinary case.
+  ///
+  /// Distinct from [onAdd] being null, and the difference is what the customer is told. A closed
+  /// shop draws nothing, because nothing on the shelf can be added and the reason is the shop's
+  /// state, said once at the top of the screen. An item the merchant has switched off is the only
+  /// one of its neighbours that cannot be bought, so it says so on itself — the same sentence the
+  /// public web menu has always put on that item.
+  final String? soldOutLabel;
 
   static const double imageHeight = 100;
 
@@ -1179,6 +1190,41 @@ class ShelfGridTile extends StatelessWidget {
   }
 
   Widget _control() {
+    // Said before the add control is considered, so that an unavailable item reads the same
+    // whether the shop is open or shut: the item is off either way, and "sold out" is the more
+    // specific of the two reasons it cannot be added.
+    if (soldOutLabel case final String label) {
+      return SizedBox(
+        height: hitHeight,
+        child: Center(
+          child: SizedBox(
+            height: controlHeight,
+            width: double.infinity,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: DeliveryColors.background,
+                borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                border: Border.all(color: DeliveryColors.border),
+              ),
+              child: Center(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    // Muted, not brand: this is the absence of an offer, not one.
+                    color: DeliveryColors.muted,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     if (onAdd == null) {
       return const SizedBox(height: hitHeight);
     }

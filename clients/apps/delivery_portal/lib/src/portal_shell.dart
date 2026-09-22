@@ -80,6 +80,7 @@ class PortalApis {
     required this.reports,
     required this.catalogScan,
     required this.demand,
+    required this.menuInsights,
     required this.shopChat,
     required this.moderation,
     required this.attachments,
@@ -141,6 +142,10 @@ class PortalApis {
 
   /// How busy the neighbourhoods around a shop are — the merchant Demand Radar.
   final DemandApi demand;
+
+  /// What the shop's own menu has been doing: opens of its public page as bands over a floor,
+  /// when in the day they fall, and what was actually delivered.
+  final MenuInsightsApi menuInsights;
 
   /// Customers' conversations with the merchant's shops.
   final ShopChatApi shopChat;
@@ -408,6 +413,20 @@ class PortalArea {
                   storeId: storeId,
                 )),
       ),
+      // What that menu has been doing (Figma 139:255), beside the builder that arranges it.
+      // Appended like everything else in the suite, never inserted — `jump(2)` must keep meaning
+      // Orders.
+      PortalDestination(
+        icon: Icons.insights_outlined,
+        selectedIcon: Icons.insights,
+        label: (DeliveryStrings t) => t.merchMenuInsightsTitle,
+        build: (PortalApis a, _, __, ___) => _withStore(
+            a,
+            (String? storeId) => MenuInsightsScreen(
+                  api: a.menuInsights,
+                  storeId: storeId,
+                )),
+      ),
       PortalDestination(
         icon: Icons.category_outlined,
         selectedIcon: Icons.category,
@@ -501,14 +520,20 @@ class PortalArea {
     ],
   );
 
-  /// Where the goods rail keeps the shelves, the register, the menu, the shelf sections and the
-  /// staff roster: the merchant suite's pages, appended after My shop and never moved
-  /// (see [merchant_]).
+  /// Where the goods rail keeps the shelves, the register, the menu, the menu's figures, the shelf
+  /// sections and the staff roster: the merchant suite's pages, appended after My shop and never
+  /// moved (see [merchant_]).
   ///
   /// The menu is in here for the reason the shelf sections are — a services shop has no shelf to
   /// arrange, and Product Service refuses an offer without its service terms, so a menu builder
-  /// there would be a screen with nothing in it and a switch that means nothing.
-  static const Set<int> _notForServicesShops = <int>{7, 8, 9, 10, 11};
+  /// there would be a screen with nothing in it and a switch that means nothing. Its figures follow
+  /// it: a shop with no menu page has nothing to say about one being opened.
+  ///
+  /// **These are indices into the goods rail, so inserting a page there moves them.** A page added
+  /// between My shop and the Demand Radar shifts every number after it, and the symptom is the
+  /// staff roster quietly reappearing on the services rail rather than anything failing to build —
+  /// which is why `services_rail_test` names the rail it expects, page by page.
+  static const Set<int> _notForServicesShops = <int>{7, 8, 9, 10, 11, 12};
 
   /// The Merchant Hub for an owner who runs a goods shop and a services shop: the goods rail exactly as
   /// it is, with the services shop's queue and offers appended.
