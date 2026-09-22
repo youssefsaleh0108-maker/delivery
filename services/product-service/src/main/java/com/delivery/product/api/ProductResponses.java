@@ -49,6 +49,7 @@ final class ProductResponses {
                 product.isGiftFeatured(),
                 ServiceTermsResponse.of(view.service()),
                 view.fromPrice(),
-                ModerationResponse.of(product));
+                ModerationResponse.of(product),
+                product.getPosition());
     }
 }
