@@ -290,6 +290,7 @@ public class PublicShopPageService {
         }
 
         List<ShopBasket.Line> lines = new ArrayList<>(at.size());
+        List<ShopBasket.Send.Item> ticket = new ArrayList<>(at.size());
         BigDecimal total = ZERO2;
         for (BasketLine line : at) {
             if (line.at() < 0 || line.at() >= shelf.ordered().size()) {
@@ -304,6 +305,10 @@ public class PublicShopPageService {
             BigDecimal lineTotal = money(unit.multiply(BigDecimal.valueOf(line.qty())));
             lines.add(new ShopBasket.Line(line.at(), product.getName(), note(line.note()),
                     line.qty(), unit, lineTotal, product.isInStock()));
+            // The row a position actually names, which is the one thing a ticket cannot be written
+            // without. Collected beside the line the diner reads rather than looked up a second
+            // time afterwards, so the two can never name different rows.
+            ticket.add(new ShopBasket.Send.Item(product.getId(), line.qty()));
             if (!product.isInStock()) {
                 // Priced, said, and left out of the sum: a diner must see what it would have cost,
                 // and must not be quoted a total that includes something the kitchen has run out of.
@@ -319,7 +324,48 @@ public class PublicShopPageService {
         if (!store.isOrderable(clock.instant())) {
             problems.add(ShopBasket.Problem.CLOSED);
         }
-        return new ShopBasket(lines, total, seat, problems);
+        // Only a pad with nothing wrong with it carries the request that sends it. Every refusal
+        // above has already been put into words for the diner, and a pad that has one has no
+        // button either — which is the same rule said once, in the one place that knows.
+        ShopBasket.Send send = problems.isEmpty() && seat != null
+                ? new ShopBasket.Send(store.getId(), seat, ticket, total, ticketNotes(lines))
+                : null;
+        return new ShopBasket(lines, total, seat, problems, send);
+    }
+
+    /**
+     * How much of a diner's notes a ticket can carry.
+     *
+     * <p>{@code PlaceTableOrderRequest.notes} is one field of 500 characters for the whole order,
+     * because an order line in that service carries no note of its own — a delivery never needed
+     * one. So the lines' notes are gathered into it, each one behind the dish it is about, and this
+     * is where they stop. Twenty lines of sixty characters could not fit and would be refused by
+     * that field's own bound, which would lose the order rather than a note.
+     */
+    static final int MAX_TICKET_NOTES = 500;
+
+    /**
+     * The diner's notes as one line a waiter reads: {@code Hummus: no onions · Fattoush: no mint}.
+     *
+     * <p>Whole entries only. A note cut in half on a kitchen ticket is worse than a note that is
+     * not there: "no" and "nuts" are the same four characters as "no nuts" minus a space. What it
+     * costs is that a diner who writes on the twentieth line of a very long order may not have it
+     * read — their own pad still shows it, so they can say it to the waiter, and
+     * {@code PublicShopBasketApiTest} pins the rule.
+     */
+    private static String ticketNotes(List<ShopBasket.Line> lines) {
+        StringBuilder all = new StringBuilder();
+        for (ShopBasket.Line line : lines) {
+            if (line.note() == null) {
+                continue;
+            }
+            String entry = (all.isEmpty() ? "" : " · ") + line.name() + ": " + line.note();
+            if (all.length() + entry.length() > MAX_TICKET_NOTES) {
+                break;
+            }
+            all.append(entry);
+        }
+        return all.isEmpty() ? null : all.toString();
     }
 
     /**

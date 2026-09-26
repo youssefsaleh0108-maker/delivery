@@ -24,8 +24,11 @@ import java.util.List;
  * <p>The same escaper covers the one thing here a <em>diner</em> typed — the note on a line — which
  * is the only free text on this surface and comes from somebody nobody has identified.
  *
- * <p>It names no product, no section and no shop beyond what the page already prints. A line is the
- * position it was asked about, the name the page already shows, and what was asked for with it.
+ * <p>Nothing it <em>draws</em> names a product, a section or a shop beyond what the page already
+ * prints: a line is the position it was asked about, the name the page already shows, and what was
+ * asked for with it. The one thing here that carries ids is {@code send}, which is the order
+ * service's own request for a pad that could be sent — relayed by the browser, drawn by nothing,
+ * and absent from every pad that could not. See {@link ShopBasket.Send} for why it is built here.
  */
 final class ShopBasketJson {
 
@@ -110,8 +113,49 @@ final class ShopBasketJson {
             b.append('"').append(ShopPageHtml.json(says.get(i))).append('"');
         }
         b.append(']');
+        send(b, basket.send());
         b.append('}');
         return b.toString();
+    }
+
+    /**
+     * The request that sends this pad to the kitchen, for the browser to relay unread.
+     *
+     * <p><strong>The only part of this document that is not words</strong>, and the only part
+     * nothing draws. The field names are the order service's own, so this is its
+     * {@code PlaceTableOrderRequest} written out whole: {@code basket.js} posts it as it stands and
+     * reads no field of it. Which is how a total can be inside it without being a number in a
+     * browser — the page cannot add up something it never looks at, and
+     * {@code ShopBasketScriptTest.neverComputesAPrice} holds the file to that.
+     *
+     * <p>Absent on every pad that cannot be sent, which is what leaves the button dead: see
+     * {@link ShopBasket.Send}. An absent {@code notes} is absent rather than null — a ticket with
+     * nothing written on it should print nothing, not the word "null".
+     */
+    private static void send(StringBuilder b, ShopBasket.Send send) {
+        if (send == null) {
+            return;
+        }
+        b.append(",\"send\":{\"storeId\":\"").append(send.storeId())
+                .append("\",\"table\":").append(send.table())
+                .append(",\"items\":[");
+        for (int i = 0; i < send.items().size(); i++) {
+            ShopBasket.Send.Item item = send.items().get(i);
+            if (i > 0) {
+                b.append(',');
+            }
+            b.append("{\"productId\":\"").append(item.productId())
+                    .append("\",\"qty\":").append(item.qty()).append('}');
+        }
+        // The figure the diner was shown, at the scale the platform stores money in. Mismatched
+        // against the catalogue when the send lands is a 409 and no ticket.
+        b.append("],\"expectedTotal\":").append(send.expectedTotal());
+        if (send.notes() != null) {
+            // Written by a diner nobody has identified, through the same escaper as everything a
+            // merchant typed — and then into the one field a ticket has for it.
+            b.append(",\"notes\":\"").append(ShopPageHtml.json(send.notes())).append('"');
+        }
+        b.append('}');
     }
 
     /**
