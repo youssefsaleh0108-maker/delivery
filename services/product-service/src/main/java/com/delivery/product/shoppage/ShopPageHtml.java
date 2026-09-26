@@ -301,7 +301,7 @@ final class ShopPageHtml {
                 // already on the screen before either file arrives, and nothing waits on them.
                 .append("<script src=\"").append(assets.script()).append("\" defer></script>");
         if (pad) {
-            // Only where there is a pad to run. It is 8.8 kB gzipped and the first thing it does on
+            // Only where there is a pad to run. It is 9.0 kB gzipped and the first thing it does on
             // a page without one is leave, so every shop that has not turned table ordering on was
             // paying for a file that could not do anything — and that is nearly every shop there
             // is. The sentence such a shop owes a scanned card is shop.js’s, above.

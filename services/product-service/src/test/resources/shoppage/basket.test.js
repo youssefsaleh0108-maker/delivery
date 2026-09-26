@@ -923,7 +923,53 @@ heading('every way a send can be refused is a sentence on the screen');
     check('no round is drawn for an order the kitchen never got', page.rounds().length, 0);
     check('the pad still holds what was chosen', page.names(), ['Hummus']);
     check('and the button says what it always says', page.go.textContent, 'Send to the kitchen');
+
+    // AND IT IS STILL THERE A MOMENT LATER. A refusal the shop owns re-prices the pad, and that
+    // answer arrives a quarter of a second after the words do — with nothing wrong with the pad,
+    // so nothing to say about it. Found by driving the real page: the sentence appeared and then
+    // vanished before it could be read, which is a send that failed in silence.
+    page.flush();
+    check('and is still on the screen after the pad is priced again',
+      page.says.textContent, one.words);
   });
+}
+
+heading('a refusal goes when the diner answers it, and not before');
+{
+  const page = visit({ slug: 'furn', version: 'v1', names: ['Hummus', 'Fattoush'],
+    store: browser(), search: '?t=7', reply: answer(),
+    back: [{ status: 429, body: {} }, { status: 201, body: ticket() }] });
+  page.addRow(0).flush();
+  page.send();
+  page.flush();
+  check('said', page.says.textContent,
+    'That table has sent several orders just now. Wait a moment and send again.');
+
+  page.addRow(1).flush();
+  check('changing the pad answers it', page.says.textContent, '');
+
+  page.send();
+  page.flush();
+  check('and a send that works leaves nothing behind either',
+    [page.says.textContent, page.rounds().length], ['', 1]);
+}
+
+heading('a shop that says something as well as refusing says both');
+{
+  const page = visit({ slug: 'furn', version: 'v1', names: ['Hummus'], store: browser(),
+    search: '?t=7', reply: answer(), back: { status: 422, body: {} } });
+  page.addRow(0).flush();
+  // The kitchen shut between the quote and the tap: the send is refused, and the pad priced again
+  // says why in the shop's own words.
+  page.reply(answer({ ok: false, send: undefined,
+    says: ['The kitchen is closed right now, so this cannot be sent.'] }));
+  page.send();
+  page.flush();
+
+  check('the refusal and the reason, in that order', page.says.textContent,
+    'The shop could not take this order. '
+    + 'The kitchen is closed right now, so this cannot be sent.');
+  check('and the button stays dead, because the kitchen is shut', page.reachable(), false);
 }
 
 heading('a refusal the shop owns is priced again, so the reason is current');

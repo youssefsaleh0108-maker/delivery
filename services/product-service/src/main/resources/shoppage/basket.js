@@ -275,7 +275,9 @@
     }
     store();
     draw();
-    // Dead until this pad has been priced again: see hold().
+    // Dead until this pad has been priced again: see hold(). And a refusal the diner has just
+    // answered by changing the pad has had its reply.
+    refusal = '';
     hold();
     ask();
   }
@@ -285,6 +287,7 @@
     if (i < 0) { return; }
     lines[i][2] = text.slice(0, 60);
     store();
+    refusal = '';
     hold();
     ask();
   }
@@ -428,9 +431,12 @@
     about.hidden = !lines.length;
     if (answer.send) { allow(answer); }
 
-    var trouble = '';
+    // A refusal the diner has not had a chance to read yet, and then whatever the shop says about
+    // the pad as it is now. In that order, and both: a send refused is repriced immediately, and an
+    // answer that overwrote the refusal with nothing would be a send that failed in silence.
+    var trouble = refusal;
     for (var s = 0; s < (answer.says || []).length; s++) {
-      trouble += (s ? ' ' : '') + answer.says[s];
+      trouble += (trouble ? ' ' : '') + answer.says[s];
     }
     says.textContent = trouble;
     counter.textContent = answer.count;
@@ -513,6 +519,9 @@
   */
   var ready = null;
   var going = null;
+  // The last refusal, kept until the diner does something about it: the quote that follows one
+  // arrives a quarter of a second later and would otherwise wipe it off the screen.
+  var refusal = '';
 
   function fire() {
     // One tap at a time. A second ROUND is a second ticket, which is what the server makes of it.
@@ -520,6 +529,7 @@
     going = ready;
     hold();
     go.textContent = sendingLabel;
+    refusal = '';
     says.textContent = '';
     var request = new XMLHttpRequest();
     request.open('POST', sendPath, true);
@@ -565,7 +575,8 @@
     var sent = going;
     going = null;
     go.textContent = goLabel;
-    says.textContent = refusals[why] || refusals.FAILED || '';
+    refusal = refusals[why] || refusals.FAILED || '';
+    says.textContent = refusal;
     if (why === 'FAILED') {
       // Nothing was learnt about the pad — the request may never have left the phone — so it is not
       // repainted: lines, total and button as they were, and the diner decides to try again.
@@ -582,6 +593,7 @@
     what the kitchen is doing with it.
   */
   function kept(sent, id, state) {
+    refusal = '';
     var round = { i: id, s: state, u: Date.now(), t: sent.of.total, tl: sent.of.totalLbp,
       k: sent.of.totalLabel, l: [] };
     var was = sent.of.lines || [];

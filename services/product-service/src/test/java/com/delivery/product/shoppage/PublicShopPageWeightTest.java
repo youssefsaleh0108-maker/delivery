@@ -159,14 +159,14 @@ class PublicShopPageWeightTest {
         report("busy, 40 items, en", english);
         report("busy, 40 items, ar", arabic);
 
-        // 24.1 kB over the wire for a restaurant that takes orders from its tables — measured with
+        // 23.8 kB over the wire for a restaurant that takes orders from its tables — measured with
         // table ordering ON, because a budget for the page without the feature on it is a budget
-        // for a page nobody is arguing about. 8.8 kB of it is basket.js. A 3G handset at a
+        // for a page nobody is arguing about. 9.0 kB of it is basket.js. A 3G handset at a
         // realistic 400 kbit/s fetches the lot in about half a second.
         //
         // It was 13 kB before any of this, then 18.5 for the pad — an Add button on every row, a
         // priced panel at the foot of the menu, a note field per line, the strip that leads back to
-        // it — and it is 24.1 now that the pad can be SENT: the post, the receipt of what went, the
+        // it — and it is 23.8 now that the pad can be SENT: the post, the receipt of what went, the
         // ticket's state as the kitchen moves it, a sentence for every refusal, and a memory of
         // what this phone has already sent from this table. The brief allowed 35 kB.
         //
@@ -194,14 +194,14 @@ class PublicShopPageWeightTest {
      * it past it.
      *
      * <p><strong>Ordering at the table was allowed to take this to 35 kB.</strong> The pad brought
-     * it to 24.8 and sending brings it to 29.9, which is the whole of what was asked for: a pad that
-     * cannot be sent is not ordering at the table, and the 5.1 kB between those two figures is the
+     * it to 24.8 and sending brings it to 30.1, which is the whole of what was asked for: a pad that
+     * cannot be sent is not ordering at the table, and the 5.3 kB between those two figures is the
      * post, the receipt, the ticket's state and a sentence for every refusal.
      *
      * <p>So the ceiling is 32 rather than the 35 that was offered: a budget raised to the limit
      * because the limit exists, rather than to what was spent plus room to notice drift, is not a
      * budget. And this is the worst page the service can send — a hundred and twenty described
-     * items, in Arabic. The shop a diner actually scans a card in sits at 24.1.
+     * items, in Arabic. The shop a diner actually scans a card in sits at 23.8.
      */
     @Test
     @DisplayName("the worst page this service can send still fits the 35 kB budget, at 32")
@@ -246,11 +246,11 @@ class PublicShopPageWeightTest {
      * every shop page there is, cached for a year across all of them; a dekkane with three things
      * on its shelf pays for a filter it barely needs and a basket it very much does.
      *
-     * <p>16 kB, then 17, and 22 now — the Arabic rendering measures 20.9 kB with both files. 164 B
+     * <p>16 kB, then 17, and 22 now — the Arabic rendering measures 21.2 kB with both files. 164 B
      * of the first move was the sentence a shop with table
      * ordering off owes a diner who scanned one of its cards, which now ships hidden and is revealed
      * by {@code shop.js} ({@link ShopPageHtml#orderWithTheStaff}). The rest is basket.js growing
-     * from 4.7 kB to 8.8 kB gzipped so that the pad can be sent — and on a three-item shop that
+     * from 4.7 kB to 9.0 kB gzipped so that the pad can be sent — and on a three-item shop that
      * file is most of what there is to download, which is exactly why it is no longer linked on the
      * pages that cannot use it.
      */
