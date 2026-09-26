@@ -151,25 +151,30 @@ class PublicShopPageApiTest {
     /**
      * It is still a document, not an app.
      *
-     * <p>Three {@code <script>} elements now, and not one of them is code the page was handed: the
-     * catalogue filter and the basket, both files from this origin, and the structured-data block,
+     * <p>Two {@code <script>} elements on an ordinary shop's page, and neither of them is code the
+     * page was handed: the catalogue filter, a file from this origin, and the structured-data block,
      * which carries a JSON media type a browser parses as data and never executes — which is also
      * why {@code script-src 'self'} does not have to allow anything inline for it. Nothing here is
      * inline JavaScript, and there is no handler attribute anywhere. The page is complete before
      * any of them arrives and stays complete if none does, which is what the whole design rests
      * on: a chat app's preview runs no JavaScript at all.
+     *
+     * <p>The basket's file is the third, and only on a shop that takes orders from its tables. It
+     * is 8.6 kB gzipped and the first thing it does on a page with no pad is leave, so a shop that
+     * has not turned table ordering on — which is nearly every shop — was downloading all of it to
+     * find out it had nothing to do. See {@code ShopPageHtml.head}.
      */
     @Test
-    @DisplayName("no inline code: two script files from this origin, and one block of data")
+    @DisplayName("no inline code: one script file from this origin, one block of data, no basket")
     void carriesNoInlineScript() throws Exception {
         ShopPageFixture shop = stocked();
         String html = body(shop.mvc().perform(get("/s/" + shop.slug())).andReturn());
 
-        // Every script element on the page is one of the three, by name.
-        assertThat(html.split("<script", -1).length - 1).isEqualTo(3);
+        // Every script element on the page is one of the two, by name.
+        assertThat(html.split("<script", -1).length - 1).isEqualTo(2);
         assertThat(html)
                 .contains("<script src=\"/s/assets/shop.js?v=")
-                .contains("<script src=\"/s/assets/basket.js?v=")
+                .doesNotContain("basket.js")
                 .contains("\" defer></script>")
                 .contains("<script type=\"application/ld+json\">")
                 .doesNotContain("javascript:")
@@ -181,6 +186,12 @@ class PublicShopPageApiTest {
                 .doesNotContain("<style")
                 .doesNotContain("fonts.googleapis.com")
                 .doesNotContain("cdn.");
+
+        // And the third file, where there is a pad for it to run: same origin, same deferred link.
+        ShopPageFixture tables = stocked().takesTableOrders();
+        String withPad = body(tables.mvc().perform(get("/s/" + tables.slug())).andReturn());
+        assertThat(withPad.split("<script", -1).length - 1).isEqualTo(3);
+        assertThat(withPad).contains("<script src=\"/s/assets/basket.js?v=");
     }
 
     @Test

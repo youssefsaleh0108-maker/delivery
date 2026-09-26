@@ -114,6 +114,32 @@ function buildPage(options) {
   panel.setAttribute('data-v', options.version);
   panel.setAttribute('data-e', 'The total could not be worked out just now.');
   panel.setAttribute('data-nt', 'Scan the code on your table to order from here.');
+  // Where a round goes and where its ticket is read back — paths, so same-origin whichever
+  // hostname served the page — and every word for what happens after the tap. All of them as
+  // ShopPageHtml prints them and ShopPageText spells them.
+  panel.setAttribute('data-s', '/api/table-orders');
+  panel.setAttribute('data-ss', '/api/table-orders/status/');
+  panel.setAttribute('data-g', options.arabic ? 'يُرسل…' : 'Sending…');
+  panel.setAttribute('data-sd', 'DELIVERED|CANCELLED');
+  panel.setAttribute('data-st', options.arabic
+    ? 'PLACED=أُرسل إلى المطبخ. لم يُستلم بعد.|ACCEPTED=المطبخ استلم طلبك.|PREPARING=يُجهّز الآن.'
+      + '|READY=جاهز.|PICKED_UP=جاهز.|DELIVERED=قُدّم. بالهناء والشفاء.'
+      + '|CANCELLED=أُلغي هذا الطلب. اسأل الموظفين.'
+    : 'PLACED=Sent to the kitchen. Not picked up yet.|ACCEPTED=The kitchen has your order.'
+      + '|PREPARING=Being made now.|READY=Ready.|PICKED_UP=Ready.'
+      + '|DELIVERED=Served. Enjoy your meal.|CANCELLED=This order was cancelled. '
+      + 'Please ask the staff.');
+  panel.setAttribute('data-r', options.arabic
+    ? 'TOO_MANY=أُرسلت طلبات كثيرة من هذه الطاولة. انتظر لحظة ثم أرسل مرة أخرى.'
+      + '|REFUSED=لم يستطع المتجر استقبال هذا الطلب.'
+      + '|PRICE_CHANGED=تغيّر السعر. راجع المجموع الجديد ثم أرسل مرة أخرى.'
+      + '|FAILED=تعذّر إرسال طلبك الآن. حاول مرة أخرى أو اطلب من الموظفين.'
+      + '|GONE=لم تعد هناك تحديثات لهذا الطلب. اسأل الموظفين عنه.'
+    : 'TOO_MANY=That table has sent several orders just now. Wait a moment and send again.'
+      + '|REFUSED=The shop could not take this order.'
+      + '|PRICE_CHANGED=The price changed. Check the new total and send again.'
+      + '|FAILED=Your order could not be sent just now. Try again, or order with the staff.'
+      + '|GONE=There are no more updates for this order. Ask the staff about it.');
 
   const table = add(panel, ['.bktab'], 'p');
   table.hidden = true;
@@ -128,7 +154,15 @@ function buildPage(options) {
   add(panel, ['.bksum'], 'div');
   add(panel, ['.bkwhat'], 'p').hidden = true;
   add(panel, ['.bksays'], 'p');
-  add(panel, ['.bkgo'], 'button').disabled = true;
+  const button = add(panel, ['.bkgo'], 'button');
+  button.disabled = true;
+  button.textContent = options.arabic ? 'أرسل إلى المطبخ' : 'Send to the kitchen';
+  button.setAttribute('aria-disabled', 'true');
+  // What this table has already sent, under the button that sends the next round. Hidden until
+  // there is one, and filled by the script out of the answers it was given.
+  const sent = add(panel, ['.bksent'], 'div');
+  sent.hidden = true;
+  add(sent, ['.bkgot'], 'ol');
 
   const peek = add(root, ['.peek'], 'a');
   peek.hidden = true;
@@ -153,12 +187,34 @@ function visit(options) {
   XHR.prototype.open = function (method, url) { this.method = method; this.url = url; };
   XHR.prototype.setRequestHeader = function () {};
   XHR.prototype.abort = function () { aborted++; };
+  /*
+    The page talks to three addresses now, and they answer differently, so each has its own arranged
+    reply: `reply` is the quote's, as it always was, `back` is the send's and `read` is a ticket's
+    own link. Each is {status, body}, or an array for one answer per call in order, or 'error' for a
+    request that never arrives, or 'hold' for one that has not answered yet — which is the state a
+    diner on a slow connection taps a second time in.
+  */
   XHR.prototype.send = function (body) {
-    sent.push({ url: this.url, method: this.method, body: JSON.parse(body) });
-    const reply = options.reply;
-    if (reply === 'error') { this.onerror(); return; }
-    this.status = reply && reply.status ? reply.status : 200;
-    this.responseText = JSON.stringify(reply && reply.body ? reply.body : reply || {});
+    const kind = this.url.indexOf('/quote') >= 0 ? 'quote'
+      : (this.method === 'POST' ? 'send' : 'read');
+    sent.push({ url: this.url, method: this.method, kind: kind,
+      body: body ? JSON.parse(body) : null });
+    let reply = kind === 'quote' ? options.reply
+      : (kind === 'send' ? options.back : options.read);
+    if (Array.isArray(reply)) {
+      const turn = sent.filter(c => c.kind === kind).length - 1;
+      reply = reply[Math.min(turn, reply.length - 1)];
+    }
+    if (reply === 'hold') { return; }
+    if (reply === 'error' || (reply === undefined && kind !== 'quote')) {
+      // A request nobody arranged an answer for went nowhere, which is a truer default than a
+      // silent 200: a case that forgot one should notice.
+      this.onerror();
+      return;
+    }
+    this.status = reply && reply.status ? reply.status : (kind === 'send' ? 201 : 200);
+    this.responseText = JSON.stringify(reply && reply.body !== undefined ? reply.body
+      : (reply || {}));
     this.onload();
   };
 
@@ -166,7 +222,9 @@ function visit(options) {
     document: {
       querySelector: s => root.querySelector(s),
       querySelectorAll: s => root.querySelectorAll(s),
-      createElement: tag => element(tag)
+      createElement: tag => element(tag),
+      // A phone whose owner is looking at it. The script asks nothing while this is true.
+      hidden: !!options.pocket
     },
     window: {
       location: { search: options.search || '' },
@@ -193,8 +251,38 @@ function visit(options) {
     says: root.querySelector('.bksays'),
     sums: root.querySelector('.bksum'),
     table: root.querySelector('.bktab'),
+    go: root.querySelector('.bkgo'),
+    sentBox: root.querySelector('.bksent'),
+    got: root.querySelector('.bkgot'),
     sent: sent,
     aborted: () => aborted,
+    /** Whether the one action on this page can be taken at all. */
+    reachable() {
+      return !this.go.disabled && this.go.getAttribute('aria-disabled') !== 'true';
+    },
+    /** Taps it, the way a diner does — and does nothing at all if it is dead, as they would. */
+    send() {
+      if (!this.go.disabled) { this.go.onclick(); }
+      return this;
+    },
+    /** Every POST that reached the order service, in order: one per ticket, never more. */
+    posts() {
+      return sent.filter(call => call.method === 'POST' && call.url === '/api/table-orders');
+    },
+    reads() {
+      return sent.filter(call => call.method === 'GET');
+    },
+    /** The rounds drawn under the button: what each one was, what it came to, where it has got to. */
+    rounds() {
+      return this.got.children.map(row => ({
+        lines: row.children[0].children.map(had => had.children.map(c => c.textContent)),
+        total: row.children[1].textContent,
+        state: row.children[2].textContent
+      }));
+    },
+    answers(read) { options.read = read; return this; },
+    /** The phone goes in a pocket, or comes out of one. */
+    pocketed(yes) { sandbox.document.hidden = yes; return this; },
     /** Runs whatever the debounce was holding. */
     flush() {
       const due = timers.splice(0, timers.length);
@@ -252,7 +340,31 @@ function answer(overrides) {
     totalLbp: '135,000 LBP',
     totalLabel: 'Total',
     table: '7',
-    says: []
+    says: [],
+    // The one part of a quote that is not words: the order service's own request, for a pad that
+    // could be sent as it stands. Its presence is the server saying so, and the page's only
+    // business with it is to post it — which is why every field here is the order service's.
+    send: SEND
+  }, overrides || {});
+}
+
+const SEND = {
+  storeId: '8f14e45f-ceea-467a-9c2e-1e0a1b2c3d4e',
+  table: 7,
+  items: [{ productId: '11111111-2222-3333-4444-555555555555', qty: 1 }],
+  expectedTotal: 1.50
+};
+
+/** A ticket, as the order service answers a send. */
+function ticket(overrides) {
+  return Object.assign({
+    id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+    table: 7,
+    status: 'PLACED',
+    shopName: 'Furn Beirut',
+    items: [{ name: 'Hummus', qty: 1, unitPrice: 1.50, lineTotal: 1.50 }],
+    total: 1.50,
+    sentAt: '2026-09-23T17:00:00Z'
   }, overrides || {});
 }
 
@@ -556,13 +668,351 @@ heading('when the server cannot be asked, there is no total at all');
   check('and the strip is not offering a total it does not have', page.peek.hidden, true);
 }
 
-heading('Send never beckons while there is nowhere to send to');
+// --- the one action
+
+/*
+  THE CASE THIS FEATURE SHIPPED WITHOUT.
+
+  Everything else about ordering at a table was built, merged, deployed and covered — the endpoint,
+  the ledger proof, a smoke test that calls it with curl — and none of it opened the page and pressed
+  the button, so a diner could build a correct, server-priced order and had nowhere to send it. The
+  button was `disabled` in a line of this script, with no explanation on the screen.
+
+  So: a shop that takes table orders, a code off a card, food on the pad, and the question is whether
+  the diner can act. If the button is ever dead or inert while the server says the pad can be sent,
+  this fails.
+*/
+heading('a pad the server says can be sent HAS a button, and it reaches the kitchen');
 {
   const page = visit({ slug: 'furn', version: 'v1', names: ['Hummus'], store: browser(),
-    search: '?t=7', reply: answer({ ok: true }) });
+    search: '?t=7', reply: answer(), back: { status: 201, body: ticket() } });
   page.addRow(0).flush();
-  check('the button is dead even on a pad with nothing wrong with it',
-    page.panel.querySelector('.bkgo').disabled, true);
+
+  check('the button is alive', page.reachable(), true);
+  check('and says so to a screen reader', page.go.getAttribute('aria-disabled'), 'false');
+
+  page.send();
+  check('one POST, to the path the page was given', page.posts().map(c => c.url),
+    ['/api/table-orders']);
+  check('carrying the server’s own body, byte for byte and nothing added',
+    page.posts()[0].body, SEND);
+}
+
+heading('nothing is sent while the server has not said it can be');
+{
+  // The refusals, each one arriving as the absence of `send` AND a sentence. Both halves: a dead
+  // button with nothing beside it is the defect, and a sentence with a live button would send food
+  // to a closed kitchen.
+  const refusals = [
+    { what: 'a closed kitchen', reply: answer({ ok: false, send: undefined,
+      says: ['The kitchen is closed right now, so this cannot be sent.'] }),
+    words: 'The kitchen is closed right now, so this cannot be sent.' },
+    { what: 'something that ran out', reply: answer({ ok: false, send: undefined,
+      says: ['Something on your order has run out. Remove it to send the rest.'] }),
+    words: 'Something on your order has run out. Remove it to send the rest.' },
+    { what: 'a shop that does not take table orders', reply: answer({ ok: false, send: undefined,
+      lines: [], says: ['This shop does not take orders from the table online.'] }),
+    words: 'This shop does not take orders from the table online.' },
+    { what: 'a table this shop does not have', reply: answer({ ok: false, send: undefined,
+      table: undefined, says: ['Scan the code on your table to order from here.'] }),
+    words: 'Scan the code on your table to order from here.' }
+  ];
+  refusals.forEach(one => {
+    const page = visit({ slug: 'furn', version: 'v1', names: ['Hummus'], store: browser(),
+      search: '?t=7', reply: one.reply });
+    page.addRow(0).flush();
+    check('the button is dead for ' + one.what, page.reachable(), false);
+    check('and the diner is told why, in words', page.says.textContent, one.words);
+    page.send();
+    check('and nothing reached the kitchen', page.posts().length, 0);
+  });
+}
+
+heading('a pad that changed since the quote cannot be sent until it is priced again');
+{
+  const page = visit({ slug: 'furn', version: 'v1', names: ['Hummus', 'Fattoush'],
+    store: browser(), search: '?t=7', reply: answer(), back: { status: 201, body: ticket() } });
+  page.addRow(0).flush();
+  check('sendable', page.reachable(), true);
+
+  page.addRow(1);
+  check('a tap kills the button, because the body in hand is for the pad before the tap',
+    page.reachable(), false);
+  page.send();
+  check('so nothing goes', page.posts().length, 0);
+
+  page.flush();
+  check('and the fresh answer brings it back', page.reachable(), true);
+}
+
+heading('what the diner sees after sending');
+{
+  const store = browser();
+  const page = visit({ slug: 'furn', version: 'v1', names: ['Hummus'], store: store,
+    search: '?t=7',
+    reply: answer({ count: '2 items', lines: [{ at: 0, name: 'Hummus', qty: '2×',
+      price: '$3.00', priceLbp: '270,000 LBP' }], total: '$3.00', totalLbp: '270,000 LBP' }),
+    back: { status: 201, body: ticket() } });
+  page.addRow(0).addRow(0).flush();
+  page.send();
+
+  check('what they ordered, priced as the server spelled it, not as this page could have',
+    page.rounds()[0].lines, [['2×', 'Hummus', '$3.00270,000 LBP']]);
+  check('the total, labelled, the server’s own string',
+    page.rounds()[0].total, 'Total$3.00270,000 LBP');
+  check('and where the kitchen has got to', page.rounds()[0].state,
+    'Sent to the kitchen. Not picked up yet.');
+  check('the receipt is shown at all', page.sentBox.hidden, false);
+
+  check('the pad is emptied, so the same food cannot be sent twice by accident',
+    [page.lines.children.length, page.panel.querySelector('.bkempty').hidden], [0, false]);
+  check('and the button with it', page.reachable(), false);
+  check('the table is still named', page.table.textContent, 'Table 7');
+  check('what is kept is the receipt and the ticket, under this table’s own key',
+    store.keys().sort(), ['yd.s.furn.7']);
+}
+
+heading('a second round is a second ticket, not a replacement');
+{
+  const store = browser();
+  const page = visit({ slug: 'furn', version: 'v1', names: ['Hummus', 'Fattoush'], store: store,
+    search: '?t=7', reply: answer(), back: [{ status: 201, body: ticket() },
+      { status: 201, body: ticket({ id: 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff' }) }] });
+  page.addRow(0).flush();
+  page.send();
+
+  page.reply(answer({ lines: [{ at: 1, name: 'Fattoush', qty: '1×', price: '$2.25' }],
+    total: '$2.25' }));
+  page.addRow(1).flush();
+  check('the pad fills again', page.names(), ['Fattoush']);
+  page.send();
+
+  check('two POSTs', page.posts().length, 2);
+  check('and two rounds on the screen, in the order they were sent',
+    page.rounds().map(r => r.lines[0][1]), ['Hummus', 'Fattoush']);
+  check('the second did not replace the first in storage',
+    JSON.parse(store.raw('yd.s.furn.7')).r.map(r => r.i),
+    ['aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff']);
+}
+
+heading('a reload at the same table remembers what was already sent');
+{
+  const store = browser();
+  const first = visit({ slug: 'furn', version: 'v1', names: ['Hummus'], store: store,
+    search: '?t=7', reply: answer(), back: { status: 201, body: ticket() } });
+  first.addRow(0).flush();
+  first.send();
+
+  const again = visit({ slug: 'furn', version: 'v1', names: ['Hummus'], store: store,
+    search: '?t=7', reply: answer({ lines: [], total: '', ok: false, send: undefined,
+      says: [] }), read: { status: 200, body: ticket({ status: 'PREPARING' }) } });
+
+  check('the round is on the screen before anything is asked', again.rounds()[0].lines,
+    [['1×', 'Hummus', '$1.50135,000 LBP']]);
+  check('with the state it was last known to be in', again.rounds()[0].state,
+    'Sent to the kitchen. Not picked up yet.');
+  check('the pad itself is empty, because it was sent', again.lines.children.length, 0);
+
+  // And then the kitchen's turn: the ticket is asked after, once, and what comes back is drawn.
+  again.flush();
+  check('the ticket was read back with its own link', again.reads().map(c => c.url),
+    ['/api/table-orders/status/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee']);
+  check('and the diner is told what the kitchen is doing', again.rounds()[0].state,
+    'Being made now.');
+  check('which is remembered too', JSON.parse(store.raw('yd.s.furn.7')).r[0].s, 'PREPARING');
+}
+
+heading('a ticket that has stopped moving is not asked about again');
+{
+  const store = browser();
+  const page = visit({ slug: 'furn', version: 'v1', names: ['Hummus'], store: store,
+    search: '?t=7', reply: answer(),
+    back: { status: 201, body: ticket() },
+    read: { status: 200, body: ticket({ status: 'DELIVERED' }) } });
+  page.addRow(0).flush();
+  page.send();
+  page.flush();
+
+  check('served, in words', page.rounds()[0].state, 'Served. Enjoy your meal.');
+  const asked = page.reads().length;
+  page.flush().flush();
+  check('and nothing is asked after that', page.reads().length, asked);
+}
+
+heading('a phone in a pocket asks nothing');
+{
+  const page = visit({ slug: 'furn', version: 'v1', names: ['Hummus'], store: browser(),
+    search: '?t=7', reply: answer(), back: { status: 201, body: ticket() } });
+  page.addRow(0).flush();
+  page.send();
+
+  page.pocketed(true).flush();
+  check('no ticket was read while nobody was looking', page.reads().length, 0);
+  page.answers({ status: 200, body: ticket({ status: 'READY' }) }).pocketed(false).flush();
+  check('and it catches up when the diner looks again', page.rounds()[0].state, 'Ready.');
+}
+
+heading('a link that has run out of life is the end of the story, said as one');
+{
+  const page = visit({ slug: 'furn', version: 'v1', names: ['Hummus'], store: browser(),
+    search: '?t=7', reply: answer(),
+    back: { status: 201, body: ticket() }, read: { status: 404, body: { title: 'Not found' } } });
+  page.addRow(0).flush();
+  page.send();
+  page.flush();
+
+  check('the round is still there, with what was ordered on it',
+    page.rounds()[0].lines[0][1], 'Hummus');
+  check('and the diner is told rather than left with a blank line', page.rounds()[0].state,
+    'There are no more updates for this order. Ask the staff about it.');
+  const asked = page.reads().length;
+  page.flush();
+  check('nothing is asked after that either', page.reads().length, asked);
+}
+
+// --- every refusal of a send, in words
+
+heading('every way a send can be refused is a sentence on the screen');
+{
+  const refusals = [
+    { what: 'too many from one table', back: { status: 429,
+      body: { code: 'TABLE_ORDER_REFUSED', refusal: 'TOO_MANY' } },
+    words: 'That table has sent several orders just now. Wait a moment and send again.' },
+    { what: 'the shop refusing it', back: { status: 422,
+      body: { code: 'TABLE_ORDER_REFUSED', refusal: 'NOT_TAKING_TABLE_ORDERS' } },
+    words: 'The shop could not take this order.' },
+    { what: 'a price that moved', back: { status: 409,
+      body: { code: 'PRICE_CHANGED', expectedTotal: 1.50, total: 1.75 } },
+    words: 'The price changed. Check the new total and send again.' },
+    { what: 'an item that has gone', back: { status: 422, body: { title: 'Item unavailable' } },
+      words: 'The shop could not take this order.' },
+    { what: 'nothing serving that path at all', back: { status: 404, body: {} },
+      words: 'Your order could not be sent just now. Try again, or order with the staff.' },
+    { what: 'the service falling over', back: { status: 503, body: {} },
+      words: 'Your order could not be sent just now. Try again, or order with the staff.' },
+    { what: 'a request that never left the phone', back: 'error',
+      words: 'Your order could not be sent just now. Try again, or order with the staff.' }
+  ];
+  refusals.forEach(one => {
+    const page = visit({ slug: 'furn', version: 'v1', names: ['Hummus'], store: browser(),
+      search: '?t=7', reply: answer(), back: one.back });
+    page.addRow(0).flush();
+    page.send();
+
+    check('refused for ' + one.what + ', in words', page.says.textContent, one.words);
+    check('no round is drawn for an order the kitchen never got', page.rounds().length, 0);
+    check('the pad still holds what was chosen', page.names(), ['Hummus']);
+    check('and the button says what it always says', page.go.textContent, 'Send to the kitchen');
+  });
+}
+
+heading('a refusal the shop owns is priced again, so the reason is current');
+{
+  const page = visit({ slug: 'furn', version: 'v1', names: ['Hummus'], store: browser(),
+    search: '?t=7', reply: answer(),
+    back: { status: 409, body: { code: 'PRICE_CHANGED' } } });
+  page.addRow(0).flush();
+  const asked = page.sent.length;
+
+  page.reply(answer({ total: '$1.75', totalLbp: '157,500 LBP' }));
+  page.send();
+  page.flush();
+
+  check('the pad was asked again', page.sent.length > asked, true);
+  check('and it is the new total on the screen',
+    page.sums.children[0].children[1].textContent, '$1.75157,500 LBP');
+  check('the button is alive again, because the diner decides whether to send it',
+    page.reachable(), true);
+}
+
+heading('a request that failed can be tried again without asking anything else');
+{
+  const page = visit({ slug: 'furn', version: 'v1', names: ['Hummus'], store: browser(),
+    search: '?t=7', reply: answer(), back: ['error', { status: 201, body: ticket() }] });
+  page.addRow(0).flush();
+  page.send();
+
+  check('told', page.says.textContent,
+    'Your order could not be sent just now. Try again, or order with the staff.');
+  check('and the button is back, with the pad exactly as it was',
+    [page.reachable(), page.names()], [true, ['Hummus']]);
+
+  page.send();
+  check('the second attempt is the same body', page.posts().map(c => c.body), [SEND, SEND]);
+  check('and this time there is a round', page.rounds().length, 1);
+}
+
+heading('one tap is one ticket, whatever a diner does with a slow connection');
+{
+  // A send in flight answers nothing yet: every further tap must do nothing at all, because the
+  // second one would be a second ticket for food already on its way.
+  const page = visit({ slug: 'furn', version: 'v1', names: ['Hummus'], store: browser(),
+    search: '?t=7', reply: answer(), back: 'hold' });
+  page.addRow(0).flush();
+
+  page.go.onclick();
+  check('the label says what is happening', page.go.textContent, 'Sending…');
+  check('and the button is dead while it happens', page.reachable(), false);
+  page.go.onclick();
+  page.go.onclick();
+  check('three taps, one POST', page.posts().length, 1);
+  check('and no round claimed for an answer nobody has had yet', page.rounds().length, 0);
+}
+
+heading('a 201 nobody can read is an order that exists, not a failure');
+{
+  const page = visit({ slug: 'furn', version: 'v1', names: ['Hummus'], store: browser(),
+    search: '?t=7', reply: answer(), back: { status: 201, body: 'not json at all' } });
+  page.addRow(0).flush();
+  page.send();
+
+  check('the round is recorded, because the kitchen has the food',
+    page.rounds()[0].lines[0][1], 'Hummus');
+  check('and said to be just sent', page.rounds()[0].state,
+    'Sent to the kitchen. Not picked up yet.');
+  check('with nothing to ask after, so nothing is asked', page.reads().length, 0);
+  check('and no refusal claimed', page.says.textContent, '');
+}
+
+heading('a ticket id that is not one never reaches an address');
+{
+  const page = visit({ slug: 'furn', version: 'v1', names: ['Hummus'], store: browser(),
+    search: '?t=7', reply: answer(),
+    back: { status: 201, body: ticket({ id: '../../api/orders/mine' }) } });
+  page.addRow(0).flush();
+  page.send();
+  page.flush();
+
+  check('the round stands', page.rounds().length, 1);
+  check('and not one request was built out of that', page.reads(), []);
+}
+
+heading('in Arabic, every one of those sentences is Arabic');
+{
+  const store = browser();
+  const page = visit({ slug: 'furn', version: 'v1', names: ['حمص'], store: store, arabic: true,
+    search: '?t=7', lang: 'ar',
+    reply: answer({ count: '٢ أصناف', lines: [{ at: 0, name: 'حمص', qty: '٢×',
+      price: '٣٫٠٠ $', priceLbp: '٢٧٠٬٠٠٠ ل.ل.' }], total: '٣٫٠٠ $',
+    totalLbp: '٢٧٠٬٠٠٠ ل.ل.', totalLabel: 'المجموع', table: '٧' }),
+    back: { status: 201, body: ticket() },
+    read: { status: 200, body: ticket({ status: 'READY' }) } });
+  page.addRow(0).addRow(0).flush();
+
+  check('the button is alive on an Arabic page too', page.reachable(), true);
+  page.send();
+  page.flush();
+  check('the receipt is the server’s Arabic, digits and all',
+    [page.rounds()[0].lines[0][0], page.rounds()[0].total],
+    ['٢×', 'المجموع٣٫٠٠ $٢٧٠٬٠٠٠ ل.ل.']);
+  check('and the state is Arabic', page.rounds()[0].state, 'جاهز.');
+
+  const refused = visit({ slug: 'furn', version: 'v1', names: ['حمص'], store: browser(),
+    arabic: true, search: '?t=7', reply: answer(), back: { status: 429, body: {} } });
+  refused.addRow(0).flush();
+  refused.send();
+  check('and so is a refusal', refused.says.textContent,
+    'أُرسلت طلبات كثيرة من هذه الطاولة. انتظر لحظة ثم أرسل مرة أخرى.');
 }
 
 heading('what is wrong with a pad is said, above the button');

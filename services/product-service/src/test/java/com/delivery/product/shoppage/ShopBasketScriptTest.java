@@ -62,16 +62,24 @@ class ShopBasketScriptTest {
      * The rule the whole feature rests on, asserted against the file rather than left in a comment.
      *
      * <p>A total is the server's answer or it is nothing. The surest way to keep a browser from
-     * producing one of its own is to give it nothing to produce it from — the quote carries spelled
-     * strings and no numbers — and the second surest is this: the file contains no arithmetic on
+     * producing one of its own is to give it nothing to produce it from — every figure the quote
+     * spells is a string — and the second surest is this: the file contains no arithmetic on
      * anything that came back from the server at all.
      *
-     * <p>What it does do with numbers is count things: a quantity goes up by one, and a position is
-     * an index into a list of rows. Those are the only two, they are both about rows rather than
-     * money, and neither ever touches a value the server sent.
+     * <p>What it does do with numbers is count things: a quantity goes up by one, a position is an
+     * index into a list of rows, and two ages in milliseconds say whether a pad or a receipt is too
+     * old to keep. They are about rows and time; not one of them has ever seen a price.
+     *
+     * <p><strong>The one number that does reach the browser is sealed.</strong> A quote for a pad
+     * that can be sent carries {@code send} — the order service's own request, total included —
+     * because a ticket cannot name a dish by where it sat on somebody's screen
+     * ({@link ShopBasket.Send}). The script relays it: it appears in the file exactly once, as the
+     * argument of one {@code JSON.stringify}, and no field of it is ever read. That is asserted here
+     * rather than described in a comment, because it is the whole of what makes an amount of money
+     * passing through a browser harmless.
      */
     @Test
-    @DisplayName("the script works out no price: there is no money arithmetic in it anywhere")
+    @DisplayName("the script works out no price, and never opens the request that carries one")
     void neverComputesAPrice() throws Exception {
         String code = code(served());
 
@@ -87,14 +95,26 @@ class ShopBasketScriptTest {
                 .doesNotContain("parseInt")
                 .doesNotContain("Math.round")
                 .doesNotContain("Number(");
-        // What arithmetic there is: one count going up or down by one, and one age in
-        // milliseconds. Both are about rows and time; neither has ever seen a price.
+        // What arithmetic there is: one count going up or down by one, and two ages — the pad's and
+        // a sent round's, each against how long it is worth keeping.
         assertThat(occurrences(code, "+=")).isEqualTo(2);
-        assertThat(code).contains("lines[i][1] += by").contains("(Date.now() - held.u) > KEEP");
+        assertThat(code).contains("lines[i][1] += by")
+                .contains("(Date.now() - was.u) > KEEP")
+                .contains("(Date.now() - round.u) < TOLD");
         // And every figure printed is a field of the answer, assigned as it arrived.
         for (String spelled : List.of("line.price", "answer.total", "answer.totalLbp",
                 "answer.count")) {
             assertThat(code).as("%s is printed, not computed", spelled).contains(spelled);
+        }
+
+        // The sealed request: posted once, opened never. `send` is read off the answer and handed
+        // straight to stringify, and the only other names it goes by are the two that carry it —
+        // so there is no path in this file from the total inside it to anything on the screen.
+        assertThat(occurrences(code, "JSON.stringify")).isEqualTo(3);
+        assertThat(code).contains("JSON.stringify(going.body)").contains("body: answer.send");
+        for (String reaching : List.of("send.expectedTotal", "send.items", "send.storeId",
+                "send.table", "body.expectedTotal", "body.items", ".expectedTotal")) {
+            assertThat(code).as("nothing in the file reads %s", reaching).doesNotContain(reaching);
         }
     }
 
@@ -142,17 +162,22 @@ class ShopBasketScriptTest {
         // A basket, its receipt and one request. Anything approaching a framework here would be a
         // second download standing between a reader on 3G and a shop's opening hours.
         //
-        // About 13.4 kB on disk and 4.7 kB over the wire, which is the figure that matters and the
-        // one PublicShopPageWeightTest counts: the two rules this file is built on are written at
-        // the top of it, and prose gzips to almost nothing. shop.js keeps its comments short
-        // because a wrong guess there costs a search box; a wrong guess here costs somebody money.
+        // The ceiling was 13 kB, then 14 when the pad learnt to take an order at a table. It is 28
+        // now, and this is what bought it: the pad could be filled and priced but not SENT — the
+        // button was disabled in a line of this file with nothing on the screen to explain it — and
+        // sending is not one line. It is the post, the receipt of what went, the ticket's state as
+        // the kitchen moves it, a sentence for every way a send can be refused, and a memory of
+        // what this phone has already sent from this table.
         //
-        // The ceiling was 13 kB until this file grew a second job: the same basket now also takes
-        // an order at a restaurant table, where there is no address, no fee and no rider. That put
-        // it 339 B over on disk and 0.4 kB over on the wire, and a busy 40-item shop still gzips to
-        // 18.6 kB against a 35 kB budget. Raised rather than shrunk, and the real numbers written
-        // down — a ceiling nobody can name the cost of is one that gets nudged again next time.
-        assertThat(result.getResponse().getContentAsByteArray().length).isLessThan(14 * 1024);
+        // The real numbers, because a ceiling nobody can name the cost of is one that gets nudged
+        // again next time: 26.9 kB on disk, 8.6 kB gzipped — up from 13.4 kB and 4.7 kB. Gzipped is
+        // the figure that matters and the one PublicShopPageWeightTest counts; a busy 40-item shop's
+        // whole page is 23.9 kB over the wire against the 35 kB the brief allowed.
+        //
+        // And it is now linked only where there is a pad to run (ShopPageHtml.head), which is what
+        // makes that affordable: a shop with table ordering off used to download all of this to
+        // discover it had nothing to do, and nearly every shop has it off.
+        assertThat(result.getResponse().getContentAsByteArray().length).isLessThan(28 * 1024);
     }
 
     @Test
@@ -164,19 +189,64 @@ class ShopBasketScriptTest {
         String html = PublicShopBasketApiTest.page(shop, "en");
 
         for (String hook : List.of(".bk", ".bl", ".bkempty", ".bksum", ".bkwhat", ".bksays",
-                ".bkn", ".bkgo", ".bktab", ".bkno", ".peek", ".a",
+                ".bkn", ".bkgo", ".bktab", ".bkno", ".bksent", ".bkgot", ".peek", ".a",
                 ".menu .sec .items > li")) {
             assertThat(js).as("the script looks for %s", hook).contains("'" + hook + "'");
         }
         for (String attribute : List.of("data-q", "data-v", "data-e", "data-nt", "data-l",
-                "data-more", "data-less", "data-note", "data-eg")) {
+                "data-more", "data-less", "data-note", "data-eg",
+                // And the half of the pad that sends it: where to, where the ticket is read back,
+                // and every sentence about what happens after the tap.
+                "data-s", "data-ss", "data-g", "data-st", "data-r", "data-sd")) {
             assertThat(js).as("the script reads %s", attribute).contains("'" + attribute + "'");
             assertThat(html).as("the page writes %s", attribute).contains(attribute + "=\"");
         }
         for (String css : List.of("class=\"bk\"", "class=\"bl\"", "class=\"bkempty\"",
-                "class=\"bksum\"", "class=\"bksays\"", "class=\"peek\"", "class=\"a\"")) {
+                "class=\"bksum\"", "class=\"bksays\"", "class=\"bksent\"", "class=\"bkgot\"",
+                "class=\"peek\"", "class=\"a\"")) {
             assertThat(html).as("the page draws %s", css).contains(css);
         }
+        // The two addresses, exactly as the deployment routes them, and both relative: the page is
+        // served on two hostnames under connect-src 'self', so an absolute one would be blocked for
+        // every reader who arrived by the other name. ShopPageHtml.SEND_PATH says it at length.
+        assertThat(html).contains("data-s=\"/api/table-orders\"")
+                .contains("data-ss=\"/api/table-orders/status/\"");
+    }
+
+    /**
+     * That the one action on this page is wired to anything at all.
+     *
+     * <p><strong>This is the assertion whose absence shipped the defect.</strong> A diner could scan
+     * a card, fill a pad, read a correct server-priced total — and not send it, because this file
+     * said {@code go.disabled = true} with a comment explaining that there was nowhere for it to go.
+     * There was, by then: the endpoint, its refusals and its status link were built, merged and
+     * deployed. Every test passed, because no test connected the two halves.
+     *
+     * <p>What the pressing of the button does is a question about a document, so
+     * {@link #theBasketBehaves} answers it, under node, which is not on every machine. This case is
+     * the half that cannot skip: the button has an action, the action posts to the address the page
+     * printed, and what takes the disabled off is the server's answer and nothing else.
+     */
+    @Test
+    @DisplayName("the send is wired: the button has an action, and the server is what enables it")
+    void theButtonIsWiredToASend() throws Exception {
+        String js = code(served());
+
+        assertThat(js)
+                .as("the button has an action")
+                .contains("go.onclick = fire")
+                .as("which posts to the path the page printed, not to an address of its own")
+                .contains("request.open('POST', sendPath, true)")
+                .contains("panel.getAttribute('data-s')")
+                .as("and the ticket's own link is read back the same way")
+                .contains("request.open('GET', statusPath + round.i, true)");
+        // What enables it: one place, and its condition is a field of the server's answer. There is
+        // no second path to a live button and no way for the browser to decide it has one.
+        assertThat(occurrences(js, "go.disabled = false")).isEqualTo(1);
+        assertThat(js).contains("if (answer.send) { allow(answer); }");
+        // And what disables it: one place too, so "dead" and "the reason is on the screen" cannot
+        // come apart.
+        assertThat(occurrences(js, "go.disabled = true")).isEqualTo(1);
     }
 
     // ---------------------------------------------------------------- and then, running it
@@ -203,18 +273,25 @@ class ShopBasketScriptTest {
     }
 
     /**
-     * Adding, changing and removing; surviving a reload; two shops staying apart; a table code
-     * kept and a nonsense one ignored; and a total that appears only when the server has sent one.
+     * Adding, changing and removing; surviving a reload; two shops staying apart; a table code kept
+     * and a nonsense one ignored; a total that appears only when the server has sent one — and then
+     * the tap: that the button can be pressed at all, that one press is one ticket, that a second
+     * round is a second ticket, what the diner is shown afterwards, and every refusal in words.
      *
      * <p>All of it against the real file. The cases and what each one asserts are in
      * {@code basket.test.js} beside this class — they are written there rather than here because
      * they are about a document, and a Java test that built one would be a second, worse browser.
+     *
+     * <p><strong>Skipping this skips the reachability of the send.</strong>
+     * {@link #theButtonIsWiredToASend} is the part that cannot skip, and it is deliberately narrow:
+     * it reads the file, not the screen. A build with no node has not been told that a diner can
+     * order.
      */
     @Test
-    @DisplayName("the basket fills, survives, stays out of the next shop's, and invents no figures")
+    @DisplayName("the basket fills, sends, remembers what it sent, and says every refusal")
     void theBasketBehaves(@TempDir Path tmp) throws Exception {
-        Assumptions.assumeTrue(nodeIsHere(),
-                "node is not on the PATH, so basket.js cannot be run: skipping the basket cases");
+        Assumptions.assumeTrue(nodeIsHere(), "node is not on the PATH, so basket.js cannot be run: "
+                + "skipping the basket cases, INCLUDING whether the send button can be pressed");
 
         Path script = unpack(tmp, SCRIPT);
         Path harness = unpack(tmp, HARNESS);

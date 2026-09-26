@@ -105,10 +105,12 @@ class PublicShopPageFindingTest {
         String html = render(aisled().takesTableOrders(), "en");
 
         // Four rows in the fixture, all in stock, so four Add buttons; plus the two search
-        // controls and the five parts of the pad.
-        assertThat(occurrences(html, "hidden")).isEqualTo(2 + 4 + 5);
+        // controls and the six parts of the pad — the sixth being the list of rounds this table has
+        // already sent, which is empty until one has been.
+        assertThat(occurrences(html, "hidden")).isEqualTo(2 + 4 + 6);
         assertThat(html)
                 .contains("<div class=\"bk\" hidden")
+                .contains("<div class=\"bksent\" hidden><h3>Sent from this table</h3>")
                 .contains("<a class=\"peek\" href=\"#basket\" hidden>Your order</a>")
                 .contains("<button class=\"a\" type=\"button\" hidden>Add</button>");
         assertThat(occurrences(html, "<li hidden")).isZero();
