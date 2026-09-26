@@ -116,6 +116,43 @@ final class ShopPageHtml {
     static final String BASKET_SCRIPT = "/s/assets/basket.js";
 
     /**
+     * Where a table's order goes, and where the diner reads it back.
+     *
+     * <p><strong>Paths, not URLs, for the same reason the quote is one</strong> — and here it
+     * matters more, because this one is not even this service. The page is served on
+     * {@code www.youdrop.shop} and on the API hostname, and its policy is {@code default-src 'none'}
+     * with {@code connect-src 'self'}: an absolute address would be cross-origin, and therefore
+     * blocked before it left the browser, for every reader who arrived by the other name. So the
+     * deployment routes {@code /api/table-orders} on both hostnames — an exact mirror of the shop
+     * page's own router, so a page and the endpoint it posts to are always on the same host — and
+     * the page prints a path, which is same-origin by construction. See the note above the
+     * {@code table-orders} IngressRoute in {@code deploy/k3s/overlays/ingress.template.yaml}.
+     *
+     * <p>Two of them and not one with a suffix bolted on in the browser: the status link sits under
+     * its own {@code status/} segment, which is a security property of that service's permit-all
+     * list rather than a spelling, and it is not this page's business to know that.
+     */
+    static final String SEND_PATH = "/api/table-orders";
+
+    static final String STATUS_PATH = SEND_PATH + "/status/";
+
+    /**
+     * The ticket states nothing follows, so the page knows when to stop asking.
+     *
+     * <p>A copy of {@code OrderStatus.isTerminal()} in another service, and named as one. It is
+     * here rather than in {@code basket.js} because a copy that lives in a comment in a JavaScript
+     * file is a copy nobody finds: if that lifecycle ever grows a third ending, this line is what
+     * has to change, and it is one line in a file with tests around it rather than a condition in a
+     * browser.
+     *
+     * <p>Getting it wrong is cheap in one direction and not the other. A state missing from here
+     * means a phone politely asking about a finished order every thirty seconds until the page is
+     * closed; a state wrongly in here means a diner watching "being made" for food that is already
+     * on the table. Neither touches money, and both are visible.
+     */
+    static final String TERMINAL_STATES = "DELIVERED|CANCELLED";
+
+    /**
      * Renders one shop.
      *
      * @param base    the public origin the page believes it is on, for the canonical URL, the Open
@@ -136,7 +173,8 @@ final class ShopPageHtml {
         String picture = page.coverThumbUrl() != null ? page.coverThumbUrl() : page.logoUrl();
 
         StringBuilder b = new StringBuilder(8192);
-        head(b, t, title, description, url, picture, page.name(), page.logoUrl(), assets);
+        head(b, t, title, description, url, picture, page.name(), page.logoUrl(), assets,
+                page.tableOrdering());
 
         b.append("<body><main class=\"shop\">");
         hero(b, page, t, what, url);
@@ -207,7 +245,7 @@ final class ShopPageHtml {
 
     private static void head(StringBuilder b, ShopPageText t, String title, String description,
                              String url, String picture, String name, String logo,
-                             Assets assets) {
+                             Assets assets, boolean pad) {
         b.append("<!doctype html><html lang=\"").append(t.tag())
                 .append("\" dir=\"").append(t.dir()).append("\"><head>")
                 .append("<meta charset=\"utf-8\">")
@@ -261,9 +299,15 @@ final class ShopPageHtml {
         b.append("<link rel=\"stylesheet\" href=\"").append(assets.stylesheet()).append("\">")
                 // Deferred, so they are fetched alongside the markup and run after it: the shelf is
                 // already on the screen before either file arrives, and nothing waits on them.
-                .append("<script src=\"").append(assets.script()).append("\" defer></script>")
-                .append("<script src=\"").append(assets.basket()).append("\" defer></script>")
-                .append("</head>");
+                .append("<script src=\"").append(assets.script()).append("\" defer></script>");
+        if (pad) {
+            // Only where there is a pad to run. It is 9.0 kB gzipped and the first thing it does on
+            // a page without one is leave, so every shop that has not turned table ordering on was
+            // paying for a file that could not do anything — and that is nearly every shop there
+            // is. The sentence such a shop owes a scanned card is shop.js’s, above.
+            b.append("<script src=\"").append(assets.basket()).append("\" defer></script>");
+        }
+        b.append("</head>");
     }
 
     // ---------------------------------------------------------------- sections
@@ -647,10 +691,10 @@ final class ShopPageHtml {
      * an order pad rather than selling the meal.
      *
      * <p><strong>Drawn only for a shop that has turned this on.</strong> A shop that has not gets
-     * the sentence instead, in place of the pad, because a diner holding a scanned code deserves to
-     * be told why there is nothing to tap rather than left to work it out. And the pad is revealed
-     * only on a page opened from a table's own code: a shop's page travels in WhatsApp, and
-     * somebody across the city holding that link is not sitting at one of its tables.
+     * {@link #orderWithTheStaff} instead — a sentence for the diner holding a scanned code, and
+     * nothing at all for everybody else. And the pad is revealed only on a page opened from a
+     * table's own code: a shop's page travels in WhatsApp, and somebody across the city holding
+     * that link is not sitting at one of its tables.
      *
      * <p><strong>It asks for nothing about the diner.</strong> No address — there is nowhere to
      * deliver to — no phone, no account. The one thing anybody types here is a note on a line, for
@@ -661,15 +705,12 @@ final class ShopPageHtml {
      * this page has always made and the reason the catalogue is in the first response.
      */
     private static void pad(StringBuilder b, PublicShopPage page, ShopPageText t) {
-        b.append("<section class=\"block order\" id=\"basket\"><h2>").append(esc(t.yourOrder()))
-                .append("</h2>");
         if (!page.tableOrdering()) {
-            // The shop's own decision, said and then nothing else drawn. No panel, no script hooks,
-            // no button: there is no pad on this page at all, and the sentence is the whole of it.
-            b.append("<p class=\"note\">").append(esc(t.orderWithTheStaff())).append("</p>")
-                    .append("</section>");
+            orderWithTheStaff(b, t);
             return;
         }
+        b.append("<section class=\"block order\" id=\"basket\"><h2>").append(esc(t.yourOrder()))
+                .append("</h2>");
         b.append(
                 // Visible until the script hides it, rather than hidden until the script shows it:
                 // the diner who never gets the file is the one who needs to be told.
@@ -694,6 +735,18 @@ final class ShopPageHtml {
                 // dictionary — the bargain the "nothing matches" line already makes.
                 .append("\" data-e=\"").append(esc(t.couldNotPrice()))
                 .append("\" data-nt=\"").append(esc(t.scanTheCodeOnYourTable()))
+                // Where the order goes, where its ticket is read back, and every word the script
+                // needs for what happens after the diner taps: the label on the button while it is
+                // in flight, what each state of the ticket means at a table, and a sentence for
+                // each way the kitchen can refuse it. All of them here, in the page's own language,
+                // for the same reason the two above are — the script carries no dictionary, and a
+                // refusal nobody spelled is a refusal the diner is not shown.
+                .append("\" data-s=\"").append(SEND_PATH)
+                .append("\" data-ss=\"").append(STATUS_PATH)
+                .append("\" data-g=\"").append(esc(t.sending()))
+                .append("\" data-st=\"").append(esc(t.ticketStates()))
+                .append("\" data-r=\"").append(esc(t.sendRefusals()))
+                .append("\" data-sd=\"").append(TERMINAL_STATES)
                 // The name of the parameter a table's card carries, from the one class that
                 // spells it. ShopTableCodes exists because three things had to agree about it and
                 // a fourth — the script that reads it back off the address — is now one of them.
@@ -722,9 +775,61 @@ final class ShopPageHtml {
                 // Disabled in the markup, so it is disabled for the half-second before the script
                 // runs and for ever if it does not. aria-disabled as well: a disabled button is
                 // skipped by some screen readers entirely, and this one has something to say.
+                //
+                // What takes the disabled off is the quote: an answer carrying `send` is the server
+                // saying this pad could become a ticket, and nothing else in the browser decides
+                // it. A pad that cannot be sent keeps a dead button AND the sentence above it
+                // saying why — the two are the same answer, and neither ships without the other.
                 .append("<p><button class=\"cta bkgo\" type=\"button\" disabled aria-disabled=\"true\">")
                 .append(esc(t.sendToKitchen())).append("</button></p>")
+                // What this phone has already sent from this table, under the pad that will send
+                // the next round. Built by the script out of the answers it was given and kept in
+                // this browser, because there is no account to hang an order history on — and
+                // announced politely, so a diner whose order moves from "being made" to "ready"
+                // hears it without having to stare at the screen.
+                .append("<div class=\"bksent\" hidden><h3>").append(esc(t.alreadySent()))
+                .append("</h3><ol class=\"bkgot\" aria-live=\"polite\"></ol></div>")
                 .append("</div></section>");
+    }
+
+    /**
+     * What a shop that has not turned table ordering on says to a diner who scanned one of its
+     * cards — and says to nobody else.
+     *
+     * <p><strong>Hidden, and revealed by {@code shop.js} on an address carrying a table code.</strong>
+     * That is not a style choice; it is the only way this sentence can be true. The document is one
+     * document per shop and language, memoised, and {@code ?t=} deliberately never reaches it
+     * ({@code PublicShopPageApiTest.aTableCodeNeverReachesTheDocument}), so the server rendering it
+     * cannot know whether this reader scanned anything. Written visible — as it was — it told every
+     * reader of every shop about a restaurant feature they had not asked about: a pharmacy's page,
+     * an electronics shop's, a florist's, on the one page the whole merchant-adoption push asks
+     * shops to share. A page opened without a code is the menu, and that is the brief's rule.
+     *
+     * <p><strong>{@code shop.js} and not {@code basket.js}.</strong> Both files are linked on every
+     * shop page as it stands, so this is not about a download — it is about which file owns what.
+     * {@code basket.js}'s first act is to leave a page with no panel, and a page with no panel is
+     * precisely the page this sentence is for; giving the pad's file a second job that only runs
+     * when there is no pad would leave neither file with a rule anybody could state.
+     * {@code shop.js} shows, hides and marks what the document arrived with, which is exactly this,
+     * and is what it already does for the search field.
+     *
+     * <p><strong>What it costs.</strong> A diner with no script, at a shop that turned ordering off,
+     * scans the card and sees no sentence: the menu, complete and priced, and no explanation of why
+     * there is nothing to tap. They ask the staff — which is what the sentence would have told them
+     * to do. The reader who loses something is the one this page was always able to serve least, and
+     * they lose a sentence rather than the menu.
+     *
+     * <p>The whole section goes, heading included. A visible "Your order" over a hidden sentence
+     * would be worse than either.
+     */
+    private static void orderWithTheStaff(StringBuilder b, ShopPageText t) {
+        b.append("<section class=\"block order bkoff\" id=\"basket\" hidden data-t=\"")
+                // The name of the parameter a table's card carries, from the one class that spells
+                // it — the same attribute the pad ships, read by the same rule in the same file.
+                .append(esc(ShopTableCodes.PARAM)).append("\"><h2>").append(esc(t.yourOrder()))
+                .append("</h2>")
+                .append("<p class=\"note\">").append(esc(t.orderWithTheStaff())).append("</p>")
+                .append("</section>");
     }
 
     /**

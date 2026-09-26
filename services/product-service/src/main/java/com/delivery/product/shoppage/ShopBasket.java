@@ -10,9 +10,13 @@ import java.util.Set;
  *
  * <p>A value in the same spirit as {@link PublicShopPage}, and for the second of the same two
  * reasons: it is read by a stranger, so what may be said about a shop is an explicit list of fields
- * rather than whatever happens to be on an entity. There is no product id here, no store id and no
- * merchant id — a line is the position it was asked about, a name, and whatever the diner asked for
- * with it.
+ * rather than whatever happens to be on an entity. A line is the position it was asked about, a
+ * name, and whatever the diner asked for with it — no product id, no store id, no merchant id.
+ *
+ * <p>The one exception is {@link Send}, and it is an exception with a job: a pad that can be sent
+ * carries the request that sends it, ids and all, because a ticket cannot name a dish by where it
+ * sat on somebody's screen. It is absent from every pad that cannot be sent, no merchant id is in
+ * it, and nothing in it is drawn.
  *
  * <p><strong>There is one figure, and it is the food.</strong> No delivery fee, no minimum, no
  * service charge and no tax: the platform is lending a restaurant an order pad, and the bill is
@@ -36,16 +40,67 @@ public record ShopBasket(
          */
         Integer table,
         /** Everything standing between this pad and a ticket. Empty means nothing is. */
-        Set<Problem> problems) {
+        Set<Problem> problems,
+        /**
+         * The ticket this pad would become, ready to post, or null when it cannot become one —
+         * which is every pad {@link #ok()} is false for. See {@link Send}.
+         */
+        Send send) {
 
     public ShopBasket {
         lines = List.copyOf(lines);
         problems = problems.isEmpty() ? Set.of() : Set.copyOf(problems);
     }
 
+    /** A pad with nowhere to go: every refusal, and an empty one. */
+    public ShopBasket(List<Line> lines, BigDecimal total, Integer table, Set<Problem> problems) {
+        this(lines, total, table, problems, null);
+    }
+
     /** Whether this could be sent to the kitchen as it stands. */
     public boolean ok() {
         return problems.isEmpty();
+    }
+
+    /**
+     * The order-service request this pad would become — built here, and posted by the browser
+     * without being read.
+     *
+     * <p><strong>Why the server builds the whole body.</strong> A ticket names things this page has
+     * never printed and never will: the shop's id and a product id per line. The browser could have
+     * been handed those and left to assemble a request around a total — and then the total would be
+     * a number in a browser, which is the one thing this whole feature is shaped to prevent. So the
+     * server assembles it, the browser relays it, and {@code basket.js} reads no field of it: it
+     * exists in that file only as the argument to one {@code JSON.stringify}, which
+     * {@code ShopBasketScriptTest} asserts.
+     *
+     * <p>Present only on a pad that could be sent as it stands. That is what makes the button's
+     * state a server decision rather than a guess in a browser — no send, no button — and it is
+     * why a pad that is merely empty, or stale, or at a closed kitchen, cannot produce one.
+     *
+     * <p><strong>A tampered copy buys nothing.</strong> The field names are the order service's own
+     * ({@code PlaceTableOrderRequest}), so somebody who edits this in a console is talking to that
+     * endpoint on its own terms: the prices come from the catalogue, a total that does not match
+     * what the catalogue says is a 409 and no ticket, a shop that is not the products' shop is
+     * refused, and the table is checked against the room. What they can do is order food to a table
+     * in a restaurant they are not sitting in, which is what the printed card already lets anybody
+     * standing near it do, and what the rate limit is for.
+     *
+     * @param expectedTotal what the diner was shown, so nobody is charged a figure they did not
+     *                      see: mismatched is a 409 {@code PRICE_CHANGED} and no ticket
+     * @param notes         the diner's line notes gathered into the one field a ticket has, because
+     *                      an order line there carries no note of its own
+     */
+    public record Send(java.util.UUID storeId, int table, List<Item> items,
+                       BigDecimal expectedTotal, String notes) {
+
+        public Send {
+            items = List.copyOf(items);
+        }
+
+        /** One line as the order service names it: the product, and how many. */
+        public record Item(java.util.UUID productId, int qty) {
+        }
     }
 
     /**

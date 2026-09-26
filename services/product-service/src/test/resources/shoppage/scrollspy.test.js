@@ -126,11 +126,20 @@ function build(at) {
   doc.children.push(menu);
   doc.documentElement = documentElement;
 
+  // The section a shop with table ordering OFF ships hidden: a sibling of the menu, not part of
+  // it. Absent unless a case asks for one, so not a single scroll-spy case above can feel it.
+  if (at.staffOnly) {
+    const off = add(doc, element('section'), ['.bkoff']);
+    off.hidden = true;
+    off.setAttribute('data-t', 't');
+    doc.off = off;
+  }
+
   const listeners = {};
   const win = {
     innerHeight: at.innerHeight,
     pageYOffset: at.pageYOffset,
-    location: { hash: at.hash || '' },
+    location: { hash: at.hash || '', search: at.search || '' },
     addEventListener(name, handler) {
       (listeners[name] = listeners[name] || []).push(handler);
     },
@@ -304,6 +313,49 @@ const cases = [
   }
 ];
 
+// ------------------------------------------------- and the sentence a scanned card is owed
+
+/**
+ * "This shop does not take orders from the table online. Please order with the staff."
+ *
+ * <p>It is in the document of every shop that has table ordering off, which is nearly every shop
+ * there is — a pharmacy, an electronics shop, a florist — because the document is one document and
+ * a table code never reaches the server that renders it. So it ships hidden, and the whole of what
+ * reveals it is an address carrying a code off a card. These cases are that rule, run.
+ *
+ * <p>The shapes that are not a card are the shapes basket.js already refuses, because a reader who
+ * typed something into the query string has not scanned anything.
+ */
+function revealed(search) {
+  const page = build({
+    staffOnly: true, search: search,
+    barBottom: 54, innerHeight: 812, pageYOffset: 0,
+    sections: [{ name: 'Mezze', top: 54, bottom: 600 }]
+  });
+  const sandbox = {
+    window: page.win,
+    document: page.doc,
+    Math: Math,
+    requestAnimationFrame(fn) { fn(); }
+  };
+  sandbox.globalThis = sandbox;
+  script.runInNewContext(sandbox);
+  return !page.doc.off.hidden;
+}
+
+const sentenceCases = [
+  { what: 'a page shared in a chat, with no code at all, does not mention tables', search: '', expect: false },
+  { what: 'the language link on the same page does not either', search: '?lang=ar', expect: false },
+  { what: 'a scanned card is told, in words, to order with the staff', search: '?t=7', expect: true },
+  { what: 'and so is a two-digit table', search: '?t=12', expect: true },
+  { what: 'with the code among other parameters', search: '?lang=ar&t=3', expect: true },
+  { what: 'an empty code is not a code', search: '?t=', expect: false },
+  { what: 'nor is a word', search: '?t=ABCDEFGHIJ', expect: false },
+  { what: 'nor markup somebody typed', search: '?t=%3Cscript%3E', expect: false },
+  { what: 'nor an Arabic-Indic seven, which no card carries', search: '?t=%D9%A7', expect: false },
+  { what: 'nor a number longer than any card', search: '?t=7777', expect: false }
+];
+
 let failed = 0;
 cases.forEach(one => {
   const got = run(one.at);
@@ -313,5 +365,14 @@ cases.forEach(one => {
     + '\n        expected ' + one.expect + ', marked ' + got);
 });
 
-console.log(failed ? failed + ' of ' + cases.length + ' failed' : 'all ' + cases.length + ' passed');
+sentenceCases.forEach(one => {
+  const got = revealed(one.search);
+  const ok = got === one.expect;
+  if (!ok) { failed++; }
+  console.log((ok ? '  ok  ' : 'FAIL  ') + one.what
+    + '\n        expected shown=' + one.expect + ', got shown=' + got);
+});
+
+const total = cases.length + sentenceCases.length;
+console.log(failed ? failed + ' of ' + total + ' failed' : 'all ' + total + ' passed');
 process.exit(failed ? 1 : 0);
