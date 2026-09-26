@@ -22940,6 +22940,54 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Too few'**
   String get merchMenuOpensTooFewShort;
+
+  /// How a table order is marked in the shop's own order queue and on its detail screen — in the slot a delivery order puts its address in. Shown on its own while the table has only one ticket open.
+  ///
+  /// In en, this message translates to:
+  /// **'Table {table}'**
+  String merchTableTicket(int table);
+
+  /// The same marking once one table has more than one ticket open, so the staff can tell a party's second send from its first. The round is counted from that table's still-open tickets when the queue is drawn; nothing stores it.
+  ///
+  /// In en, this message translates to:
+  /// **'Table {table} · round {round}'**
+  String merchTableTicketRound(int table, int round);
+
+  /// The heading of the card that stands where 'Customer Details' stands on a delivery order. A table order has no customer to detail — no account, no name, no phone — so the card is about the table instead.
+  ///
+  /// In en, this message translates to:
+  /// **'Table'**
+  String get merchTableSection;
+
+  /// Said in place of the address and phone a delivery order shows. It is there so the absence reads as a fact about dining in rather than as a field that failed to load, and so nobody goes looking for a number to ring.
+  ///
+  /// In en, this message translates to:
+  /// **'Ordered in the room, so there is no address and no phone number. The table is where it goes.'**
+  String get merchTableInTheRoom;
+
+  /// Stands where the delivery fee line stands on a delivery order's receipt. Said in words rather than shown as a row of 0.00, which would read as a fee that happened to be free this once.
+  ///
+  /// In en, this message translates to:
+  /// **'No delivery fee and no commission — a table order is the shop\'s own trade.'**
+  String get merchTableBooksNothing;
+
+  /// The COLLECTED action on a table order, which is labelled 'Customer collected' on a pickup. Nobody comes to the counter for this one: the food crosses the floor.
+  ///
+  /// In en, this message translates to:
+  /// **'Served to the table'**
+  String get merchTableActionServed;
+
+  /// READY on a table order. 'Ready for pickup' is what a delivery says, and there is nobody coming to pick this up.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to serve'**
+  String get merchTableStatusReady;
+
+  /// DELIVERED on a table order, and the last step of its flow. Nothing was delivered — it was carried to a table in the same room.
+  ///
+  /// In en, this message translates to:
+  /// **'Served'**
+  String get merchTableStatusServed;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

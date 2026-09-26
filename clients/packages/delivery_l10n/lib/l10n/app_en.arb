@@ -6543,5 +6543,50 @@
   "merchMenuOpensTooFewShort": "Too few",
   "@merchMenuOpensTooFewShort": {
     "description": "The suppressed figure where there is only room for a couple of words — a metric tile's value, a bar's trailing label. The full sentence, with the floor in it, is merchMenuOpensTooFew and is shown beside it."
+  },
+  "merchTableTicket": "Table {table}",
+  "@merchTableTicket": {
+    "description": "How a table order is marked in the shop's own order queue and on its detail screen — in the slot a delivery order puts its address in. Shown on its own while the table has only one ticket open.",
+    "placeholders": {
+      "table": {
+        "type": "int"
+      }
+    }
+  },
+  "merchTableTicketRound": "Table {table} · round {round}",
+  "@merchTableTicketRound": {
+    "description": "The same marking once one table has more than one ticket open, so the staff can tell a party's second send from its first. The round is counted from that table's still-open tickets when the queue is drawn; nothing stores it.",
+    "placeholders": {
+      "table": {
+        "type": "int"
+      },
+      "round": {
+        "type": "int"
+      }
+    }
+  },
+  "merchTableSection": "Table",
+  "@merchTableSection": {
+    "description": "The heading of the card that stands where 'Customer Details' stands on a delivery order. A table order has no customer to detail — no account, no name, no phone — so the card is about the table instead."
+  },
+  "merchTableInTheRoom": "Ordered in the room, so there is no address and no phone number. The table is where it goes.",
+  "@merchTableInTheRoom": {
+    "description": "Said in place of the address and phone a delivery order shows. It is there so the absence reads as a fact about dining in rather than as a field that failed to load, and so nobody goes looking for a number to ring."
+  },
+  "merchTableBooksNothing": "No delivery fee and no commission — a table order is the shop's own trade.",
+  "@merchTableBooksNothing": {
+    "description": "Stands where the delivery fee line stands on a delivery order's receipt. Said in words rather than shown as a row of 0.00, which would read as a fee that happened to be free this once."
+  },
+  "merchTableActionServed": "Served to the table",
+  "@merchTableActionServed": {
+    "description": "The COLLECTED action on a table order, which is labelled 'Customer collected' on a pickup. Nobody comes to the counter for this one: the food crosses the floor."
+  },
+  "merchTableStatusReady": "Ready to serve",
+  "@merchTableStatusReady": {
+    "description": "READY on a table order. 'Ready for pickup' is what a delivery says, and there is nobody coming to pick this up."
+  },
+  "merchTableStatusServed": "Served",
+  "@merchTableStatusServed": {
+    "description": "DELIVERED on a table order, and the last step of its flow. Nothing was delivered — it was carried to a table in the same room."
   }
 }

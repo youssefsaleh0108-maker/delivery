@@ -99,7 +99,13 @@ Future<_Script> _pump(WidgetTester tester,
   addTearDown(tester.view.reset);
   final _Script script = _Script((RequestOptions r) async {
     if (r.method == 'GET' && r.path == '/api/orders/merchant') {
-      return (200, _page(<Map<String, dynamic>>[_order()]));
+      // Per kind, as the endpoint answers: the screen asks for baskets and for table orders
+      // separately, because the server's `kind` filter takes one value. Answering both with the same
+      // page would put this order in the queue twice, and every assertion below counting one row would
+      // be counting a bug in the stub.
+      return r.queryParameters['kind'] == OrderKind.catalog.wire
+          ? (200, _page(<Map<String, dynamic>>[_order()]))
+          : (200, _page(<Map<String, dynamic>>[]));
     }
     if (r.method == 'POST') return onPost(r);
     return (404, null);

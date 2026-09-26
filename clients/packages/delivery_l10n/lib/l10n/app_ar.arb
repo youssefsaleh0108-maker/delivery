@@ -4257,5 +4257,13 @@
   "merchMenuBestSellersNote": "الطلبات المُسلَّمة وحدها — السلّة الملغاة ليست دليلاً على شيء.",
   "merchMenuNoItemViews": "لا يوجد عدد مشاهدات لكل صنف. صفحة قائمتك صفحة واحدة، فكل صنف فيها يُقرأ بقدر ما يُقرأ غيره.",
   "merchMenuDemandRadarRow": "ما الذي بحث عنه جيرانك",
-  "merchMenuOpensTooFewShort": "أقل من أن يُذكر"
+  "merchMenuOpensTooFewShort": "أقل من أن يُذكر",
+  "merchTableTicket": "طاولة {table}",
+  "merchTableTicketRound": "طاولة {table} · الجولة {round}",
+  "merchTableSection": "الطاولة",
+  "merchTableInTheRoom": "الطلب من داخل الصالة، فلا عنوان ولا رقم هاتف. الطاولة هي مكان التقديم.",
+  "merchTableBooksNothing": "لا أجرة توصيل ولا عمولة — طلب الطاولة تجارة المتجر وحده.",
+  "merchTableActionServed": "قُدِّم للطاولة",
+  "merchTableStatusReady": "جاهز للتقديم",
+  "merchTableStatusServed": "قُدِّم"
 }

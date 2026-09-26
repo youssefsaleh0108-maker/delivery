@@ -13621,4 +13621,34 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get merchMenuOpensTooFewShort => 'Too few';
+
+  @override
+  String merchTableTicket(int table) {
+    return 'Table $table';
+  }
+
+  @override
+  String merchTableTicketRound(int table, int round) {
+    return 'Table $table · round $round';
+  }
+
+  @override
+  String get merchTableSection => 'Table';
+
+  @override
+  String get merchTableInTheRoom =>
+      'Ordered in the room, so there is no address and no phone number. The table is where it goes.';
+
+  @override
+  String get merchTableBooksNothing =>
+      'No delivery fee and no commission — a table order is the shop\'s own trade.';
+
+  @override
+  String get merchTableActionServed => 'Served to the table';
+
+  @override
+  String get merchTableStatusReady => 'Ready to serve';
+
+  @override
+  String get merchTableStatusServed => 'Served';
 }
