@@ -647,10 +647,10 @@ final class ShopPageHtml {
      * an order pad rather than selling the meal.
      *
      * <p><strong>Drawn only for a shop that has turned this on.</strong> A shop that has not gets
-     * the sentence instead, in place of the pad, because a diner holding a scanned code deserves to
-     * be told why there is nothing to tap rather than left to work it out. And the pad is revealed
-     * only on a page opened from a table's own code: a shop's page travels in WhatsApp, and
-     * somebody across the city holding that link is not sitting at one of its tables.
+     * {@link #orderWithTheStaff} instead — a sentence for the diner holding a scanned code, and
+     * nothing at all for everybody else. And the pad is revealed only on a page opened from a
+     * table's own code: a shop's page travels in WhatsApp, and somebody across the city holding
+     * that link is not sitting at one of its tables.
      *
      * <p><strong>It asks for nothing about the diner.</strong> No address — there is nowhere to
      * deliver to — no phone, no account. The one thing anybody types here is a note on a line, for
@@ -661,15 +661,12 @@ final class ShopPageHtml {
      * this page has always made and the reason the catalogue is in the first response.
      */
     private static void pad(StringBuilder b, PublicShopPage page, ShopPageText t) {
-        b.append("<section class=\"block order\" id=\"basket\"><h2>").append(esc(t.yourOrder()))
-                .append("</h2>");
         if (!page.tableOrdering()) {
-            // The shop's own decision, said and then nothing else drawn. No panel, no script hooks,
-            // no button: there is no pad on this page at all, and the sentence is the whole of it.
-            b.append("<p class=\"note\">").append(esc(t.orderWithTheStaff())).append("</p>")
-                    .append("</section>");
+            orderWithTheStaff(b, t);
             return;
         }
+        b.append("<section class=\"block order\" id=\"basket\"><h2>").append(esc(t.yourOrder()))
+                .append("</h2>");
         b.append(
                 // Visible until the script hides it, rather than hidden until the script shows it:
                 // the diner who never gets the file is the one who needs to be told.
@@ -725,6 +722,46 @@ final class ShopPageHtml {
                 .append("<p><button class=\"cta bkgo\" type=\"button\" disabled aria-disabled=\"true\">")
                 .append(esc(t.sendToKitchen())).append("</button></p>")
                 .append("</div></section>");
+    }
+
+    /**
+     * What a shop that has not turned table ordering on says to a diner who scanned one of its
+     * cards — and says to nobody else.
+     *
+     * <p><strong>Hidden, and revealed by {@code shop.js} on an address carrying a table code.</strong>
+     * That is not a style choice; it is the only way this sentence can be true. The document is one
+     * document per shop and language, memoised, and {@code ?t=} deliberately never reaches it
+     * ({@code PublicShopPageApiTest.aTableCodeNeverReachesTheDocument}), so the server rendering it
+     * cannot know whether this reader scanned anything. Written visible — as it was — it told every
+     * reader of every shop about a restaurant feature they had not asked about: a pharmacy's page,
+     * an electronics shop's, a florist's, on the one page the whole merchant-adoption push asks
+     * shops to share. A page opened without a code is the menu, and that is the brief's rule.
+     *
+     * <p><strong>{@code shop.js} and not {@code basket.js}.</strong> Both files are linked on every
+     * shop page as it stands, so this is not about a download — it is about which file owns what.
+     * {@code basket.js}'s first act is to leave a page with no panel, and a page with no panel is
+     * precisely the page this sentence is for; giving the pad's file a second job that only runs
+     * when there is no pad would leave neither file with a rule anybody could state.
+     * {@code shop.js} shows, hides and marks what the document arrived with, which is exactly this,
+     * and is what it already does for the search field.
+     *
+     * <p><strong>What it costs.</strong> A diner with no script, at a shop that turned ordering off,
+     * scans the card and sees no sentence: the menu, complete and priced, and no explanation of why
+     * there is nothing to tap. They ask the staff — which is what the sentence would have told them
+     * to do. The reader who loses something is the one this page was always able to serve least, and
+     * they lose a sentence rather than the menu.
+     *
+     * <p>The whole section goes, heading included. A visible "Your order" over a hidden sentence
+     * would be worse than either.
+     */
+    private static void orderWithTheStaff(StringBuilder b, ShopPageText t) {
+        b.append("<section class=\"block order bkoff\" id=\"basket\" hidden data-t=\"")
+                // The name of the parameter a table's card carries, from the one class that spells
+                // it — the same attribute the pad ships, read by the same rule in the same file.
+                .append(esc(ShopTableCodes.PARAM)).append("\"><h2>").append(esc(t.yourOrder()))
+                .append("</h2>")
+                .append("<p class=\"note\">").append(esc(t.orderWithTheStaff())).append("</p>")
+                .append("</section>");
     }
 
     /**

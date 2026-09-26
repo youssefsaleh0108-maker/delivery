@@ -312,8 +312,15 @@ class PublicShopBasketApiTest {
         String html = page(shop, "en");
 
         assertThat(html)
-                .contains("This shop does not take orders from the table online. "
-                        + "Please order with the staff.")
+                // Said, and said to the one reader it is about: the section ships hidden and
+                // shop.js reveals it on an address carrying a table's code. Nearly every shop on
+                // the platform has table ordering off — a pharmacy, an electronics shop, a florist
+                // — and this is the page they are asked to share, so a reader who scanned nothing
+                // is told nothing about tables at all. ShopPageHtml.orderWithTheStaff has the why.
+                .contains("<section class=\"block order bkoff\" id=\"basket\" hidden data-t=\"t\">"
+                        + "<h2>Your order</h2>"
+                        + "<p class=\"note\">This shop does not take orders from the table online. "
+                        + "Please order with the staff.</p></section>")
                 // Not a hidden pad waiting to be unhidden: there is no pad in the document at all.
                 .doesNotContain("class=\"bk\"")
                 .doesNotContain("class=\"peek\"")

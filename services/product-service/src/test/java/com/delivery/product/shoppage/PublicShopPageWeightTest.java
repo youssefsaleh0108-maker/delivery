@@ -228,6 +228,12 @@ class PublicShopPageWeightTest {
      * three-item shop downloads and all of it is shared. One stylesheet and two scripts serve
      * every shop page there is, cached for a year across all of them; a dekkane with three things
      * on its shelf pays for a filter it barely needs and a basket it very much does.
+     *
+     * <p>16 kB, and now 17: the Arabic rendering measures 16.4 kB with both scripts. The 164 B
+     * gzipped that took it there is the sentence a shop with table ordering off owes a diner who
+     * scanned one of its cards — it used to be written into every reader's copy of every shop's
+     * page, so it now ships hidden and {@code shop.js} reveals it on a {@code ?t=} address
+     * ({@link ShopPageHtml#orderWithTheStaff}). The markup side of that costs 4 B.
      */
     @Test
     @DisplayName("a small shop's page is small, in both languages")
@@ -238,7 +244,7 @@ class PublicShopPageWeightTest {
                     .section("Bread", Item.of("Kaak", "1.50"), Item.of("Markouk", "2.25"),
                             Item.of("Manakish", "2.00")), language);
             report("small, 3 items, " + language, fetched);
-            assertThat(fetched.withScript()).isLessThan(16 * 1024);
+            assertThat(fetched.withScript()).isLessThan(17 * 1024);
             // The reader with no script pays for none of it — not the filter, not the bar's
             // behaviour, not the basket — and still gets the whole shelf, every price, and a row
             // of working section links. This figure did not move at all.
