@@ -705,4 +705,58 @@ void main() {
           lessThan(tester.getCenter(find.byIcon(Icons.tune)).dx));
     });
   });
+
+  /// A badge whose label is a sentence rather than a word.
+  ///
+  /// YdBadge has always declared `maxLines: 1` and `TextOverflow.ellipsis` on its label, and until a
+  /// caller passed something long it never had to keep that promise. A Row gives a non-flexible child
+  /// unbounded width on the main axis, so the label was measured at its natural width and the badge
+  /// overflowed — a yellow stripe and a logged error — instead of cutting the text it had asked to cut.
+  group('YdBadge with a long label', () {
+    Widget badge(String label, {double width = 160, IconData? icon}) => MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: width,
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: YdBadge.brand(label: label, icon: icon, uppercase: false, fontSize: 12),
+                ),
+              ),
+            ),
+          ),
+        );
+
+    testWidgets('cuts the label instead of overflowing its box', (WidgetTester tester) async {
+      await tester.pumpWidget(badge('Table 7 · round 2', icon: Icons.table_restaurant_outlined));
+
+      expect(tester.takeException(), isNull);
+      // Still one line, still inside the room it was given.
+      expect(tester.getSize(find.byType(YdBadge)).width, lessThanOrEqualTo(160));
+      // And the label is still the label: a cut is a rendering, not a change of text, so a finder and
+      // a screen reader both still see the words.
+      expect(find.text('Table 7 · round 2'), findsOneWidget);
+    });
+
+    testWidgets('a short label is untouched by the change', (WidgetTester tester) async {
+      await tester.pumpWidget(badge('Ready', width: 300));
+
+      expect(tester.takeException(), isNull);
+      final double width = tester.getSize(find.byType(YdBadge)).width;
+      // Sized to its content, not stretched to the room available: the pill shape every other caller
+      // of this widget depends on.
+      expect(width, lessThan(300));
+      expect(width, greaterThan(0));
+    });
+
+    testWidgets('right to left, a long label is cut just the same', (WidgetTester tester) async {
+      await tester.pumpWidget(Directionality(
+        textDirection: TextDirection.rtl,
+        child: badge('طاولة 7 · الجولة 2', icon: Icons.table_restaurant_outlined),
+      ));
+
+      expect(tester.takeException(), isNull);
+      expect(tester.getSize(find.byType(YdBadge)).width, lessThanOrEqualTo(160));
+    });
+  });
 }

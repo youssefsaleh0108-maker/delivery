@@ -78,15 +78,23 @@ class YdBadge extends StatelessWidget {
             Icon(icon, size: 12, color: color),
             const SizedBox(width: DeliverySpacing.xs),
           ],
-          Text(
-            uppercase ? label.toUpperCase() : label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: fontSize,
-              fontWeight: FontWeight.w600,
-              color: color,
-              height: 1.2,
+          // Flexible, or the ellipsis below is a promise this badge cannot keep. A Row gives a
+          // non-flexible child unbounded width on the main axis, so the label was measured at its full
+          // natural width and the badge overflowed — painting a stripe and logging an error — instead of
+          // cutting the text it had already asked to have cut. Invisible for a one-word status pill,
+          // which is every caller this widget was written for; not invisible for a badge carrying a
+          // sentence, at 320dp, at the text scale a phone with large type reports.
+          Flexible(
+            child: Text(
+              uppercase ? label.toUpperCase() : label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: fontSize,
+                fontWeight: FontWeight.w600,
+                color: color,
+                height: 1.2,
+              ),
             ),
           ),
         ],
