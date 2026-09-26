@@ -276,6 +276,7 @@ class DeliveryOrder {
     this.compensateCarrier = false,
     this.kind = OrderKind.catalog,
     this.fulfilment = Fulfilment.delivery,
+    this.tableLabel,
     this.serviceCategory,
     this.customerDisplayName,
     this.readyAt,
@@ -392,6 +393,15 @@ class DeliveryOrder {
   /// How the customer gets it: a delivery on every order but a service order collected at the shop.
   final Fulfilment fulfilment;
 
+  /// Which table sent it; null on every other kind of order.
+  ///
+  /// The whole of what the staff need that a delivery does not give them, and the reason it is its own
+  /// field rather than a line in [notes]: notes are door instructions for a rider, and a number a
+  /// waiter has to find inside a sentence is a number that gets misread on a busy evening.
+  ///
+  /// Numbered from 1. It carries no round — see [tableRoundOf] for why there is nothing to carry.
+  final int? tableLabel;
+
   /// What a service order's shop does; null on every other order, and for a category this build does
   /// not know.
   final ServiceCategory? serviceCategory;
@@ -436,6 +446,23 @@ class DeliveryOrder {
 
   /// Whether the customer collects it at the shop — so no rider, no fee, no address and no tracking.
   bool get isPickup => fulfilment == Fulfilment.pickup;
+
+  /// Whether a diner sent this from a table in the shop's own room.
+  ///
+  /// Read off the kind, not off a missing address: an order whose address failed to save would look
+  /// exactly the same, and would then be shown to a kitchen as a table it has no way to carry food to.
+  bool get isTableOrder => kind == OrderKind.table;
+
+  /// Whether a rider carries it. False for a pickup and for a table order, which is the question any
+  /// control that would show, claim, track or chase a rider has to ask first.
+  bool get isCarried => fulfilment.isCarried;
+
+  /// Whether the platform books anything for this order: false for a table order alone.
+  ///
+  /// What a screen showing earnings must consult before adding an order to a figure. A table order is
+  /// the restaurant's own trade end to end — no delivery fee, no rider fee, no commission — so a
+  /// total that counted it would be claiming the platform earned something it did not.
+  bool get settles => kind.settles;
 
   /// The terms a service order's one line was ordered on; null on any other order.
   ServiceOrderLine? get serviceLine =>
@@ -535,6 +562,9 @@ class DeliveryOrder {
         // then as what such an order was: a delivered basket with nothing to wait for.
         kind: OrderKind.fromWire(json['kind']),
         fulfilment: Fulfilment.fromWire(json['fulfilment']),
+        // A `Short` on the wire, so a num rather than an int: the same field read back through a
+        // JSON library that widens it would otherwise throw on a cast a table order cannot avoid.
+        tableLabel: (json['tableLabel'] as num?)?.toInt(),
         serviceCategory: ServiceCategory.maybeFromWire(_textOrNull(json['serviceCategory'])),
         customerDisplayName: _textOrNull(json['customerDisplayName']),
         readyAt: _parseTime(json['readyAt']),
@@ -550,6 +580,93 @@ class DeliveryOrder {
 
   static DateTime? _parseTime(Object? value) =>
       value is String ? DateTime.tryParse(value)?.toLocal() : null;
+}
+
+/// Which send this ticket is from its table, and how many that table has open.
+///
+/// Derived, never stored. See [tableRoundOf].
+class TableRound {
+  const TableRound({required this.round, required this.openTickets});
+
+  /// Counted from 1: the first of the table's open tickets is round one.
+  final int round;
+
+  /// How many tickets that table has open, this one included. Never zero.
+  final int openTickets;
+
+  /// Whether this table has only this one ticket open — so the round names nothing the staff cannot
+  /// see, and a card showing it would be adding a number for its own sake.
+  bool get isOnlyTicket => openTickets <= 1;
+
+  @override
+  bool operator ==(Object other) =>
+      other is TableRound && other.round == round && other.openTickets == openTickets;
+
+  @override
+  int get hashCode => Object.hash(round, openTickets);
+
+  @override
+  String toString() => 'TableRound($round of $openTickets)';
+}
+
+/// Which round a table's ticket is, counted from the table's own still-open tickets in [amongst].
+///
+/// **There is no round on the wire, deliberately.** Sending again from a table makes a second ticket
+/// rather than changing the first, and nothing anywhere records "this is round two" — so the number
+/// is counted here, at the moment a queue is drawn, from the tickets that queue is holding.
+///
+/// Counting *open* tickets rather than every ticket the table sent is what makes a newly seated party
+/// start at round one without anybody telling the app a party left: once the last ticket of a meal is
+/// served or cancelled it stops being counted, so the next send is round one again. The cost is the
+/// other side of the same coin — when round one of a meal still in progress is served, the party's
+/// round two becomes round one. That is why a lone ticket is drawn without a round at all
+/// ([TableRound.isOnlyTicket]): the number is shown exactly while there are two tickets to tell apart,
+/// which is when it is needed and when renumbering cannot surprise anybody, because both are on screen.
+///
+/// Null when there is no round to name: an order that is not a table order, one whose table the server
+/// did not send, and a ticket already served or cancelled — a closed ticket cannot be placed among
+/// tickets that have since closed too, and a number invented for it would be a guess.
+///
+/// [amongst] is whatever the caller is holding — one merchant's own page of orders. Orders of other
+/// tables, other kinds and other shops are ignored, so a caller may pass its whole list.
+TableRound? tableRoundOf(DeliveryOrder order, Iterable<DeliveryOrder> amongst) {
+  final int? table = order.tableLabel;
+  if (!order.isTableOrder || table == null || order.status.isTerminal) {
+    return null;
+  }
+
+  final List<DeliveryOrder> open = <DeliveryOrder>[
+    for (final DeliveryOrder other in amongst)
+      if (other.isTableOrder &&
+          other.tableLabel == table &&
+          other.merchantId == order.merchantId &&
+          !other.status.isTerminal)
+        other,
+  ];
+  // The order itself may not be in what the caller passed — a detail screen holds one order and the
+  // list it came from separately, and re-reading it gives a fresh instance.
+  if (!open.any((DeliveryOrder o) => o.id == order.id)) {
+    open.add(order);
+  }
+
+  // Oldest first, because the first send is round one. Ties break on id so two tickets sent in the
+  // same second — one tap on two phones at one table — are numbered the same way every rebuild
+  // rather than swapping places under the staff's eyes. An order with no placedAt sorts last: it is
+  // the one the server could not date, and guessing it is the oldest would renumber everything else.
+  open.sort((DeliveryOrder a, DeliveryOrder b) {
+    final DateTime? at = a.placedAt;
+    final DateTime? bt = b.placedAt;
+    if (at == null || bt == null) {
+      return at == null && bt == null ? a.id.compareTo(b.id) : (at == null ? 1 : -1);
+    }
+    final int byTime = at.compareTo(bt);
+    return byTime != 0 ? byTime : a.id.compareTo(b.id);
+  });
+
+  return TableRound(
+    round: open.indexWhere((DeliveryOrder o) => o.id == order.id) + 1,
+    openTickets: open.length,
+  );
 }
 
 /// A rider's reported position.
