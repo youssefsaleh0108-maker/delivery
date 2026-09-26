@@ -121,7 +121,13 @@ class _ServiceOrderDetailState extends State<ServiceOrderDetail> {
           value: switch (o.fulfilment) {
             Fulfilment.pickup => t.svcBoFulfilPickup,
             Fulfilment.delivery => t.svcBoFulfilDelivery,
-            Fulfilment.unknown => t.svcBoTermUnknown,
+            // DINE_IN belongs to a table order, and the database will not let a service order be one
+            // (V40: DINE_IN if and only if the kind is TABLE), so this screen cannot be shown one.
+            // Named rather than swept up by a wildcard, and answered with the same words as a value
+            // this build does not know, because that is the honest position: this screen has no term
+            // for a fulfilment a service order cannot have. A table order is read in the shop's own
+            // orders, not here.
+            Fulfilment.dineIn || Fulfilment.unknown => t.svcBoTermUnknown,
           },
         ),
         // The server's stamp — acceptance plus the offer's longest turnaround — or a dash until the

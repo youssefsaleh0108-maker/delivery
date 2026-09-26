@@ -98,18 +98,31 @@ class _OrdersScreenState extends State<OrdersScreen> {
     super.dispose();
   }
 
+  /// The kinds this queue can actually work, each fetched as its own page.
+  ///
+  /// Baskets, and orders sent from a table in the shop's own room. Deliberately not every kind: a
+  /// service order is declined with a reason, collected at the counter, or cancelled once its customer
+  /// has not come — steps the services queue offers and this one does not — so an owner running a
+  /// services shop under the same account would find its orders sitting here with no button that
+  /// moves them. A table order is the opposite case: every step it takes is a step this queue already
+  /// has a button for, which is why it belongs here rather than on a screen of its own.
+  static const List<OrderKind> _kinds = <OrderKind>[OrderKind.catalog, OrderKind.table];
+
   Future<void> _refresh({bool silent = false}) async {
     if (!silent) setState(() => _loading = true);
     try {
-      // Goods orders only. An owner who also runs a services shop gets its orders here too otherwise,
-      // and this queue cannot work one: a service order is declined with a reason, collected at the
-      // counter, or cancelled once its customer has not come — steps the services queue offers and
-      // this one does not, so the order would sit here with no button that moves it.
-      final Paged<DeliveryOrder> page =
-          await widget.api.forMerchant(kind: OrderKind.catalog, size: 50);
+      // One request per kind rather than one unfiltered request filtered here, because the server's
+      // `kind` takes a single value and the page is the newest 50 orders of whatever it matched. A
+      // shop that also sells services would have its baskets and its tickets pushed off that page by
+      // orders this screen then discarded — a queue that silently loses the oldest order still
+      // waiting to be accepted. A page each keeps that impossible; the cost is a second request every
+      // poll, on the merchant's own device, against an endpoint scoped to their own shop.
+      final List<Paged<DeliveryOrder>> pages = await Future.wait(<Future<Paged<DeliveryOrder>>>[
+        for (final OrderKind kind in _kinds) widget.api.forMerchant(kind: kind, size: 50),
+      ]);
       if (!mounted) return;
       setState(() {
-        _orders = page.content;
+        _orders = _merged(pages);
         _error = null;
         _loading = false;
       });
@@ -121,6 +134,27 @@ class _OrdersScreenState extends State<OrdersScreen> {
         _loading = false;
       });
     }
+  }
+
+  /// The kinds' pages as one queue, newest first.
+  ///
+  /// Each page arrives newest first on its own; interleaving them by when the order was placed is what
+  /// makes the queue read as one evening's work rather than every basket and then every table ticket.
+  /// An order the server could not date sorts to the end — it cannot be placed among the rest, and
+  /// guessing it is the newest would put it above orders a merchant is waiting on.
+  static List<DeliveryOrder> _merged(List<Paged<DeliveryOrder>> pages) {
+    final List<DeliveryOrder> all = <DeliveryOrder>[
+      for (final Paged<DeliveryOrder> page in pages) ...page.content,
+    ];
+    all.sort((DeliveryOrder a, DeliveryOrder b) {
+      final DateTime? at = a.placedAt;
+      final DateTime? bt = b.placedAt;
+      if (at == null || bt == null) {
+        return at == null && bt == null ? 0 : (at == null ? 1 : -1);
+      }
+      return bt.compareTo(at);
+    });
+    return all;
   }
 
   Future<void> _act(DeliveryOrder order, OrderAction action) async {
@@ -142,7 +176,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       // 422 means the order moved on since this list was drawn — someone else acted first.
       final String message = e.response?.statusCode == 422
           ? t.orderAlreadyMovedRefreshing
-          : t.actionFailed(merchantActionLabel(action, t).toLowerCase());
+          : t.actionFailed(merchantActionLabel(action, t, on: order).toLowerCase());
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
       await _refresh(silent: true);
     } finally {
@@ -155,6 +189,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       builder: (_) => MerchantOrderDetailScreen(
         api: widget.api,
         order: order,
+        queue: _orders,
         // The detail screen can move an order along too, so the queue behind it reloads rather
         // than sitting on a status the merchant has just changed.
         onChanged: (_) => _refresh(silent: true),
@@ -374,6 +409,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   Widget _card(DeliveryOrder order) => _OrderCard(
         order: order,
+        // The whole queue, not the visible bucket: a table's round is counted from every ticket that
+        // table has open, and the ticket before this one may already have been accepted and so be
+        // sitting in a different tab. Counting within the tab in view would make "round 2" change to
+        // "round 1" on a tap that only changed which rows are listed.
+        queue: _orders,
         busy: _busyOrderId == order.id,
         onAction: (OrderAction a) => _act(order, a),
         onOpen: () => _open(order),
@@ -440,12 +480,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
 class _OrderCard extends StatelessWidget {
   const _OrderCard({
     required this.order,
+    required this.queue,
     required this.busy,
     required this.onAction,
     required this.onOpen,
   });
 
   final DeliveryOrder order;
+
+  /// Every order the queue is holding, for counting which round of its table this ticket is. Nothing
+  /// else on the card depends on it.
+  final List<DeliveryOrder> queue;
+
   final bool busy;
   final void Function(OrderAction) onAction;
   final VoidCallback onOpen;
@@ -455,6 +501,9 @@ class _OrderCard extends StatelessWidget {
     final DeliveryStrings t = DeliveryStrings.of(context);
     final bool isNew = order.status == OrderStatus.placed;
     final String age = merchantTimeAgo(order.placedAt, t);
+    // Null on everything that is not a table order, which is what keeps the address row and this one
+    // mutually exclusive without either having to know about the other.
+    final String? tableMark = tableMarkFor(order, queue, t);
 
     return YdCard.bordered(
       onTap: onOpen,
@@ -498,7 +547,9 @@ class _OrderCard extends StatelessWidget {
           // *id* and no name, so the state goes in that slot instead — which the tab strip only
           // implies, and stops implying the moment somebody looks at "Completed" and cannot tell a
           // delivered order from a cancelled one.
-          MerchantStatusTag(status: order.status, label: order.status.labelIn(t)),
+          // Said in the order's own words: READY on a table order is "Ready to serve", not "Ready for
+          // pickup", because nobody is coming to pick it up.
+          MerchantStatusTag(status: order.status, label: order.statusLabelIn(t)),
           const SizedBox(height: DeliverySpacing.xs),
           Text(
             order.items
@@ -512,6 +563,28 @@ class _OrderCard extends StatelessWidget {
               height: 1.4,
             ),
           ),
+          // Where a delivery puts its address, a table order puts its table.
+          //
+          // The same slot, because it answers the same question — where does this food go — and the
+          // staff read it in the same glance. Not the same treatment: an address is a reference a rider
+          // will look up later, drawn faint; a table number is the instruction, so it is a badge in the
+          // brand colour and it cannot be mistaken for a street. Nothing is drawn for a table order
+          // whose table the server did not send, which the database will not allow: an empty badge
+          // reading "Table" would be worse than the row being absent.
+          if (tableMark != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.sm),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: YdBadge.brand(
+                label: tableMark,
+                icon: Icons.table_restaurant_outlined,
+                // A table number and a round are figures, not a shouted word; and the design's
+                // uppercasing does nothing in Arabic anyway.
+                uppercase: false,
+                fontSize: 12,
+              ),
+            ),
+          ],
           if (order.deliveryAddress.isNotEmpty) ...<Widget>[
             const SizedBox(height: DeliverySpacing.xs),
             Row(
@@ -550,7 +623,11 @@ class _OrderCard extends StatelessWidget {
           ],
           // A waiver on this order is the merchant's own money, so it is said on the row rather
           // than left to be noticed in a payout statement at the end of the month.
-          if (order.merchantFeeWaived || order.deliveryFeeWaived) ...<Widget>[
+          // Never on a table order: a waiver is a charge the platform chose to drop, and a table order
+          // was never charged anything to drop. See the receipt on the detail screen, which says what
+          // is true instead.
+          if (!order.isTableOrder &&
+              (order.merchantFeeWaived || order.deliveryFeeWaived)) ...<Widget>[
             const SizedBox(height: DeliverySpacing.xs),
             Row(
               children: <Widget>[
@@ -595,7 +672,7 @@ class _OrderCard extends StatelessWidget {
                   if (i > 0) const SizedBox(width: DeliverySpacing.sm),
                   Expanded(
                     child: MerchantActionButton(
-                      label: merchantActionLabel(order.availableActions[i], t),
+                      label: merchantActionLabel(order.availableActions[i], t, on: order),
                       onPressed:
                           busy ? null : () => onAction(order.availableActions[i]),
                       primary: order.availableActions[i] != OrderAction.cancel,

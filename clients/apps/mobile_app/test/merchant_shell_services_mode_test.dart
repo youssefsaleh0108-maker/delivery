@@ -329,8 +329,19 @@ void main() {
     await openTab(tester, en.navOrders);
     expect(find.byType(OrdersScreen), findsOneWidget);
     expect(gateway.merchantOrderQueries, isNotEmpty);
-    expect(gateway.merchantOrderQueries, everyElement(contains('kind=CATALOG')),
+    // Every request names a kind, and none of them names SERVICE. That is the rule, rather than "every
+    // request says CATALOG": this queue asks for the kinds it can actually work, and a table order is
+    // one of them — every step a table order takes is a step this queue already has a button for. A
+    // service order is not: it is declined with a reason, collected at the counter, or cancelled once
+    // its customer has not come, and none of those buttons is here. An unfiltered request would sweep
+    // this owner's print shop in, which is the thing being guarded.
+    expect(gateway.merchantOrderQueries, everyElement(contains('kind=')),
+        reason: 'an unfiltered queue would sweep in the orders it has no button for');
+    expect(gateway.merchantOrderQueries, everyElement(isNot(contains('kind=SERVICE'))),
         reason: 'a service order is worked in the services queue, which the goods queue cannot do');
+    expect(
+        gateway.merchantOrderQueries.where((String q) => q.contains('kind=TABLE')), isNotEmpty,
+        reason: 'the kitchen has to be able to see a ticket sent from one of its own tables');
 
     await openTab(tester, en.navSettings);
     final MerchantSettingsScreen settings =

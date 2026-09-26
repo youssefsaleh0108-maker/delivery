@@ -16,14 +16,22 @@ import 'package:flutter_test/flutter_test.dart';
 /// 320dp — and a layout that does not fit fails silently in a release build, where the overflow
 /// stripe is not drawn and the merchant simply cannot reach the Accept button. These pump it at the
 /// sizes a real phone reports and let the framework's own overflow errors fail the test.
+/// Answers `GET /api/orders/merchant` per `kind`, which is how the endpoint actually behaves.
+///
+/// The screen asks for its two workable kinds separately, because the server's `kind` takes a single
+/// value. A stub that answered every request with the same page would hand the queue each order twice
+/// and every count on this screen would read double — so the kind is honoured here, and a kind with
+/// nothing staged answers an empty page rather than somebody else's orders.
 class _StubAdapter implements HttpClientAdapter {
-  _StubAdapter(this.body);
+  _StubAdapter(this.byKind);
 
-  final Object body;
+  final Map<String, Object> byKind;
 
   @override
   Future<ResponseBody> fetch(RequestOptions options, Stream<Uint8List>? requestStream,
       Future<void>? cancelFuture) async {
+    final String kind = '${options.queryParameters['kind'] ?? ''}';
+    final Object body = byKind[kind] ?? _page(<Map<String, dynamic>>[]);
     return ResponseBody.fromString(jsonEncode(body), 200, headers: <String, List<String>>{
       Headers.contentTypeHeader: <String>[Headers.jsonContentType]
     });
@@ -77,9 +85,12 @@ Object _page(List<Map<String, dynamic>> orders) => <String, dynamic>{
       'totalPages': 1,
     };
 
-OrderApi _api(Object page) {
+OrderApi _api(Object catalogPage, {Object? tablePage}) {
   final Dio dio = Dio(BaseOptions(baseUrl: 'http://gateway'))
-    ..httpClientAdapter = _StubAdapter(page);
+    ..httpClientAdapter = _StubAdapter(<String, Object>{
+      'CATALOG': catalogPage,
+      if (tablePage != null) 'TABLE': tablePage,
+    });
   return OrderApi(dio);
 }
 
@@ -126,12 +137,15 @@ Object _busyQueue() => _page(<Map<String, dynamic>>[
 
 void main() {
   Future<void> pumpAt(WidgetTester tester, Size size,
-      {double textScale = 1.0, Locale locale = const Locale('en'), Object? page}) async {
+      {double textScale = 1.0,
+      Locale locale = const Locale('en'),
+      Object? page,
+      Object? tablePage}) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(_wrap(
-      OrdersScreen(api: _api(page ?? _busyQueue())),
+      OrdersScreen(api: _api(page ?? _busyQueue(), tablePage: tablePage)),
       locale: locale,
       textScale: textScale,
     ));
