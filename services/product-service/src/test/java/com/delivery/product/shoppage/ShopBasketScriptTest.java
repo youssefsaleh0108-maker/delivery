@@ -170,9 +170,10 @@ class ShopBasketScriptTest {
         // what this phone has already sent from this table.
         //
         // The real numbers, because a ceiling nobody can name the cost of is one that gets nudged
-        // again next time: 26.9 kB on disk, 8.6 kB gzipped — up from 13.4 kB and 4.7 kB. Gzipped is
-        // the figure that matters and the one PublicShopPageWeightTest counts; a busy 40-item shop's
-        // whole page is 23.9 kB over the wire against the 35 kB the brief allowed.
+        // again next time: 26.9 kB on disk (27,518 B against a 28,672 B ceiling) and 8.8 kB gzipped,
+        // up from 13.4 kB and 4.7 kB. Gzipped is the figure that matters and the one
+        // PublicShopPageWeightTest counts; a busy 40-item shop's whole page is 24.1 kB over the
+        // wire against the 35 kB the brief allowed.
         //
         // And it is now linked only where there is a pad to run (ShopPageHtml.head), which is what
         // makes that affordable: a shop with table ordering off used to download all of this to

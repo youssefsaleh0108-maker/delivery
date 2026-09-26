@@ -378,6 +378,10 @@
     answer as the body, so what the diner is shown they sent and what went cannot be two pads.
   */
   function allow(answer) {
+    // A page with nowhere printed on it is a page rendered before sending existed, held in a cache
+    // for its own five minutes after a deploy. Its button stays dead, which is where this feature
+    // started; there is nothing to post to and no sentence on it to say so either.
+    if (!sendPath) { return; }
     ready = { body: answer.send, of: answer };
     go.disabled = false;
     go.setAttribute('aria-disabled', 'false');
@@ -605,6 +609,7 @@
 
   function watch() {
     if (watching) { window.clearTimeout(watching); watching = null; }
+    if (!statusPath) { return; }
     for (var i = 0; i < told.length; i++) {
       if (told[i].i && !stopped(told[i].s)) {
         watching = window.setTimeout(look, WAIT);
@@ -628,16 +633,19 @@
     request.open('GET', statusPath + round.i, true);
     request.onload = function () {
       var answer = null;
+      var now = null;
       if (request.status === 404) {
-        round.s = 'GONE';
+        now = 'GONE';
       } else if (request.status === 200) {
         try { answer = JSON.parse(request.responseText); } catch (bad) { return; }
         if (!answer || !states[answer.status]) { return; }
-        round.s = answer.status;
-      } else {
-        // A proxy, or the service having a moment: the round keeps the state it had.
-        return;
+        now = answer.status;
       }
+      // Nothing new — a proxy, the service having a moment, or a kitchen that has not touched the
+      // ticket since the last turn. The round keeps what it had and nothing is redrawn: .bkgot is
+      // a live region, and rebuilding it would read the whole thing out again every half minute.
+      if (!now || now === round.s) { return; }
+      round.s = now;
       storeSent();
       drawSent();
       watch();

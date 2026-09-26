@@ -159,20 +159,20 @@ class PublicShopPageWeightTest {
         report("busy, 40 items, en", english);
         report("busy, 40 items, ar", arabic);
 
-        // 23.9 kB over the wire for a restaurant that takes orders from its tables — measured with
+        // 24.1 kB over the wire for a restaurant that takes orders from its tables — measured with
         // table ordering ON, because a budget for the page without the feature on it is a budget
-        // for a page nobody is arguing about. 8.6 kB of it is basket.js. A 3G handset at a
+        // for a page nobody is arguing about. 8.8 kB of it is basket.js. A 3G handset at a
         // realistic 400 kbit/s fetches the lot in about half a second.
         //
-        // It was 13 kB before any of this, then 18.6 for the pad — an Add button on every row, a
+        // It was 13 kB before any of this, then 18.5 for the pad — an Add button on every row, a
         // priced panel at the foot of the menu, a note field per line, the strip that leads back to
-        // it — and it is 23.9 now that the pad can be SENT: the post, the receipt of what went, the
+        // it — and it is 24.1 now that the pad can be SENT: the post, the receipt of what went, the
         // ticket's state as the kitchen moves it, a sentence for every refusal, and a memory of
         // what this phone has already sent from this table. The brief allowed 35 kB.
         //
         // The number worth watching is the next one down rather than this one. A diner with
-        // scripting off still gets the whole menu and every price and runs none of the pad: 12.0 kB
-        // against the 11.1 kB it was before any of this. The 0.8 kB it grew for sending is words —
+        // scripting off still gets the whole menu and every price and runs none of the pad: 11.7 kB
+        // against the 10.9 kB it was before any of this. The 0.8 kB it grew for sending is words —
         // what each state of a ticket means at a table, and why a send was refused — shipped in the
         // markup in the page's own language, as every other sentence on this page is, and paid for
         // by a reader who cannot use them. A shop with table ordering off pays none of it: it does
@@ -194,14 +194,14 @@ class PublicShopPageWeightTest {
      * it past it.
      *
      * <p><strong>Ordering at the table was allowed to take this to 35 kB.</strong> The pad brought
-     * it to 24.6 and sending brings it to 30.3, which is the whole of what was asked for: a pad that
-     * cannot be sent is not ordering at the table, and the 5.7 kB between those two figures is the
+     * it to 24.8 and sending brings it to 29.9, which is the whole of what was asked for: a pad that
+     * cannot be sent is not ordering at the table, and the 5.1 kB between those two figures is the
      * post, the receipt, the ticket's state and a sentence for every refusal.
      *
      * <p>So the ceiling is 32 rather than the 35 that was offered: a budget raised to the limit
      * because the limit exists, rather than to what was spent plus room to notice drift, is not a
      * budget. And this is the worst page the service can send — a hundred and twenty described
-     * items, in Arabic. The shop a diner actually scans a card in sits at 23.9.
+     * items, in Arabic. The shop a diner actually scans a card in sits at 24.1.
      */
     @Test
     @DisplayName("the worst page this service can send still fits the 35 kB budget, at 32")
@@ -246,10 +246,11 @@ class PublicShopPageWeightTest {
      * every shop page there is, cached for a year across all of them; a dekkane with three things
      * on its shelf pays for a filter it barely needs and a basket it very much does.
      *
-     * <p>16 kB, then 17, and 21 now. 164 B of the first move was the sentence a shop with table
+     * <p>16 kB, then 17, and 22 now — the Arabic rendering measures 20.9 kB with both files. 164 B
+     * of the first move was the sentence a shop with table
      * ordering off owes a diner who scanned one of its cards, which now ships hidden and is revealed
      * by {@code shop.js} ({@link ShopPageHtml#orderWithTheStaff}). The rest is basket.js growing
-     * from 4.7 kB to 8.6 kB gzipped so that the pad can be sent — and on a three-item shop that
+     * from 4.7 kB to 8.8 kB gzipped so that the pad can be sent — and on a three-item shop that
      * file is most of what there is to download, which is exactly why it is no longer linked on the
      * pages that cannot use it.
      */
@@ -262,13 +263,13 @@ class PublicShopPageWeightTest {
                     .section("Bread", Item.of("Kaak", "1.50"), Item.of("Markouk", "2.25"),
                             Item.of("Manakish", "2.00")), language);
             report("small, 3 items, " + language, fetched);
-            assertThat(fetched.withScript()).isLessThan(21 * 1024);
+            assertThat(fetched.withScript()).isLessThan(22 * 1024);
             // The reader with no script runs none of it — not the filter, not the bar's behaviour,
             // not the basket — and still gets the whole shelf, every price, and a row of working
             // section links. What they now pay for is 0.8 kB of WORDS: what each state of a ticket
             // means at a table and why a send was refused, in the markup, in their own language,
             // because a script that carried a dictionary would be carrying it in one language for
-            // a file cached across every shop on the platform. 8.5 kB to 9.3 kB, so 10 kB — and
+            // a file cached across every shop on the platform. 8.3 kB to 9.1 kB, so 10 kB — and
             // only at a shop that has turned table ordering on. Every other shop's page is
             // byte-for-byte what it was.
             assertThat(fetched.withoutScript()).isLessThan(10 * 1024);

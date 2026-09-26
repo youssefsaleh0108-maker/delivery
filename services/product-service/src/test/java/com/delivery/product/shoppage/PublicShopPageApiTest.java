@@ -160,7 +160,7 @@ class PublicShopPageApiTest {
      * on: a chat app's preview runs no JavaScript at all.
      *
      * <p>The basket's file is the third, and only on a shop that takes orders from its tables. It
-     * is 8.6 kB gzipped and the first thing it does on a page with no pad is leave, so a shop that
+     * is 8.8 kB gzipped and the first thing it does on a page with no pad is leave, so a shop that
      * has not turned table ordering on — which is nearly every shop — was downloading all of it to
      * find out it had nothing to do. See {@code ShopPageHtml.head}.
      */

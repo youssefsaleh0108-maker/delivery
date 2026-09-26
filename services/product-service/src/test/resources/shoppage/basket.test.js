@@ -839,6 +839,26 @@ heading('a ticket that has stopped moving is not asked about again');
   check('and nothing is asked after that', page.reads().length, asked);
 }
 
+heading('a ticket the kitchen has not touched is not redrawn');
+{
+  // .bkgot is a live region: rebuilding it announces the whole thing again. So a poll that brings
+  // back the state the round already had must leave the rows it is looking at alone.
+  const page = visit({ slug: 'furn', version: 'v1', names: ['Hummus'], store: browser(),
+    search: '?t=7', reply: answer(), back: { status: 201, body: ticket() },
+    read: { status: 200, body: ticket() } });
+  page.addRow(0).flush();
+  page.send();
+  const drawn = page.got.children[0];
+
+  page.flush();
+  check('the ticket was asked after', page.reads().length, 1);
+  check('and the row a screen reader is on is the same row', page.got.children[0] === drawn, true);
+
+  page.answers({ status: 200, body: ticket({ status: 'READY' }) }).flush();
+  check('a state that did change is drawn', page.rounds()[0].state, 'Ready.');
+  check('which is a new row', page.got.children[0] === drawn, false);
+}
+
 heading('a phone in a pocket asks nothing');
 {
   const page = visit({ slug: 'furn', version: 'v1', names: ['Hummus'], store: browser(),
