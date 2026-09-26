@@ -295,6 +295,19 @@ class PublicShopPageInjectionTest {
         var parsed = new com.fasterxml.jackson.databind.ObjectMapper().readTree(json);
         assertThat(parsed.path("lines").get(0).path("name").asText())
                 .isEqualTo(typed(ITEM).replace("‮", ""));
+
+        // And the newest surface of all: the request that sends this pad, where the merchant's name
+        // for a dish and a stranger's note about it are put into one string that a kitchen prints.
+        // Two authors, neither of them trusted, through the one escaper — and then the string comes
+        // back out of the parser as both of them typed it.
+        String withNote = PublicShopBasketApiTest.quote(shop, language, "{\"version\":\"" + version
+                + "\",\"table\":\"7\",\"lines\":[{\"at\":0,\"qty\":2,\"note\":"
+                + "\"</script><script>alert(1)\\u202Eno onions\"}]}");
+        assertThat(withNote).doesNotContain("<").doesNotContain(">").doesNotContain("‮");
+        assertThat(new com.fasterxml.jackson.databind.ObjectMapper().readTree(withNote)
+                .path("send").path("notes").asText())
+                .isEqualTo(typed(ITEM).replace("‮", "")
+                        + ": </script><script>alert(1)no onions");
     }
 
     @Test

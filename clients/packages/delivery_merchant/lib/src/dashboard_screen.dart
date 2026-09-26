@@ -80,6 +80,25 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
   /// How many orders the design's "Recent Orders" feed holds.
   static const int _recentCount = 5;
 
+  /// The kinds this dashboard previews, which are the kinds its Orders queue can work.
+  static const List<OrderKind> _recentKinds = <OrderKind>[OrderKind.catalog, OrderKind.table];
+
+  /// Several kinds' pages as one list, newest first. An order the server could not date sorts last.
+  static List<DeliveryOrder> _newestFirst(List<Paged<DeliveryOrder>> pages) {
+    final List<DeliveryOrder> all = <DeliveryOrder>[
+      for (final Paged<DeliveryOrder> page in pages) ...page.content,
+    ];
+    all.sort((DeliveryOrder a, DeliveryOrder b) {
+      final DateTime? at = a.placedAt;
+      final DateTime? bt = b.placedAt;
+      if (at == null || bt == null) {
+        return at == null && bt == null ? 0 : (at == null ? 1 : -1);
+      }
+      return bt.compareTo(at);
+    });
+    return all;
+  }
+
   /// The narrowest a day's slice of the chart can be and still read as a bar with a letter under it.
   ///
   /// A fortnight shares the width evenly, so this is what decides whether the chart fits the card
@@ -182,13 +201,21 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
 
   Future<void> _refreshRecent() async {
     try {
-      // Goods orders only, as the queue these rows open lists them: a service order is the services
-      // queue's to work.
-      final Paged<DeliveryOrder> page =
-          await widget.api.forMerchant(kind: OrderKind.catalog, size: _recentCount);
+      // The same kinds the queue these rows open lists, and for the same reason: a service order is
+      // the services queue's to work, and a table order is this one's. Both kinds are asked for
+      // separately because the server's `kind` takes a single value.
+      //
+      // Matching the queue is not tidiness. "Pending orders" above these rows is the server's count of
+      // everything placed and unaccepted, which includes a table's ticket — so a preview that left
+      // tables out would have this page contradicting itself: three waiting, two shown, and nothing to
+      // say where the third went.
+      final List<Paged<DeliveryOrder>> pages = await Future.wait(<Future<Paged<DeliveryOrder>>>[
+        for (final OrderKind kind in _recentKinds)
+          widget.api.forMerchant(kind: kind, size: _recentCount),
+      ]);
       if (!mounted) return;
       setState(() {
-        _recent = page.content;
+        _recent = _newestFirst(pages).take(_recentCount).toList(growable: false);
         _recentLoaded = true;
       });
     } catch (_) {
@@ -887,7 +914,13 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
   Widget _recentRow(DeliveryOrder order, DeliveryStrings t) {
     // The design's meta line names the customer. The order payload carries a customer id and no
     // name, so it says what is actually known: how many lines, and what they came to.
+    //
+    // A table order leads with its table, because that is the part a member of staff is looking for and
+    // the row has no address slot to put it in. It goes first so that the ellipsis this line has always
+    // used takes the figures rather than the table, on the narrow phone where something has to go.
+    final String? tableMark = tableMarkFor(order, _recent, t);
     final String meta = <String>[
+      if (tableMark != null) tableMark,
       t.itemCount(order.items.length),
       merchantMoney(order.totalAmount),
     ].join(' • ');
@@ -897,6 +930,10 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
         builder: (_) => MerchantOrderDetailScreen(
           api: widget.api,
           order: order,
+          // The five rows this preview holds, which is what there is to count a table's round from
+          // here. Fewer than the queue has, so this screen may say "Table 7" where the queue says
+          // "Table 7 · round 2" — a round it cannot stand behind is one it does not claim.
+          queue: _recent,
           onChanged: (_) => _refresh(silent: true),
         ),
       )),
@@ -933,7 +970,7 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
             ),
           ),
           const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
-          MerchantStatusTag(status: order.status, label: order.status.labelIn(t)),
+          MerchantStatusTag(status: order.status, label: order.statusLabelIn(t)),
         ],
       ),
     );

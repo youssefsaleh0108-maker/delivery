@@ -74,12 +74,16 @@ class PublicShopPageFindingTest {
         }
         assertThat(occurrences(html, "<span class=\"n\">")).isEqualTo(names.size());
         // A shop that does not take orders from its tables — which is every shop on the platform
-        // until one turns it on — has exactly the two hidden controls it has always had: the
-        // search field and its "nothing matches" line. No pad, no Add buttons, no strip.
-        assertThat(occurrences(html, "hidden")).isEqualTo(2);
+        // until one turns it on — has the two hidden controls it has always had, the search field
+        // and its "nothing matches" line, and one more: the section that says to order with the
+        // staff. That sentence is for a diner who scanned a card, and this shop's page is read by
+        // people who scanned nothing, so it arrives hidden and shop.js reveals it on a `?t=`
+        // address. No pad, no Add buttons, no strip.
+        assertThat(occurrences(html, "hidden")).isEqualTo(3);
         assertThat(html)
                 .contains("<p class=\"q\" hidden>")
                 .contains("<p class=\"qn\" role=\"status\" hidden>")
+                .contains("<section class=\"block order bkoff\" id=\"basket\" hidden data-t=\"t\">")
                 .doesNotContain("class=\"bk\"")
                 .doesNotContain("class=\"peek\"");
         // The shelf itself: every row is there, visible, priced, whatever happens to the scripts.
@@ -101,10 +105,12 @@ class PublicShopPageFindingTest {
         String html = render(aisled().takesTableOrders(), "en");
 
         // Four rows in the fixture, all in stock, so four Add buttons; plus the two search
-        // controls and the five parts of the pad.
-        assertThat(occurrences(html, "hidden")).isEqualTo(2 + 4 + 5);
+        // controls and the six parts of the pad — the sixth being the list of rounds this table has
+        // already sent, which is empty until one has been.
+        assertThat(occurrences(html, "hidden")).isEqualTo(2 + 4 + 6);
         assertThat(html)
                 .contains("<div class=\"bk\" hidden")
+                .contains("<div class=\"bksent\" hidden><h3>Sent from this table</h3>")
                 .contains("<a class=\"peek\" href=\"#basket\" hidden>Your order</a>")
                 .contains("<button class=\"a\" type=\"button\" hidden>Add</button>");
         assertThat(occurrences(html, "<li hidden")).isZero();

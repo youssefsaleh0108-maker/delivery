@@ -28,6 +28,16 @@ enum OrderKind {
   /// decline.
   service('SERVICE'),
 
+  /// Sent from a table in the shop's own room by a diner with no account: they scanned the card on
+  /// the table, the menu opened in their browser, and they sent. Eaten where it was ordered.
+  ///
+  /// A kind of its own rather than a flag on [catalog], and the reason is money. The platform lent
+  /// the restaurant an order pad; it did not sell the meal, carry it or collect for it, so this is
+  /// the one kind that books nothing at all — no delivery fee, no rider fee, no commission. The
+  /// server makes that a property of the kind (`OrderKind.settles()`) so settlement asks one
+  /// question and gets one answer, and no screen here may imply otherwise.
+  table('TABLE'),
+
   /// A kind this build does not know. Never read as one of the others — a new kind shown as a basket
   /// would get a basket's screens — and never sent.
   unknown(null);
@@ -40,6 +50,14 @@ enum OrderKind {
   /// Whether nobody sold the goods: an errand the rider runs, which has no shop and so no shop's
   /// share of anything.
   bool get isErrand => this == butlerBuy || this == butlerSend;
+
+  /// Whether the platform books anything for an order of this kind — mirroring
+  /// `OrderKind.settles()`.
+  ///
+  /// False for exactly one kind. Asked here rather than compared against [table] wherever somebody
+  /// remembers to, because "does money move" is the rule a later change is most likely to break by
+  /// adding a total that quietly includes a ticket the platform is not a party to.
+  bool get settles => this != table;
 
   /// [catalog] when the server sent no kind; [unknown] when it sent one this build does not know.
   static OrderKind fromWire(Object? value) {
@@ -68,6 +86,15 @@ enum Fulfilment {
   /// no address and nothing to track, and it ends when the shop marks it collected.
   pickup('PICKUP'),
 
+  /// Eaten at the table it was ordered from. Only ever an [OrderKind.table] order.
+  ///
+  /// Nobody fetches it and nobody carries it: the diner is already in the room and the food crosses
+  /// the floor. It shares every structural absence with a [pickup] — no address, no pin, no area, no
+  /// fee, no rider, no carrier, never picked up — but it is a separate value because a cash pickup
+  /// means the shop is holding notes the platform is owed a commission on, and a table order owes the
+  /// platform nothing. Two names, so that rule can never be read off the wrong one.
+  dineIn('DINE_IN'),
+
   /// A fulfilment this build does not know. Neither a pickup nor a delivery, so no screen offers a
   /// counter's actions or a rider's tracking for it; and never sent.
   unknown(null);
@@ -76,6 +103,17 @@ enum Fulfilment {
 
   /// The server's spelling; null for [unknown].
   final String? wire;
+
+  /// Whether a rider carries it — what puts an order on a job board and gives it a carrier.
+  ///
+  /// The question every control that assumes a rider should ask, rather than testing for [delivery]:
+  /// a pickup and a table order are both fetched by somebody already at the shop, and neither has a
+  /// rider to show, claim, track or chase.
+  bool get isCarried => this == delivery;
+
+  /// Whether whoever eats it is already at the shop, which is what decides who ends the order —
+  /// mirroring `Fulfilment.isCollectedInPerson()`.
+  bool get isCollectedInPerson => this == pickup || this == dineIn;
 
   /// [delivery] when the server sent none; [unknown] for a value this build does not know.
   static Fulfilment fromWire(Object? value) {

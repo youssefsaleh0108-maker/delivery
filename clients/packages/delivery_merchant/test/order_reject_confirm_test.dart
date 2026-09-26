@@ -26,10 +26,19 @@ class _Script implements HttpClientAdapter {
       Future<void>? cancelFuture) async {
     requests.add(options);
     // A decision is answered with the order as it now stands; every read with the order as it was.
+    //
+    // The queue asks for each kind it can work separately, because the server's `kind` filter takes a
+    // single value — so this basket is answered to the basket request alone. Answering both would put
+    // one order in the queue twice, and "tap Reject" would then have two buttons to choose between.
     final (int status, Object body) = options.method == 'POST'
         ? (200, _order(status: 'CANCELLED', actions: const <String>[]))
         : options.path == '/api/orders/merchant'
-            ? (200, _page(<Map<String, dynamic>>[_order()]))
+            ? (
+                200,
+                _page(options.queryParameters['kind'] == OrderKind.catalog.wire
+                    ? <Map<String, dynamic>>[_order()]
+                    : <Map<String, dynamic>>[])
+              )
             : (200, _order());
     return ResponseBody.fromString(jsonEncode(body), status,
         headers: <String, List<String>>{

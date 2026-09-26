@@ -292,3 +292,63 @@ extension SaleFactStatusLabel on SaleFactStatus {
         SaleFactStatus.voided => t.repStatusVoided,
       };
 }
+
+// ---------------------------------------------------------------------- orders at a table
+
+/// The words a table order needs where a delivery's own would be wrong.
+///
+/// A table order travels the same statuses as a basket — PLACED, ACCEPTED, PREPARING, READY, and
+/// DELIVERED once the shop says so — but three of the sentences the apps say about those statuses are
+/// about a rider who does not exist. "Ready for pickup" tells a restaurant somebody is coming for the
+/// food; "Delivered" says it left the building. Neither is true of a plate that crossed a room.
+///
+/// An extension on the order rather than on [OrderStatus], because the status alone cannot answer it:
+/// the same READY means two different things depending on who is going to move the food. Every other
+/// status reads the same either way and is deliberately left to [OrderStatusLabel.labelIn] rather
+/// than restated here, so there is one place a status is named and one exception to it.
+extension TableOrderWording on DeliveryOrder {
+  /// This order's state, in the words its own kind of order uses.
+  String statusLabelIn(DeliveryStrings t) {
+    if (!isTableOrder) {
+      return status.labelIn(t);
+    }
+    return switch (status) {
+      OrderStatus.ready => t.merchTableStatusReady,
+      OrderStatus.delivered => t.merchTableStatusServed,
+      // PICKED_UP is unreachable for a table order — the server never offers a merchant or a rider
+      // the transition into it on a fulfilment nobody carries — so there is nothing to reword. It
+      // falls through to the shared wording rather than being given a table sentence that would only
+      // ever be read if the server started breaking its own rule.
+      _ => status.labelIn(t),
+    };
+  }
+
+  /// What this action is called on this order.
+  ///
+  /// Only COLLECTED differs, and it differs on every table order: the shop's hand-over of a pickup is
+  /// a customer arriving at a counter, and a table order's is a waiter crossing the floor. The rest of
+  /// the picklist reads the same for both and is left alone.
+  String actionLabelIn(OrderAction action, DeliveryStrings t) =>
+      isTableOrder && action == OrderAction.collected
+          ? t.merchTableActionServed
+          : action.labelIn(t);
+}
+
+/// How a table's ticket is marked in a shop's queue: "Table 7", or "Table 7 · round 2" once that table
+/// has more than one ticket open.
+///
+/// Null for anything that is not a table order with a table on it, so a caller can put this straight
+/// into the slot a delivery order fills with its address and draw nothing when there is nothing.
+///
+/// [amongst] is the orders the caller is holding; the round is counted from them. See [tableRoundOf]
+/// for why it is counted at all, and why a table with one ticket open shows no round.
+String? tableMarkFor(DeliveryOrder order, Iterable<DeliveryOrder> amongst, DeliveryStrings t) {
+  final int? table = order.tableLabel;
+  if (!order.isTableOrder || table == null) {
+    return null;
+  }
+  final TableRound? round = tableRoundOf(order, amongst);
+  return round == null || round.isOnlyTicket
+      ? t.merchTableTicket(table)
+      : t.merchTableTicketRound(table, round.round);
+}

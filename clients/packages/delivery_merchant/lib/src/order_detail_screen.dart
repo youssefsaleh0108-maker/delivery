@@ -490,8 +490,16 @@ class MerchantActionButton extends StatelessWidget {
 }
 
 /// What a merchant-facing action is called on these screens.
-String merchantActionLabel(OrderAction action, DeliveryStrings t) =>
-    action == OrderAction.cancel ? t.merchReject : action.labelIn(t);
+///
+/// [on] is the order the button sits on, when there is one. It is what makes COLLECTED read "Served
+/// to the table" on a table order and "Customer collected" on a pickup — the same transition, and two
+/// different things happening in the room. Omit it where the label is about the action in the abstract
+/// (a failure message naming what was attempted, a services step's fixed caption) and the shared
+/// wording is what is wanted.
+String merchantActionLabel(OrderAction action, DeliveryStrings t, {DeliveryOrder? on}) =>
+    action == OrderAction.cancel
+        ? t.merchReject
+        : (on?.actionLabelIn(action, t) ?? action.labelIn(t));
 
 /// The marker a merchant's Reject writes on the order.
 ///
@@ -590,6 +598,7 @@ class MerchantOrderDetailScreen extends StatefulWidget {
     super.key,
     required this.api,
     required this.order,
+    this.queue = const <DeliveryOrder>[],
     this.onChanged,
   });
 
@@ -598,6 +607,14 @@ class MerchantOrderDetailScreen extends StatefulWidget {
   /// The order as the list had it. Kept as the first paint so the screen opens on content rather
   /// than on a spinner, then refreshed against the server.
   final DeliveryOrder order;
+
+  /// The list this order was opened from, for counting which round of its table a table order is.
+  ///
+  /// Optional, and empty is a correct answer rather than a missing one: a round is counted from a
+  /// table's other open tickets, and a caller holding no list has none to count. The table itself is on
+  /// the order and is shown either way — a screen opened from the dashboard says "Table 7" where one
+  /// opened from the queue may say "Table 7 · round 2". Neither says a round it cannot stand behind.
+  final List<DeliveryOrder> queue;
 
   /// Told whenever this screen moves the order along, so the queue behind it can reload rather
   /// than sit on a status the merchant has just changed.
@@ -617,6 +634,21 @@ class _MerchantOrderDetailScreenState extends State<MerchantOrderDetailScreen> {
     OrderStatus.ready,
     OrderStatus.pickedUp,
   ];
+
+  /// The same track for a table order, one step shorter.
+  ///
+  /// `PICKED_UP` is not merely unlikely here, it is unreachable: `Order.canMoveTo` refuses the
+  /// transition on any fulfilment nobody carries, so a fourth bar would be a step that can never
+  /// light. Three bars, all full once the plate is on the table, is the truth about what the kitchen
+  /// does — and the state line above them says "Served", which is the part `PICKED_UP` was standing in
+  /// for.
+  static const List<OrderStatus> _tableFlow = <OrderStatus>[
+    OrderStatus.accepted,
+    OrderStatus.preparing,
+    OrderStatus.ready,
+  ];
+
+  List<OrderStatus> get _track => _order.isTableOrder ? _tableFlow : _flow;
 
   late DeliveryOrder _order = widget.order;
   bool _busy = false;
@@ -664,7 +696,7 @@ class _MerchantOrderDetailScreenState extends State<MerchantOrderDetailScreen> {
       // 422 means the order moved on since this screen was drawn — somebody else acted first.
       final String message = e.response?.statusCode == 422
           ? t.orderAlreadyMovedRefreshing
-          : t.actionFailed(merchantActionLabel(action, t).toLowerCase());
+          : t.actionFailed(merchantActionLabel(action, t, on: _order).toLowerCase());
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
       await _reload();
     } finally {
@@ -705,7 +737,7 @@ class _MerchantOrderDetailScreenState extends State<MerchantOrderDetailScreen> {
                       children: <Widget>[
                         _flowCard(t),
                         const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
-                        _customerCard(t),
+                        _order.isTableOrder ? _tableCard(t) : _customerCard(t),
                         if (_order.gift != null) ...<Widget>[
                           const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
                           _giftCard(t, _order.gift!),
@@ -731,9 +763,10 @@ class _MerchantOrderDetailScreenState extends State<MerchantOrderDetailScreen> {
   // -------------------------------------------------------------------- flow
 
   Widget _flowCard(DeliveryStrings t) {
-    final int current = _flow.indexOf(_order.status);
+    final List<OrderStatus> track = _track;
+    final int current = track.indexOf(_order.status);
     // Delivered is past the last drawn step, not missing from the track: everything is behind it.
-    final int reached = _order.status == OrderStatus.delivered ? _flow.length - 1 : current;
+    final int reached = _order.status == OrderStatus.delivered ? track.length - 1 : current;
 
     return YdCard.bordered(
       child: Column(
@@ -757,7 +790,7 @@ class _MerchantOrderDetailScreenState extends State<MerchantOrderDetailScreen> {
               ),
               const SizedBox(width: DeliverySpacing.sm),
               Text(
-                _order.status.labelIn(t),
+                _order.statusLabelIn(t),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.end,
@@ -775,7 +808,7 @@ class _MerchantOrderDetailScreenState extends State<MerchantOrderDetailScreen> {
             padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.xs),
             child: Row(
               children: <Widget>[
-                for (int i = 0; i < _flow.length; i++) ...<Widget>[
+                for (int i = 0; i < track.length; i++) ...<Widget>[
                   if (i > 0) const SizedBox(width: DeliverySpacing.xs),
                   Expanded(child: _step(i, reached, t)),
                 ],
@@ -803,7 +836,7 @@ class _MerchantOrderDetailScreenState extends State<MerchantOrderDetailScreen> {
         ),
         const SizedBox(height: DeliverySpacing.xs),
         Text(
-          _stepLabel(_flow[index], t),
+          _stepLabel(_track[index], t),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.center,
@@ -826,12 +859,57 @@ class _MerchantOrderDetailScreenState extends State<MerchantOrderDetailScreen> {
   String _stepLabel(OrderStatus status, DeliveryStrings t) => switch (status) {
         OrderStatus.accepted => t.stepAccepted,
         OrderStatus.preparing => t.stepPreparing,
+        // "Ready" reads the same for both on a bar this narrow; the full sentence a table order needs
+        // is in the state line above, which says "Ready to serve".
         OrderStatus.ready => t.stepReady,
         OrderStatus.pickedUp => t.merchStepPickedUp,
         _ => status.labelIn(t),
       };
 
   // ---------------------------------------------------------------- customer
+
+  /// What stands where "Customer Details" stands on a delivery order, when the order came from a table.
+  ///
+  /// A separate card rather than the customer card with its fields blanked, because there is no
+  /// customer here to detail and never will be: a diner scanning a code is not asked to register, so the
+  /// order carries a synthetic id, no name, no phone and no address. Left as the customer card it would
+  /// have read "Deliver to" with nothing after it — a field that looks like it failed to load, on the
+  /// one screen where a member of staff is deciding what to do with the food.
+  ///
+  /// So it says the table, and then says in a sentence why there is nothing else: the absence is a fact
+  /// about dining in, and somebody who is told it stops looking for a number to ring.
+  Widget _tableCard(DeliveryStrings t) {
+    final String mark = tableMarkFor(_order, widget.queue, t) ?? t.merchTableSection;
+
+    return YdCard.bordered(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          _sectionLabel(t.merchTableSection),
+          const SizedBox(height: DeliverySpacing.sm),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: YdBadge.brand(
+              label: mark,
+              icon: Icons.table_restaurant_outlined,
+              uppercase: false,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: DeliverySpacing.sm),
+          Text(
+            t.merchTableInTheRoom,
+            style: const TextStyle(
+              fontSize: 13,
+              color: DeliveryColors.muted,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _customerCard(DeliveryStrings t) {
     final String? phone = _order.contactPhone;
@@ -996,7 +1074,13 @@ class _MerchantOrderDetailScreenState extends State<MerchantOrderDetailScreen> {
           const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
           // A waiver on this order is the merchant's own money, so it is said on the receipt
           // rather than left to be noticed in a payout statement at the end of the month.
-          if (_order.merchantFeeWaived || _order.deliveryFeeWaived) ...<Widget>[
+          // Never on a table order, whatever the flags say. A waiver is the platform choosing not to
+          // charge something it was owed, and on a table order it was owed nothing to begin with — so
+          // "No commission on this order" would claim a favour that was never granted, and
+          // [merchTableBooksNothing] below says the true thing instead. The server sends both flags
+          // false here today; this is what keeps the claim off the screen if that ever stops being so.
+          if (!_order.isTableOrder &&
+              (_order.merchantFeeWaived || _order.deliveryFeeWaived)) ...<Widget>[
             Row(
               children: <Widget>[
                 const Icon(Icons.redeem_rounded, size: 15, color: DeliveryColors.brand),
@@ -1020,10 +1104,34 @@ class _MerchantOrderDetailScreenState extends State<MerchantOrderDetailScreen> {
           ],
           _totalRow(t.subtotal, merchantMoney(_order.goodsSubtotal)),
           const SizedBox(height: 6),
-          _totalRow(
-            t.deliveryFeeLabelMerchant,
-            merchantMoney(_order.deliveryFeeCharged),
-          ),
+          // A table order has no delivery fee to show, and a row reading "Delivery fee 0.00" would be
+          // the wrong kind of nothing: it reads as a fee that happened to come to zero this once, which
+          // is what a waived delivery is. Nothing was waived here, because nothing was ever charged —
+          // the platform lent this shop an order pad. So the row is replaced by the sentence, which
+          // also says the other half a merchant would otherwise have to ask about: no commission
+          // either. The grand total below it is then the food and only the food.
+          if (_order.isTableOrder)
+            Row(
+              children: <Widget>[
+                const Icon(Icons.table_restaurant_outlined, size: 15, color: DeliveryColors.muted),
+                const SizedBox(width: DeliverySpacing.xs),
+                Expanded(
+                  child: Text(
+                    t.merchTableBooksNothing,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: DeliveryColors.muted,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+              ],
+            )
+          else
+            _totalRow(
+              t.deliveryFeeLabelMerchant,
+              merchantMoney(_order.deliveryFeeCharged),
+            ),
           // Inside the grand total and outside the goods and the fee, so itemised for the receipt
           // to add up.
           if (_order.gift != null && _order.gift!.wrapFee > 0) ...<Widget>[
@@ -1148,7 +1256,7 @@ class _MerchantOrderDetailScreenState extends State<MerchantOrderDetailScreen> {
           if (i > 0) const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
           Expanded(
             child: MerchantActionButton(
-              label: merchantActionLabel(actions[i], t),
+              label: merchantActionLabel(actions[i], t, on: _order),
               onPressed: _busy ? null : () => _act(actions[i]),
               primary: actions[i] != OrderAction.cancel,
               radius: DeliveryRadius.md,

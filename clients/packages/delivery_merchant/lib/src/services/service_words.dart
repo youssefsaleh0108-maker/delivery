@@ -147,6 +147,11 @@ Widget? svcFulfilmentChip(DeliveryOrder order, DeliveryStrings t) {
   final String? label = switch (order.fulfilment) {
     Fulfilment.pickup => t.svcChipPickup,
     Fulfilment.delivery => t.svcChipDelivery,
+    // DINE_IN cannot reach these screens: it belongs to a table order, and a services shop's queue is
+    // filtered to SERVICE. Named rather than swept into a wildcard so that if a later change does route
+    // one here, this chip says nothing instead of calling a table a pickup — and so the next fulfilment
+    // anybody adds still fails to compile until somebody decides what a counter should read.
+    Fulfilment.dineIn => null,
     Fulfilment.unknown => null,
   };
   if (label == null) return null;

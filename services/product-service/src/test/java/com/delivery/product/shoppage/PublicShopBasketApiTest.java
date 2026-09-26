@@ -183,6 +183,123 @@ class PublicShopBasketApiTest {
         assertThat(answer.path("totalLbp").asText()).isEqualTo("135,000 LBP");
     }
 
+    // ---------------------------------------------------------------- somewhere to send it
+
+    /**
+     * The request that turns a pad into a ticket, which the page posts and does not read.
+     *
+     * <p>Built here because a ticket names things this page never prints — the shop and a product
+     * per line — and because the alternative was handing a browser the ids and a total and letting
+     * it assemble a request around them, which is the one thing this whole surface is shaped to
+     * prevent. Every field name below is the order service's own
+     * ({@code OrderDtos.PlaceTableOrderRequest}), so what the browser relays is that request and
+     * not a translation of it.
+     */
+    @Test
+    @DisplayName("a pad that can be sent carries the order service's own request, ready to post")
+    void carriesTheRequestThatSendsIt() throws Exception {
+        ShopPageFixture shop = aShop();
+        JsonNode answer = atTable7(shop, "[{\"at\":2,\"qty\":3},{\"at\":0,\"qty\":1}]");
+        JsonNode send = answer.path("send");
+
+        assertThat(answer.path("ok").asBoolean()).isTrue();
+        assertThat(send.path("storeId").asText()).isEqualTo(shop.shop().getId().toString());
+        // The number off the card, as a number, because that is the field's type where it lands.
+        assertThat(send.path("table").asInt()).isEqualTo(7);
+        assertThat(send.path("items")).hasSize(2);
+        assertThat(send.path("items").get(0).path("productId").asText())
+                .isEqualTo(shop.productIds().get(2));
+        assertThat(send.path("items").get(0).path("qty").asInt()).isEqualTo(3);
+        assertThat(send.path("items").get(1).path("productId").asText())
+                .isEqualTo(shop.productIds().get(0));
+        // The figure the diner was shown, so nobody is charged a number they did not see: three
+        // jallab at 0.75 and one hummus at 1.50 is $3.75, and that is what was drawn above it.
+        assertThat(answer.path("total").asText()).isEqualTo("$3.75");
+        assertThat(send.path("expectedTotal").decimalValue()).isEqualByComparingTo("3.75");
+        // Nothing else is in it. A merchant id, a promo code or an address appearing here would be
+        // this page joining a settlement path it has no business on.
+        assertThat(send.fieldNames()).toIterable()
+                .containsExactlyInAnyOrder("storeId", "table", "items", "expectedTotal");
+    }
+
+    /**
+     * No {@code send} on a pad that cannot be sent, which is what leaves the button dead.
+     *
+     * <p>The two halves are one answer: the sentences that tell the diner why, and the absence of a
+     * request. A refusal with a request in it would be a live button over a closed kitchen; a
+     * request with no sentence is the defect this page shipped with.
+     */
+    @Test
+    @DisplayName("every refusal is a pad with no request in it, and words saying why")
+    void refusalsCarryNoRequest() throws Exception {
+        ShopPageFixture open = aShop();
+        String version = versionOf(page(open, "en"));
+
+        // Nothing on it.
+        assertThat(JSON.readTree(quote(open, "en", "{\"version\":\"" + version
+                + "\",\"table\":\"7\",\"lines\":[]}")).has("send")).isFalse();
+        // A table this shop does not have.
+        assertThat(JSON.readTree(quote(open, "en", "{\"version\":\"" + version
+                + "\",\"table\":\"99\",\"lines\":[{\"at\":0,\"qty\":1}]}")).has("send")).isFalse();
+        // A shelf that has moved under the pad.
+        assertThat(JSON.readTree(quote(open, "en", "{\"version\":\"moved\",\"table\":\"7\","
+                + "\"lines\":[{\"at\":0,\"qty\":1}]}")).has("send")).isFalse();
+
+        // A shut kitchen, a dish that has run out, and a shop that never turned this on: each of
+        // them already says so in words, and each of them now also has nothing to post.
+        ShopPageFixture shut = new ShopPageFixture().takesTableOrders()
+                .at("2026-09-20T02:00:00Z").section("Mezze", Item.of("Hummus", "1.50"));
+        JsonNode closed = atTable7(shut, "[{\"at\":0,\"qty\":1}]");
+        assertThat(closed.has("send")).isFalse();
+        assertThat(closed.path("says").get(0).asText())
+                .isEqualTo("The kitchen is closed right now, so this cannot be sent.");
+
+        ShopPageFixture out = new ShopPageFixture().takesTableOrders()
+                .section("Mezze", Item.of("Hummus", "1.50").outOfStock());
+        JsonNode gone = atTable7(out, "[{\"at\":0,\"qty\":1}]");
+        assertThat(gone.has("send")).isFalse();
+        assertThat(gone.path("says").get(0).asText())
+                .isEqualTo("Something on your order has run out. Remove it to send the rest.");
+
+        ShopPageFixture off = new ShopPageFixture().section("Mezze", Item.of("Hummus", "1.50"));
+        assertThat(JSON.readTree(quote(off, "en", "{\"version\":\"x\",\"table\":\"7\","
+                + "\"lines\":[{\"at\":0,\"qty\":1}]}")).has("send")).isFalse();
+    }
+
+    /**
+     * The diner's notes, gathered into the one field a ticket has for them.
+     *
+     * <p>An order line in the order service carries no note — a delivery never needed one — so the
+     * notes are collected behind the dishes they are about and cut to that field's own 500
+     * characters. Whole entries only: half a note on a kitchen ticket is worse than none, because
+     * "no" and "nuts" are what is left when "no nuts" is cut in the middle.
+     */
+    @Test
+    @DisplayName("the notes on the lines become the one note a ticket carries")
+    void gathersTheNotesOntoTheTicket() throws Exception {
+        JsonNode answer = atTable7(aShop(), "[{\"at\":0,\"qty\":1,\"note\":\"no onions\"},"
+                + "{\"at\":1,\"qty\":1},{\"at\":2,\"qty\":1,\"note\":\"no ice\"}]");
+
+        assertThat(answer.path("send").path("notes").asText())
+                .isEqualTo("Hummus: no onions · Jallab: no ice");
+
+        // Nothing written, nothing carried: a ticket should print no gap for a note nobody left.
+        assertThat(atTable7(aShop(), "[{\"at\":0,\"qty\":1}]").path("send").has("notes")).isFalse();
+
+        // Twenty lines of sixty characters cannot fit in five hundred. What fits, fits whole, and
+        // the field's own bound is never the thing that refuses the order.
+        StringBuilder many = new StringBuilder("[");
+        for (int i = 0; i < 3; i++) {
+            many.append(i > 0 ? "," : "").append("{\"at\":").append(i)
+                    .append(",\"qty\":1,\"note\":\"").append("y".repeat(60)).append("\"}");
+        }
+        String notes = atTable7(aShop(), many.append(']').toString())
+                .path("send").path("notes").asText();
+        assertThat(notes).hasSizeLessThanOrEqualTo(PublicShopPageService.MAX_TICKET_NOTES)
+                .doesNotEndWith("y ").endsWith("y".repeat(60));
+        assertThat(notes.split(" · ", -1)).hasSize(3);
+    }
+
     // ---------------------------------------------------------------- the note
 
     /**
@@ -312,8 +429,15 @@ class PublicShopBasketApiTest {
         String html = page(shop, "en");
 
         assertThat(html)
-                .contains("This shop does not take orders from the table online. "
-                        + "Please order with the staff.")
+                // Said, and said to the one reader it is about: the section ships hidden and
+                // shop.js reveals it on an address carrying a table's code. Nearly every shop on
+                // the platform has table ordering off — a pharmacy, an electronics shop, a florist
+                // — and this is the page they are asked to share, so a reader who scanned nothing
+                // is told nothing about tables at all. ShopPageHtml.orderWithTheStaff has the why.
+                .contains("<section class=\"block order bkoff\" id=\"basket\" hidden data-t=\"t\">"
+                        + "<h2>Your order</h2>"
+                        + "<p class=\"note\">This shop does not take orders from the table online. "
+                        + "Please order with the staff.</p></section>")
                 // Not a hidden pad waiting to be unhidden: there is no pad in the document at all.
                 .doesNotContain("class=\"bk\"")
                 .doesNotContain("class=\"peek\"")
@@ -505,23 +629,39 @@ class PublicShopBasketApiTest {
                 .contains("This link does not point at a shop on YouDrop.");
     }
 
+    /**
+     * What a quote is allowed to name, now that a pad has somewhere to go.
+     *
+     * <p>Nothing the page <em>draws</em> carries an id — a line is still the position it was asked
+     * about and the name the page already shows. The ids are in {@code send} and nowhere else: the
+     * shop's, and one per line, because the order service cannot be told about a dish by where it
+     * sat on somebody's screen. Everything that was never the browser's business still is not: no
+     * merchant id, no SKU, no barcode, no section id, no delivery-area id.
+     */
     @Test
-    @DisplayName("a quote names no id: not a dish's, not a section's, not the shop's")
+    @DisplayName("a quote names ids in one place only: the request that sends it")
     void namesNothingThePageDoesNot() throws Exception {
         ShopPageFixture shop = aShop().areas("Hamra");
         String json = quote(shop, "en", "{\"version\":\"" + versionOf(page(shop, "en"))
                 + "\",\"table\":\"7\",\"lines\":[{\"at\":0,\"qty\":1},{\"at\":2,\"qty\":1}]}");
 
-        assertThat(json).doesNotContain(shop.shop().getId().toString())
-                .doesNotContain(ShopPageFixture.MERCHANT)
+        assertThat(json).doesNotContain(ShopPageFixture.MERCHANT)
                 .doesNotContain(ShopPageFixture.SKU)
                 .doesNotContain(ShopPageFixture.BARCODE);
-        for (String id : shop.productIds()) {
-            assertThat(json).doesNotContain(id);
-        }
         for (String id : shop.sectionAndAreaIds()) {
             assertThat(json).doesNotContain(id);
         }
+        // The shop's id and the two rows asked about, inside send and inside nothing else: cut the
+        // send off the end of the document and there is not an id left in what remains.
+        JsonNode answer = JSON.readTree(json);
+        String drawn = json.substring(0, json.indexOf(",\"send\":"));
+        assertThat(drawn).doesNotContain(shop.shop().getId().toString());
+        for (String id : shop.productIds()) {
+            assertThat(drawn).as("%s is not in anything the page draws", id).doesNotContain(id);
+        }
+        assertThat(answer.path("send").path("storeId").asText())
+                .isEqualTo(shop.shop().getId().toString());
+        assertThat(answer.path("send").path("items")).hasSize(2);
     }
 
     // ---------------------------------------------------------------- the table and the page

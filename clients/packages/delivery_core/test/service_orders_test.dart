@@ -232,9 +232,9 @@ void main() {
 
     test('the kinds, fulfilments, decline reasons and refusal codes are exactly the server\'s', () {
       expect(OrderKind.values.map((OrderKind k) => k.wire).whereType<String>(),
-          <String>['CATALOG', 'BUTLER_BUY', 'BUTLER_SEND', 'SERVICE']);
+          <String>['CATALOG', 'BUTLER_BUY', 'BUTLER_SEND', 'SERVICE', 'TABLE']);
       expect(Fulfilment.values.map((Fulfilment f) => f.wire).whereType<String>(),
-          <String>['DELIVERY', 'PICKUP']);
+          <String>['DELIVERY', 'PICKUP', 'DINE_IN']);
       expect(DeclineReason.picklist.map((DeclineReason r) => r.wire),
           <String>['TOO_BUSY', 'CANNOT_DO', 'FILE_PROBLEM', 'OTHER']);
       expect(

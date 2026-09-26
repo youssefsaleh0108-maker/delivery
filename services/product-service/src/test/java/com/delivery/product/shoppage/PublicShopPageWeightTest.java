@@ -109,6 +109,11 @@ class PublicShopPageWeightTest {
      * that left out the optional files would be a budget for the cheaper reader. The basket is in
      * here from the day it shipped, because an uncounted download is how a budget stops meaning
      * anything.
+     *
+     * <p>It is counted when the page <em>links</em> it, which is now only a shop that takes orders
+     * from its tables ({@code ShopPageHtml.head}). Every fixture in this class is one of those, so
+     * every figure below is the heavier reader; a shop with table ordering off does not fetch the
+     * file at all, and a budget that charged it for one would be measuring a page nobody is served.
      */
     private Fetched fetch(ShopPageFixture shop, String language) throws Exception {
         byte[] html = shop.mvc().perform(get("/s/" + shop.slug()).param("lang", language))
@@ -117,10 +122,15 @@ class PublicShopPageWeightTest {
                 .andReturn().getResponse().getContentAsByteArray();
         byte[] js = shop.mvc().perform(get("/s/assets/shop.js"))
                 .andReturn().getResponse().getContentAsByteArray();
-        byte[] basket = shop.mvc().perform(get("/s/assets/basket.js"))
-                .andReturn().getResponse().getContentAsByteArray();
+        byte[] basket = new String(html, java.nio.charset.StandardCharsets.UTF_8)
+                .contains("/s/assets/basket.js")
+                ? shop.mvc().perform(get("/s/assets/basket.js"))
+                        .andReturn().getResponse().getContentAsByteArray()
+                : new byte[0];
         return new Fetched(html.length + css.length + js.length + basket.length,
-                gzipped(html) + gzipped(css), gzipped(js) + gzipped(basket), html);
+                gzipped(html) + gzipped(css),
+                // Nothing, and not gzip's twenty bytes of header, for a file nobody fetches.
+                gzipped(js) + (basket.length == 0 ? 0 : gzipped(basket)), html);
     }
 
     /**
@@ -149,23 +159,28 @@ class PublicShopPageWeightTest {
         report("busy, 40 items, en", english);
         report("busy, 40 items, ar", arabic);
 
-        // 20 kB over the wire for a restaurant that takes orders from its tables — measured with
+        // 23.8 kB over the wire for a restaurant that takes orders from its tables — measured with
         // table ordering ON, because a budget for the page without the feature on it is a budget
-        // for a page nobody is arguing about. 4.4 kB of it is basket.js. A 3G handset at a
+        // for a page nobody is arguing about. 9.0 kB of it is basket.js. A 3G handset at a
         // realistic 400 kbit/s fetches the lot in about half a second.
         //
-        // It was 13 kB, and what it bought is the order pad: an Add button on every row, a priced
-        // panel at the foot of the menu, a note field per line, and the strip that leads back to
-        // it. The brief allowed 35 kB; it cost a third of that.
+        // It was 13 kB before any of this, then 18.5 for the pad — an Add button on every row, a
+        // priced panel at the foot of the menu, a note field per line, the strip that leads back to
+        // it — and it is 23.8 now that the pad can be SENT: the post, the receipt of what went, the
+        // ticket's state as the kitchen moves it, a sentence for every refusal, and a memory of
+        // what this phone has already sent from this table. The brief allowed 35 kB.
         //
         // The number worth watching is the next one down rather than this one. A diner with
-        // scripting off pays for none of the pad and still gets the whole menu and every price,
-        // and that figure has barely moved: 11.2 kB against the 11.1 kB it was before any of this.
-        // Adding ordering to this page cost the reader who cannot use it about a hundred bytes.
+        // scripting off still gets the whole menu and every price and runs none of the pad: 11.7 kB
+        // against the 10.9 kB it was before any of this. The 0.8 kB it grew for sending is words —
+        // what each state of a ticket means at a table, and why a send was refused — shipped in the
+        // markup in the page's own language, as every other sentence on this page is, and paid for
+        // by a reader who cannot use them. A shop with table ordering off pays none of it: it does
+        // not draw the pad and no longer links its file either.
         for (Fetched fetched : List.of(english, arabic)) {
-            assertThat(fetched.withScript()).isLessThan(20 * 1024);
-            assertThat(fetched.withoutScript()).isLessThan(12 * 1024);
-            assertThat(fetched.uncompressed()).isLessThan(72 * 1024);
+            assertThat(fetched.withScript()).isLessThan(25 * 1024);
+            assertThat(fetched.withoutScript()).isLessThan(13 * 1024);
+            assertThat(fetched.uncompressed()).isLessThan(88 * 1024);
         }
     }
 
@@ -178,17 +193,18 @@ class PublicShopPageWeightTest {
      * This is the whole budget for everything the page needs, and nothing that lands here may take
      * it past it.
      *
-     * <p><strong>Ordering at the table was allowed to take this to 35 kB. It came in at 24.6.</strong>
-     * So the ceiling moves to 28 rather than to what was offered: a budget raised because it was
-     * allowed to be, rather than because something was spent, is not a budget.
+     * <p><strong>Ordering at the table was allowed to take this to 35 kB.</strong> The pad brought
+     * it to 24.8 and sending brings it to 30.1, which is the whole of what was asked for: a pad that
+     * cannot be sent is not ordering at the table, and the 5.3 kB between those two figures is the
+     * post, the receipt, the ticket's state and a sentence for every refusal.
      *
-     * <p>It moves at all — rather than staying at the 25 kB it was — because the worst Arabic page
-     * now sits a few hundred bytes under that, and a tripwire that thin stops catching drift and
-     * starts catching sentences. Three kilobytes is room for the next piece of this to be a
-     * decision instead of an accident, and it is still seven below what this one was offered.
+     * <p>So the ceiling is 32 rather than the 35 that was offered: a budget raised to the limit
+     * because the limit exists, rather than to what was spent plus room to notice drift, is not a
+     * budget. And this is the worst page the service can send — a hundred and twenty described
+     * items, in Arabic. The shop a diner actually scans a card in sits at 23.8.
      */
     @Test
-    @DisplayName("the worst page this service can send still fits the whole 25 kB budget")
+    @DisplayName("the worst page this service can send still fits the 35 kB budget, at 32")
     void anEnormousShelfIsBounded() throws Exception {
         Fetched english = fetch(cappedShop().shelfTotal(4000), "en");
         Fetched arabic = fetch(cappedShop().shelfTotal(4000), "ar");
@@ -205,12 +221,13 @@ class PublicShopPageWeightTest {
             // The ceiling the page was given, rather than a line drawn just above where it
             // happens to sit: the two budgets above are the tripwires that catch drift, and this
             // is the number the page may not exceed whatever else is ever added to it.
-            assertThat(fetched.withScript()).isLessThan(25 * 1024);
+            assertThat(fetched.withScript()).isLessThan(32 * 1024);
             // Uncompressed too, because gzip is a courtesy: a proxy that strips Accept-Encoding,
-            // or a client that never sent it, gets these bytes instead. 144 kB, not 128: the two
-            // scripts are 20 kB of it unzipped and 7 kB of it on the wire, and this is the one
-            // budget where a comment's characters cost the same as the code's.
-            assertThat(fetched.uncompressed()).isLessThan(144 * 1024);
+            // or a client that never sent it, gets these bytes instead. 160 kB, not 144: the two
+            // scripts are 35 kB of it unzipped and 12 kB of it on the wire, and this is the one
+            // budget where a comment's characters cost the same as the code's — which is why the
+            // prose that would have gone in basket.js is in ShopPageHtml and ShopBasket instead.
+            assertThat(fetched.uncompressed()).isLessThan(160 * 1024);
         }
     }
 
@@ -228,6 +245,14 @@ class PublicShopPageWeightTest {
      * three-item shop downloads and all of it is shared. One stylesheet and two scripts serve
      * every shop page there is, cached for a year across all of them; a dekkane with three things
      * on its shelf pays for a filter it barely needs and a basket it very much does.
+     *
+     * <p>16 kB, then 17, and 22 now — the Arabic rendering measures 21.2 kB with both files. 164 B
+     * of the first move was the sentence a shop with table
+     * ordering off owes a diner who scanned one of its cards, which now ships hidden and is revealed
+     * by {@code shop.js} ({@link ShopPageHtml#orderWithTheStaff}). The rest is basket.js growing
+     * from 4.7 kB to 9.0 kB gzipped so that the pad can be sent — and on a three-item shop that
+     * file is most of what there is to download, which is exactly why it is no longer linked on the
+     * pages that cannot use it.
      */
     @Test
     @DisplayName("a small shop's page is small, in both languages")
@@ -238,11 +263,16 @@ class PublicShopPageWeightTest {
                     .section("Bread", Item.of("Kaak", "1.50"), Item.of("Markouk", "2.25"),
                             Item.of("Manakish", "2.00")), language);
             report("small, 3 items, " + language, fetched);
-            assertThat(fetched.withScript()).isLessThan(16 * 1024);
-            // The reader with no script pays for none of it — not the filter, not the bar's
-            // behaviour, not the basket — and still gets the whole shelf, every price, and a row
-            // of working section links. This figure did not move at all.
-            assertThat(fetched.withoutScript()).isLessThan(9 * 1024);
+            assertThat(fetched.withScript()).isLessThan(22 * 1024);
+            // The reader with no script runs none of it — not the filter, not the bar's behaviour,
+            // not the basket — and still gets the whole shelf, every price, and a row of working
+            // section links. What they now pay for is 0.8 kB of WORDS: what each state of a ticket
+            // means at a table and why a send was refused, in the markup, in their own language,
+            // because a script that carried a dictionary would be carrying it in one language for
+            // a file cached across every shop on the platform. 8.3 kB to 9.1 kB, so 10 kB — and
+            // only at a shop that has turned table ordering on. Every other shop's page is
+            // byte-for-byte what it was.
+            assertThat(fetched.withoutScript()).isLessThan(10 * 1024);
         }
     }
 

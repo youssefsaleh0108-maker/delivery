@@ -13802,4 +13802,34 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get merchMenuOpensTooFewShort => 'أقل من أن يُذكر';
+
+  @override
+  String merchTableTicket(int table) {
+    return 'طاولة $table';
+  }
+
+  @override
+  String merchTableTicketRound(int table, int round) {
+    return 'طاولة $table · الجولة $round';
+  }
+
+  @override
+  String get merchTableSection => 'الطاولة';
+
+  @override
+  String get merchTableInTheRoom =>
+      'الطلب من داخل الصالة، فلا عنوان ولا رقم هاتف. الطاولة هي مكان التقديم.';
+
+  @override
+  String get merchTableBooksNothing =>
+      'لا أجرة توصيل ولا عمولة — طلب الطاولة تجارة المتجر وحده.';
+
+  @override
+  String get merchTableActionServed => 'قُدِّم للطاولة';
+
+  @override
+  String get merchTableStatusReady => 'جاهز للتقديم';
+
+  @override
+  String get merchTableStatusServed => 'قُدِّم';
 }

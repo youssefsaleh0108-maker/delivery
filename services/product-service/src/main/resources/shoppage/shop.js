@@ -1,19 +1,27 @@
 /*
-  The only script on the shop page, and it may only ever hide things or mark them.
+  The only script on the shop page, and it may only ever show, hide or mark what the document
+  already arrived with.
 
   The rule to keep if this file is ever edited: nothing fetched, no markup built, no row the
   document did not arrive with. The whole catalogue is in the HTML the server sent, so a phone with
   scripting off, a phone that gave up on this file, a chat app's preview and a crawler all see the
   complete shelf. PublicShopPageFindingTest holds it to that by reading the served file.
 
-  Two things live here and neither is load-bearing: the search field, and the mark, the sideways
-  scroll and the arrow keys on a bar of section links that already navigates on its own.
+  Three things live here and none is load-bearing: the search field, the bar's mark and keys, and
+  the one sentence a shop with table ordering off owes a diner who scanned one of its cards.
 
   ES5 on purpose: the handset is whatever was to hand, and a syntax error in an old WebView takes
   the search box down with it. Comments are short for the same reason — this file crosses a 3G
   network, and ShopPageHtml, where the reasoning lives, does not.
 */
 (function () {
+  // The sentence only a scanned card is owed. Why it ships hidden: ShopPageHtml.orderWithTheStaff.
+  var off = document.querySelector('.bkoff');
+  if (off && new RegExp('[?&]' + (off.getAttribute('data-t') || 't') + '=[0-9]{1,3}(&|#|$)')
+      .test(window.location.search || '')) {
+    off.hidden = false;
+  }
+
   var menu = document.querySelector('.menu');
   if (!menu) { return; }
 

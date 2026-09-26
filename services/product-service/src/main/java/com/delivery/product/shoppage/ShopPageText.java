@@ -521,6 +521,73 @@ enum ShopPageText {
                         + "complete without it.";
     }
 
+    // ---------------------------------------------------------------- once it has been sent
+
+    /** On the button, while the order is on its way to the kitchen. */
+    String sending() {
+        return this == AR ? "يُرسل…" : "Sending…";
+    }
+
+    /** Over the rounds this phone has already sent from this table. */
+    String alreadySent() {
+        return this == AR ? "أرسلت من هذه الطاولة" : "Sent from this table";
+    }
+
+    /**
+     * Where a sent round's ticket has got to, in the diner's words rather than the kitchen's.
+     *
+     * <p>Keyed by the order service's own status, and spelled here so that the browser holds no
+     * dictionary and makes no decision: it looks up what the ticket says it is and prints the
+     * sentence. Several statuses share a sentence, because a diner waiting for hummus does not
+     * need to know the difference between a ticket the kitchen has accepted and one a rider would
+     * have collected — and the ones that would mean something else on a delivery are spelled for
+     * what they mean at a table. DELIVERED is food carried four metres.
+     *
+     * <p>Every status the lifecycle has is here. One that went unspelled would be a diner watching
+     * a blank line while their order moved.
+     */
+    String ticketStates() {
+        return this == AR
+                ? "PLACED=أُرسل إلى المطبخ. لم يُستلم بعد.|ACCEPTED=المطبخ استلم طلبك."
+                        + "|PREPARING=يُجهّز الآن.|READY=جاهز.|PICKED_UP=جاهز."
+                        + "|DELIVERED=قُدّم. بالهناء والشفاء.|CANCELLED=أُلغي هذا الطلب. "
+                        + "اسأل الموظفين."
+                : "PLACED=Sent to the kitchen. Not picked up yet.|ACCEPTED=The kitchen has your "
+                        + "order.|PREPARING=Being made now.|READY=Ready.|PICKED_UP=Ready."
+                        + "|DELIVERED=Served. Enjoy your meal.|CANCELLED=This order was cancelled. "
+                        + "Please ask the staff.";
+    }
+
+    /**
+     * Why a send did not become a ticket, in words, keyed by what the order service answered.
+     *
+     * <p><strong>Every one of these is shown to the diner.</strong> A send that goes nowhere and
+     * says nothing is the defect this page shipped with, and a silent disabled button is the same
+     * defect wearing a different hat. So each refusal the endpoint can give has a sentence here,
+     * including the two it is worth being honest about: {@code TOO_MANY}, which is the rate limit
+     * and clears on its own — a second tap inside twenty seconds meets it, and so does a genuine
+     * second round sent too quickly — and {@code FAILED}, which is everything else, including a
+     * request that never left the phone.
+     *
+     * <p>{@code PRICE_CHANGED} says what happened and stops there: the new total is on the pad by
+     * the time the diner reads it, because the page re-asks the quote rather than repeating a
+     * figure the kitchen has already disagreed with. The page never re-sends on its own.
+     */
+    String sendRefusals() {
+        return this == AR
+                ? "TOO_MANY=أُرسلت طلبات كثيرة من هذه الطاولة. انتظر لحظة ثم أرسل مرة أخرى."
+                        + "|REFUSED=لم يستطع المتجر استقبال هذا الطلب."
+                        + "|PRICE_CHANGED=تغيّر السعر. راجع المجموع الجديد ثم أرسل مرة أخرى."
+                        + "|FAILED=تعذّر إرسال طلبك الآن. حاول مرة أخرى أو اطلب من الموظفين."
+                        + "|GONE=لم تعد هناك تحديثات لهذا الطلب. اسأل الموظفين عنه."
+                : "TOO_MANY=That table has sent several orders just now. Wait a moment and send "
+                        + "again.|REFUSED=The shop could not take this order."
+                        + "|PRICE_CHANGED=The price changed. Check the new total and send again."
+                        + "|FAILED=Your order could not be sent just now. Try again, or order with "
+                        + "the staff.|GONE=There are no more updates for this order. Ask the staff "
+                        + "about it.";
+    }
+
 
     String howToOrder() {
         return this == AR ? "كيف تطلب" : "How to order";
